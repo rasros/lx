@@ -6,7 +6,7 @@
 
 **Converts files into simple Markdown-fenced blocks for easy use in LLM chats.**
 
-The goal is to make prompt setup **repeatable**. Instead of letting an agent guess context or manually selecting files in a UI, you define the exact context you want in one shell command and rerun it whenever you need a fresh session. It works smoothly with tools like `rg -l`, `fd`, and recursive shell globs.
+The goal is to make prompt setup **repeatable**. Instead of letting an agent guess context or manually selecting files in a UI, you define the exact context you want in one shell command and rerun it whenever you need a fresh session. It works smoothly with modern tools like `rg -l`, `fd`, and recursive shell globs.
 
 This gives you a stable, controllable workflow:
 
@@ -78,8 +78,8 @@ lx file.py | clip
 
 * Generates Markdown headers and fenced blocks for one or many files.
 * Automatically detects fenced-code language from file extension.
-* Supports lightweight, ergonomic slicing (`-h`, `-t`, `-n`).
-* Optional line numbers for precise AI instructions.
+* Supports simple licing (`-h`, `-t`, `-n`).
+* Optional line numbers.
 * Reads filenames from CLI args or stdin (great with `rg`, `find`, etc.).
 * Customizable delimiters with placeholders.
 
