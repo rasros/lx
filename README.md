@@ -45,6 +45,9 @@ cmd/lx/main.go (18 rows)
 ---
 ```go
 package main
+
+import (
+    "fmt"
 ... (rest omitted)
 ```
 ~~~
@@ -76,11 +79,11 @@ lx file.py | clip
 
 ## Features
 
-* Generates Markdown headers and fenced blocks for one or many files.
-* Automatically detects fenced-code language from file extension.
+* Generates Markdown headers for one or many files.
+* Automatically detects language from file extension.
 * Supports simple licing (`-h`, `-t`, `-n`).
-* Optional line numbers.
-* Reads filenames from CLI args or stdin (great with `rg`, `find`, etc.).
+* Optional line numbers when needed.
+* Reads filenames from CLI args or stdin.
 * Customizable delimiters with placeholders.
 
 ---
