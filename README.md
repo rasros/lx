@@ -6,7 +6,7 @@
 
 **Converts files into simple Markdown-fenced blocks for easy use in LLM chats.**
 
-The goal is to make prompt setup **repeatable**. Instead of letting an agent guess context or manually selecting files in a UI, you define the exact context you want in one shell command and rerun it whenever you need a fresh session. It works smoothly with modern tools like `rg -l`, `fd`, and recursive shell globs.
+The goal is to make prompt setup **repeatable** and **precise**. Instead of letting an agent guess context or manually selecting files in a UI, you define the exact context you want in one shell command and rerun it whenever you need a fresh session. It works smoothly with modern tools like `rg -l`, `fd` (or `grep` and `find`), and recursive shell globs.
 
 This gives you a stable, controllable workflow:
 
