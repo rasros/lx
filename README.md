@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rasros/lx)](https://goreportcard.com/report/github.com/rasros/lx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Converts files into simple Markdown-fenced blocks for easy use in LLM chats.**
+**`lx` is a CLI tool that formats lists of files into Markdown blocks for LLM chats.**
 
 The goal is to make prompt setup **repeatable** and **precise**. Instead of letting an agent guess context or manually selecting files in a UI, you define the exact context you want in one shell command and rerun it whenever you need a fresh session. It works smoothly with modern tools like `rg -l`, `fd` (or `grep` and `find`), and recursive shell globs.
 
