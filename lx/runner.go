@@ -4,61 +4,26 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
-	"strconv"
-	"strings"
-	"time"
+	"text/template"
 )
 
 type Runner struct {
-	Head             int
-	Tail             int
-	PrefixDelimiter  string
-	PostfixDelimiter string
-	LineNumbers      bool
+	Head        int
+	Tail        int
+	Template    *template.Template
+	LineNumbers bool
 }
 
-// platform-specific newline placeholder replacement
-var nl = func() string {
-	if runtime.GOOS == "windows" {
-		return "\r\n"
-	}
-	return "\n"
-}()
-
-// NewRunner constructs a Runner with default delimiters if none are provided.
-func NewRunner(head, tail int, prefix, postfix string, lineNumbers bool) Runner {
-	if prefix == "" {
-		prefix = "{filename} ({row_count} rows){n}---{n}```{language}{n}"
-	}
-	if postfix == "" {
-		postfix = "```{n}{n}"
-	}
-	return Runner{
-		Head:             head,
-		Tail:             tail,
-		PrefixDelimiter:  prefix,
-		PostfixDelimiter: postfix,
-		LineNumbers:      lineNumbers,
+func NewRunner(head, tail int, tmpl *template.Template, lineNumbers bool) *Runner {
+	return &Runner{
+		Head:        head,
+		Tail:        tail,
+		Template:    tmpl,
+		LineNumbers: lineNumbers,
 	}
 }
 
-func (r Runner) buildPrefix(path string, totalRows int, byteSize int64, lastMod, lang string) string {
-	prefix := r.PrefixDelimiter
-	prefix = strings.ReplaceAll(prefix, "{filename}", path)
-	prefix = strings.ReplaceAll(prefix, "{row_count}", strconv.Itoa(totalRows))
-	prefix = strings.ReplaceAll(prefix, "{byte_size}", strconv.FormatInt(byteSize, 10))
-	prefix = strings.ReplaceAll(prefix, "{last_modified}", lastMod)
-	prefix = strings.ReplaceAll(prefix, "{language}", lang)
-	prefix = strings.ReplaceAll(prefix, "{n}", nl)
-	return prefix
-}
-
-func (r Runner) buildPostfix() string {
-	return strings.ReplaceAll(r.PostfixDelimiter, "{n}", nl)
-}
-
-func (r Runner) runFile(path string, out io.Writer) error {
+func (r *Runner) runFile(path string, index, total int, out io.Writer) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("stat %q: %w", path, err)
@@ -69,38 +34,41 @@ func (r Runner) runFile(path string, out io.Writer) error {
 		return fmt.Errorf("read %q: %w", path, err)
 	}
 
-	view, totalRows := prepareView(data, r.Head, r.Tail)
+	var view []byte
+	var totalRows int
+	
+	isBin := IsBinaryData(data)
 
-	byteSize := info.Size()
-	lastMod := info.ModTime().Format(time.RFC3339)
-	lang := languageFromPath(path)
-
-	prefix := r.buildPrefix(path, totalRows, byteSize, lastMod, lang)
-
-	if _, err := out.Write([]byte(prefix)); err != nil {
-		return fmt.Errorf("write prefix: %w", err)
+	if !isBin {
+		view, totalRows = prepareView(data, r.Head, r.Tail)
+		if r.LineNumbers {
+			view = addLineNumbers(view, totalRows, r.Head, r.Tail)
+		}
 	}
 
-	var toWrite []byte
-	if r.LineNumbers {
-		toWrite = addLineNumbers(view, totalRows, r.Head, r.Tail)
-	} else {
-		toWrite = view
+	ctx := FileContext{
+		Path:       path,
+		Size:       info.Size(),
+		ModTime:    info.ModTime(),
+		TotalRows:  totalRows,
+		Language:   languageFromPath(path),
+		Content:    string(view),
+		IsBinary:   isBin,
+		FileIndex:  index,
+		TotalFiles: total,
 	}
 
-	if _, err := out.Write(toWrite); err != nil {
-		return fmt.Errorf("write data: %w", err)
-	}
-	if _, err := out.Write([]byte(r.buildPostfix())); err != nil {
-		return fmt.Errorf("write postfix: %w", err)
+	if err := r.Template.Execute(out, ctx); err != nil {
+		return fmt.Errorf("template exec: %w", err)
 	}
 
 	return nil
 }
 
-func (r Runner) Run(files []string, out io.Writer) error {
-	for _, path := range files {
-		if err := r.runFile(path, out); err != nil {
+func (r *Runner) Run(files []string, out io.Writer) error {
+	total := len(files)
+	for i, path := range files {
+		if err := r.runFile(path, i+1, total, out); err != nil {
 			return fmt.Errorf("lx: %w", err)
 		}
 	}

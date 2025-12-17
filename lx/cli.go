@@ -12,12 +12,9 @@ import (
 var Version = "(devel)"
 
 func init() {
-	// If ldflags already set Version (e.g. release builds), leave it unchanged.
 	if Version != "(devel)" {
 		return
 	}
-
-	// For go install
 	if info, ok := debug.ReadBuildInfo(); ok {
 		v := info.Main.Version
 		if v != "" && v != "(devel)" {
@@ -26,11 +23,9 @@ func init() {
 	}
 }
 
-// NewCommand builds the urfave/cli command for lx.
 func NewCommand() *ucli.Command {
 	var opts Options
 
-	// Make --help the only help flag (freeing -h for --head).
 	ucli.HelpFlag = &ucli.BoolFlag{
 		Name:        "help",
 		Usage:       "show help",
@@ -40,7 +35,7 @@ func NewCommand() *ucli.Command {
 
 	return &ucli.Command{
 		Name:    "lx",
-		Usage:   "print files with headers, delimiters, and optional head/tail slicing",
+		Usage:   "print files with headers, slicing, and go-templates",
 		Version: Version,
 
 		Flags: []ucli.Flag{
@@ -50,32 +45,23 @@ func NewCommand() *ucli.Command {
 				Usage:       "print first N lines (0 = no limit)",
 				Destination: &opts.Head,
 			},
-
 			&ucli.IntFlag{
 				Name:        "tail",
 				Aliases:     []string{"t"},
 				Usage:       "print last N lines (0 = no limit)",
 				Destination: &opts.Tail,
 			},
-
 			&ucli.IntFlag{
 				Name:        "n",
-				Usage:       "print N lines split between head and tail (0 = no limit)",
+				Usage:       "print N lines split between head and tail",
 				Destination: &opts.NBoth,
 			},
-
 			&ucli.StringFlag{
-				Name: "prefix-delimiter",
-				Usage: "string printed before file contents; placeholders: {filename}, {row_count}, " +
-					"{byte_size}, {last_modified}, {language}, {n}",
-				Destination: &opts.PrefixDelimiter,
+				Name:        "config",
+				Aliases:     []string{"f"},
+				Usage:       "path to yaml config file",
+				Destination: &opts.ConfigPath,
 			},
-			&ucli.StringFlag{
-				Name:        "postfix-delimiter",
-				Usage:       "string printed after file contents, see prefix-delimter for placeholders",
-				Destination: &opts.PostfixDelimiter,
-			},
-
 			&ucli.BoolFlag{
 				Name:        "line-numbers",
 				Aliases:     []string{"l"},
@@ -85,15 +71,12 @@ func NewCommand() *ucli.Command {
 		},
 
 		Action: func(ctx context.Context, cmd *ucli.Command) error {
-			// Track which flags were explicitly set to preserve override rules.
 			opts.HeadSet = cmd.IsSet("head")
 			opts.TailSet = cmd.IsSet("tail")
 			opts.NSet = cmd.IsSet("n")
 
-			// Start with filenames from CLI args.
 			files := cmd.Args().Slice()
 
-			// Add filenames from piped stdin (one per line), if any.
 			stdinFiles, err := readFilenamesFromStdin()
 			if err != nil {
 				return fmt.Errorf("lx: read stdin: %w", err)
@@ -106,7 +89,10 @@ func NewCommand() *ucli.Command {
 				return fmt.Errorf("lx: provide one or more file paths via args or stdin")
 			}
 
-			r := opts.Effective()
+			r, err := opts.Effective()
+			if err != nil {
+				return err
+			}
 
 			if err := r.Run(files, os.Stdout); err != nil {
 				return fmt.Errorf("lx: %w", err)
