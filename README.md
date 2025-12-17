@@ -4,9 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rasros/lx)](https://goreportcard.com/report/github.com/rasros/lx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Converts files into simple Markdown-fenced blocks for easy use in LLM chats.**
-
-The goal is to make prompt setup **repeatable**. Instead of letting an agent guess context or manually selecting files in a UI, you define the exact context you want in one shell command and rerun it whenever you need a fresh session. It works smoothly with tools like `rg -l`, `fd`, and recursive shell globs.
+The goal of `lx` is to make prompt setup **repeatable** and **precise**. Instead of letting an agent guess context or manually selecting files in a UI, you define the exact context you want in one shell command and rerun it whenever you need a fresh session. It works smoothly with modern tools like `rg -l`, `fd` (or `grep` and `find`), and recursive shell globs.
 
 This gives you a stable, controllable workflow:
 
@@ -45,6 +43,9 @@ cmd/lx/main.go (18 rows)
 ---
 ```go
 package main
+
+import (
+    "fmt"
 ... (rest omitted)
 ```
 ~~~
@@ -76,11 +77,11 @@ lx file.py | clip
 
 ## Features
 
-* Generates Markdown headers and fenced blocks for one or many files.
-* Automatically detects fenced-code language from file extension.
-* Supports lightweight, ergonomic slicing (`-h`, `-t`, `-n`).
-* Optional line numbers for precise AI instructions.
-* Reads filenames from CLI args or stdin (great with `rg`, `find`, etc.).
+* Generates Markdown headers for one or many files.
+* Automatically detects language from file extension.
+* Supports simple licing (`-h`, `-t`, `-n`).
+* Optional line numbers when needed.
+* Reads filenames from CLI args or stdin.
 * Customizable delimiters with placeholders.
 
 ---
