@@ -1,0 +1,28 @@
+# This is the default template (matches internal default)
+template: |
+  {{ if .IsBinary -}}
+  [{{ .FileIndex }}/{{ .TotalFiles }}] {{ .Path }} - binary file skipped ({{ .Size | humanize }})
+  {{ else -}}
+  [{{ .FileIndex }}/{{ .TotalFiles }}] {{ .Path }} ({{ .TotalRows }} rows)
+  ---
+  ```{{ .Language }}
+  {{ .Content | endNewline -}}
+  ```
+  {{ end -}}
+
+# Full feature template example
+# template: |
+# {{ if .IsBinary -}}
+# Binary file ({{ .FileIndex }} of {{ .TotalFiles }})
+# Path: {{ .Path }}
+# Size: {{ .Size | humanize }}
+# {{ else -}}
+# ================================================================================
+# FILE {{ .FileIndex }}/{{ .TotalFiles }}: {{ .Path }}
+# Meta: {{ .TotalRows }} lines | {{ .Size | humanize }} | {{ .Language }}
+# Time: {{ .ModTime | date "2006-01-02 15:04:05" }}
+# ================================================================================
+# ```{{ .Language }}
+# {{ .Content | endNewline -}}
+# ```
+# {{ end -}}

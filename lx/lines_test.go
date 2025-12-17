@@ -139,7 +139,7 @@ func TestSliceLines_TailOnly(t *testing.T) {
 }
 
 func TestSliceLines_HeadTailWithEllipsis(t *testing.T) {
-	input := []byte("a\nb\nc\nd\ne\n") // 5 lines
+	input := []byte("a\nb\nc\nd\ne\n")
 	got := sliceLines(input, 1, 2)
 	want := []byte("a\n... (2 rows skipped)\n" + "d\ne\n")
 	if !bytes.Equal(got, want) {
@@ -165,7 +165,6 @@ func TestSliceLines_TailCoversAll(t *testing.T) {
 
 func TestSliceLines_HeadTailCoverAll(t *testing.T) {
 	input := []byte("a\nb\nc\n")
-	// head + tail >= total lines, should return full data.
 	got := sliceLines(input, 1, 2)
 	if !bytes.Equal(got, input) {
 		t.Errorf("sliceLines head+tail cover all changed data: got %q, want %q", got, input)

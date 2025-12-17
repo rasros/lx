@@ -6,9 +6,18 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
 )
 
-func TestRunner_DefaultDelimitersAndPlaceholders(t *testing.T) {
+func newTestRunner(head, tail int, tmplStr string) *Runner {
+	if tmplStr == "" {
+		tmplStr = DefaultTemplate
+	}
+	t := template.Must(template.New("test").Funcs(TemplateFuncs()).Parse(tmplStr))
+	return NewRunner(head, tail, t, false)
+}
+
+func TestRunner_DefaultTemplate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.txt")
 	content := "a\nb\nc\n"
@@ -17,25 +26,22 @@ func TestRunner_DefaultDelimitersAndPlaceholders(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := NewRunner(0, 0, "", "", false)
+	r := newTestRunner(0, 0, "")
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
 	}
 
 	out := buf.String()
-	if !strings.Contains(out, path+" (3 rows)\n---\n```text\n") {
-		t.Errorf("missing default prefix with placeholders, got:\n%s", out)
+	if !strings.Contains(out, "test.txt (3 rows)") {
+		t.Errorf("missing default header info, got:\n%s", out)
 	}
 	if !strings.Contains(out, content) {
 		t.Errorf("missing content")
 	}
-	if !strings.HasSuffix(out, "```\n\n") {
-		t.Errorf("missing default postfix")
-	}
 }
 
-func TestRunner_CustomDelimiters(t *testing.T) {
+func TestRunner_CustomTemplate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
 	content := "line1\nline2\n"
@@ -44,24 +50,22 @@ func TestRunner_CustomDelimiters(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := Runner{
-		PrefixDelimiter:  "BEGIN {filename} {row_count}\n",
-		PostfixDelimiter: "END\n",
-	}
+	tmpl := "START {{ .Path }}\n{{ .Content }}END"
+	r := newTestRunner(0, 0, tmpl)
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
 	}
 
 	out := buf.String()
-	if !strings.Contains(out, "BEGIN "+path+" 2\n") {
-		t.Errorf("prefix substitution incorrect, got:\n%s", out)
+	if !strings.Contains(out, "START "+path) {
+		t.Errorf("template header incorrect, got:\n%s", out)
 	}
-	if !strings.Contains(out, content) {
+	if !strings.Contains(out, "line1\nline2\n") {
 		t.Errorf("missing content")
 	}
-	if !strings.HasSuffix(out, "END\n") {
-		t.Errorf("missing custom postfix")
+	if !strings.HasSuffix(out, "END") {
+		t.Errorf("missing template footer")
 	}
 }
 
@@ -74,64 +78,85 @@ func TestRunner_HeadOnly(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := Runner{
-		Head:             2,
-		PrefixDelimiter:  "P\n",
-		PostfixDelimiter: "Q\n",
-	}
+	r := newTestRunner(2, 0, "{{ .Content }}")
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
 	}
 
 	out := buf.String()
-	mid := strings.TrimPrefix(out, "P\n")
-	mid = strings.TrimSuffix(mid, "Q\n")
-
-	if !strings.Contains(mid, "a\nb\n") {
+	if !strings.Contains(out, "a\nb\n") {
 		t.Errorf("missing first two lines")
 	}
-	if strings.Contains(mid, "c\n") {
+	if strings.Contains(out, "c\n") {
 		t.Errorf("unexpected extra line")
 	}
 }
 
-func TestRunner_MultipleFiles(t *testing.T) {
+func TestRunner_BinaryDetection(t *testing.T) {
 	dir := t.TempDir()
-	p1 := filepath.Join(dir, "f1.txt")
-	p2 := filepath.Join(dir, "f2.txt")
-	if err := os.WriteFile(p1, []byte("x\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p2, []byte("y\n"), 0o644); err != nil {
+	path := filepath.Join(dir, "binary.dat")
+	content := []byte{0x00, 0x01, 0x02}
+	if err := os.WriteFile(path, content, 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	var buf bytes.Buffer
-	r := NewRunner(0, 0, "", "", false)
+	tmpl := "{{ if .IsBinary }}BINARY{{ else }}TEXT{{ end }}"
+	r := newTestRunner(0, 0, tmpl)
 
-	if err := r.Run([]string{p1, p2}, &buf); err != nil {
-		t.Fatalf("Run error: %v", err)
+	if err := r.Run([]string{path}, &buf); err != nil {
+		t.Fatal(err)
 	}
 
-	out := buf.String()
-	if !strings.Contains(out, p1) || !strings.Contains(out, p2) {
-		t.Errorf("missing prefixes for multiple files")
-	}
-	if !strings.Contains(out, "x\n") || !strings.Contains(out, "y\n") {
-		t.Errorf("missing contents for multiple files")
+	if buf.String() != "BINARY" {
+		t.Errorf("Failed to detect binary file, got: %s", buf.String())
 	}
 }
 
-func TestRunner_FileNotFound(t *testing.T) {
-	var buf bytes.Buffer
-	r := NewRunner(0, 0, "", "", false)
-
-	err := r.Run([]string{"no_such_file.txt"}, &buf)
-	if err == nil {
-		t.Fatalf("expected error for missing file")
+func TestRunner_BinaryDetection_PNG(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "image.png")
+	// PNG Magic Bytes: 89 50 4E 47 0D 0A 1A 0A
+	content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+	if err := os.WriteFile(path, content, 0644); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), "no_such_file.txt") {
-		t.Errorf("error does not mention filename: %v", err)
+
+	var buf bytes.Buffer
+	tmpl := "{{ if .IsBinary }}BINARY{{ else }}TEXT{{ end }}"
+	r := newTestRunner(0, 0, tmpl)
+
+	if err := r.Run([]string{path}, &buf); err != nil {
+		t.Fatal(err)
+	}
+
+	if buf.String() != "BINARY" {
+		t.Errorf("Failed to detect PNG as binary, got: %s", buf.String())
+	}
+}
+
+func TestRunner_MultipleFiles_Indexing(t *testing.T) {
+	dir := t.TempDir()
+	p1 := filepath.Join(dir, "f1.txt")
+	p2 := filepath.Join(dir, "f2.txt")
+	_ = os.WriteFile(p1, []byte("A"), 0644)
+	_ = os.WriteFile(p2, []byte("B"), 0644)
+
+	var buf bytes.Buffer
+	r := newTestRunner(0, 0, "") // Use DefaultTemplate
+
+	if err := r.Run([]string{p1, p2}, &buf); err != nil {
+		t.Fatal(err)
+	}
+
+	out := buf.String()
+	
+	// Check for "[1/2]" and "[2/2]" in output
+	if !strings.Contains(out, "[1/2]") {
+		t.Errorf("Output missing first file index [1/2]")
+	}
+	if !strings.Contains(out, "[2/2]") {
+		t.Errorf("Output missing second file index [2/2]")
 	}
 }

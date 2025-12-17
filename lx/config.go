@@ -1,6 +1,17 @@
 package lx
 
-// Options holds CLI-level configuration before effective values are derived.
+import (
+	"fmt"
+	"os"
+	"text/template"
+
+	"gopkg.in/yaml.v3"
+)
+
+type Config struct {
+	Template string `yaml:"template"`
+}
+
 type Options struct {
 	Head  int
 	Tail  int
@@ -10,28 +21,21 @@ type Options struct {
 	TailSet bool
 	NSet    bool
 
-	PrefixDelimiter  string
-	PostfixDelimiter string
-	LineNumbers      bool
+	ConfigPath  string
+	LineNumbers bool
 }
 
-// Effective derives a fully configured Runner from the options, applying
-// -n / --head / --tail override rules.
-func (o Options) Effective() Runner {
+func (o Options) Effective() (*Runner, error) {
 	effHead := o.Head
 	effTail := o.Tail
 
 	if o.NSet && o.NBoth > 0 {
 		total := o.NBoth
-
 		switch {
 		case !o.HeadSet && !o.TailSet:
-			// Pure -n N: split N between head and tail, head gets extra on odd N.
 			effHead = (total + 1) / 2
 			effTail = total / 2
-
 		case o.HeadSet && !o.TailSet:
-			// -n N with explicit --head: keep head, derive tail as the remainder.
 			h := o.Head
 			if h < 0 {
 				h = 0
@@ -41,9 +45,7 @@ func (o Options) Effective() Runner {
 			}
 			effHead = h
 			effTail = total - h
-
 		case !o.HeadSet && o.TailSet:
-			// -n N with explicit --tail: keep tail, derive head as the remainder.
 			t := o.Tail
 			if t < 0 {
 				t = 0
@@ -53,19 +55,44 @@ func (o Options) Effective() Runner {
 			}
 			effTail = t
 			effHead = total - t
-
-		case o.HeadSet && o.TailSet:
-			// Both explicitly set; respect them and let -n only be a shorthand
-			// for "I care about both ends" without overriding explicit values.
-			// effHead / effTail already initialized from o.Head / o.Tail.
 		}
+	}
+
+	tmplStr := DefaultTemplate
+	if o.ConfigPath != "" {
+		cfg, err := loadConfig(o.ConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("load config: %w", err)
+		}
+		if cfg.Template != "" {
+			tmplStr = cfg.Template
+		}
+	}
+
+	t, err := template.New("lx").Funcs(TemplateFuncs()).Parse(tmplStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse template: %w", err)
 	}
 
 	return NewRunner(
 		effHead,
 		effTail,
-		o.PrefixDelimiter,
-		o.PostfixDelimiter,
+		t,
 		o.LineNumbers,
-	)
+	), nil
+}
+
+func loadConfig(path string) (*Config, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var cfg Config
+	dec := yaml.NewDecoder(f)
+	if err := dec.Decode(&cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
 }
