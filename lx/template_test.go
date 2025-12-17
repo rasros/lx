@@ -1,9 +1,9 @@
 package lx
 
 import (
+	"bytes"
 	"testing"
 	"time"
-	"bytes"
 )
 
 func TestIsBinaryData(t *testing.T) {
@@ -73,7 +73,7 @@ func TestTemplateFuncs_EndNewline(t *testing.T) {
 
 func TestTemplateFuncs_Date(t *testing.T) {
 	dateFn := TemplateFuncs()["date"].(func(string, time.Time) string)
-	
+
 	ts := time.Date(2025, 12, 17, 14, 0, 0, 0, time.UTC)
 	got := dateFn("2006-01-02", ts)
 	if got != "2025-12-17" {

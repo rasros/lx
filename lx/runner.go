@@ -36,7 +36,7 @@ func (r *Runner) runFile(path string, index, total int, out io.Writer) error {
 
 	var view []byte
 	var totalRows int
-	
+
 	isBin := IsBinaryData(data)
 
 	if !isBin {
