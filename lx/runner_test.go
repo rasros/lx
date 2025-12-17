@@ -151,7 +151,7 @@ func TestRunner_MultipleFiles_Indexing(t *testing.T) {
 	}
 
 	out := buf.String()
-	
+
 	// Check for "[1/2]" and "[2/2]" in output
 	if !strings.Contains(out, "[1/2]") {
 		t.Errorf("Output missing first file index [1/2]")
