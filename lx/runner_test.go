@@ -114,49 +114,23 @@ func TestRunner_BinaryDetection(t *testing.T) {
 	}
 }
 
-func TestRunner_BinaryDetection_PNG(t *testing.T) {
+func TestRunner_RunFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "image.png")
-	// PNG Magic Bytes: 89 50 4E 47 0D 0A 1A 0A
-	content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
-	if err := os.WriteFile(path, content, 0644); err != nil {
+	path := filepath.Join(dir, "single.txt")
+	if err := os.WriteFile(path, []byte("data"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	var buf bytes.Buffer
-	tmpl := "{{ if .IsBinary }}BINARY{{ else }}TEXT{{ end }}"
-	r := newTestRunner(0, 0, tmpl)
+	r := newTestRunner(0, 0, "") // default template
 
-	if err := r.Run([]string{path}, &buf); err != nil {
-		t.Fatal(err)
-	}
-
-	if buf.String() != "BINARY" {
-		t.Errorf("Failed to detect PNG as binary, got: %s", buf.String())
-	}
-}
-
-func TestRunner_MultipleFiles_Indexing(t *testing.T) {
-	dir := t.TempDir()
-	p1 := filepath.Join(dir, "f1.txt")
-	p2 := filepath.Join(dir, "f2.txt")
-	_ = os.WriteFile(p1, []byte("A"), 0644)
-	_ = os.WriteFile(p2, []byte("B"), 0644)
-
-	var buf bytes.Buffer
-	r := newTestRunner(0, 0, "") // Use DefaultTemplate
-
-	if err := r.Run([]string{p1, p2}, &buf); err != nil {
-		t.Fatal(err)
+	err := r.RunFile(path, 42, 100, &buf)
+	if err != nil {
+		t.Fatalf("RunFile error: %v", err)
 	}
 
 	out := buf.String()
-
-	// Check for "[1/2]" and "[2/2]" in output
-	if !strings.Contains(out, "[1/2]") {
-		t.Errorf("Output missing first file index [1/2]")
-	}
-	if !strings.Contains(out, "[2/2]") {
-		t.Errorf("Output missing second file index [2/2]")
+	if !strings.Contains(out, "[42/100]") {
+		t.Errorf("Output missing file index [42/100], got:\n%s", out)
 	}
 }
