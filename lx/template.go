@@ -10,7 +10,6 @@ import (
 	"unicode/utf8"
 )
 
-// DefaultTemplate includes file numbering now.
 const DefaultTemplate = `{{ if .IsBinary }}` +
 	`[{{ .FileIndex }}/{{ .TotalFiles }}] {{ .Path }} - binary file skipped ({{ .Size | humanize }})` + "\n" +
 	`{{ else }}` +
@@ -43,6 +42,8 @@ type FileContext struct {
 	TotalFiles int
 }
 
+var sizeUnits = []string{"B", "kB", "MB", "GB", "TB"}
+
 func TemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"date": func(layout string, t time.Time) string {
@@ -59,10 +60,7 @@ func TemplateFuncs() template.FuncMap {
 			return fmt.Sprintf("%.1f %s", val, suffix)
 		},
 		"endNewline": func(s string) string {
-			if s == "" {
-				return s
-			}
-			if !strings.HasSuffix(s, "\n") {
+			if s != "" && !strings.HasSuffix(s, "\n") {
 				return s + "\n"
 			}
 			return s
