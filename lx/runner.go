@@ -23,7 +23,9 @@ func NewRunner(head, tail int, tmpl *template.Template, lineNumbers bool) *Runne
 	}
 }
 
-func (r *Runner) runFile(path string, index, total int, out io.Writer) error {
+// RunFile processes a single file with the current runner configuration.
+// It is exported to support interleaved argument parsing.
+func (r *Runner) RunFile(path string, index, total int, out io.Writer) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("stat %q: %w", path, err)
@@ -65,10 +67,11 @@ func (r *Runner) runFile(path string, index, total int, out io.Writer) error {
 	return nil
 }
 
+// Run processes a list of files using the current runner configuration.
 func (r *Runner) Run(files []string, out io.Writer) error {
 	total := len(files)
 	for i, path := range files {
-		if err := r.runFile(path, i+1, total, out); err != nil {
+		if err := r.RunFile(path, i+1, total, out); err != nil {
 			return fmt.Errorf("lx: %w", err)
 		}
 	}
