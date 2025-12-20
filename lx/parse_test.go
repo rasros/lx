@@ -2,6 +2,7 @@ package lx
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -24,6 +25,16 @@ func TestParse(t *testing.T) {
 	}{
 		// --- Success Cases ---
 		{
+			name: "double dash delimiter",
+			args: []string{"-h", "5", "--", "-file-with-dash.txt", "normal.txt"},
+			wantOps: []Op{
+				{Action: "head", Value: "5"},
+				{Action: "FILE", Value: "-file-with-dash.txt"},
+				{Action: "FILE", Value: "normal.txt"},
+			},
+			wantGlo: map[string]string{},
+		},
+		{
 			name: "sticky number",
 			args: []string{"-h5", "file.txt"},
 			wantOps: []Op{
@@ -33,9 +44,10 @@ func TestParse(t *testing.T) {
 			wantGlo: map[string]string{},
 		},
 		{
-			name: "joined bool flags",
-			args: []string{"-lv", "file.txt"},
+			name: "grouped bools with sticky number (-lvh5)",
+			args: []string{"-lvh5", "file.txt"},
 			wantOps: []Op{
+				{Action: "head", Value: "5"},
 				{Action: "FILE", Value: "file.txt"},
 			},
 			wantGlo: map[string]string{
@@ -44,24 +56,36 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name: "joined bool and sticky number",
-			args: []string{"-lh5", "file.txt"},
+			name: "grouped bools with sticky string (-lvfconfig.yaml)",
+			args: []string{"-lvfconfig.yaml", "main.go"},
+			wantOps: []Op{
+				{Action: "FILE", Value: "main.go"},
+			},
+			wantGlo: map[string]string{
+				"line-numbers": "true",
+				"verbose":      "true",
+				"config":       "config.yaml",
+			},
+		},
+		{
+			name:    "sticky string alone (-fconfig.yaml)",
+			args:    []string{"-fconfig.yaml"},
+			wantOps: []Op{},
+			wantGlo: map[string]string{
+				"config": "config.yaml",
+			},
+		},
+		{
+			name: "grouped bools space separated number (-lvh 5)",
+			args: []string{"-lvh", "5", "file.txt"},
 			wantOps: []Op{
 				{Action: "head", Value: "5"},
 				{Action: "FILE", Value: "file.txt"},
 			},
 			wantGlo: map[string]string{
 				"line-numbers": "true",
+				"verbose":      "true",
 			},
-		},
-		{
-			name: "space separated number",
-			args: []string{"-h", "5", "file.txt"},
-			wantOps: []Op{
-				{Action: "head", Value: "5"},
-				{Action: "FILE", Value: "file.txt"},
-			},
-			wantGlo: map[string]string{},
 		},
 		{
 			name: "long flag with equals",
@@ -71,16 +95,6 @@ func TestParse(t *testing.T) {
 				{Action: "FILE", Value: "file.go"},
 			},
 			wantGlo: map[string]string{},
-		},
-		{
-			name: "long flag space separated",
-			args: []string{"--config", "my.yaml", "main.go"},
-			wantOps: []Op{
-				{Action: "FILE", Value: "main.go"},
-			},
-			wantGlo: map[string]string{
-				"config": "my.yaml",
-			},
 		},
 
 		// --- Error Cases ---
@@ -109,10 +123,9 @@ func TestParse(t *testing.T) {
 			errSubstr: "flag --head requires a value",
 		},
 		{
-			name:    "invalid number format",
-			args:    []string{"-h", "foo"},
-			wantErr: true,
-			// FIXED: Expecting "--head" not "-head"
+			name:      "invalid number format inside sticky",
+			args:      []string{"-hfoo"},
+			wantErr:   true,
 			errSubstr: "flag --head expects a number, got \"foo\"",
 		},
 		{
@@ -120,18 +133,6 @@ func TestParse(t *testing.T) {
 			args:      []string{"--verbose=true"},
 			wantErr:   true,
 			errSubstr: "flag --verbose does not take a value",
-		},
-		{
-			name:      "sticky string disallowed (short)",
-			args:      []string{"-fconfig.yaml"},
-			wantErr:   true,
-			errSubstr: "does not support sticky/clustered values",
-		},
-		{
-			name:      "clustered string disallowed (short)",
-			args:      []string{"-lf", "config.yaml"},
-			wantErr:   true,
-			errSubstr: "does not support sticky/clustered values",
 		},
 	}
 
@@ -143,7 +144,7 @@ func TestParse(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("Parse() expected error, got nil")
-				} else if tt.errSubstr != "" && !contains(err.Error(), tt.errSubstr) {
+				} else if tt.errSubstr != "" && !strings.Contains(err.Error(), tt.errSubstr) {
 					t.Errorf("Parse() error = %q, want substr %q", err.Error(), tt.errSubstr)
 				}
 				return
@@ -164,13 +165,4 @@ func TestParse(t *testing.T) {
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	for i := 0; i < len(s)-len(substr)+1; i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
