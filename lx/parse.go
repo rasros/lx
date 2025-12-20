@@ -59,6 +59,14 @@ func Parse(args []string, defs []CommandDef) (*ParsedArgs, error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
+		// POSIX "--" delimiter: end of flags
+		if arg == "--" {
+			for j := i + 1; j < len(args); j++ {
+				res.Ops = append(res.Ops, Op{Action: "FILE", Value: args[j]})
+			}
+			break
+		}
+
 		if strings.HasPrefix(arg, "--") {
 			consumed, err := parseLong(arg, args, i, longMap, res)
 			if err != nil {
@@ -136,14 +144,9 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 			continue
 		}
 
-		// String flags cannot be sticky/clustered (e.g., -fval)
-		if def.ValueType == ValueAny && len(chars) > 1 {
-			return 0, fmt.Errorf("flag -%c does not support sticky/clustered values", char)
-		}
-
 		val := ""
 		if j+1 < len(chars) {
-			// Sticky value (e.g., -n5)
+			// Sticky value
 			val = string(chars[j+1:])
 		} else {
 			// Next arg value
