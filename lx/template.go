@@ -19,6 +19,10 @@ const DefaultTemplate = `{{ if .IsBinary }}` +
 {{ .Content | endNewline -}}` + "```\n" + `
 {{ end }}`
 
+const DefaultSectionTemplate = `
+### {{ .Name }}
+`
+
 func IsBinaryData(data []byte) bool {
 	limit := 1024
 	if len(data) < limit {
@@ -40,6 +44,10 @@ type FileContext struct {
 	IsBinary   bool
 	FileIndex  int
 	TotalFiles int
+}
+
+type SectionContext struct {
+	Name string
 }
 
 var sizeUnits = []string{"B", "kB", "MB", "GB", "TB"}

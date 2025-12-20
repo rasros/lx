@@ -32,6 +32,8 @@ var definitions = []CommandDef{
 	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print first N lines (0 = no limit)"},
 	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print last N lines (0 = no limit)"},
 	{Name: "n", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
+	{Name: "section", Short: "s", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print a section header"},
+	{Name: "prompt", Short: "p", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print custom text directly"},
 }
 
 func Run(ctx context.Context, args []string) error {
@@ -123,6 +125,18 @@ func processStream(parsed *ParsedArgs) error {
 			}
 			fileIndex++
 
+		case "section":
+			runner, err := opts.Effective()
+			if err != nil {
+				return err
+			}
+			if err := runner.RunSection(op.Value, os.Stdout); err != nil {
+				return err
+			}
+
+		case "prompt":
+			fmt.Fprintln(os.Stdout, op.Value)
+
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Head = val
@@ -159,17 +173,17 @@ USAGE:
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 INTERLEAVED COMMANDS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 EXAMPLE:
-   lx -h 5 file1.txt -t 2 file2.txt
-   (Prints 5 lines of file1, then 2 lines of file2)
+   lx -h 5 file1.txt -s "Next Section" -t 2 file2.txt
+   (Prints 5 lines of file1, a section header, then 2 lines of file2)
 `
 
 func printHelp() {

@@ -8,18 +8,20 @@ import (
 )
 
 type Runner struct {
-	Head        int
-	Tail        int
-	Template    *template.Template
-	LineNumbers bool
+	Head            int
+	Tail            int
+	Template        *template.Template
+	SectionTemplate *template.Template
+	LineNumbers     bool
 }
 
-func NewRunner(head, tail int, tmpl *template.Template, lineNumbers bool) *Runner {
+func NewRunner(head, tail int, tmpl, sectionTmpl *template.Template, lineNumbers bool) *Runner {
 	return &Runner{
-		Head:        head,
-		Tail:        tail,
-		Template:    tmpl,
-		LineNumbers: lineNumbers,
+		Head:            head,
+		Tail:            tail,
+		Template:        tmpl,
+		SectionTemplate: sectionTmpl,
+		LineNumbers:     lineNumbers,
 	}
 }
 
@@ -64,6 +66,17 @@ func (r *Runner) RunFile(path string, index, total int, out io.Writer) error {
 		return fmt.Errorf("template exec: %w", err)
 	}
 
+	return nil
+}
+
+// RunSection processes a section header with the current runner configuration.
+func (r *Runner) RunSection(name string, out io.Writer) error {
+	ctx := SectionContext{
+		Name: name,
+	}
+	if err := r.SectionTemplate.Execute(out, ctx); err != nil {
+		return fmt.Errorf("section template exec: %w", err)
+	}
 	return nil
 }
 
