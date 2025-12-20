@@ -38,11 +38,13 @@ func (r *Runner) RunFile(path string, index, total int, out io.Writer) error {
 
 	var view []byte
 	var totalRows int
+	var language string
 
 	isBin := IsBinaryData(data)
 
 	if !isBin {
 		view, totalRows = prepareView(data, r.Head, r.Tail)
+		language = DetectLanguage(path, data)
 		if r.LineNumbers {
 			view = addLineNumbers(view, totalRows, r.Head, r.Tail)
 		}
@@ -53,7 +55,7 @@ func (r *Runner) RunFile(path string, index, total int, out io.Writer) error {
 		Size:       info.Size(),
 		ModTime:    info.ModTime(),
 		TotalRows:  totalRows,
-		Language:   languageFromPath(path),
+		Language:   language,
 		Content:    string(view),
 		IsBinary:   isBin,
 		FileIndex:  index,
