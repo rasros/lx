@@ -103,15 +103,17 @@ func processStream(parsed *ParsedArgs) error {
 		opts.LineNumbers = true
 	}
 
+	ops := reorderTrailingOps(parsed.Ops)
+
 	totalFiles := 0
-	for _, op := range parsed.Ops {
+	for _, op := range ops {
 		if op.Action == "FILE" {
 			totalFiles++
 		}
 	}
 
 	fileIndex := 1
-	for _, op := range parsed.Ops {
+	for _, op := range ops {
 		switch op.Action {
 		case "FILE":
 			runner, err := opts.Effective()
@@ -151,6 +153,31 @@ func processStream(parsed *ParsedArgs) error {
 	return nil
 }
 
+// reorderTrailingOps moves configuration flags that appear after the LAST file
+// to immediately before that file.
+func reorderTrailingOps(ops []Op) []Op {
+	// Find the index of the last FILE operation
+	lastFileIdx := -1
+	for i := len(ops) - 1; i >= 0; i-- {
+		if ops[i].Action == "FILE" {
+			lastFileIdx = i
+			break
+		}
+	}
+
+	// If no file or file is already last, nothing to do
+	if lastFileIdx == -1 || lastFileIdx == len(ops)-1 {
+		return ops
+	}
+
+	newOps := make([]Op, 0, len(ops))
+	newOps = append(newOps, ops[:lastFileIdx]...)
+	newOps = append(newOps, ops[lastFileIdx+1:]...)
+	newOps = append(newOps, ops[lastFileIdx])
+
+	return newOps
+}
+
 const helpTmpl = `NAME:
    lx - print files with headers, slicing, and go-templates
 
@@ -159,12 +186,12 @@ USAGE:
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 INTERLEAVED COMMANDS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 EXAMPLE:

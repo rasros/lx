@@ -118,6 +118,17 @@ func TestRun_Integration(t *testing.T) {
 			},
 		},
 		{
+			name: "trailing flag logic (lx file -n1)",
+			args: []string{f1, "-n1"},
+			want: []string{
+				"1-one",
+			},
+			wantMissing: []string{
+				"1-two",
+				"1-three",
+			},
+		},
+		{
 			name: "flag state reset check",
 			// Ensure setting tail resets head (the bug we fixed)
 			args: []string{"--head", "1", f1, "--tail", "1", f1},
@@ -128,7 +139,6 @@ func TestRun_Integration(t *testing.T) {
 		},
 		{
 			name: "line numbers global",
-			// FIXED: Changed -h1 to --head 1 since -h short flag was removed
 			args: []string{"-l", "--head", "1", f1},
 			want: []string{
 				"1: 1-one",
