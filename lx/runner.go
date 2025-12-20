@@ -73,7 +73,7 @@ func (r Runner) runFile(path string, out io.Writer) error {
 
 	byteSize := info.Size()
 	lastMod := info.ModTime().Format(time.RFC3339)
-	lang := languageFromPath(path)
+	lang := DetectLanguage(path, data)
 
 	prefix := r.buildPrefix(path, totalRows, byteSize, lastMod, lang)
 
