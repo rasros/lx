@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Template        string `yaml:"template"`
 	SectionTemplate string `yaml:"section_template"`
+	PromptTemplate  string `yaml:"prompt_template"`
 }
 
 type Options struct {
@@ -61,6 +62,7 @@ func (o Options) Effective() (*Runner, error) {
 
 	tmplStr := DefaultTemplate
 	sectionTmplStr := DefaultSectionTemplate
+	promptTmplStr := DefaultPromptTemplate
 
 	if o.ConfigPath != "" {
 		cfg, err := loadConfig(o.ConfigPath)
@@ -73,23 +75,33 @@ func (o Options) Effective() (*Runner, error) {
 		if cfg.SectionTemplate != "" {
 			sectionTmplStr = cfg.SectionTemplate
 		}
+		if cfg.PromptTemplate != "" {
+			promptTmplStr = cfg.PromptTemplate
+		}
 	}
 
-	t, err := template.New("lx").Funcs(TemplateFuncs()).Parse(tmplStr)
+	funcs := TemplateFuncs()
+	tMain, err := template.New("lx").Funcs(funcs).Parse(tmplStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
 	}
 
-	st, err := template.New("section").Funcs(TemplateFuncs()).Parse(sectionTmplStr)
+	tSection, err := template.New("section").Funcs(funcs).Parse(sectionTmplStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse section template: %w", err)
+	}
+
+	tPrompt, err := template.New("prompt").Funcs(funcs).Parse(promptTmplStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse prompt template: %w", err)
 	}
 
 	return NewRunner(
 		effHead,
 		effTail,
-		t,
-		st,
+		tMain,
+		tSection,
+		tPrompt,
 		o.LineNumbers,
 	), nil
 }

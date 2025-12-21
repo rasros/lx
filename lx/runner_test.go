@@ -9,19 +9,17 @@ import (
 	"text/template"
 )
 
-// newTestRunner is a helper to create a Runner with compiled templates.
-func newTestRunner(head, tail int, tmplStr, sectionTmplStr string) *Runner {
+func newTestRunner(head, tail int, tmplStr string) *Runner {
 	if tmplStr == "" {
 		tmplStr = DefaultTemplate
 	}
-	if sectionTmplStr == "" {
-		sectionTmplStr = DefaultSectionTemplate
-	}
 
-	t := template.Must(template.New("test").Funcs(TemplateFuncs()).Parse(tmplStr))
-	st := template.Must(template.New("section").Funcs(TemplateFuncs()).Parse(sectionTmplStr))
+	funcs := TemplateFuncs()
+	tMain := template.Must(template.New("test").Funcs(funcs).Parse(tmplStr))
+	tSection := template.Must(template.New("section").Funcs(funcs).Parse(DefaultSectionTemplate))
+	tPrompt := template.Must(template.New("prompt").Funcs(funcs).Parse(DefaultPromptTemplate))
 
-	return NewRunner(head, tail, t, st, false)
+	return NewRunner(head, tail, tMain, tSection, tPrompt, false)
 }
 
 func TestRunner_DefaultTemplate(t *testing.T) {
@@ -33,7 +31,7 @@ func TestRunner_DefaultTemplate(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := newTestRunner(0, 0, "", "")
+	r := newTestRunner(0, 0, "")
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
@@ -48,6 +46,26 @@ func TestRunner_DefaultTemplate(t *testing.T) {
 	}
 }
 
+func TestRunner_EmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "empty.txt")
+	if err := os.WriteFile(path, []byte{}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	r := newTestRunner(0, 0, "")
+
+	if err := r.Run([]string{path}, &buf); err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "empty.txt - empty file") {
+		t.Errorf("Expected 'empty file' notice, got:\n%s", out)
+	}
+}
+
 func TestRunner_CustomTemplate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
@@ -58,7 +76,7 @@ func TestRunner_CustomTemplate(t *testing.T) {
 
 	var buf bytes.Buffer
 	tmpl := "START {{ .Path }}\n{{ .Content }}END"
-	r := newTestRunner(0, 0, tmpl, "")
+	r := newTestRunner(0, 0, tmpl)
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
@@ -85,7 +103,7 @@ func TestRunner_HeadOnly(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := newTestRunner(2, 0, "{{ .Content }}", "")
+	r := newTestRunner(2, 0, "{{ .Content }}")
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
@@ -110,7 +128,7 @@ func TestRunner_BinaryDetection(t *testing.T) {
 
 	var buf bytes.Buffer
 	tmpl := "{{ if .IsBinary }}BINARY{{ else }}TEXT{{ end }}"
-	r := newTestRunner(0, 0, tmpl, "")
+	r := newTestRunner(0, 0, tmpl)
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatal(err)
@@ -129,9 +147,9 @@ func TestRunner_RunFile(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := newTestRunner(0, 0, "", "") // default templates
+	r := newTestRunner(0, 0, "") // default template
 
-	err := r.RunFile(path, 42, 100, &buf)
+	_, err := r.RunFile(path, 42, 100, false, &buf)
 	if err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
@@ -142,54 +160,25 @@ func TestRunner_RunFile(t *testing.T) {
 	}
 }
 
-func TestRunner_RunSection(t *testing.T) {
+func TestRunner_Spacing(t *testing.T) {
+	dir := t.TempDir()
+	empty := filepath.Join(dir, "empty")
+	text := filepath.Join(dir, "text")
+	_ = os.WriteFile(empty, []byte{}, 0644)
+	_ = os.WriteFile(text, []byte("content"), 0644)
+
 	var buf bytes.Buffer
+	r := newTestRunner(0, 0, "")
 
-	// Define a custom section template
-	sectionTmpl := ">>> {{ .Name }} <<<"
-
-	r := newTestRunner(0, 0, "", sectionTmpl)
-
-	if err := r.RunSection("Environment Setup", &buf); err != nil {
-		t.Fatalf("RunSection error: %v", err)
+	// Run: empty (compact) -> text (block)
+	// Expect gap
+	if err := r.Run([]string{empty, text}, &buf); err != nil {
+		t.Fatal(err)
 	}
 
-	// Expect two newlines at the end to form a blank row
-	want := ">>> Environment Setup <<<\n\n"
-	if buf.String() != want {
-		t.Errorf("RunSection output = %q, want %q", buf.String(), want)
-	}
-}
-
-func TestRunner_RunPrompt_AddsBlankRow(t *testing.T) {
-	var buf bytes.Buffer
-	r := newTestRunner(0, 0, "", "")
-
-	// Case 1: No newline provided -> adds \n\n
-	if err := r.RunPrompt("Hello", &buf); err != nil {
-		t.Fatalf("RunPrompt error: %v", err)
-	}
-	if buf.String() != "Hello\n\n" {
-		t.Errorf("RunPrompt(Hello) = %q, want %q", buf.String(), "Hello\\n\\n")
-	}
-
-	buf.Reset()
-
-	// Case 2: Newline already exists -> adds one \n to make it \n\n
-	if err := r.RunPrompt("World\n", &buf); err != nil {
-		t.Fatalf("RunPrompt error: %v", err)
-	}
-	if buf.String() != "World\n\n" {
-		t.Errorf("RunPrompt(World\\n) = %q, want %q", buf.String(), "World\\n\\n")
-	}
-
-	buf.Reset()
-
-	// Case 3: Two newlines exist -> leaves it alone
-	if err := r.RunPrompt("Done\n\n", &buf); err != nil {
-		t.Fatalf("RunPrompt error: %v", err)
-	}
-	if buf.String() != "Done\n\n" {
-		t.Errorf("RunPrompt(Done\\n\\n) = %q, want %q", buf.String(), "Done\\n\\n")
+	out := buf.String()
+	// Check for gap between empty and text
+	if !strings.Contains(out, "empty file\n\n") {
+		t.Errorf("Missing gap between empty and text file. Got:\n%q", out)
 	}
 }

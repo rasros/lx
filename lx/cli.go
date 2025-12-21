@@ -24,16 +24,22 @@ func init() {
 }
 
 var definitions = []CommandDef{
-	{Name: "config", Short: "f", Type: CmdGlobal, ValueType: ValueAny, Usage: "path to yaml config file"},
-	{Name: "line-numbers", Short: "l", Type: CmdGlobal, ValueType: ValueNone, Usage: "print line numbers"},
-	{Name: "version", Short: "v", Type: CmdGlobal, ValueType: ValueNone, Usage: "print the version"},
+	// Global Config
+	{Name: "config", Short: "y", Type: CmdGlobal, ValueType: ValueAny, Usage: "path to yaml config file"},
+	{Name: "version", Short: "V", Type: CmdGlobal, ValueType: ValueNone, Usage: "print the version"},
 	{Name: "help", Short: "h", Type: CmdGlobal, ValueType: ValueNone, Usage: "show help"},
 
+	// Interleaved Options
+	{Name: "line-numbers", Short: "l", Type: CmdInterleaved, ValueType: ValueNone, Usage: "print line numbers"},
+	{Name: "no-line-numbers", Short: "L", Type: CmdInterleaved, ValueType: ValueNone, Usage: "don't print line numbers"},
 	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print first N lines (0 = no limit)"},
 	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print last N lines (0 = no limit)"},
 	{Name: "n", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
-	{Name: "section", Short: "s", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print a section header"},
-	{Name: "prompt", Short: "p", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print custom text directly"},
+
+	// Actions
+	{Name: "file", Short: "f", Type: CmdAction, ValueType: ValueAny, Usage: "explicit file path"},
+	{Name: "section", Short: "s", Type: CmdAction, ValueType: ValueAny, Usage: "print a section header"},
+	{Name: "prompt", Short: "p", Type: CmdAction, ValueType: ValueAny, Usage: "print custom text directly"},
 }
 
 func Run(ctx context.Context, args []string) error {
@@ -71,26 +77,26 @@ func handleGlobals(parsed *ParsedArgs) bool {
 }
 
 func gatherInputs(parsed *ParsedArgs) error {
-	hasFiles := false
+	hasFilesOrGenerators := false
 	for _, op := range parsed.Ops {
-		if op.Action == "FILE" {
-			hasFiles = true
+		if op.Action == "FILE" || op.Action == "file" || op.Action == "section" || op.Action == "prompt" {
+			hasFilesOrGenerators = true
 			break
 		}
 	}
 
-	if !hasFiles {
+	if !hasFilesOrGenerators {
 		stdinFiles, err := readFilenamesFromStdin()
 		if err != nil {
 			return fmt.Errorf("read stdin: %w", err)
 		}
 		for _, f := range stdinFiles {
-			parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f})
-			hasFiles = true
+			parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f, Type: CmdAction})
+			hasFilesOrGenerators = true
 		}
 	}
 
-	if !hasFiles {
+	if !hasFilesOrGenerators {
 		return fmt.Errorf("no input files provided")
 	}
 	return nil
@@ -101,30 +107,41 @@ func processStream(parsed *ParsedArgs) error {
 	if cfg, ok := parsed.Globals["config"]; ok {
 		opts.ConfigPath = cfg
 	}
-	if _, ok := parsed.Globals["line-numbers"]; ok {
-		opts.LineNumbers = true
-	}
 
 	ops := reorderTrailingOps(parsed.Ops)
 
+	// --- Pass 1: Validate all inputs ---
+	for _, op := range ops {
+		if op.Action == "FILE" || op.Action == "file" {
+			if _, err := os.Stat(op.Value); err != nil {
+				return fmt.Errorf("stat %q: %w", op.Value, err)
+			}
+		}
+	}
+
+	// --- Pass 2: Execute and Print ---
 	totalFiles := 0
 	for _, op := range ops {
-		if op.Action == "FILE" {
+		if op.Action == "FILE" || op.Action == "file" {
 			totalFiles++
 		}
 	}
 
 	fileIndex := 1
+	prevCompact := false // Track if previous output was a compact line
+
 	for _, op := range ops {
 		switch op.Action {
-		case "FILE":
+		case "FILE", "file":
 			runner, err := opts.Effective()
 			if err != nil {
 				return err
 			}
-			if err := runner.RunFile(op.Value, fileIndex, totalFiles, os.Stdout); err != nil {
+			isCompact, err := runner.RunFile(op.Value, fileIndex, totalFiles, prevCompact, os.Stdout)
+			if err != nil {
 				return err
 			}
+			prevCompact = isCompact
 			fileIndex++
 
 		case "section":
@@ -132,81 +149,94 @@ func processStream(parsed *ParsedArgs) error {
 			if err != nil {
 				return err
 			}
+			if prevCompact {
+				fmt.Fprintln(os.Stdout)
+			}
 			if err := runner.RunSection(op.Value, os.Stdout); err != nil {
 				return err
 			}
+			prevCompact = false
 
 		case "prompt":
 			runner, err := opts.Effective()
 			if err != nil {
 				return err
 			}
+			if prevCompact {
+				fmt.Fprintln(os.Stdout)
+			}
 			if err := runner.RunPrompt(op.Value, os.Stdout); err != nil {
 				return err
 			}
+			prevCompact = false
 
+		case "line-numbers":
+			opts.LineNumbers = true
+		case "no-line-numbers":
+			opts.LineNumbers = false
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Head = val
 			opts.HeadSet = true
-			// Reset tail/N
 			opts.Tail, opts.TailSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
-
 		case "tail":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Tail = val
 			opts.TailSet = true
-			// Reset head/N
 			opts.Head, opts.HeadSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
-
 		case "n":
 			val, _ := strconv.Atoi(op.Value)
 			opts.NBoth = val
 			opts.NSet = true
-			// Reset head/tail
 			opts.HeadSet = false
 			opts.TailSet = false
 		}
 	}
+
+	// If the stream ends with a compact file (which only prints \n),
+	// add one more newline to visually separate it from the shell prompt.
+	if prevCompact {
+		fmt.Fprintln(os.Stdout)
+	}
+
 	return nil
 }
 
-// reorderTrailingOps moves configuration flags that appear after the LAST file
-// to immediately before that file, BUT leaves "action" flags (section/prompt) in place.
 func reorderTrailingOps(ops []Op) []Op {
-	// Find the index of the last FILE operation
-	lastFileIdx := -1
+	lastActionIdx := -1
 	for i := len(ops) - 1; i >= 0; i-- {
-		if ops[i].Action == "FILE" {
-			lastFileIdx = i
+		if ops[i].Type == CmdAction {
+			lastActionIdx = i
 			break
 		}
 	}
 
-	// If no file or file is already last, nothing to do
-	if lastFileIdx == -1 || lastFileIdx == len(ops)-1 {
+	if lastActionIdx == -1 || lastActionIdx == len(ops)-1 {
 		return ops
 	}
 
-	var toMove []Op // Config flags (head, tail, n)
-	var toStay []Op // Action flags (section, prompt)
+	modifiers := make([]Op, 0)
+	others := make([]Op, 0)
 
-	for _, op := range ops[lastFileIdx+1:] {
-		switch op.Action {
-		case "head", "tail", "n":
-			toMove = append(toMove, op)
-		default:
-			toStay = append(toStay, op)
+	for _, op := range ops[lastActionIdx+1:] {
+		if op.Type == CmdInterleaved {
+			modifiers = append(modifiers, op)
+		} else {
+			others = append(others, op)
 		}
 	}
 
+	if len(modifiers) == 0 {
+		return ops
+	}
+
 	newOps := make([]Op, 0, len(ops))
-	newOps = append(newOps, ops[:lastFileIdx]...) // Everything before last file
-	newOps = append(newOps, toMove...)            // Config flags moved before
-	newOps = append(newOps, ops[lastFileIdx])     // The last file
-	newOps = append(newOps, toStay...)            // Action flags stayed after
+	newOps = append(newOps, ops[:lastActionIdx]...)
+	newOps = append(newOps, modifiers...)
+	newOps = append(newOps, ops[lastActionIdx])
+	newOps = append(newOps, others...)
 
 	return newOps
 }
@@ -215,38 +245,47 @@ const helpTmpl = `NAME:
    lx - print files with headers, slicing, and go-templates
 
 USAGE:
-   lx [global options] [command state options] [files...]
+   lx [global options] [command state options] [files/actions...]
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
-INTERLEAVED COMMANDS (apply to subsequent files):
+INTERLEAVED OPTIONS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+{{- end }}
+
+ACTIONS (executed in order):
+{{- range .Actions }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 EXAMPLE:
-   lx -h 5 file1.txt -s "Next Section" -t 2 file2.txt
+   lx -h 5 file1.txt -s "Section 2" -t 2 file2.txt
    (Prints 5 lines of file1, a section header, then 2 lines of file2)
 `
 
 func printHelp() {
-	var globals, interleaved []CommandDef
+	var globals, interleaved, actions []CommandDef
 
 	for _, d := range definitions {
-		if d.Type == CmdGlobal {
+		switch d.Type {
+		case CmdGlobal:
 			globals = append(globals, d)
-		} else {
+		case CmdInterleaved:
 			interleaved = append(interleaved, d)
+		case CmdAction:
+			actions = append(actions, d)
 		}
 	}
 
 	data := struct {
 		Globals     []CommandDef
 		Interleaved []CommandDef
-	}{globals, interleaved}
+		Actions     []CommandDef
+	}{globals, interleaved, actions}
 
 	t := template.Must(template.New("help").Parse(helpTmpl))
 	if err := t.Execute(os.Stdout, data); err != nil {
