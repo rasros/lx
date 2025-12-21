@@ -24,22 +24,22 @@ func init() {
 }
 
 var definitions = []CommandDef{
+	// Global Config
 	{Name: "config", Short: "y", Type: CmdGlobal, ValueType: ValueAny, Usage: "path to yaml config file"},
 	{Name: "version", Short: "V", Type: CmdGlobal, ValueType: ValueNone, Usage: "print the version"},
 	{Name: "help", Short: "h", Type: CmdGlobal, ValueType: ValueNone, Usage: "show help"},
 
-	// Toggles
-	{Name: "line-numbers", Short: "l", Type: CmdGlobal, ValueType: ValueNone, Usage: "print line numbers"},
-	{Name: "no-line-numbers", Short: "L", Type: CmdGlobal, ValueType: ValueNone, Usage: "don't print line numbers"},
-
-	// Interleaved - State
+	// Interleaved Options
+	{Name: "line-numbers", Short: "l", Type: CmdInterleaved, ValueType: ValueNone, Usage: "print line numbers"},
+	{Name: "no-line-numbers", Short: "L", Type: CmdInterleaved, ValueType: ValueNone, Usage: "don't print line numbers"},
 	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print first N lines (0 = no limit)"},
 	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print last N lines (0 = no limit)"},
 	{Name: "n", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
 
-	// Interleaved - Actions
-	{Name: "section", Short: "s", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print a section header"},
-	{Name: "prompt", Short: "p", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print custom text directly"},
+	// Print Actions
+	{Name: "file", Short: "f", Type: CmdAction, ValueType: ValueAny, Usage: "explicit file path"},
+	{Name: "section", Short: "s", Type: CmdAction, ValueType: ValueAny, Usage: "print a section header"},
+	{Name: "prompt", Short: "p", Type: CmdAction, ValueType: ValueAny, Usage: "print custom text directly"},
 }
 
 func Run(ctx context.Context, args []string) error {
@@ -79,7 +79,7 @@ func handleGlobals(parsed *ParsedArgs) bool {
 func gatherInputs(parsed *ParsedArgs) error {
 	hasFilesOrGenerators := false
 	for _, op := range parsed.Ops {
-		if op.Action == "FILE" || op.Action == "section" || op.Action == "prompt" {
+		if op.Action == "FILE" || op.Action == "file" || op.Action == "section" || op.Action == "prompt" {
 			hasFilesOrGenerators = true
 			break
 		}
@@ -91,7 +91,7 @@ func gatherInputs(parsed *ParsedArgs) error {
 			return fmt.Errorf("read stdin: %w", err)
 		}
 		for _, f := range stdinFiles {
-			parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f})
+			parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f, Type: CmdAction})
 			hasFilesOrGenerators = true
 		}
 	}
@@ -108,19 +108,11 @@ func processStream(parsed *ParsedArgs) error {
 		opts.ConfigPath = cfg
 	}
 
-	if _, ok := parsed.Globals["no-line-numbers"]; ok {
-		opts.LineNumbers = false
-	}
-	if _, ok := parsed.Globals["line-numbers"]; ok {
-		opts.LineNumbers = true
-	}
-
 	ops := reorderTrailingOps(parsed.Ops)
 
 	// --- Pass 1: Validate all inputs ---
-	// We strictly check that all files exist before printing a single byte.
 	for _, op := range ops {
-		if op.Action == "FILE" {
+		if op.Action == "FILE" || op.Action == "file" {
 			if _, err := os.Stat(op.Value); err != nil {
 				return fmt.Errorf("stat %q: %w", op.Value, err)
 			}
@@ -130,7 +122,7 @@ func processStream(parsed *ParsedArgs) error {
 	// --- Pass 2: Execute and Print ---
 	totalFiles := 0
 	for _, op := range ops {
-		if op.Action == "FILE" {
+		if op.Action == "FILE" || op.Action == "file" {
 			totalFiles++
 		}
 	}
@@ -138,7 +130,7 @@ func processStream(parsed *ParsedArgs) error {
 	fileIndex := 1
 	for _, op := range ops {
 		switch op.Action {
-		case "FILE":
+		case "FILE", "file":
 			runner, err := opts.Effective()
 			if err != nil {
 				return err
@@ -166,6 +158,12 @@ func processStream(parsed *ParsedArgs) error {
 				return err
 			}
 
+		case "line-numbers":
+			opts.LineNumbers = true
+
+		case "no-line-numbers":
+			opts.LineNumbers = false
+
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Head = val
@@ -191,24 +189,46 @@ func processStream(parsed *ParsedArgs) error {
 	return nil
 }
 
-// ... (reorderTrailingOps and helpTmpl/printHelp remain the same) ...
+// reorderTrailingOps moves State Modifier flags (CmdInterleaved) that appear
+// after the LAST Action (FILE, file, section, prompt) to immediately before that Action.
 func reorderTrailingOps(ops []Op) []Op {
-	lastFileIdx := -1
+	// Find the index of the last Action
+	lastActionIdx := -1
 	for i := len(ops) - 1; i >= 0; i-- {
-		if ops[i].Action == "FILE" {
-			lastFileIdx = i
+		if ops[i].Type == CmdAction {
+			lastActionIdx = i
 			break
 		}
 	}
 
-	if lastFileIdx == -1 || lastFileIdx == len(ops)-1 {
+	// If no action or action is already last, nothing to do
+	if lastActionIdx == -1 || lastActionIdx == len(ops)-1 {
 		return ops
 	}
 
+	// Separate modifiers (to move) from others (to stay)
+	modifiers := make([]Op, 0)
+	others := make([]Op, 0)
+
+	for _, op := range ops[lastActionIdx+1:] {
+		if op.Type == CmdInterleaved {
+			modifiers = append(modifiers, op)
+		} else {
+			others = append(others, op)
+		}
+	}
+
+	// If no modifiers to move, return original
+	if len(modifiers) == 0 {
+		return ops
+	}
+
+	// Reconstruct: Prefix + Modifiers + Action + Others
 	newOps := make([]Op, 0, len(ops))
-	newOps = append(newOps, ops[:lastFileIdx]...)
-	newOps = append(newOps, ops[lastFileIdx+1:]...)
-	newOps = append(newOps, ops[lastFileIdx])
+	newOps = append(newOps, ops[:lastActionIdx]...)
+	newOps = append(newOps, modifiers...)
+	newOps = append(newOps, ops[lastActionIdx])
+	newOps = append(newOps, others...)
 
 	return newOps
 }
@@ -217,15 +237,20 @@ const helpTmpl = `NAME:
    lx - print files with headers, slicing, and go-templates
 
 USAGE:
-   lx [global options] [command state options] [files...]
+   lx [global options] [command state options] [files/actions...]
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
    --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
-INTERLEAVED COMMANDS (apply to subsequent files):
+INTERLEAVED OPTIONS (apply to subsequent files):
 {{- range .Interleaved }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+{{- end }}
+
+ACTIONS (executed in order):
+{{- range .Actions }}
    --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
@@ -235,20 +260,24 @@ EXAMPLE:
 `
 
 func printHelp() {
-	var globals, interleaved []CommandDef
+	var globals, interleaved, actions []CommandDef
 
 	for _, d := range definitions {
-		if d.Type == CmdGlobal {
+		switch d.Type {
+		case CmdGlobal:
 			globals = append(globals, d)
-		} else {
+		case CmdInterleaved:
 			interleaved = append(interleaved, d)
+		case CmdAction:
+			actions = append(actions, d)
 		}
 	}
 
 	data := struct {
 		Globals     []CommandDef
 		Interleaved []CommandDef
-	}{globals, interleaved}
+		Actions     []CommandDef
+	}{globals, interleaved, actions}
 
 	t := template.Must(template.New("help").Parse(helpTmpl))
 	if err := t.Execute(os.Stdout, data); err != nil {

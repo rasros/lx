@@ -112,6 +112,23 @@ func TestRun_Integration(t *testing.T) {
 			},
 		},
 		{
+			name:        "explicit file flag (-f)",
+			args:        []string{"-f", f1, "-n1"},
+			want:        []string{"1-one"},
+			wantMissing: []string{"1-two"},
+		},
+		{
+			name: "explicit file flag mixed with implicit",
+			args: []string{f1, "-f", f2},
+			want: []string{"1-one", "2-A"},
+		},
+		{
+			name:        "trailing flag logic with -f (lx -f file -n1)",
+			args:        []string{"-f", f1, "-n1"},
+			want:        []string{"1-one"},
+			wantMissing: []string{"1-two"},
+		},
+		{
 			name: "sticky flags logic",
 			args: []string{"-n2", f2},
 			want: []string{
@@ -134,6 +151,14 @@ func TestRun_Integration(t *testing.T) {
 			},
 		},
 		{
+			name: "trailing prompt (lx file -p msg) should NOT move prompt before file",
+			args: []string{f1, "-p", "POST_PROMPT"},
+			want: []string{
+				"1-one",
+				"POST_PROMPT",
+			},
+		},
+		{
 			name: "section header and prompt",
 			args: []string{"-s", "MY HEADER", "-p", "MY PROMPT", f1},
 			want: []string{
@@ -151,8 +176,6 @@ func TestRun_Integration(t *testing.T) {
 		},
 		{
 			name: "line numbers precedence (explicit -l wins over -L)",
-			// Implementation detail: we check -L first, then -l overwrites it.
-			// So -L -l results in line numbers.
 			args: []string{"-L", "-l", f1},
 			want: []string{
 				"1: 1-one",
@@ -160,8 +183,6 @@ func TestRun_Integration(t *testing.T) {
 		},
 		{
 			name: "line numbers precedence (explicit -l wins over -L regardless of order)",
-			// Even if -l is first in args, the map doesn't preserve order,
-			// but our logic checks L then l, so L is overwritten.
 			args: []string{"-l", "-L", f1},
 			want: []string{
 				"1: 1-one",
@@ -179,12 +200,13 @@ func TestRun_Integration(t *testing.T) {
 		},
 		{
 			name: "config flag alias (-y)",
-			// We can't easily test valid yaml loading here without a file,
-			// but we can test that the flag is parsed and passed effectively.
-			// For now, just ensure it runs without crashing on argument parsing.
 			args: []string{"-y", "missing.yaml", f1},
-			// It might fail on file open inside Run, which returns error.
-			// Let's expect it to fail:
+			// Expect failure handled in loop
+		},
+		{
+			name: "missing file check before output",
+			args: []string{f1, "non_existent_file"},
+			// Expect failure handled in loop
 		},
 	}
 
@@ -198,6 +220,16 @@ func TestRun_Integration(t *testing.T) {
 			if tt.name == "config flag alias (-y)" {
 				if err == nil {
 					t.Errorf("Expected error for missing config file, got nil")
+				}
+				return
+			}
+			// Special handling for missing file test
+			if tt.name == "missing file check before output" {
+				if err == nil {
+					t.Errorf("Expected error for non-existent file, got nil")
+				}
+				if strings.Contains(out, "1-one") {
+					t.Errorf("Should not have printed f1 content when a subsequent file is missing")
 				}
 				return
 			}

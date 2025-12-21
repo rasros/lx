@@ -28,9 +28,9 @@ func TestParse(t *testing.T) {
 			name: "double dash delimiter",
 			args: []string{"-h", "5", "--", "-file-with-dash.txt", "normal.txt"},
 			wantOps: []Op{
-				{Action: "head", Value: "5"},
-				{Action: "FILE", Value: "-file-with-dash.txt"},
-				{Action: "FILE", Value: "normal.txt"},
+				{Action: "head", Value: "5", Type: CmdInterleaved},
+				{Action: "FILE", Value: "-file-with-dash.txt", Type: CmdAction},
+				{Action: "FILE", Value: "normal.txt", Type: CmdAction},
 			},
 			wantGlo: map[string]string{},
 		},
@@ -38,8 +38,8 @@ func TestParse(t *testing.T) {
 			name: "sticky number",
 			args: []string{"-h5", "file.txt"},
 			wantOps: []Op{
-				{Action: "head", Value: "5"},
-				{Action: "FILE", Value: "file.txt"},
+				{Action: "head", Value: "5", Type: CmdInterleaved},
+				{Action: "FILE", Value: "file.txt", Type: CmdAction},
 			},
 			wantGlo: map[string]string{},
 		},
@@ -47,8 +47,8 @@ func TestParse(t *testing.T) {
 			name: "grouped bools with sticky number (-lvh5)",
 			args: []string{"-lvh5", "file.txt"},
 			wantOps: []Op{
-				{Action: "head", Value: "5"},
-				{Action: "FILE", Value: "file.txt"},
+				{Action: "head", Value: "5", Type: CmdInterleaved},
+				{Action: "FILE", Value: "file.txt", Type: CmdAction},
 			},
 			wantGlo: map[string]string{
 				"line-numbers": "true",
@@ -59,7 +59,7 @@ func TestParse(t *testing.T) {
 			name: "grouped bools with sticky string (-lvfconfig.yaml)",
 			args: []string{"-lvfconfig.yaml", "main.go"},
 			wantOps: []Op{
-				{Action: "FILE", Value: "main.go"},
+				{Action: "FILE", Value: "main.go", Type: CmdAction},
 			},
 			wantGlo: map[string]string{
 				"line-numbers": "true",
@@ -79,8 +79,8 @@ func TestParse(t *testing.T) {
 			name: "grouped bools space separated number (-lvh 5)",
 			args: []string{"-lvh", "5", "file.txt"},
 			wantOps: []Op{
-				{Action: "head", Value: "5"},
-				{Action: "FILE", Value: "file.txt"},
+				{Action: "head", Value: "5", Type: CmdInterleaved},
+				{Action: "FILE", Value: "file.txt", Type: CmdAction},
 			},
 			wantGlo: map[string]string{
 				"line-numbers": "true",
@@ -91,8 +91,8 @@ func TestParse(t *testing.T) {
 			name: "long flag with equals",
 			args: []string{"--head=10", "file.go"},
 			wantOps: []Op{
-				{Action: "head", Value: "10"},
-				{Action: "FILE", Value: "file.go"},
+				{Action: "head", Value: "10", Type: CmdInterleaved},
+				{Action: "FILE", Value: "file.go", Type: CmdAction},
 			},
 			wantGlo: map[string]string{},
 		},

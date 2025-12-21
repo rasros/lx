@@ -9,8 +9,9 @@ import (
 type CmdType int
 
 const (
-	CmdGlobal CmdType = iota
-	CmdInterleaved
+	CmdGlobal      CmdType = iota
+	CmdInterleaved         // State modifiers (sticky settings like --head, --tail)
+	CmdAction              // Immediate actions (like --section, --prompt)
 )
 
 type ValueType int
@@ -32,6 +33,7 @@ type CommandDef struct {
 type Op struct {
 	Action string
 	Value  string
+	Type   CmdType
 }
 
 type ParsedArgs struct {
@@ -62,7 +64,8 @@ func Parse(args []string, defs []CommandDef) (*ParsedArgs, error) {
 		// POSIX "--" delimiter: end of flags
 		if arg == "--" {
 			for j := i + 1; j < len(args); j++ {
-				res.Ops = append(res.Ops, Op{Action: "FILE", Value: args[j]})
+				// File is treated as an Action implicitly for ordering purposes
+				res.Ops = append(res.Ops, Op{Action: "FILE", Value: args[j], Type: CmdAction})
 			}
 			break
 		}
@@ -85,7 +88,7 @@ func Parse(args []string, defs []CommandDef) (*ParsedArgs, error) {
 			continue
 		}
 
-		res.Ops = append(res.Ops, Op{Action: "FILE", Value: arg})
+		res.Ops = append(res.Ops, Op{Action: "FILE", Value: arg, Type: CmdAction})
 	}
 
 	return res, nil
@@ -179,7 +182,7 @@ func addOp(res *ParsedArgs, def CommandDef, val string) error {
 	if def.Type == CmdGlobal {
 		res.Globals[def.Name] = val
 	} else {
-		res.Ops = append(res.Ops, Op{Action: def.Name, Value: val})
+		res.Ops = append(res.Ops, Op{Action: def.Name, Value: val, Type: def.Type})
 	}
 	return nil
 }
