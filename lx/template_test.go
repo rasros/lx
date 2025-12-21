@@ -50,27 +50,6 @@ func TestTemplateFuncs_Humanize(t *testing.T) {
 	}
 }
 
-func TestTemplateFuncs_EndNewline(t *testing.T) {
-	endNewline := TemplateFuncs()["endNewline"].(func(string) string)
-
-	tests := []struct {
-		name string
-		in   string
-		want string
-	}{
-		{"empty", "", ""},
-		{"no newline", "foo", "foo\n"},
-		{"has newline", "foo\n", "foo\n"},
-	}
-
-	for _, tt := range tests {
-		got := endNewline(tt.in)
-		if got != tt.want {
-			t.Errorf("endNewline(%q) = %q, want %q", tt.name, got, tt.want)
-		}
-	}
-}
-
 func TestTemplateFuncs_Date(t *testing.T) {
 	dateFn := TemplateFuncs()["date"].(func(string, time.Time) string)
 

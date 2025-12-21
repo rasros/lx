@@ -4,20 +4,19 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"strings"
 	"text/template"
 	"time"
 	"unicode/utf8"
 )
 
+// DefaultTemplate fixed: removed the accidental extra newline before {{ end }}.
 const DefaultTemplate = `{{ if .IsBinary }}` +
 	`[{{ .FileIndex }}/{{ .TotalFiles }}] {{ .Path }} - binary file skipped ({{ .Size | humanize }})` + "\n" +
 	`{{ else }}` +
 	`[{{ .FileIndex }}/{{ .TotalFiles }}] {{ .Path }} ({{ .TotalRows }} rows)
 ---
 ` + "```{{ .Language }}" + `
-{{ .Content | endNewline -}}` + "```\n" + `
-{{ end }}`
+{{ .Content }}` + "```\n" + `{{ end }}`
 
 const DefaultSectionTemplate = `
 ### {{ .Name }}
@@ -66,12 +65,6 @@ func TemplateFuncs() template.FuncMap {
 			suffix := sizes[int(e)]
 			val := float64(s) / math.Pow(1000, e)
 			return fmt.Sprintf("%.1f %s", val, suffix)
-		},
-		"endNewline": func(s string) string {
-			if s != "" && !strings.HasSuffix(s, "\n") {
-				return s + "\n"
-			}
-			return s
 		},
 	}
 }

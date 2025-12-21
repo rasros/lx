@@ -137,7 +137,13 @@ func processStream(parsed *ParsedArgs) error {
 			}
 
 		case "prompt":
-			fmt.Fprintln(os.Stdout, op.Value)
+			runner, err := opts.Effective()
+			if err != nil {
+				return err
+			}
+			if err := runner.RunPrompt(op.Value, os.Stdout); err != nil {
+				return err
+			}
 
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
@@ -168,7 +174,7 @@ func processStream(parsed *ParsedArgs) error {
 }
 
 // reorderTrailingOps moves configuration flags that appear after the LAST file
-// to immediately before that file.
+// to immediately before that file, BUT leaves "action" flags (section/prompt) in place.
 func reorderTrailingOps(ops []Op) []Op {
 	// Find the index of the last FILE operation
 	lastFileIdx := -1
@@ -184,10 +190,23 @@ func reorderTrailingOps(ops []Op) []Op {
 		return ops
 	}
 
+	var toMove []Op // Config flags (head, tail, n)
+	var toStay []Op // Action flags (section, prompt)
+
+	for _, op := range ops[lastFileIdx+1:] {
+		switch op.Action {
+		case "head", "tail", "n":
+			toMove = append(toMove, op)
+		default:
+			toStay = append(toStay, op)
+		}
+	}
+
 	newOps := make([]Op, 0, len(ops))
-	newOps = append(newOps, ops[:lastFileIdx]...)
-	newOps = append(newOps, ops[lastFileIdx+1:]...)
-	newOps = append(newOps, ops[lastFileIdx])
+	newOps = append(newOps, ops[:lastFileIdx]...) // Everything before last file
+	newOps = append(newOps, toMove...)            // Config flags moved before
+	newOps = append(newOps, ops[lastFileIdx])     // The last file
+	newOps = append(newOps, toStay...)            // Action flags stayed after
 
 	return newOps
 }

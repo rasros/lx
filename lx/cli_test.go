@@ -93,6 +93,7 @@ func TestRun_Integration(t *testing.T) {
 		args        []string
 		want        []string // Strings that MUST be present
 		wantMissing []string // Strings that MUST NOT be present
+		checkOrder  bool     // If true, check want strings appear in order
 	}{
 		{
 			name: "interleaved head and tail",
@@ -129,6 +130,12 @@ func TestRun_Integration(t *testing.T) {
 			},
 		},
 		{
+			name:       "trailing prompt logic (lx file -p text)",
+			args:       []string{f1, "-p", "AFTER_FILE"},
+			want:       []string{"1-one", "AFTER_FILE"},
+			checkOrder: true,
+		},
+		{
 			name: "flag state reset check",
 			// Ensure setting tail resets head (the bug we fixed)
 			args: []string{"--head", "1", f1, "--tail", "1", f1},
@@ -163,6 +170,17 @@ func TestRun_Integration(t *testing.T) {
 			for _, s := range tt.wantMissing {
 				if strings.Contains(out, s) {
 					t.Errorf("Output should NOT contain %q.\nOutput:\n%s", s, out)
+				}
+			}
+
+			if tt.checkOrder && len(tt.want) > 1 {
+				idxPrev := -1
+				for _, s := range tt.want {
+					idxCurr := strings.Index(out, s)
+					if idxCurr < idxPrev {
+						t.Errorf("Order mismatch: %q appeared before previous token.\nOutput:\n%s", s, out)
+					}
+					idxPrev = idxCurr
 				}
 			}
 		})
