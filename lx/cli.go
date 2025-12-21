@@ -24,14 +24,20 @@ func init() {
 }
 
 var definitions = []CommandDef{
-	{Name: "config", Short: "f", Type: CmdGlobal, ValueType: ValueAny, Usage: "path to yaml config file"},
-	{Name: "line-numbers", Short: "l", Type: CmdGlobal, ValueType: ValueNone, Usage: "print line numbers"},
-	{Name: "version", Short: "v", Type: CmdGlobal, ValueType: ValueNone, Usage: "print the version"},
+	{Name: "config", Short: "y", Type: CmdGlobal, ValueType: ValueAny, Usage: "path to yaml config file"},
+	{Name: "version", Short: "V", Type: CmdGlobal, ValueType: ValueNone, Usage: "print the version"},
 	{Name: "help", Short: "h", Type: CmdGlobal, ValueType: ValueNone, Usage: "show help"},
 
+	// Toggles
+	{Name: "line-numbers", Short: "l", Type: CmdGlobal, ValueType: ValueNone, Usage: "print line numbers"},
+	{Name: "no-line-numbers", Short: "L", Type: CmdGlobal, ValueType: ValueNone, Usage: "don't print line numbers"},
+
+	// Interleaved - State
 	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print first N lines (0 = no limit)"},
 	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print last N lines (0 = no limit)"},
 	{Name: "n", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
+
+	// Interleaved - Actions
 	{Name: "section", Short: "s", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print a section header"},
 	{Name: "prompt", Short: "p", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print custom text directly"},
 }
@@ -71,26 +77,26 @@ func handleGlobals(parsed *ParsedArgs) bool {
 }
 
 func gatherInputs(parsed *ParsedArgs) error {
-	hasFiles := false
+	hasFilesOrGenerators := false
 	for _, op := range parsed.Ops {
-		if op.Action == "FILE" {
-			hasFiles = true
+		if op.Action == "FILE" || op.Action == "section" || op.Action == "prompt" {
+			hasFilesOrGenerators = true
 			break
 		}
 	}
 
-	if !hasFiles {
+	if !hasFilesOrGenerators {
 		stdinFiles, err := readFilenamesFromStdin()
 		if err != nil {
 			return fmt.Errorf("read stdin: %w", err)
 		}
 		for _, f := range stdinFiles {
 			parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f})
-			hasFiles = true
+			hasFilesOrGenerators = true
 		}
 	}
 
-	if !hasFiles {
+	if !hasFilesOrGenerators {
 		return fmt.Errorf("no input files provided")
 	}
 	return nil
@@ -101,12 +107,27 @@ func processStream(parsed *ParsedArgs) error {
 	if cfg, ok := parsed.Globals["config"]; ok {
 		opts.ConfigPath = cfg
 	}
+
+	if _, ok := parsed.Globals["no-line-numbers"]; ok {
+		opts.LineNumbers = false
+	}
 	if _, ok := parsed.Globals["line-numbers"]; ok {
 		opts.LineNumbers = true
 	}
 
 	ops := reorderTrailingOps(parsed.Ops)
 
+	// --- Pass 1: Validate all inputs ---
+	// We strictly check that all files exist before printing a single byte.
+	for _, op := range ops {
+		if op.Action == "FILE" {
+			if _, err := os.Stat(op.Value); err != nil {
+				return fmt.Errorf("stat %q: %w", op.Value, err)
+			}
+		}
+	}
+
+	// --- Pass 2: Execute and Print ---
 	totalFiles := 0
 	for _, op := range ops {
 		if op.Action == "FILE" {
@@ -149,7 +170,6 @@ func processStream(parsed *ParsedArgs) error {
 			val, _ := strconv.Atoi(op.Value)
 			opts.Head = val
 			opts.HeadSet = true
-			// Reset tail/N
 			opts.Tail, opts.TailSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
 
@@ -157,7 +177,6 @@ func processStream(parsed *ParsedArgs) error {
 			val, _ := strconv.Atoi(op.Value)
 			opts.Tail = val
 			opts.TailSet = true
-			// Reset head/N
 			opts.Head, opts.HeadSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
 
@@ -165,7 +184,6 @@ func processStream(parsed *ParsedArgs) error {
 			val, _ := strconv.Atoi(op.Value)
 			opts.NBoth = val
 			opts.NSet = true
-			// Reset head/tail
 			opts.HeadSet = false
 			opts.TailSet = false
 		}
@@ -173,10 +191,8 @@ func processStream(parsed *ParsedArgs) error {
 	return nil
 }
 
-// reorderTrailingOps moves configuration flags that appear after the LAST file
-// to immediately before that file, BUT leaves "action" flags (section/prompt) in place.
+// ... (reorderTrailingOps and helpTmpl/printHelp remain the same) ...
 func reorderTrailingOps(ops []Op) []Op {
-	// Find the index of the last FILE operation
 	lastFileIdx := -1
 	for i := len(ops) - 1; i >= 0; i-- {
 		if ops[i].Action == "FILE" {
@@ -185,28 +201,14 @@ func reorderTrailingOps(ops []Op) []Op {
 		}
 	}
 
-	// If no file or file is already last, nothing to do
 	if lastFileIdx == -1 || lastFileIdx == len(ops)-1 {
 		return ops
 	}
 
-	var toMove []Op // Config flags (head, tail, n)
-	var toStay []Op // Action flags (section, prompt)
-
-	for _, op := range ops[lastFileIdx+1:] {
-		switch op.Action {
-		case "head", "tail", "n":
-			toMove = append(toMove, op)
-		default:
-			toStay = append(toStay, op)
-		}
-	}
-
 	newOps := make([]Op, 0, len(ops))
-	newOps = append(newOps, ops[:lastFileIdx]...) // Everything before last file
-	newOps = append(newOps, toMove...)            // Config flags moved before
-	newOps = append(newOps, ops[lastFileIdx])     // The last file
-	newOps = append(newOps, toStay...)            // Action flags stayed after
+	newOps = append(newOps, ops[:lastFileIdx]...)
+	newOps = append(newOps, ops[lastFileIdx+1:]...)
+	newOps = append(newOps, ops[lastFileIdx])
 
 	return newOps
 }
@@ -219,16 +221,16 @@ USAGE:
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 INTERLEAVED COMMANDS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-14s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 EXAMPLE:
-   lx -h 5 file1.txt -s "Next Section" -t 2 file2.txt
+   lx -n5 file1.txt -s "Section 2" -n2 file2.txt
    (Prints 5 lines of file1, a section header, then 2 lines of file2)
 `
 

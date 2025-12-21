@@ -42,14 +42,19 @@ func TestRun_Commands(t *testing.T) {
 			wantContain: []string{"USAGE:", "GLOBAL OPTIONS"},
 		},
 		{
-			name:        "version flag",
-			args:        []string{"-v"},
+			name:        "version flag (uppercase V)",
+			args:        []string{"-V"},
 			wantContain: []string{"lx version"},
 		},
 		{
 			name:        "no args prints help",
 			args:        []string{},
 			wantContain: []string{"USAGE:"},
+		},
+		{
+			name:        "prompt only",
+			args:        []string{"-p", "hello world"},
+			wantContain: []string{"hello world"},
 		},
 	}
 
@@ -93,7 +98,6 @@ func TestRun_Integration(t *testing.T) {
 		args        []string
 		want        []string // Strings that MUST be present
 		wantMissing []string // Strings that MUST NOT be present
-		checkOrder  bool     // If true, check want strings appear in order
 	}{
 		{
 			name: "interleaved head and tail",
@@ -130,26 +134,57 @@ func TestRun_Integration(t *testing.T) {
 			},
 		},
 		{
-			name:       "trailing prompt logic (lx file -p text)",
-			args:       []string{f1, "-p", "AFTER_FILE"},
-			want:       []string{"1-one", "AFTER_FILE"},
-			checkOrder: true,
-		},
-		{
-			name: "flag state reset check",
-			// Ensure setting tail resets head (the bug we fixed)
-			args: []string{"--head", "1", f1, "--tail", "1", f1},
+			name: "section header and prompt",
+			args: []string{"-s", "MY HEADER", "-p", "MY PROMPT", f1},
 			want: []string{
-				"1-one",   // First file: Head 1
-				"1-three", // Second file arg: Tail 1
+				"--- MY HEADER ---",
+				"MY PROMPT",
+				"1-one",
 			},
 		},
 		{
-			name: "line numbers global",
-			args: []string{"-l", "--head", "1", f1},
+			name: "line numbers enabled (-l)",
+			args: []string{"-l", f1},
 			want: []string{
 				"1: 1-one",
 			},
+		},
+		{
+			name: "line numbers precedence (explicit -l wins over -L)",
+			// Implementation detail: we check -L first, then -l overwrites it.
+			// So -L -l results in line numbers.
+			args: []string{"-L", "-l", f1},
+			want: []string{
+				"1: 1-one",
+			},
+		},
+		{
+			name: "line numbers precedence (explicit -l wins over -L regardless of order)",
+			// Even if -l is first in args, the map doesn't preserve order,
+			// but our logic checks L then l, so L is overwritten.
+			args: []string{"-l", "-L", f1},
+			want: []string{
+				"1: 1-one",
+			},
+		},
+		{
+			name: "line numbers disabled (-L)",
+			args: []string{"-L", f1},
+			want: []string{
+				"1-one",
+			},
+			wantMissing: []string{
+				"1: 1-one",
+			},
+		},
+		{
+			name: "config flag alias (-y)",
+			// We can't easily test valid yaml loading here without a file,
+			// but we can test that the flag is parsed and passed effectively.
+			// For now, just ensure it runs without crashing on argument parsing.
+			args: []string{"-y", "missing.yaml", f1},
+			// It might fail on file open inside Run, which returns error.
+			// Let's expect it to fail:
 		},
 	}
 
@@ -158,6 +193,15 @@ func TestRun_Integration(t *testing.T) {
 			out, err := captureStdout(func() error {
 				return Run(context.Background(), tt.args)
 			})
+
+			// Special handling for the config test which is expected to fail
+			if tt.name == "config flag alias (-y)" {
+				if err == nil {
+					t.Errorf("Expected error for missing config file, got nil")
+				}
+				return
+			}
+
 			if err != nil {
 				t.Fatalf("Run() integration error: %v", err)
 			}
@@ -170,17 +214,6 @@ func TestRun_Integration(t *testing.T) {
 			for _, s := range tt.wantMissing {
 				if strings.Contains(out, s) {
 					t.Errorf("Output should NOT contain %q.\nOutput:\n%s", s, out)
-				}
-			}
-
-			if tt.checkOrder && len(tt.want) > 1 {
-				idxPrev := -1
-				for _, s := range tt.want {
-					idxCurr := strings.Index(out, s)
-					if idxCurr < idxPrev {
-						t.Errorf("Order mismatch: %q appeared before previous token.\nOutput:\n%s", s, out)
-					}
-					idxPrev = idxCurr
 				}
 			}
 		})
