@@ -1,28 +1,55 @@
-# This is the default template (matches internal default)
+# ------------------------------------------------------------------
+# lx Default Configuration
+# ------------------------------------------------------------------
+
+# Main file template
+# Matches internal default:
+# - Handles binary files gracefully
+# - Hides [1/N] index if only one file is processed
+# - Adds appropriate spacing between files
 template: |
   {{ if .IsBinary -}}
-  [{{ .FileIndex }}/{{ .TotalFiles }}] {{ .Path }} - binary file skipped ({{ .Size | humanize }})
+  {{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})
+
   {{ else -}}
-  [{{ .FileIndex }}/{{ .TotalFiles }}] {{ .Path }} ({{ .TotalRows }} rows)
+  {{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} ({{ .TotalRows }} rows)
   ---
   ```{{ .Language }}
   {{ .Content | endNewline -}}
   ```
+
   {{ end -}}
 
-# Full feature template example
+# Section Header Template (-s flag)
+section_template: |
+  ## {{ .Body | endNewline }}
+
+# Prompt Template (-p flag)
+prompt_template: |
+  {{ .Body | endNewline }}
+
+# ------------------------------------------------------------------
+# Full Feature Example (Reference)
+# ------------------------------------------------------------------
 # template: |
-# {{ if .IsBinary -}}
-# Binary file ({{ .FileIndex }} of {{ .TotalFiles }})
-# Path: {{ .Path }}
-# Size: {{ .Size | humanize }}
-# {{ else -}}
-# ================================================================================
-# FILE {{ .FileIndex }}/{{ .TotalFiles }}: {{ .Path }}
-# Meta: {{ .TotalRows }} lines | {{ .Size | humanize }} | {{ .Language }}
-# Time: {{ .ModTime | date "2006-01-02 15:04:05" }}
-# ================================================================================
-# ```{{ .Language }}
-# {{ .Content | endNewline -}}
-# ```
-# {{ end -}}
+#   {{ if .IsBinary -}}
+#   !!! Binary File: {{ .Path }} ({{ .Size | humanize }})
+#
+#   {{ else -}}
+#   ================================================================================
+#   FILE: {{ .Path }}
+#   META: {{ .TotalRows }} lines | {{ .Size | humanize }} | {{ .Language }} | Modified: {{ .ModTime | date "2006-01-02 15:04" }}
+#   ================================================================================
+#   ```{{ .Language }}
+#   {{ .Content | endNewline -}}
+#   ```
+#
+#   {{ end -}}
+#
+# section_template: |
+#   ################################################################################
+#   # SECTION: {{ .Body | upper }}
+#   ################################################################################
+#
+# prompt_template: |
+#   >>> SYSTEM PROMPT: {{ .Body }}
