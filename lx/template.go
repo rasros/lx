@@ -14,6 +14,8 @@ const DefaultTemplate = `{{ if eq .Size 0 }}` +
 	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - empty file` + "\n" +
 	`{{ else if .IsBinary }}` +
 	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` + "\n" +
+	`{{ else if .IsCompactView }}` +
+	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - skipped ({{ .TotalRows }} rows)` + "\n" +
 	`{{ else }}` +
 	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} ({{ .TotalRows }} rows)
 ---
@@ -38,15 +40,16 @@ func IsBinaryData(data []byte) bool {
 }
 
 type FileContext struct {
-	Path       string
-	Size       int64
-	ModTime    time.Time
-	TotalRows  int
-	Language   string
-	Content    string
-	IsBinary   bool
-	FileIndex  int
-	TotalFiles int
+	Path          string
+	Size          int64
+	ModTime       time.Time
+	TotalRows     int
+	Language      string
+	Content       string
+	IsBinary      bool
+	IsCompactView bool
+	FileIndex     int
+	TotalFiles    int
 }
 
 func TemplateFuncs() template.FuncMap {

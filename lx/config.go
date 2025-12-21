@@ -28,35 +28,47 @@ type Options struct {
 }
 
 func (o Options) Effective() (*Runner, error) {
-	effHead := o.Head
-	effTail := o.Tail
+	// Default to -1 (Unlimited)
+	effHead, effTail := -1, -1
 
-	if o.NSet && o.NBoth > 0 {
-		total := o.NBoth
-		switch {
-		case !o.HeadSet && !o.TailSet:
-			effHead = (total + 1) / 2
-			effTail = total / 2
-		case o.HeadSet && !o.TailSet:
-			h := o.Head
-			if h < 0 {
-				h = 0
+	if o.NSet {
+		if o.NBoth == 0 {
+			effHead, effTail = 0, 0
+		} else {
+			total := o.NBoth
+			switch {
+			case o.HeadSet:
+				h := o.Head
+				if h < 0 {
+					h = 0
+				} else if h > total {
+					h = total
+				}
+				effHead, effTail = h, total-h
+			case o.TailSet:
+				t := o.Tail
+				if t < 0 {
+					t = 0
+				} else if t > total {
+					t = total
+				}
+				effTail, effHead = t, total-t
+			default:
+				effHead, effTail = (total+1)/2, total/2
 			}
-			if h > total {
-				h = total
+		}
+	} else {
+		if o.HeadSet {
+			effHead = o.Head
+			if !o.TailSet {
+				effTail = 0
 			}
-			effHead = h
-			effTail = total - h
-		case !o.HeadSet && o.TailSet:
-			t := o.Tail
-			if t < 0 {
-				t = 0
+		}
+		if o.TailSet {
+			effTail = o.Tail
+			if !o.HeadSet {
+				effHead = 0
 			}
-			if t > total {
-				t = total
-			}
-			effTail = t
-			effHead = total - t
 		}
 	}
 

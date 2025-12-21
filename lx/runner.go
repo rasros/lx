@@ -36,7 +36,7 @@ func (r *Runner) RunPrompt(body string, out io.Writer) error {
 }
 
 // RunFile processes a single file.
-// It returns true if the file was "compact" (empty or binary), false if it was a text block.
+// It returns true if the file was "compact" (empty, binary, or skipped by user), false if it was a text block.
 func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io.Writer) (bool, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -54,18 +54,25 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 
 	isEmpty := len(data) == 0
 	isBin := !isEmpty && IsBinaryData(data)
-	isCompact := isEmpty || isBin
+	isExplicitCompact := r.Head == 0 && r.Tail == 0
+	isCompact := isEmpty || isBin || isExplicitCompact
 
-	// Logic: If the previous output was compact (list-like) and this one is a Block (text),
-	// we must force a newline to separate them.
 	if prevCompact && !isCompact {
 		if _, err := out.Write([]byte("\n")); err != nil {
 			return false, err
 		}
 	}
 
-	if !isCompact {
-		view, totalRows = prepareView(data, r.Head, r.Tail)
+	if isExplicitCompact {
+		totalRows = countLines(data)
+	} else if !isCompact {
+		if r.Head < 0 && r.Tail < 0 {
+			view = data
+			totalRows = countLines(data)
+		} else {
+			view, totalRows = prepareView(data, r.Head, r.Tail)
+		}
+
 		language = DetectLanguage(path, data)
 		if r.LineNumbers {
 			view = addLineNumbers(view, totalRows, r.Head, r.Tail)
@@ -73,15 +80,16 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 	}
 
 	ctx := FileContext{
-		Path:       path,
-		Size:       info.Size(),
-		ModTime:    info.ModTime(),
-		TotalRows:  totalRows,
-		Language:   language,
-		Content:    string(view),
-		IsBinary:   isBin,
-		FileIndex:  index,
-		TotalFiles: total,
+		Path:          path,
+		Size:          info.Size(),
+		ModTime:       info.ModTime(),
+		TotalRows:     totalRows,
+		Language:      language,
+		Content:       string(view),
+		IsBinary:      isBin,
+		IsCompactView: isCompact,
+		FileIndex:     index,
+		TotalFiles:    total,
 	}
 
 	if err := r.Template.Execute(out, ctx); err != nil {

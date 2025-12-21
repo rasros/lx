@@ -32,9 +32,10 @@ var definitions = []CommandDef{
 	// Interleaved Options
 	{Name: "line-numbers", Short: "l", Type: CmdInterleaved, ValueType: ValueNone, Usage: "print line numbers"},
 	{Name: "no-line-numbers", Short: "L", Type: CmdInterleaved, ValueType: ValueNone, Usage: "don't print line numbers"},
-	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print first N lines (0 = no limit)"},
-	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print last N lines (0 = no limit)"},
-	{Name: "n", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
+	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print first N lines (0 = compact/skip)"},
+	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print last N lines (0 = compact/skip)"},
+	{Name: "lines", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
+	{Name: "reset-lines", Short: "N", Type: CmdInterleaved, ValueType: ValueNone, Usage: "reset lines limits (and head/tail)"},
 
 	// Actions
 	{Name: "file", Short: "f", Type: CmdAction, ValueType: ValueAny, Usage: "explicit file path"},
@@ -186,12 +187,16 @@ func processStream(parsed *ParsedArgs) error {
 			opts.TailSet = true
 			opts.Head, opts.HeadSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
-		case "n":
+		case "lines":
 			val, _ := strconv.Atoi(op.Value)
 			opts.NBoth = val
 			opts.NSet = true
 			opts.HeadSet = false
 			opts.TailSet = false
+		case "reset-lines":
+			opts.Head, opts.HeadSet = 0, false
+			opts.Tail, opts.TailSet = 0, false
+			opts.NBoth, opts.NSet = 0, false
 		}
 	}
 
@@ -249,17 +254,17 @@ USAGE:
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
 {{- end }}
 
 INTERLEAVED OPTIONS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
 {{- end }}
 
 ACTIONS (printed in order):
 {{- range .Actions }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
 {{- end }}
 
 EXAMPLE:
