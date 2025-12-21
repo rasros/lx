@@ -3,14 +3,11 @@
 # ------------------------------------------------------------------
 
 # Main file template
-# Matches internal default:
-# - Handles binary files gracefully
-# - Hides [1/N] index if only one file is processed
-# - Adds appropriate spacing between files
 template: |
-  {{ if .IsBinary -}}
+  {{ if eq .Size 0 -}}
+  {{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - empty file
+  {{ else if .IsBinary -}}
   {{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})
-
   {{ else -}}
   {{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} ({{ .TotalRows }} rows)
   ---
@@ -22,7 +19,8 @@ template: |
 
 # Section Header Template (-s flag)
 section_template: |
-  ## {{ .Body | endNewline }}
+  ## {{ .Body | endNewline -}}
+  ---
 
 # Prompt Template (-p flag)
 prompt_template: |
