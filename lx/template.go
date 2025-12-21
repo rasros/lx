@@ -10,26 +10,26 @@ import (
 	"unicode/utf8"
 )
 
-// DefaultTemplate uses explicit newlines and avoids raw string line-breaks
-// that would introduce unwanted spacing.
-const DefaultTemplate = `{{ if .IsBinary }}` +
-	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` + "\n\n" +
+const DefaultTemplate = `{{ if eq .Size 0 }}` +
+	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - empty file` + "\n" +
+	`{{ else if .IsBinary }}` +
+	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` + "\n" +
 	`{{ else }}` +
 	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} ({{ .TotalRows }} rows)
 ---
 ` + "```{{ .Language }}" + `
 {{ .Content | endNewline -}}` + "```\n\n" + `{{ end }}`
 
-// DefaultSectionTemplate is used by the -s flag.
 const DefaultSectionTemplate = `## {{ .Body | endNewline }}` + "---\n\n"
-
-// DefaultPromptTemplate is used by the -p flag.
 const DefaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
 
 func IsBinaryData(data []byte) bool {
 	limit := 1024
 	if len(data) < limit {
 		limit = len(data)
+	}
+	if len(data) == 0 {
+		return false
 	}
 	if bytes.IndexByte(data[:limit], 0) != -1 {
 		return true

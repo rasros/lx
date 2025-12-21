@@ -46,6 +46,26 @@ func TestRunner_DefaultTemplate(t *testing.T) {
 	}
 }
 
+func TestRunner_EmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "empty.txt")
+	if err := os.WriteFile(path, []byte{}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	r := newTestRunner(0, 0, "")
+
+	if err := r.Run([]string{path}, &buf); err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "empty.txt - empty file") {
+		t.Errorf("Expected 'empty file' notice, got:\n%s", out)
+	}
+}
+
 func TestRunner_CustomTemplate(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
@@ -129,7 +149,7 @@ func TestRunner_RunFile(t *testing.T) {
 	var buf bytes.Buffer
 	r := newTestRunner(0, 0, "") // default template
 
-	err := r.RunFile(path, 42, 100, &buf)
+	_, err := r.RunFile(path, 42, 100, false, &buf)
 	if err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
@@ -137,5 +157,28 @@ func TestRunner_RunFile(t *testing.T) {
 	out := buf.String()
 	if !strings.Contains(out, "[42/100]") {
 		t.Errorf("Output missing file index [42/100], got:\n%s", out)
+	}
+}
+
+func TestRunner_Spacing(t *testing.T) {
+	dir := t.TempDir()
+	empty := filepath.Join(dir, "empty")
+	text := filepath.Join(dir, "text")
+	_ = os.WriteFile(empty, []byte{}, 0644)
+	_ = os.WriteFile(text, []byte("content"), 0644)
+
+	var buf bytes.Buffer
+	r := newTestRunner(0, 0, "")
+
+	// Run: empty (compact) -> text (block)
+	// Expect gap
+	if err := r.Run([]string{empty, text}, &buf); err != nil {
+		t.Fatal(err)
+	}
+
+	out := buf.String()
+	// Check for gap between empty and text
+	if !strings.Contains(out, "empty file\n\n") {
+		t.Errorf("Missing gap between empty and text file. Got:\n%q", out)
 	}
 }

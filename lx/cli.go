@@ -36,7 +36,7 @@ var definitions = []CommandDef{
 	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print last N lines (0 = no limit)"},
 	{Name: "n", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
 
-	// Print Actions
+	// Actions
 	{Name: "file", Short: "f", Type: CmdAction, ValueType: ValueAny, Usage: "explicit file path"},
 	{Name: "section", Short: "s", Type: CmdAction, ValueType: ValueAny, Usage: "print a section header"},
 	{Name: "prompt", Short: "p", Type: CmdAction, ValueType: ValueAny, Usage: "print custom text directly"},
@@ -128,6 +128,8 @@ func processStream(parsed *ParsedArgs) error {
 	}
 
 	fileIndex := 1
+	prevCompact := false // Track if previous output was a compact line
+
 	for _, op := range ops {
 		switch op.Action {
 		case "FILE", "file":
@@ -135,9 +137,11 @@ func processStream(parsed *ParsedArgs) error {
 			if err != nil {
 				return err
 			}
-			if err := runner.RunFile(op.Value, fileIndex, totalFiles, os.Stdout); err != nil {
+			isCompact, err := runner.RunFile(op.Value, fileIndex, totalFiles, prevCompact, os.Stdout)
+			if err != nil {
 				return err
 			}
+			prevCompact = isCompact
 			fileIndex++
 
 		case "section":
@@ -145,39 +149,43 @@ func processStream(parsed *ParsedArgs) error {
 			if err != nil {
 				return err
 			}
+			if prevCompact {
+				fmt.Fprintln(os.Stdout)
+			}
 			if err := runner.RunSection(op.Value, os.Stdout); err != nil {
 				return err
 			}
+			prevCompact = false
 
 		case "prompt":
 			runner, err := opts.Effective()
 			if err != nil {
 				return err
 			}
+			if prevCompact {
+				fmt.Fprintln(os.Stdout)
+			}
 			if err := runner.RunPrompt(op.Value, os.Stdout); err != nil {
 				return err
 			}
+			prevCompact = false
 
 		case "line-numbers":
 			opts.LineNumbers = true
-
 		case "no-line-numbers":
 			opts.LineNumbers = false
-
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Head = val
 			opts.HeadSet = true
 			opts.Tail, opts.TailSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
-
 		case "tail":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Tail = val
 			opts.TailSet = true
 			opts.Head, opts.HeadSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
-
 		case "n":
 			val, _ := strconv.Atoi(op.Value)
 			opts.NBoth = val
@@ -186,13 +194,17 @@ func processStream(parsed *ParsedArgs) error {
 			opts.TailSet = false
 		}
 	}
+
+	// If the stream ends with a compact file (which only prints \n),
+	// add one more newline to visually separate it from the shell prompt.
+	if prevCompact {
+		fmt.Fprintln(os.Stdout)
+	}
+
 	return nil
 }
 
-// reorderTrailingOps moves State Modifier flags (CmdInterleaved) that appear
-// after the LAST Action (FILE, file, section, prompt) to immediately before that Action.
 func reorderTrailingOps(ops []Op) []Op {
-	// Find the index of the last Action
 	lastActionIdx := -1
 	for i := len(ops) - 1; i >= 0; i-- {
 		if ops[i].Type == CmdAction {
@@ -201,12 +213,10 @@ func reorderTrailingOps(ops []Op) []Op {
 		}
 	}
 
-	// If no action or action is already last, nothing to do
 	if lastActionIdx == -1 || lastActionIdx == len(ops)-1 {
 		return ops
 	}
 
-	// Separate modifiers (to move) from others (to stay)
 	modifiers := make([]Op, 0)
 	others := make([]Op, 0)
 
@@ -218,12 +228,10 @@ func reorderTrailingOps(ops []Op) []Op {
 		}
 	}
 
-	// If no modifiers to move, return original
 	if len(modifiers) == 0 {
 		return ops
 	}
 
-	// Reconstruct: Prefix + Modifiers + Action + Others
 	newOps := make([]Op, 0, len(ops))
 	newOps = append(newOps, ops[:lastActionIdx]...)
 	newOps = append(newOps, modifiers...)
@@ -255,7 +263,7 @@ ACTIONS (executed in order):
 {{- end }}
 
 EXAMPLE:
-   lx -n5 file1.txt -s "Section 2" -n2 file2.txt
+   lx -h 5 file1.txt -s "Section 2" -t 2 file2.txt
    (Prints 5 lines of file1, a section header, then 2 lines of file2)
 `
 

@@ -81,11 +81,14 @@ func TestRun_Integration(t *testing.T) {
 	f1 := filepath.Join(tmpDir, "f1.txt")
 	f2 := filepath.Join(tmpDir, "f2.txt")
 	longF := filepath.Join(tmpDir, "long.txt")
+	emptyF := filepath.Join(tmpDir, "empty.txt")
 
 	// f1: 3 lines
 	_ = os.WriteFile(f1, []byte("1-one\n1-two\n1-three\n"), 0644)
 	// f2: 4 lines
 	_ = os.WriteFile(f2, []byte("2-A\n2-B\n2-C\n2-D\n"), 0644)
+	// emptyF: 0 lines
+	_ = os.WriteFile(emptyF, []byte{}, 0644)
 	// longF: 10 lines
 	var longContent bytes.Buffer
 	for i := 1; i <= 10; i++ {
@@ -149,7 +152,6 @@ func TestRun_Integration(t *testing.T) {
 			args: []string{"-l", f1},
 			want: []string{"1: 1-one"},
 		},
-		// NEW: Test order precedence
 		{
 			name: "line numbers precedence (-L then -l enables)",
 			args: []string{"-L", "-l", f1},
@@ -166,6 +168,13 @@ func TestRun_Integration(t *testing.T) {
 			args:        []string{"-L", f1},
 			want:        []string{"1-one"},
 			wantMissing: []string{"1: 1-one"},
+		},
+		{
+			name: "trailing newline consistency (empty file)",
+			// Expectation: empty file ends with \n, plus extra \n from end-of-stream logic
+			// so output should end with "empty file\n\n"
+			args: []string{"-f", emptyF},
+			want: []string{"empty file\n\n"},
 		},
 		{
 			name: "config flag alias (-y)",
