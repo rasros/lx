@@ -9,7 +9,8 @@ import (
 )
 
 type Config struct {
-	Template string `yaml:"template"`
+	Template        string `yaml:"template"`
+	SectionTemplate string `yaml:"section_template"`
 }
 
 type Options struct {
@@ -59,6 +60,8 @@ func (o Options) Effective() (*Runner, error) {
 	}
 
 	tmplStr := DefaultTemplate
+	sectionTmplStr := DefaultSectionTemplate
+
 	if o.ConfigPath != "" {
 		cfg, err := loadConfig(o.ConfigPath)
 		if err != nil {
@@ -67,6 +70,9 @@ func (o Options) Effective() (*Runner, error) {
 		if cfg.Template != "" {
 			tmplStr = cfg.Template
 		}
+		if cfg.SectionTemplate != "" {
+			sectionTmplStr = cfg.SectionTemplate
+		}
 	}
 
 	t, err := template.New("lx").Funcs(TemplateFuncs()).Parse(tmplStr)
@@ -74,10 +80,16 @@ func (o Options) Effective() (*Runner, error) {
 		return nil, fmt.Errorf("parse template: %w", err)
 	}
 
+	st, err := template.New("section").Funcs(TemplateFuncs()).Parse(sectionTmplStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse section template: %w", err)
+	}
+
 	return NewRunner(
 		effHead,
 		effTail,
 		t,
+		st,
 		o.LineNumbers,
 	), nil
 }

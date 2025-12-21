@@ -1,30 +1,33 @@
 package lx
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"text/template"
 )
 
 type Runner struct {
-	Head        int
-	Tail        int
-	Template    *template.Template
-	LineNumbers bool
+	Head            int
+	Tail            int
+	Template        *template.Template
+	SectionTemplate *template.Template
+	LineNumbers     bool
 }
 
-func NewRunner(head, tail int, tmpl *template.Template, lineNumbers bool) *Runner {
+func NewRunner(head, tail int, tmpl, sectionTmpl *template.Template, lineNumbers bool) *Runner {
 	return &Runner{
-		Head:        head,
-		Tail:        tail,
-		Template:    tmpl,
-		LineNumbers: lineNumbers,
+		Head:            head,
+		Tail:            tail,
+		Template:        tmpl,
+		SectionTemplate: sectionTmpl,
+		LineNumbers:     lineNumbers,
 	}
 }
 
 // RunFile processes a single file with the current runner configuration.
-// It is exported to support interleaved argument parsing.
 func (r *Runner) RunFile(path string, index, total int, out io.Writer) error {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -69,6 +72,39 @@ func (r *Runner) RunFile(path string, index, total int, out io.Writer) error {
 	return nil
 }
 
+// RunSection renders the section template and ensures it is followed by a blank row.
+func (r *Runner) RunSection(name string, out io.Writer) error {
+	ctx := SectionContext{Name: name}
+
+	// Render to buffer first so we can inspect the trailing newlines
+	var buf bytes.Buffer
+	if err := r.SectionTemplate.Execute(&buf, ctx); err != nil {
+		return fmt.Errorf("section template exec: %w", err)
+	}
+
+	content := buf.String()
+	final := ensureBlankRow(content)
+
+	if _, err := io.WriteString(out, final); err != nil {
+		return fmt.Errorf("write section: %w", err)
+	}
+	return nil
+}
+
+// RunPrompt writes text preceded by a newline (separation) and followed by a blank row.
+func (r *Runner) RunPrompt(text string, out io.Writer) error {
+	// Prepend newline for separation from previous output (like Section does)
+	if !strings.HasPrefix(text, "\n") {
+		text = "\n" + text
+	}
+
+	final := ensureBlankRow(text)
+	if _, err := io.WriteString(out, final); err != nil {
+		return fmt.Errorf("write prompt: %w", err)
+	}
+	return nil
+}
+
 // Run processes a list of files using the current runner configuration.
 func (r *Runner) Run(files []string, out io.Writer) error {
 	total := len(files)
@@ -78,4 +114,15 @@ func (r *Runner) Run(files []string, out io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// ensureBlankRow ensures the string ends with at least two newlines (\n\n).
+func ensureBlankRow(s string) string {
+	if strings.HasSuffix(s, "\n\n") {
+		return s
+	}
+	if strings.HasSuffix(s, "\n") {
+		return s + "\n"
+	}
+	return s + "\n\n"
 }

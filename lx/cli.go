@@ -32,6 +32,8 @@ var definitions = []CommandDef{
 	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print first N lines (0 = no limit)"},
 	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print last N lines (0 = no limit)"},
 	{Name: "n", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
+	{Name: "section", Short: "s", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print a section header"},
+	{Name: "prompt", Short: "p", Type: CmdInterleaved, ValueType: ValueAny, Usage: "print custom text directly"},
 }
 
 func Run(ctx context.Context, args []string) error {
@@ -125,6 +127,24 @@ func processStream(parsed *ParsedArgs) error {
 			}
 			fileIndex++
 
+		case "section":
+			runner, err := opts.Effective()
+			if err != nil {
+				return err
+			}
+			if err := runner.RunSection(op.Value, os.Stdout); err != nil {
+				return err
+			}
+
+		case "prompt":
+			runner, err := opts.Effective()
+			if err != nil {
+				return err
+			}
+			if err := runner.RunPrompt(op.Value, os.Stdout); err != nil {
+				return err
+			}
+
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Head = val
@@ -154,7 +174,7 @@ func processStream(parsed *ParsedArgs) error {
 }
 
 // reorderTrailingOps moves configuration flags that appear after the LAST file
-// to immediately before that file.
+// to immediately before that file, BUT leaves "action" flags (section/prompt) in place.
 func reorderTrailingOps(ops []Op) []Op {
 	// Find the index of the last FILE operation
 	lastFileIdx := -1
@@ -170,10 +190,23 @@ func reorderTrailingOps(ops []Op) []Op {
 		return ops
 	}
 
+	var toMove []Op // Config flags (head, tail, n)
+	var toStay []Op // Action flags (section, prompt)
+
+	for _, op := range ops[lastFileIdx+1:] {
+		switch op.Action {
+		case "head", "tail", "n":
+			toMove = append(toMove, op)
+		default:
+			toStay = append(toStay, op)
+		}
+	}
+
 	newOps := make([]Op, 0, len(ops))
-	newOps = append(newOps, ops[:lastFileIdx]...)
-	newOps = append(newOps, ops[lastFileIdx+1:]...)
-	newOps = append(newOps, ops[lastFileIdx])
+	newOps = append(newOps, ops[:lastFileIdx]...) // Everything before last file
+	newOps = append(newOps, toMove...)            // Config flags moved before
+	newOps = append(newOps, ops[lastFileIdx])     // The last file
+	newOps = append(newOps, toStay...)            // Action flags stayed after
 
 	return newOps
 }
@@ -195,8 +228,8 @@ INTERLEAVED COMMANDS (apply to subsequent files):
 {{- end }}
 
 EXAMPLE:
-   lx -h 5 file1.txt -t 2 file2.txt
-   (Prints 5 lines of file1, then 2 lines of file2)
+   lx -h 5 file1.txt -s "Next Section" -t 2 file2.txt
+   (Prints 5 lines of file1, a section header, then 2 lines of file2)
 `
 
 func printHelp() {
