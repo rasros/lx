@@ -62,11 +62,6 @@ func splitLines(data []byte) [][]byte {
 	return lines
 }
 
-func sliceLines(data []byte, head, tail int) []byte {
-	view, _ := prepareView(data, head, tail)
-	return view
-}
-
 // addLineNumbers prefixes each logical line with "N: ".
 func addLineNumbers(data []byte, totalRows, head, tail int) []byte {
 	if len(data) == 0 {

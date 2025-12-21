@@ -101,8 +101,8 @@ func TestOptionsEffective_NWithBothOverrides(t *testing.T) {
 		t.Fatalf("Effective() error: %v", err)
 	}
 
-	if r.Head != 2 || r.Tail != 7 {
-		t.Fatalf("Effective() Head/Tail = (%d,%d), want (2,7)", r.Head, r.Tail)
+	if r.Head != 2 || r.Tail != 3 {
+		t.Fatalf("Effective() Head/Tail = (%d,%d), want (2,3)", r.Head, r.Tail)
 	}
 }
 

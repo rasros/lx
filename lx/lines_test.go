@@ -106,7 +106,8 @@ func TestSplitLines(t *testing.T) {
 
 func TestSliceLines_NoLimitsReturnsOriginal(t *testing.T) {
 	input := []byte("a\nb\nc\n")
-	got := sliceLines(input, 0, 0)
+	view, _ := prepareView(input, 0, 0)
+	got := view
 	if !bytes.Equal(got, input) {
 		t.Errorf("sliceLines with no limits changed data: got %q, want %q", got, input)
 	}
@@ -114,7 +115,8 @@ func TestSliceLines_NoLimitsReturnsOriginal(t *testing.T) {
 
 func TestSliceLines_EmptyData(t *testing.T) {
 	input := []byte{}
-	got := sliceLines(input, 5, 5)
+	view, _ := prepareView(input, 5, 5)
+	got := view
 	if !bytes.Equal(got, input) {
 		t.Errorf("sliceLines on empty data changed data: got %q, want %q", got, input)
 	}
@@ -122,7 +124,8 @@ func TestSliceLines_EmptyData(t *testing.T) {
 
 func TestSliceLines_HeadOnly(t *testing.T) {
 	input := []byte("a\nb\nc\n")
-	got := sliceLines(input, 2, 0)
+	view, _ := prepareView(input, 2, 0)
+	got := view
 	want := []byte("a\nb\n")
 	if !bytes.Equal(got, want) {
 		t.Errorf("sliceLines head-only = %q, want %q", got, want)
@@ -131,7 +134,8 @@ func TestSliceLines_HeadOnly(t *testing.T) {
 
 func TestSliceLines_TailOnly(t *testing.T) {
 	input := []byte("a\nb\nc\n")
-	got := sliceLines(input, 0, 2)
+	view, _ := prepareView(input, 0, 2)
+	got := view
 	want := []byte("b\nc\n")
 	if !bytes.Equal(got, want) {
 		t.Errorf("sliceLines tail-only = %q, want %q", got, want)
@@ -140,7 +144,8 @@ func TestSliceLines_TailOnly(t *testing.T) {
 
 func TestSliceLines_HeadTailWithEllipsis(t *testing.T) {
 	input := []byte("a\nb\nc\nd\ne\n")
-	got := sliceLines(input, 1, 2)
+	view, _ := prepareView(input, 1, 2)
+	got := view
 	want := []byte("a\n... (2 rows skipped)\n" + "d\ne\n")
 	if !bytes.Equal(got, want) {
 		t.Errorf("sliceLines head+tail with ellipsis = %q, want %q", got, want)
@@ -149,7 +154,8 @@ func TestSliceLines_HeadTailWithEllipsis(t *testing.T) {
 
 func TestSliceLines_HeadCoversAll(t *testing.T) {
 	input := []byte("a\nb\nc\n")
-	got := sliceLines(input, 5, 0)
+	view, _ := prepareView(input, 5, 0)
+	got := view
 	if !bytes.Equal(got, input) {
 		t.Errorf("sliceLines head covers all changed data: got %q, want %q", got, input)
 	}
@@ -157,7 +163,8 @@ func TestSliceLines_HeadCoversAll(t *testing.T) {
 
 func TestSliceLines_TailCoversAll(t *testing.T) {
 	input := []byte("a\nb\nc\n")
-	got := sliceLines(input, 0, 5)
+	view, _ := prepareView(input, 0, 5)
+	got := view
 	if !bytes.Equal(got, input) {
 		t.Errorf("sliceLines tail covers all changed data: got %q, want %q", got, input)
 	}
@@ -165,7 +172,8 @@ func TestSliceLines_TailCoversAll(t *testing.T) {
 
 func TestSliceLines_HeadTailCoverAll(t *testing.T) {
 	input := []byte("a\nb\nc\n")
-	got := sliceLines(input, 1, 2)
+	view, _ := prepareView(input, 1, 2)
+	got := view
 	if !bytes.Equal(got, input) {
 		t.Errorf("sliceLines head+tail cover all changed data: got %q, want %q", got, input)
 	}

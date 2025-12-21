@@ -31,7 +31,7 @@ func TestRunner_DefaultTemplate(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := newTestRunner(0, 0, "")
+	r := newTestRunner(-1, -1, "") // Unlimited default
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
@@ -46,6 +46,30 @@ func TestRunner_DefaultTemplate(t *testing.T) {
 	}
 }
 
+func TestRunner_CompactModeViaZero(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.txt")
+	content := "a\nb\nc\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	r := newTestRunner(0, 0, "") // Explicit Compact
+
+	if err := r.Run([]string{path}, &buf); err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "- skipped (3 rows)") {
+		t.Errorf("Expected compact/skipped output, got:\n%s", out)
+	}
+	if strings.Contains(out, "```") {
+		t.Errorf("Should not contain code block in compact mode")
+	}
+}
+
 func TestRunner_EmptyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "empty.txt")
@@ -54,7 +78,7 @@ func TestRunner_EmptyFile(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := newTestRunner(0, 0, "")
+	r := newTestRunner(-1, -1, "")
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
@@ -76,7 +100,7 @@ func TestRunner_CustomTemplate(t *testing.T) {
 
 	var buf bytes.Buffer
 	tmpl := "START {{ .Path }}\n{{ .Content }}END"
-	r := newTestRunner(0, 0, tmpl)
+	r := newTestRunner(-1, -1, tmpl)
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
@@ -128,7 +152,7 @@ func TestRunner_BinaryDetection(t *testing.T) {
 
 	var buf bytes.Buffer
 	tmpl := "{{ if .IsBinary }}BINARY{{ else }}TEXT{{ end }}"
-	r := newTestRunner(0, 0, tmpl)
+	r := newTestRunner(-1, -1, tmpl)
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatal(err)
@@ -147,7 +171,7 @@ func TestRunner_RunFile(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := newTestRunner(0, 0, "") // default template
+	r := newTestRunner(-1, -1, "") // default template
 
 	_, err := r.RunFile(path, 42, 100, false, &buf)
 	if err != nil {
@@ -168,7 +192,7 @@ func TestRunner_Spacing(t *testing.T) {
 	_ = os.WriteFile(text, []byte("content"), 0644)
 
 	var buf bytes.Buffer
-	r := newTestRunner(0, 0, "")
+	r := newTestRunner(-1, -1, "")
 
 	// Run: empty (compact) -> text (block)
 	// Expect gap
