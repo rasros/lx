@@ -257,7 +257,7 @@ INTERLEAVED OPTIONS (apply to subsequent files):
    --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
-ACTIONS (executed in order):
+ACTIONS (printed in order):
 {{- range .Actions }}
    --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
