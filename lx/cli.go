@@ -263,7 +263,7 @@ ACTIONS (executed in order):
 {{- end }}
 
 EXAMPLE:
-   lx -h 5 file1.txt -s "Section 2" -t 2 file2.txt
+   lx -n5 file1.txt -s "Section 2" -n2 file2.txt
    (Prints 5 lines of file1, a section header, then 2 lines of file2)
 `
 
