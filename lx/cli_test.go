@@ -96,20 +96,14 @@ func TestRun_Integration(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        []string
-		want        []string // Strings that MUST be present
-		wantMissing []string // Strings that MUST NOT be present
+		want        []string
+		wantMissing []string
 	}{
 		{
-			name: "interleaved head and tail",
-			args: []string{"--head", "1", f1, "--tail", "1", f2},
-			want: []string{
-				"1-one", // f1 head
-				"2-D",   // f2 tail
-			},
-			wantMissing: []string{
-				"1-two", // f1 line 2
-				"2-A",   // f2 line 1
-			},
+			name:        "interleaved head and tail",
+			args:        []string{"--head", "1", f1, "--tail", "1", f2},
+			want:        []string{"1-one", "2-D"},
+			wantMissing: []string{"1-two", "2-A"},
 		},
 		{
 			name:        "explicit file flag (-f)",
@@ -129,74 +123,49 @@ func TestRun_Integration(t *testing.T) {
 			wantMissing: []string{"1-two"},
 		},
 		{
-			name: "sticky flags logic",
-			args: []string{"-n2", f2},
-			want: []string{
-				"2-A", // First line
-				"2-D", // Last line
-			},
-			wantMissing: []string{
-				"2-B", "2-C", // Middle lines skipped
-			},
+			name:        "sticky flags logic",
+			args:        []string{"-n2", f2},
+			want:        []string{"2-A", "2-D"},
+			wantMissing: []string{"2-B", "2-C"},
 		},
 		{
-			name: "trailing flag logic (lx file -n1)",
-			args: []string{f1, "-n1"},
-			want: []string{
-				"1-one",
-			},
-			wantMissing: []string{
-				"1-two",
-				"1-three",
-			},
+			name:        "trailing flag logic (lx file -n1)",
+			args:        []string{f1, "-n1"},
+			want:        []string{"1-one"},
+			wantMissing: []string{"1-two", "1-three"},
 		},
 		{
 			name: "trailing prompt (lx file -p msg) should NOT move prompt before file",
 			args: []string{f1, "-p", "POST_PROMPT"},
-			want: []string{
-				"1-one",
-				"POST_PROMPT",
-			},
+			want: []string{"1-one", "POST_PROMPT"},
 		},
 		{
 			name: "section header and prompt",
 			args: []string{"-s", "MY HEADER", "-p", "MY PROMPT", f1},
-			want: []string{
-				"## MY HEADER",
-				"MY PROMPT",
-				"1-one",
-			},
+			want: []string{"## MY HEADER", "MY PROMPT", "1-one"},
 		},
 		{
 			name: "line numbers enabled (-l)",
 			args: []string{"-l", f1},
-			want: []string{
-				"1: 1-one",
-			},
+			want: []string{"1: 1-one"},
 		},
+		// NEW: Test order precedence
 		{
-			name: "line numbers precedence (explicit -l wins over -L)",
+			name: "line numbers precedence (-L then -l enables)",
 			args: []string{"-L", "-l", f1},
-			want: []string{
-				"1: 1-one",
-			},
+			want: []string{"1: 1-one"},
 		},
 		{
-			name: "line numbers precedence (explicit -l wins over -L regardless of order)",
-			args: []string{"-l", "-L", f1},
-			want: []string{
-				"1: 1-one",
-			},
+			name:        "line numbers precedence (-l then -L disables)",
+			args:        []string{"-l", "-L", f1},
+			want:        []string{"1-one"},
+			wantMissing: []string{"1: 1-one"},
 		},
 		{
-			name: "line numbers disabled (-L)",
-			args: []string{"-L", f1},
-			want: []string{
-				"1-one",
-			},
-			wantMissing: []string{
-				"1: 1-one",
-			},
+			name:        "line numbers disabled (-L)",
+			args:        []string{"-L", f1},
+			want:        []string{"1-one"},
+			wantMissing: []string{"1: 1-one"},
 		},
 		{
 			name: "config flag alias (-y)",
