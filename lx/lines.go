@@ -2,7 +2,8 @@ package lx
 
 import (
 	"bytes"
-	"strconv"
+	"fmt"
+	"math"
 )
 
 // countLines counts the number of newline-terminated rows.
@@ -18,6 +19,21 @@ func countLines(data []byte) int {
 	return n
 }
 
+// findNthNewline finds the index *after* the Nth newline.
+// If n is larger than total newlines, returns len(data).
+func findNthNewline(data []byte, n int) int {
+	count := 0
+	for i, b := range data {
+		if b == '\n' {
+			count++
+			if count == n {
+				return i + 1
+			}
+		}
+	}
+	return len(data)
+}
+
 // prepareView computes the sliced view of data based on head/tail and returns
 // both the view and the total number of logical rows in the original data.
 func prepareView(data []byte, head, tail int) ([]byte, int) {
@@ -25,30 +41,41 @@ func prepareView(data []byte, head, tail int) ([]byte, int) {
 		return data, 0
 	}
 
-	lines := splitLines(data)
-	total := len(lines)
+	total := countLines(data)
 
+	// Fast path: if limits exceed total, return original slice
 	if (head <= 0 && tail <= 0) || head >= total || tail >= total || (head > 0 && tail > 0 && head+tail >= total) {
 		return data, total
 	}
 
-	var out [][]byte
+	var buf bytes.Buffer
 
-	switch {
-	case head > 0 && tail > 0:
-		skipped := total - head - tail
-		out = append(out, lines[:head]...)
-		out = append(out, []byte("... ("+strconv.Itoa(skipped)+" rows skipped)\n"))
-		out = append(out, lines[total-tail:]...)
-
-	case head > 0:
-		out = lines[:head]
-
-	case tail > 0:
-		out = lines[total-tail:]
+	// Write Head
+	if head > 0 {
+		limit := findNthNewline(data, head)
+		buf.Write(data[:limit])
 	}
 
-	return bytes.Join(out, nil), total
+	// Write Ellipsis
+	if head > 0 && tail > 0 {
+		skipped := total - head - tail
+		if skipped > 0 {
+			fmt.Fprintf(&buf, "... (%d rows skipped)\n", skipped)
+		}
+	}
+
+	// Write Tail
+	if tail > 0 {
+		linesToSkip := total - tail
+		if linesToSkip > 0 {
+			start := findNthNewline(data, linesToSkip)
+			buf.Write(data[start:])
+		} else {
+			buf.Write(data)
+		}
+	}
+
+	return buf.Bytes(), total
 }
 
 func splitLines(data []byte) [][]byte {
@@ -56,7 +83,7 @@ func splitLines(data []byte) [][]byte {
 		return nil
 	}
 	lines := bytes.SplitAfter(data, []byte("\n"))
-	if len(lines[len(lines)-1]) == 0 {
+	if len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
 		lines = lines[:len(lines)-1]
 	}
 	return lines
@@ -73,10 +100,20 @@ func addLineNumbers(data []byte, totalRows, head, tail int) []byte {
 		return data
 	}
 
+	// Calculate padding width: log10(total) + 1
+	width := 1
+	if totalRows > 9 {
+		width = int(math.Log10(float64(totalRows))) + 1
+	}
+	fmtStr := fmt.Sprintf("%%%dd: ", width)
+
 	numberLines := func(chunk [][]byte, start int) []byte {
-		buf := make([]byte, 0, len(data)+len(chunk)*8)
+		// Estimate capacity to avoid re-allocations
+		estSize := len(data) + len(chunk)*(width+2)
+		buf := make([]byte, 0, estSize)
+
 		for i, ln := range chunk {
-			prefix := strconv.Itoa(start+i) + ": "
+			prefix := fmt.Sprintf(fmtStr, start+i)
 			buf = append(buf, []byte(prefix)...)
 			buf = append(buf, ln...)
 		}
