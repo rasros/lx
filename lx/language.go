@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 var extToLang = map[string]string{
@@ -148,6 +149,22 @@ var shebangToLang = map[string]string{
 	"php":     "php",
 	"lua":     "lua",
 	"make":    "makefile",
+}
+
+// IsBinary checks if the data looks like binary content.
+// It checks for null bytes in the first 1024 bytes or invalid UTF-8.
+func IsBinary(data []byte) bool {
+	limit := 1024
+	if len(data) < limit {
+		limit = len(data)
+	}
+	if len(data) == 0 {
+		return false
+	}
+	if bytes.IndexByte(data[:limit], 0) != -1 {
+		return true
+	}
+	return !utf8.Valid(data)
 }
 
 // DetectLanguage returns a language identifier based on file path and content.

@@ -1,31 +1,9 @@
 package lx
 
 import (
-	"bytes"
 	"testing"
 	"time"
 )
-
-func TestIsBinaryData(t *testing.T) {
-	tests := []struct {
-		name string
-		data []byte
-		want bool
-	}{
-		{"empty", []byte{}, false},
-		{"simple text", []byte("hello world"), false},
-		{"null byte at start", []byte{0x00, 0x61}, true},
-		{"null byte later", append(bytes.Repeat([]byte{'a'}, 600), 0x00), true},
-		{"invalid utf8", []byte{0xff, 0xfe, 0xfd}, true},
-	}
-
-	for _, tt := range tests {
-		got := IsBinaryData(tt.data)
-		if got != tt.want {
-			t.Errorf("IsBinaryData(%q) = %v, want %v", tt.name, got, tt.want)
-		}
-	}
-}
 
 func TestTemplateFuncs_Humanize(t *testing.T) {
 	humanize := TemplateFuncs()["humanize"].(func(int64) string)

@@ -44,7 +44,7 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 	var language string
 
 	isEmpty := len(data) == 0
-	isBin := !isEmpty && IsBinaryData(data)
+	isBin := !isEmpty && IsBinary(data)
 	isExplicitCompact := r.Config.Head == 0 && r.Config.Tail == 0
 	isCompact := isEmpty || isBin || isExplicitCompact
 

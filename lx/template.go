@@ -1,13 +1,11 @@
 package lx
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"strings"
 	"text/template"
 	"time"
-	"unicode/utf8"
 )
 
 const DefaultTemplate = `{{ if eq .Size 0 }}` +
@@ -24,20 +22,6 @@ const DefaultTemplate = `{{ if eq .Size 0 }}` +
 
 const DefaultSectionTemplate = `## {{ .Body | endNewline }}` + "---\n\n"
 const DefaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
-
-func IsBinaryData(data []byte) bool {
-	limit := 1024
-	if len(data) < limit {
-		limit = len(data)
-	}
-	if len(data) == 0 {
-		return false
-	}
-	if bytes.IndexByte(data[:limit], 0) != -1 {
-		return true
-	}
-	return !utf8.Valid(data)
-}
 
 type FileContext struct {
 	Path          string
