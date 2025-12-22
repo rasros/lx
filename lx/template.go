@@ -13,9 +13,9 @@ const DefaultTemplate = `{{ if eq .Size 0 }}` +
 	`{{ else if .IsBinary }}` +
 	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` + "\n" +
 	`{{ else if .IsCompactView }}` +
-	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - skipped ({{ .TotalRows }} rows)` + "\n" +
+	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)` + "\n" +
 	`{{ else }}` +
-	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} ({{ .TotalRows }} rows)
+	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
 ---
 ` + "```{{ .Language }}" + `
 {{ .Content | endNewline -}}` + "```\n\n" + `{{ end }}`
@@ -28,6 +28,7 @@ type FileContext struct {
 	Size          int64
 	ModTime       time.Time
 	TotalRows     int
+	IsEstimate    bool
 	Language      string
 	Content       string
 	IsBinary      bool
