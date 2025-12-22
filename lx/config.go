@@ -8,6 +8,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// RunnerConfig holds the lightweight, mutable options for a specific file run.
+type RunnerConfig struct {
+	Head        int
+	Tail        int
+	LineNumbers bool
+}
+
+// TemplateEngine holds the heavy, immutable parsed templates.
+type TemplateEngine struct {
+	Main    *template.Template
+	Section *template.Template
+	Prompt  *template.Template
+}
+
 type Config struct {
 	Template        string `yaml:"template"`
 	SectionTemplate string `yaml:"section_template"`
@@ -27,9 +41,10 @@ type Options struct {
 	LineNumbers bool
 }
 
-func (o Options) Effective() (*Runner, error) {
-	// Default to -1 (Unlimited)
-	effHead, effTail := -1, -1
+// ToRunnerConfig calculates the effective head/tail numbers for the current state.
+// This is fast and safe to call inside the file loop.
+func (o Options) ToRunnerConfig() RunnerConfig {
+	effHead, effTail := -1, -1 // Default to -1 (Unlimited)
 
 	if o.NSet {
 		if o.NBoth == 0 {
@@ -72,6 +87,16 @@ func (o Options) Effective() (*Runner, error) {
 		}
 	}
 
+	return RunnerConfig{
+		Head:        effHead,
+		Tail:        effTail,
+		LineNumbers: o.LineNumbers,
+	}
+}
+
+// CompileTemplates loads the config file (if any) and compiles the templates.
+// This should be called exactly once per program execution.
+func (o Options) CompileTemplates() (*TemplateEngine, error) {
 	tmplStr := DefaultTemplate
 	sectionTmplStr := DefaultSectionTemplate
 	promptTmplStr := DefaultPromptTemplate
@@ -108,14 +133,11 @@ func (o Options) Effective() (*Runner, error) {
 		return nil, fmt.Errorf("parse prompt template: %w", err)
 	}
 
-	return NewRunner(
-		effHead,
-		effTail,
-		tMain,
-		tSection,
-		tPrompt,
-		o.LineNumbers,
-	), nil
+	return &TemplateEngine{
+		Main:    tMain,
+		Section: tSection,
+		Prompt:  tPrompt,
+	}, nil
 }
 
 func loadConfig(path string) (*Config, error) {

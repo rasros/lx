@@ -19,7 +19,19 @@ func newTestRunner(head, tail int, tmplStr string) *Runner {
 	tSection := template.Must(template.New("section").Funcs(funcs).Parse(DefaultSectionTemplate))
 	tPrompt := template.Must(template.New("prompt").Funcs(funcs).Parse(DefaultPromptTemplate))
 
-	return NewRunner(head, tail, tMain, tSection, tPrompt, false)
+	engine := &TemplateEngine{
+		Main:    tMain,
+		Section: tSection,
+		Prompt:  tPrompt,
+	}
+
+	cfg := RunnerConfig{
+		Head:        head,
+		Tail:        tail,
+		LineNumbers: false,
+	}
+
+	return NewRunner(cfg, engine)
 }
 
 func TestRunner_DefaultTemplate(t *testing.T) {

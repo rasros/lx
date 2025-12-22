@@ -4,35 +4,26 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"text/template"
 )
 
 type Runner struct {
-	Head            int
-	Tail            int
-	Template        *template.Template
-	SectionTemplate *template.Template
-	PromptTemplate  *template.Template
-	LineNumbers     bool
+	Config RunnerConfig
+	Engine *TemplateEngine
 }
 
-func NewRunner(head, tail int, tmpl, sectionTmpl, promptTmpl *template.Template, lineNumbers bool) *Runner {
+func NewRunner(cfg RunnerConfig, engine *TemplateEngine) *Runner {
 	return &Runner{
-		Head:            head,
-		Tail:            tail,
-		Template:        tmpl,
-		SectionTemplate: sectionTmpl,
-		PromptTemplate:  promptTmpl,
-		LineNumbers:     lineNumbers,
+		Config: cfg,
+		Engine: engine,
 	}
 }
 
 func (r *Runner) RunSection(body string, out io.Writer) error {
-	return r.SectionTemplate.Execute(out, struct{ Body string }{Body: body})
+	return r.Engine.Section.Execute(out, struct{ Body string }{Body: body})
 }
 
 func (r *Runner) RunPrompt(body string, out io.Writer) error {
-	return r.PromptTemplate.Execute(out, struct{ Body string }{Body: body})
+	return r.Engine.Prompt.Execute(out, struct{ Body string }{Body: body})
 }
 
 // RunFile processes a single file.
@@ -54,7 +45,7 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 
 	isEmpty := len(data) == 0
 	isBin := !isEmpty && IsBinaryData(data)
-	isExplicitCompact := r.Head == 0 && r.Tail == 0
+	isExplicitCompact := r.Config.Head == 0 && r.Config.Tail == 0
 	isCompact := isEmpty || isBin || isExplicitCompact
 
 	if prevCompact && !isCompact {
@@ -66,16 +57,16 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 	if isExplicitCompact {
 		totalRows = countLines(data)
 	} else if !isCompact {
-		if r.Head < 0 && r.Tail < 0 {
+		if r.Config.Head < 0 && r.Config.Tail < 0 {
 			view = data
 			totalRows = countLines(data)
 		} else {
-			view, totalRows = prepareView(data, r.Head, r.Tail)
+			view, totalRows = prepareView(data, r.Config.Head, r.Config.Tail)
 		}
 
 		language = DetectLanguage(path, data)
-		if r.LineNumbers {
-			view = addLineNumbers(view, totalRows, r.Head, r.Tail)
+		if r.Config.LineNumbers {
+			view = addLineNumbers(view, totalRows, r.Config.Head, r.Config.Tail)
 		}
 	}
 
@@ -92,7 +83,7 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 		TotalFiles:    total,
 	}
 
-	if err := r.Template.Execute(out, ctx); err != nil {
+	if err := r.Engine.Main.Execute(out, ctx); err != nil {
 		return false, fmt.Errorf("template exec: %w", err)
 	}
 

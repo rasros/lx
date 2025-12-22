@@ -120,7 +120,13 @@ func processStream(parsed *ParsedArgs) error {
 		}
 	}
 
-	// --- Pass 2: Execute and Print ---
+	// --- Pass 2: Compile Templates Once ---
+	tmplEngine, err := opts.CompileTemplates()
+	if err != nil {
+		return err
+	}
+
+	// --- Pass 3: Execute and Print ---
 	totalFiles := 0
 	for _, op := range ops {
 		if op.Action == "FILE" || op.Action == "file" {
@@ -134,10 +140,9 @@ func processStream(parsed *ParsedArgs) error {
 	for _, op := range ops {
 		switch op.Action {
 		case "FILE", "file":
-			runner, err := opts.Effective()
-			if err != nil {
-				return err
-			}
+			runCfg := opts.ToRunnerConfig()
+			runner := NewRunner(runCfg, tmplEngine)
+
 			isCompact, err := runner.RunFile(op.Value, fileIndex, totalFiles, prevCompact, os.Stdout)
 			if err != nil {
 				return err
@@ -146,10 +151,8 @@ func processStream(parsed *ParsedArgs) error {
 			fileIndex++
 
 		case "section":
-			runner, err := opts.Effective()
-			if err != nil {
-				return err
-			}
+			runner := NewRunner(opts.ToRunnerConfig(), tmplEngine)
+
 			if prevCompact {
 				fmt.Fprintln(os.Stdout)
 			}
@@ -159,10 +162,8 @@ func processStream(parsed *ParsedArgs) error {
 			prevCompact = false
 
 		case "prompt":
-			runner, err := opts.Effective()
-			if err != nil {
-				return err
-			}
+			runner := NewRunner(opts.ToRunnerConfig(), tmplEngine)
+
 			if prevCompact {
 				fmt.Fprintln(os.Stdout)
 			}
@@ -254,17 +255,17 @@ USAGE:
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 INTERLEAVED OPTIONS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 ACTIONS (printed in order):
 {{- range .Actions }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 EXAMPLE:

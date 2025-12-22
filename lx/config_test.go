@@ -16,13 +16,10 @@ func TestOptionsEffective_NoN_UsesHeadTail(t *testing.T) {
 		NSet:    false,
 	}
 
-	r, err := opts.Effective()
-	if err != nil {
-		t.Fatalf("Effective() error: %v", err)
-	}
+	r := opts.ToRunnerConfig()
 
 	if r.Head != 2 || r.Tail != 3 {
-		t.Fatalf("Effective() Head/Tail = (%d,%d), want (2,3)", r.Head, r.Tail)
+		t.Fatalf("ToRunnerConfig() Head/Tail = (%d,%d), want (2,3)", r.Head, r.Tail)
 	}
 }
 
@@ -36,13 +33,10 @@ func TestOptionsEffective_NOnly_SplitsTotalNBetweenHeadAndTail(t *testing.T) {
 		NSet:    true,
 	}
 
-	r, err := opts.Effective()
-	if err != nil {
-		t.Fatalf("Effective() error: %v", err)
-	}
+	r := opts.ToRunnerConfig()
 
 	if r.Head != 3 || r.Tail != 2 {
-		t.Fatalf("Effective() Head/Tail = (%d,%d), want (3,2)", r.Head, r.Tail)
+		t.Fatalf("ToRunnerConfig() Head/Tail = (%d,%d), want (3,2)", r.Head, r.Tail)
 	}
 }
 
@@ -56,13 +50,10 @@ func TestOptionsEffective_NWithHeadOverride(t *testing.T) {
 		NSet:    true,
 	}
 
-	r, err := opts.Effective()
-	if err != nil {
-		t.Fatalf("Effective() error: %v", err)
-	}
+	r := opts.ToRunnerConfig()
 
 	if r.Head != 2 || r.Tail != 3 {
-		t.Fatalf("Effective() Head/Tail = (%d,%d), want (2,3)", r.Head, r.Tail)
+		t.Fatalf("ToRunnerConfig() Head/Tail = (%d,%d), want (2,3)", r.Head, r.Tail)
 	}
 }
 
@@ -76,13 +67,10 @@ func TestOptionsEffective_NWithTailOverride(t *testing.T) {
 		NSet:    true,
 	}
 
-	r, err := opts.Effective()
-	if err != nil {
-		t.Fatalf("Effective() error: %v", err)
-	}
+	r := opts.ToRunnerConfig()
 
 	if r.Head != 0 || r.Tail != 5 {
-		t.Fatalf("Effective() Head/Tail = (%d,%d), want (0,5)", r.Head, r.Tail)
+		t.Fatalf("ToRunnerConfig() Head/Tail = (%d,%d), want (0,5)", r.Head, r.Tail)
 	}
 }
 
@@ -96,13 +84,10 @@ func TestOptionsEffective_NWithBothOverrides(t *testing.T) {
 		NSet:    true,
 	}
 
-	r, err := opts.Effective()
-	if err != nil {
-		t.Fatalf("Effective() error: %v", err)
-	}
+	r := opts.ToRunnerConfig()
 
 	if r.Head != 2 || r.Tail != 3 {
-		t.Fatalf("Effective() Head/Tail = (%d,%d), want (2,3)", r.Head, r.Tail)
+		t.Fatalf("ToRunnerConfig() Head/Tail = (%d,%d), want (2,3)", r.Head, r.Tail)
 	}
 }
 
@@ -122,12 +107,12 @@ template: |
 		ConfigPath: configPath,
 	}
 
-	r, err := opts.Effective()
+	engine, err := opts.CompileTemplates()
 	if err != nil {
-		t.Fatalf("Effective() error: %v", err)
+		t.Fatalf("CompileTemplates() error: %v", err)
 	}
 
-	if r.Template == nil {
+	if engine.Main == nil {
 		t.Fatal("Expected Template to be compiled, got nil")
 	}
 }
@@ -137,7 +122,7 @@ func TestOptionsEffective_MissingConfig(t *testing.T) {
 		ConfigPath: "/path/to/non/existent/file.yaml",
 	}
 
-	_, err := opts.Effective()
+	_, err := opts.CompileTemplates()
 	if err == nil {
 		t.Fatal("Expected error for missing config file, got nil")
 	}
