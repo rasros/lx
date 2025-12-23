@@ -82,6 +82,11 @@ func NewCommand() *ucli.Command {
 				Usage:       "print line numbers",
 				Destination: &opts.LineNumbers,
 			},
+			&ucli.BoolFlag{
+				Name:        "tokens",
+				Usage:       "print estimated token count to stderr",
+				Destination: &opts.ShowTokens,
+			},
 		},
 
 		Action: func(ctx context.Context, cmd *ucli.Command) error {
