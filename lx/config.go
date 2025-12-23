@@ -13,6 +13,7 @@ type Options struct {
 	PrefixDelimiter  string
 	PostfixDelimiter string
 	LineNumbers      bool
+	ShowTokens       bool
 }
 
 // Effective derives a fully configured Runner from the options, applying
@@ -67,5 +68,6 @@ func (o Options) Effective() Runner {
 		o.PrefixDelimiter,
 		o.PostfixDelimiter,
 		o.LineNumbers,
+		o.ShowTokens,
 	)
 }
