@@ -17,7 +17,7 @@ func TestRunner_DefaultDelimitersAndPlaceholders(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := NewRunner(0, 0, "", "", false)
+	r := NewRunner(0, 0, "", "", false, false)
 
 	if err := r.Run([]string{path}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
@@ -108,7 +108,7 @@ func TestRunner_MultipleFiles(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := NewRunner(0, 0, "", "", false)
+	r := NewRunner(0, 0, "", "", false, false)
 
 	if err := r.Run([]string{p1, p2}, &buf); err != nil {
 		t.Fatalf("Run error: %v", err)
@@ -125,7 +125,7 @@ func TestRunner_MultipleFiles(t *testing.T) {
 
 func TestRunner_FileNotFound(t *testing.T) {
 	var buf bytes.Buffer
-	r := NewRunner(0, 0, "", "", false)
+	r := NewRunner(0, 0, "", "", false, false)
 
 	err := r.Run([]string{"no_such_file.txt"}, &buf)
 	if err == nil {
