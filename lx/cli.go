@@ -272,6 +272,7 @@ func processStream(parsed *ParsedArgs) error {
 }
 
 func reorderTrailingOps(ops []Op) []Op {
+	// 1. Identify the last action in the stream.
 	lastActionIdx := -1
 	for i := len(ops) - 1; i >= 0; i-- {
 		if ops[i].Type == CmdAction {
@@ -280,10 +281,12 @@ func reorderTrailingOps(ops []Op) []Op {
 		}
 	}
 
+	// If no actions or last action is the very last element, nothing to reorder.
 	if lastActionIdx == -1 || lastActionIdx == len(ops)-1 {
 		return ops
 	}
 
+	// 2. Separate subsequent items into modifiers (Interleaved) and others.
 	modifiers := make([]Op, 0)
 	others := make([]Op, 0)
 
@@ -299,10 +302,22 @@ func reorderTrailingOps(ops []Op) []Op {
 		return ops
 	}
 
+	// 3. Find the *start* of the contiguous block of Actions ending at lastActionIdx.
+	// We scan backwards from lastActionIdx to find where the sequence of Actions began.
+	firstActionIdx := lastActionIdx
+	for i := lastActionIdx - 1; i >= 0; i-- {
+		if ops[i].Type == CmdAction {
+			firstActionIdx = i
+		} else {
+			break
+		}
+	}
+
+	// 4. Construct new sequence: [Before Block] + [Modifiers] + [Block] + [Others]
 	newOps := make([]Op, 0, len(ops))
-	newOps = append(newOps, ops[:lastActionIdx]...)
+	newOps = append(newOps, ops[:firstActionIdx]...)
 	newOps = append(newOps, modifiers...)
-	newOps = append(newOps, ops[lastActionIdx])
+	newOps = append(newOps, ops[firstActionIdx:lastActionIdx+1]...)
 	newOps = append(newOps, others...)
 
 	return newOps
@@ -316,17 +331,17 @@ USAGE:
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
 {{- end }}
 
 INTERLEAVED OPTIONS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
 {{- end }}
 
 ACTIONS (printed in order):
 {{- range .Actions }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
 {{- end }}
 
 EXAMPLE:
