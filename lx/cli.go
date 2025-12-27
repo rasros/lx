@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"runtime/debug"
+	"runtime/pprof"
 	"strconv"
 	"text/template"
 )
@@ -28,6 +30,8 @@ var definitions = []CommandDef{
 	{Name: "config", Short: "y", Type: CmdGlobal, ValueType: ValueAny, Usage: "path to yaml config file"},
 	{Name: "version", Short: "V", Type: CmdGlobal, ValueType: ValueNone, Usage: "print the version"},
 	{Name: "help", Short: "h", Type: CmdGlobal, ValueType: ValueNone, Usage: "show help"},
+	{Name: "cpuprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "write cpu profile to file"},
+	{Name: "memprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "write memory profile to file"},
 
 	// Interleaved Options
 	{Name: "line-numbers", Short: "l", Type: CmdInterleaved, ValueType: ValueNone, Usage: "print line numbers"},
@@ -49,6 +53,12 @@ func Run(ctx context.Context, args []string) error {
 		return err
 	}
 
+	stopProfiling, err := setupProfiling(parsed)
+	if err != nil {
+		return err
+	}
+	defer stopProfiling()
+
 	if done := handleGlobals(parsed); done {
 		return nil
 	}
@@ -63,6 +73,57 @@ func Run(ctx context.Context, args []string) error {
 	}
 
 	return processStream(parsed)
+}
+
+// setupProfiling returns a cleanup function that must be deferred by the caller.
+func setupProfiling(parsed *ParsedArgs) (func(), error) {
+	var onExit []func()
+
+	// Helper to execute all cleanup functions in LIFO order
+	cleanup := func() {
+		for i := len(onExit) - 1; i >= 0; i-- {
+			onExit[i]()
+		}
+	}
+
+	// 1. CPU Profiling
+	if path, ok := parsed.Globals["cpuprofile"]; ok {
+		f, err := os.Create(path)
+		if err != nil {
+			return cleanup, fmt.Errorf("create cpu profile: %w", err)
+		}
+
+		if err := pprof.StartCPUProfile(f); err != nil {
+			f.Close()
+			return cleanup, fmt.Errorf("start cpu profile: %w", err)
+		}
+
+		onExit = append(onExit, func() {
+			pprof.StopCPUProfile()
+			f.Close()
+		})
+	}
+
+	// 2. Memory Profiling
+	if path, ok := parsed.Globals["memprofile"]; ok {
+		onExit = append(onExit, func() {
+			f, err := os.Create(path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "create mem profile: %v\n", err)
+				return
+			}
+			defer f.Close()
+
+			// Run GC to exclude transient objects from the profile
+			runtime.GC()
+
+			if err := pprof.WriteHeapProfile(f); err != nil {
+				fmt.Fprintf(os.Stderr, "write mem profile: %v\n", err)
+			}
+		})
+	}
+
+	return cleanup, nil
 }
 
 func handleGlobals(parsed *ParsedArgs) bool {

@@ -189,13 +189,13 @@ func TestRun_Integration(t *testing.T) {
 		{
 			name:        "explicit compact mode via -n0",
 			args:        []string{"-n0", f1},
-			want:        []string{"- skipped (3 rows)"},
+			want:        []string{"(3 rows)"}, // Updated string for new template
 			wantMissing: []string{"1-one"},
 		},
 		{
 			name:        "compact mode toggle via -n0 then reset via -N",
 			args:        []string{"-n0", f1, "-N", f2},
-			want:        []string{"- skipped (3 rows)", "2-A", "2-B"},
+			want:        []string{"(3 rows)", "2-A", "2-B"}, // Updated string
 			wantMissing: []string{"1-one"},
 		},
 	}

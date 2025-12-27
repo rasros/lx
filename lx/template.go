@@ -30,7 +30,7 @@ type FileContext struct {
 	TotalRows     int
 	IsEstimate    bool
 	Language      string
-	Content       string
+	Content       interface{}
 	IsBinary      bool
 	IsCompactView bool
 	FileIndex     int
@@ -52,11 +52,14 @@ func TemplateFuncs() template.FuncMap {
 			val := float64(s) / math.Pow(1000, e)
 			return fmt.Sprintf("%.1f %s", val, suffix)
 		},
-		"endNewline": func(s string) string {
-			if s != "" && !strings.HasSuffix(s, "\n") {
-				return s + "\n"
+		"endNewline": func(s interface{}) string {
+			if str, ok := s.(string); ok {
+				if str != "" && !strings.HasSuffix(str, "\n") {
+					return str + "\n"
+				}
+				return str
 			}
-			return s
+			return fmt.Sprintf("%v", s)
 		},
 	}
 }
