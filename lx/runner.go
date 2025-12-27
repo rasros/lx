@@ -6,9 +6,6 @@ import (
 	"os"
 )
 
-// 10MB Threshold for switching strategies
-const LargeFileThreshold = 10 * 1024 * 1024
-
 type Runner struct {
 	Config RunnerConfig
 	Engine *TemplateEngine
@@ -36,47 +33,56 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 	}
 
 	fileSize := info.Size()
-	isLarge := fileSize > LargeFileThreshold
+
+	// Mode Detection
 	isExplicitCompact := r.Config.Head == 0 && r.Config.Tail == 0
+	isUnlimited := r.Config.Head < 0 && r.Config.Tail < 0
 
-	// Use Seek Strategy only for Large Files with explicit limits
-	hasLimits := r.Config.Head >= 0 || r.Config.Tail >= 0
-	useSeekStrategy := isLarge && (hasLimits || isExplicitCompact)
-
-	var view []byte
-	var totalRows int
-	var isEstimate bool
-	var language string
-	var isBin bool
+	var (
+		headBytes, tailBytes, gapBytes []byte
+		totalRows                      int
+		isEstimate                     bool
+		language                       string
+		isBin                          bool
+	)
 
 	if prevCompact && !isExplicitCompact {
 		out.Write([]byte("\n"))
 	}
 
-	if useSeekStrategy {
-		// --- STRATEGY: LARGE FILE (Seek & Estimate) ---
-		f, err := os.Open(path)
-		if err != nil {
-			return false, err
-		}
-		defer f.Close()
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
 
-		if isExplicitCompact {
-			totalRows, _ = EstimateLineCount(f, fileSize)
-			isEstimate = true
-		} else {
-			header := make([]byte, 1024)
-			n, _ := f.ReadAt(header, 0)
-			isBin = IsBinary(header[:n])
+	if isExplicitCompact {
+		// Just estimate count, read nothing
+		var exact bool
+		totalRows, exact, _ = EstimateLineCount(f, fileSize)
+		isEstimate = !exact
+	} else {
+		// 1. Binary Check
+		header := make([]byte, 1024)
+		n, _ := f.ReadAt(header, 0)
+		isBin = IsBinary(header[:n])
 
-			if !isBin {
-				totalRows, _ = EstimateLineCount(f, fileSize)
-				isEstimate = true
+		if !isBin {
+			if isUnlimited {
+				// Read Everything
+				f.Seek(0, 0)
+				headBytes, totalRows, _ = ReadHead(f, -1)
+				// isEstimate remains false because we counted exactly
+			} else {
+				// Limited View (Head/Tail)
+				var exact bool
+				totalRows, exact, _ = EstimateLineCount(f, fileSize)
+				isEstimate = !exact
 
 				if r.Config.Head > 0 {
 					f.Seek(0, 0)
-					headBytes, _ := ReadHead(f, r.Config.Head)
-					view = append(view, headBytes...)
+					// We discard the count from ReadHead because we rely on the global estimate/exact count
+					headBytes, _, _ = ReadHead(f, r.Config.Head)
 				}
 
 				if r.Config.Tail > 0 {
@@ -85,57 +91,47 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 						if skipped < 0 {
 							skipped = 0
 						}
-						view = append(view, []byte(fmt.Sprintf("... (~%d rows skipped)\n", skipped))...)
-					}
-					tailBytes, _ := ReadTailSeek(f, r.Config.Tail)
-					view = append(view, tailBytes...)
-				}
 
+						// Condition the tilde on whether the total count was estimated
+						tilde := ""
+						if isEstimate {
+							tilde = "~"
+						}
+						gapBytes = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
+					}
+					tailBytes, _ = ReadTailSeek(f, r.Config.Tail)
+				}
+			}
+
+			// Detect language from whatever head content we have
+			if len(headBytes) > 0 {
+				language = DetectLanguage(path, headBytes)
+			} else if n > 0 {
 				language = DetectLanguage(path, header[:n])
 			}
 		}
+	}
 
-	} else {
-		// --- STRATEGY: READ STREAM ---
-		// Used for Small files OR Large files with "Unlimited" output
-		f, err := os.Open(path)
-		if err != nil {
-			return false, err
+	var content interface{}
+	// Use Formatter if LineNumbers are requested
+	if r.Config.LineNumbers && !isBin && !isExplicitCompact {
+		content = LineNumberFormatter{
+			Head:      headBytes,
+			Gap:       gapBytes,
+			Tail:      tailBytes,
+			TotalRows: totalRows,
 		}
-		defer f.Close()
-
-		res, err := ReadStream(f, r.Config.Head, r.Config.Tail)
-		if err != nil {
-			// If ReadStream fails (e.g. token too long/binary), return error or treat as binary?
-			// lx usually returns error here.
-			return false, fmt.Errorf("read stream %q: %w", path, err)
-		}
-
-		totalRows = res.TotalRows
-		isBin = !isExplicitCompact && len(res.HeadBytes) > 0 && IsBinary(res.HeadBytes)
-		if res.TotalRows == 0 && len(res.HeadBytes) == 0 {
-			isExplicitCompact = true
-		}
-
-		if !isBin && !isExplicitCompact {
-			view = res.HeadBytes
-
-			// Append Gap if needed
-			if r.Config.Head > 0 && r.Config.Tail > 0 {
-				skipped := totalRows - r.Config.Head - r.Config.Tail
-				if skipped > 0 {
-					view = append(view, []byte(fmt.Sprintf("... (%d rows skipped)\n", skipped))...)
-				}
-			}
-
-			view = append(view, res.TailBytes...)
-			language = DetectLanguage(path, res.HeadBytes)
-
-			if r.Config.LineNumbers {
-				// Note: Numbering logic in lines.go requires valid slices.
-				// Since we constructed view manually, addLineNumbers will re-split it.
-				view = addLineNumbers(view, totalRows, r.Config.Head, r.Config.Tail)
-			}
+	} else if !isBin && !isExplicitCompact {
+		// Fallback to string concatenation for standard output
+		if len(tailBytes) == 0 && len(gapBytes) == 0 {
+			content = string(headBytes)
+		} else {
+			totalLen := len(headBytes) + len(gapBytes) + len(tailBytes)
+			buf := make([]byte, 0, totalLen)
+			buf = append(buf, headBytes...)
+			buf = append(buf, gapBytes...)
+			buf = append(buf, tailBytes...)
+			content = string(buf)
 		}
 	}
 
@@ -146,7 +142,7 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 		TotalRows:     totalRows,
 		IsEstimate:    isEstimate,
 		Language:      language,
-		Content:       string(view),
+		Content:       content,
 		IsBinary:      isBin,
 		IsCompactView: isExplicitCompact || isBin || fileSize == 0,
 		FileIndex:     index,

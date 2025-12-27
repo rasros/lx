@@ -3,16 +3,86 @@ package lx
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"math"
 	"os"
 	"strconv"
 )
 
+// LineNumberFormatter handles printing distinct chunks (Head/Tail) with correct line numbers.
+type LineNumberFormatter struct {
+	Head      []byte
+	Gap       []byte
+	Tail      []byte
+	TotalRows int
+}
+
+func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
+	width := 1
+	if lnf.TotalRows > 9 {
+		width = int(math.Log10(float64(lnf.TotalRows))) + 1
+	}
+
+	numBuf := make([]byte, 0, 20)
+	spaces := []byte("          ")
+	colon := []byte(": ")
+
+	printChunk := func(data []byte, startRow int) {
+		currentRow := startRow
+		offset := 0
+		write := func(b []byte) { f.Write(b) }
+
+		for offset < len(data) {
+			idx := bytes.IndexByte(data[offset:], '\n')
+			end := offset + idx
+			if idx == -1 {
+				end = len(data)
+			} else {
+				end++
+			}
+
+			numBuf = strconv.AppendInt(numBuf[:0], int64(currentRow), 10)
+			padLen := width - len(numBuf)
+			if padLen > 0 {
+				for len(spaces) < padLen {
+					spaces = append(spaces, ' ')
+				}
+				write(spaces[:padLen])
+			}
+
+			write(numBuf)
+			write(colon)
+			write(data[offset:end])
+
+			currentRow++
+			offset = end
+		}
+	}
+
+	if len(lnf.Head) > 0 {
+		printChunk(lnf.Head, 1)
+	}
+
+	if len(lnf.Gap) > 0 {
+		f.Write(lnf.Gap)
+	}
+
+	if len(lnf.Tail) > 0 {
+		tailCount := countLines(lnf.Tail)
+		startRow := lnf.TotalRows - tailCount + 1
+		if startRow < 1 {
+			startRow = 1
+		}
+		printChunk(lnf.Tail, startRow)
+	}
+}
+
 // EstimateLineCount reads the first 4KB to calculate an average line length.
-func EstimateLineCount(r io.ReaderAt, fileSize int64) (int, error) {
+// Returns isExact=true if the file was smaller than the sample buffer.
+func EstimateLineCount(r io.ReaderAt, fileSize int64) (int, bool, error) {
 	if fileSize == 0 {
-		return 0, nil
+		return 0, true, nil
 	}
 
 	const sampleSize = 4096
@@ -20,48 +90,56 @@ func EstimateLineCount(r io.ReaderAt, fileSize int64) (int, error) {
 
 	n, err := r.ReadAt(buf, 0)
 	if err != nil && err != io.EOF {
-		return 0, err
+		return 0, false, err
 	}
 
 	if int64(n) >= fileSize {
-		return countLines(buf[:n]), nil
+		return countLines(buf[:n]), true, nil
 	}
 
 	newlineCount := bytes.Count(buf[:n], []byte("\n"))
 	if newlineCount == 0 {
-		return 1, nil
+		return 1, false, nil
 	}
 
 	avgLineLen := float64(n) / float64(newlineCount)
 	if avgLineLen == 0 {
-		return 0, nil
+		return 0, false, nil
 	}
 
 	estimated := int(float64(fileSize) / avgLineLen)
-	return estimated, nil
+	return estimated, false, nil
 }
 
-// ReadHead reads the first N lines from a reader.
-func ReadHead(r io.Reader, n int) ([]byte, error) {
-	if n <= 0 {
-		return nil, nil
+// ReadHead reads the first N lines. If n < 0, reads the entire file.
+// Returns the data and the exact number of lines read.
+func ReadHead(r io.Reader, n int) ([]byte, int, error) {
+	if n == 0 {
+		return nil, 0, nil
 	}
+
 	var buf bytes.Buffer
 	sc := bufio.NewScanner(r)
+
+	// Increase buffer size to handle reasonably long lines in large files
+	scanBuf := make([]byte, 0, 64*1024)
+	sc.Buffer(scanBuf, 10*1024*1024)
+
 	linesRead := 0
+	readAll := n < 0
 
 	for sc.Scan() {
+		// Scanned bytes are overwritten on next call, so we must write to buffer immediately
 		buf.Write(sc.Bytes())
 		buf.WriteByte('\n')
 		linesRead++
-		if linesRead >= n {
+		if !readAll && linesRead >= n {
 			break
 		}
 	}
-	return buf.Bytes(), sc.Err()
+	return buf.Bytes(), linesRead, sc.Err()
 }
 
-// ReadTailSeek reads the last N lines by seeking backwards.
 func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 	if linesWanted <= 0 {
 		return nil, nil
@@ -78,7 +156,8 @@ func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 		return nil, nil
 	}
 
-	var result []byte
+	// Store chunks in a list to avoid repetitive prepend allocations (O(N^2))
+	var chunks [][]byte
 	linesFound := 0
 	offset := fileSize
 
@@ -97,7 +176,22 @@ func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 		count := bytes.Count(buf, []byte("\n"))
 		linesFound += count
 
-		result = append(buf, result...)
+		chunks = append(chunks, buf)
+	}
+
+	// Calculate total size and allocate once
+	totalLen := 0
+	for _, chunk := range chunks {
+		totalLen += len(chunk)
+	}
+
+	result := make([]byte, totalLen)
+	currentPos := 0
+
+	// Assemble result: iterate backwards because chunks were appended from end of file to start
+	for i := len(chunks) - 1; i >= 0; i-- {
+		copy(result[currentPos:], chunks[i])
+		currentPos += len(chunks[i])
 	}
 
 	extraLines := linesFound - linesWanted
@@ -107,75 +201,6 @@ func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 	}
 
 	return result, nil
-}
-
-type StreamResult struct {
-	HeadBytes []byte
-	TailBytes []byte
-	TotalRows int
-}
-
-func ReadStream(r io.Reader, headLimit, tailLimit int) (StreamResult, error) {
-	res := StreamResult{}
-
-	sc := bufio.NewScanner(r)
-	buf := make([]byte, 0, 64*1024)
-	sc.Buffer(buf, 10*1024*1024)
-
-	var tailRing []string
-	if tailLimit > 0 {
-		tailRing = make([]string, 0, tailLimit)
-	}
-
-	tailRingIdx := 0
-	tailFull := false
-	captureAll := headLimit < 0
-
-	for sc.Scan() {
-		line := sc.Text()
-		res.TotalRows++
-
-		if captureAll || (headLimit > 0 && res.TotalRows <= headLimit) {
-			res.HeadBytes = append(res.HeadBytes, []byte(line)...)
-			res.HeadBytes = append(res.HeadBytes, '\n')
-		}
-
-		if !captureAll && tailLimit > 0 {
-			if len(tailRing) < tailLimit {
-				tailRing = append(tailRing, line)
-			} else {
-				tailRing[tailRingIdx] = line
-				tailRingIdx = (tailRingIdx + 1) % tailLimit
-				tailFull = true
-			}
-		}
-	}
-
-	if err := sc.Err(); err != nil {
-		return res, err
-	}
-
-	if !captureAll && tailLimit > 0 && len(tailRing) > 0 {
-		var tailBuf bytes.Buffer
-		count := len(tailRing)
-		start := 0
-		if tailFull {
-			start = tailRingIdx
-		}
-
-		for i := 0; i < count; i++ {
-			idx := (start + i) % count
-			lineNum := res.TotalRows - count + 1 + i
-
-			if lineNum > headLimit {
-				tailBuf.WriteString(tailRing[idx])
-				tailBuf.WriteByte('\n')
-			}
-		}
-		res.TailBytes = tailBuf.Bytes()
-	}
-
-	return res, nil
 }
 
 func countLines(data []byte) int {
@@ -200,75 +225,4 @@ func findNthNewline(data []byte, n int) int {
 		}
 	}
 	return len(data)
-}
-
-// addLineNumbers optimized for speed on large files.
-// It avoids split overhead and fmt.Sprintf.
-func addLineNumbers(data []byte, totalRows, head, tail int) []byte {
-	if len(data) == 0 {
-		return data
-	}
-
-	// Calculate padding width
-	width := 1
-	if totalRows > 9 {
-		width = int(math.Log10(float64(totalRows))) + 1
-	}
-
-	// Pre-allocate buffer to avoid resizing
-	// Estimate: Original Data + (Rows * (Width + 2 chars for ": "))
-	lineCount := countLines(data)
-	estSize := len(data) + lineCount*(width+2)
-	buf := make([]byte, 0, estSize)
-
-	// Determine start row.
-	// This simplified logic matches the usage in runner.go for standard reads.
-	startRow := 1
-	if tail > 0 && head <= 0 {
-		startRow = totalRows - tail + 1
-	}
-
-	// Reusable buffer for integer conversion
-	numBuf := make([]byte, 0, 20)
-	spaces := []byte("          ") // pre-allocated spaces for padding
-	colon := []byte(": ")
-
-	currentRow := startRow
-	offset := 0
-
-	for offset < len(data) {
-		// Find next newline
-		idx := bytes.IndexByte(data[offset:], '\n')
-		end := offset + idx
-		if idx == -1 {
-			end = len(data)
-		} else {
-			end++ // Include the newline
-		}
-
-		// 1. Format Number
-		numBuf = strconv.AppendInt(numBuf[:0], int64(currentRow), 10)
-
-		// 2. Add Padding
-		padLen := width - len(numBuf)
-		if padLen > 0 {
-			// Grow spaces if needed (rare)
-			for len(spaces) < padLen {
-				spaces = append(spaces, ' ')
-			}
-			buf = append(buf, spaces[:padLen]...)
-		}
-
-		// 3. Write "N: "
-		buf = append(buf, numBuf...)
-		buf = append(buf, colon...)
-
-		// 4. Write Line Content
-		buf = append(buf, data[offset:end]...)
-
-		currentRow++
-		offset = end
-	}
-
-	return buf
 }
