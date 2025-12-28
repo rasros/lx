@@ -204,6 +204,7 @@ func determineOutput(globals map[string]string, cfg *lx.Config) (io.Writer, *byt
 func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opts lx.Options, tmplEngine *lx.TemplateEngine, globals map[string]string, cfg *lx.Config) error {
 	totalFiles := 0
 	var totalSize int64
+	totalRows := 0
 	sectionCount := 0
 	var filePaths []string
 	var absFilePaths []string
@@ -232,6 +233,15 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 			} else {
 				absFilePaths = append(absFilePaths, op.Value)
 			}
+
+			// Estimate rows for the global context
+			f, err := os.Open(op.Value)
+			if err == nil {
+				rows, _, _ := lx.EstimateLineCount(f, info.Size())
+				totalRows += rows
+				f.Close()
+			}
+
 		} else if op.Action == "section" {
 			sectionCount++
 		}
@@ -240,6 +250,8 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 	globalCtx := lx.GlobalContext{
 		TotalFiles:    totalFiles,
 		TotalSize:     totalSize,
+		TotalRows:     totalRows,
+		TokenEstimate: lx.EstimateTokens(totalSize),
 		TotalSections: sectionCount + 1,
 		RootPath:      findCommonRoot(filePaths),
 		AbsRootPath:   findCommonRoot(absFilePaths),
@@ -384,7 +396,6 @@ func findCommonRoot(paths []string) string {
 	root := filepath.Dir(paths[0])
 
 	for _, p := range paths[1:] {
-		// While the current path doesn't start with the root, strip back the root
 		for !strings.HasPrefix(p, root+string(filepath.Separator)) && root != "." && root != "/" {
 			parent := filepath.Dir(root)
 			if parent == root {

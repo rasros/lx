@@ -9,6 +9,15 @@ import (
 	"time"
 )
 
+// EstimateTokens returns a rough estimate of the number of tokens in the given size.
+// Currently uses the heuristic: ~4 characters (bytes) per token.
+func EstimateTokens(size int64) int64 {
+	if size <= 0 {
+		return 0
+	}
+	return size / 4
+}
+
 type Runner struct {
 	Config RunnerConfig
 	Engine *TemplateEngine
@@ -142,18 +151,10 @@ func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer
 						}
 						gapBytes = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
 					}
-					// ReadTailSeek expects *os.File for optimization, but we can make it work
-					// If it's stdin, we already have the bytes in memory, so we can slice directly.
-					// However, reusing ReadTailSeek requires refactoring it to accept ReadAt.
-					// For simplicity in this diff, we can use the reader we have.
 					if isStdin {
-						// For stdin/bytes.Reader, we can implement a simple tail logic
-						// or update ReadTailSeek to take io.ReaderAt.
-						// Given "Release Cleanup", let's use a specialized check here.
 						rdr := contentReader.(*bytes.Reader)
 						allData := make([]byte, fileSize)
 						rdr.ReadAt(allData, 0)
-						// Manual tail on buffer
 						tailBytes = tailFromBuffer(allData, r.Config.Tail)
 					} else {
 						tailBytes, _ = ReadTailSeek(contentReader.(*os.File), r.Config.Tail)
@@ -196,6 +197,7 @@ func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer
 		Size:          fileSize,
 		ModTime:       modTime,
 		TotalRows:     totalRows,
+		TokenEstimate: EstimateTokens(fileSize), // Use central logic
 		IsEstimate:    isEstimate,
 		Language:      language,
 		Content:       content,
@@ -222,15 +224,12 @@ func tailFromBuffer(data []byte, lines int) []byte {
 	for i := len(data) - 1; i >= 0; i-- {
 		if data[i] == '\n' {
 			count++
-			// If we found N newlines, we take everything after this index
-			// Note: If file ends with newline, that counts as line 1
 			if i < len(data)-1 && count >= lines {
-				// check edge case for trailing newline
-				// logic mirrors countLines roughly
+				// found break point
 			}
 		}
 	}
-	// Fallback: simple logic, find Nth newline from end
+	// Fallback/Simplicity: simple logic, find Nth newline from end
 	newlinesFound := 0
 	start := 0
 	for i := len(data) - 1; i >= 0; i-- {

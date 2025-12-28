@@ -23,11 +23,15 @@ const DefaultTemplate = `{{ if eq .Size 0 }}` +
 const DefaultSectionTemplate = `## {{ .Body | endNewline }}` + "---\n\n"
 const DefaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
 const DefaultDebugTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
-	`Size: {{ .Global.TotalSize | humanize }}` + "\n"
+	`Total Rows: {{ .Global.TotalRows }}` + "\n" +
+	`Size: {{ .Global.TotalSize | humanize }}` + "\n" +
+	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"
 
 type GlobalContext struct {
 	TotalFiles    int
 	TotalSize     int64
+	TotalRows     int
+	TokenEstimate int64
 	TotalSections int
 	RootPath      string
 	AbsRootPath   string
@@ -41,6 +45,7 @@ type FileContext struct {
 	Size          int64
 	ModTime       time.Time
 	TotalRows     int
+	TokenEstimate int64
 	IsEstimate    bool
 	Language      string
 	Content       interface{}
