@@ -1,7 +1,6 @@
 package lx
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -9,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/pkoukk/tiktoken-go"
 )
 
 type Runner struct {
@@ -104,45 +101,39 @@ func (r Runner) runFile(path string, out io.Writer) error {
 }
 
 func (r Runner) Run(files []string, out io.Writer) error {
-	// if token counting is NOT requested, use the standard efficient loop
-	if !r.ShowTokens {
-		for _, path := range files {
-			if err := r.runFile(path, out); err != nil {
-				return fmt.Errorf("lx: %w", err)
-			}
-		}
-		return nil
+	var counter *byteCounter
+	writer := out
+
+	// If token estimation is requested, wrap the output writer
+	// to count the actual bytes written (headers + content + footers).
+	if r.ShowTokens {
+		counter = &byteCounter{w: out}
+		writer = counter
 	}
 
-	// if token counting is requested, we must buffer the output first
-	var buf bytes.Buffer
 	for _, path := range files {
-		// Write to our buffer instead of directly to 'out'
-		if err := r.runFile(path, &buf); err != nil {
+		if err := r.runFile(path, writer); err != nil {
 			return fmt.Errorf("lx: %w", err)
 		}
 	}
 
-	// calculate and print token to Stderr
-	fullOutput := buf.String()
-	printTokenCount(fullOutput)
-
-	// 2. Write the actual content to the original output
-	if _, err := out.Write(buf.Bytes()); err != nil {
-		return fmt.Errorf("write final output: %w", err)
+	if r.ShowTokens && counter != nil {
+		// Heuristic: ~4 characters (bytes) per token.
+		estimate := counter.total / 4
+		fmt.Fprintf(os.Stderr, "Estimated Tokens: %d\n", estimate)
 	}
 
 	return nil
 }
 
-// Helper function to count tokens using OpenAI's encoding
-func printTokenCount(text string) {
-	tkm, err := tiktoken.GetEncoding("cl100k_base") // standard for GPT-4 / GPT-3.5
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not calculate tokens: %v\n", err)
-		return
-	}
+// byteCounter wraps an io.Writer to track the total number of bytes written.
+type byteCounter struct {
+	w     io.Writer
+	total int64
+}
 
-	tokens := tkm.Encode(text, nil, nil)
-	fmt.Fprintf(os.Stderr, "Estimated Tokens: %d\n", len(tokens))
+func (b *byteCounter) Write(p []byte) (int, error) {
+	n, err := b.w.Write(p)
+	b.total += int64(n)
+	return n, err
 }
