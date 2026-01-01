@@ -3,8 +3,17 @@ set -euo pipefail
 
 REPO="rasros/lx"
 
-# Allow override, e.g. LX_INSTALL_DIR=/usr/local/bin ./install.sh
-INSTALL_DIR="${LX_INSTALL_DIR:-"$HOME/.local/bin"}"
+# Determine install directory
+# 1. Explicit override via LX_INSTALL_DIR
+# 2. System-wide (/usr/local/bin) if running as root
+# 3. User-local ($HOME/.local/bin) otherwise
+if [ -n "${LX_INSTALL_DIR:-}" ]; then
+  INSTALL_DIR="$LX_INSTALL_DIR"
+elif [ "$(id -u)" -eq 0 ]; then
+  INSTALL_DIR="/usr/local/bin"
+else
+  INSTALL_DIR="$HOME/.local/bin"
+fi
 
 log() {
   echo "[lx install] $*" >&2
@@ -106,7 +115,8 @@ Usage:
   curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
 
 Options:
-  LX_INSTALL_DIR   Override install directory (default: \$HOME/.local/bin)
+  LX_INSTALL_DIR   Override install directory
+                   (defaults to /usr/local/bin if root, else \$HOME/.local/bin)
 EOF
     exit 0
   fi
@@ -165,4 +175,3 @@ EOF
 }
 
 main "$@"
-
