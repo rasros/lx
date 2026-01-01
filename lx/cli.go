@@ -324,7 +324,7 @@ func reorderTrailingOps(ops []Op) []Op {
 }
 
 const helpTmpl = `NAME:
-   lx - print files with headers, slicing, and go-templates
+   lx - print files with headers, slicing, using go-templates
 
 USAGE:
    lx [global options] [command state options] [files/actions...]

@@ -127,3 +127,39 @@ func TestOptionsEffective_MissingConfig(t *testing.T) {
 		t.Fatal("Expected error for missing config file, got nil")
 	}
 }
+
+func TestOptionsEffective_ConfigMerging(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	envCfgPath := filepath.Join(tmpDir, "env_config.yaml")
+	envContent := `
+template: "ENV_TEMPLATE"
+section_template: "ENV_SECTION"
+`
+	if err := os.WriteFile(envCfgPath, []byte(envContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cliCfgPath := filepath.Join(tmpDir, "cli_config.yaml")
+	cliContent := `
+template: "CLI_TEMPLATE"
+`
+	if err := os.WriteFile(cliCfgPath, []byte(cliContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("LX_CONFIG", envCfgPath)
+
+	opts := Options{
+		ConfigPath: cliCfgPath,
+	}
+
+	engine, err := opts.CompileTemplates()
+	if err != nil {
+		t.Fatalf("CompileTemplates failed: %v", err)
+	}
+
+	if engine.Main == nil {
+		t.Fatal("Engine Main is nil")
+	}
+}

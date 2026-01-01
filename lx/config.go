@@ -3,6 +3,7 @@ package lx
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/template"
 
 	"gopkg.in/yaml.v3"
@@ -42,9 +43,8 @@ type Options struct {
 }
 
 // ToRunnerConfig calculates the effective head/tail numbers for the current state.
-// This is fast and safe to call inside the file loop.
 func (o Options) ToRunnerConfig() RunnerConfig {
-	effHead, effTail := -1, -1 // Default to -1 (Unlimited)
+	effHead, effTail := -1, -1 // Unlimited
 
 	if o.NSet {
 		if o.NBoth == 0 {
@@ -94,27 +94,50 @@ func (o Options) ToRunnerConfig() RunnerConfig {
 	}
 }
 
-// CompileTemplates loads the config file (if any) and compiles the templates.
-// This should be called exactly once per program execution.
+// CompileTemplates loads config files and compiles templates.
+// Priority: ~/.config/lx/config.yaml -> LX_CONFIG -> --config/-y
 func (o Options) CompileTemplates() (*TemplateEngine, error) {
-	tmplStr := DefaultTemplate
-	sectionTmplStr := DefaultSectionTemplate
-	promptTmplStr := DefaultPromptTemplate
+	var cfg Config
 
+	// 1. Default: ~/.config/lx/config.yaml
+	configDir, err := os.UserConfigDir()
+	if err == nil {
+		// On Linux: ~/.config/lx/config.yaml
+		// On Mac:   ~/Library/Application Support/lx/config.yaml
+		// On Win:   %APPDATA%\lx\config.yaml
+		defPath := filepath.Join(configDir, "lx", "config.yaml")
+		if err := mergeConfig(&cfg, defPath, false); err != nil {
+			return nil, fmt.Errorf("load default config: %w", err)
+		}
+	}
+
+	// 2. Env: LX_CONFIG
+	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
+		if err := mergeConfig(&cfg, envPath, false); err != nil {
+			return nil, fmt.Errorf("load env config: %w", err)
+		}
+	}
+
+	// 3. CLI: --config
 	if o.ConfigPath != "" {
-		cfg, err := loadConfig(o.ConfigPath)
-		if err != nil {
-			return nil, fmt.Errorf("load config: %w", err)
+		if err := mergeConfig(&cfg, o.ConfigPath, true); err != nil {
+			return nil, fmt.Errorf("load cli config: %w", err)
 		}
-		if cfg.Template != "" {
-			tmplStr = cfg.Template
-		}
-		if cfg.SectionTemplate != "" {
-			sectionTmplStr = cfg.SectionTemplate
-		}
-		if cfg.PromptTemplate != "" {
-			promptTmplStr = cfg.PromptTemplate
-		}
+	}
+
+	tmplStr := DefaultTemplate
+	if cfg.Template != "" {
+		tmplStr = cfg.Template
+	}
+
+	sectionTmplStr := DefaultSectionTemplate
+	if cfg.SectionTemplate != "" {
+		sectionTmplStr = cfg.SectionTemplate
+	}
+
+	promptTmplStr := DefaultPromptTemplate
+	if cfg.PromptTemplate != "" {
+		promptTmplStr = cfg.PromptTemplate
 	}
 
 	funcs := TemplateFuncs()
@@ -140,17 +163,20 @@ func (o Options) CompileTemplates() (*TemplateEngine, error) {
 	}, nil
 }
 
-func loadConfig(path string) (*Config, error) {
+// mergeConfig decodes a YAML file into the provided Config struct.
+// strict determines if a missing file returns an error.
+func mergeConfig(cfg *Config, path string, strict bool) error {
 	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		if strict {
+			return err
+		}
+		return nil
+	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer f.Close()
 
-	var cfg Config
-	dec := yaml.NewDecoder(f)
-	if err := dec.Decode(&cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
+	return yaml.NewDecoder(f).Decode(cfg)
 }
