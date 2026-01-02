@@ -151,8 +151,6 @@ var shebangToLang = map[string]string{
 	"make":    "makefile",
 }
 
-// IsBinary checks if the data looks like binary content.
-// It checks for null bytes in the first 1024 bytes or invalid UTF-8.
 func IsBinary(data []byte) bool {
 	limit := 1024
 	if len(data) < limit {
@@ -167,9 +165,6 @@ func IsBinary(data []byte) bool {
 	return !utf8.Valid(data)
 }
 
-// DetectLanguage returns a language identifier based on file path and content.
-// It prioritizes exact filenames, then pattern matching (Dockerfile.*),
-// then file extensions, and finally falls back to Shebang detection.
 func DetectLanguage(path string, data []byte) string {
 	base := strings.ToLower(filepath.Base(path))
 	if lang, ok := filenameToLang[base]; ok {
@@ -184,7 +179,6 @@ func DetectLanguage(path string, data []byte) string {
 	return parseShebang(data)
 }
 
-// parseShebang reads the first line of data to detect standard interpreters.
 func parseShebang(data []byte) string {
 	if len(data) < 2 || data[0] != '#' || data[1] != '!' {
 		return ""

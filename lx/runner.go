@@ -34,7 +34,6 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 
 	fileSize := info.Size()
 
-	// Mode Detection
 	isExplicitCompact := r.Config.Head == 0 && r.Config.Tail == 0
 	isUnlimited := r.Config.Head < 0 && r.Config.Tail < 0
 
@@ -57,31 +56,25 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 	defer f.Close()
 
 	if isExplicitCompact {
-		// Just estimate count, read nothing
 		var exact bool
 		totalRows, exact, _ = EstimateLineCount(f, fileSize)
 		isEstimate = !exact
 	} else {
-		// 1. Binary Check
 		header := make([]byte, 1024)
 		n, _ := f.ReadAt(header, 0)
 		isBin = IsBinary(header[:n])
 
 		if !isBin {
 			if isUnlimited {
-				// Read Everything
 				f.Seek(0, 0)
 				headBytes, totalRows, _ = ReadHead(f, -1)
-				// isEstimate remains false because we counted exactly
 			} else {
-				// Limited View (Head/Tail)
 				var exact bool
 				totalRows, exact, _ = EstimateLineCount(f, fileSize)
 				isEstimate = !exact
 
 				if r.Config.Head > 0 {
 					f.Seek(0, 0)
-					// We discard the count from ReadHead because we rely on the global estimate/exact count
 					headBytes, _, _ = ReadHead(f, r.Config.Head)
 				}
 
@@ -92,7 +85,6 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 							skipped = 0
 						}
 
-						// Condition the tilde on whether the total count was estimated
 						tilde := ""
 						if isEstimate {
 							tilde = "~"
@@ -103,7 +95,6 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 				}
 			}
 
-			// Detect language from whatever head content we have
 			if len(headBytes) > 0 {
 				language = DetectLanguage(path, headBytes)
 			} else if n > 0 {
@@ -113,7 +104,6 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 	}
 
 	var content interface{}
-	// Use Formatter if LineNumbers are requested
 	if r.Config.LineNumbers && !isBin && !isExplicitCompact {
 		content = LineNumberFormatter{
 			Head:      headBytes,
@@ -122,7 +112,6 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 			TotalRows: totalRows,
 		}
 	} else if !isBin && !isExplicitCompact {
-		// Fallback to string concatenation for standard output
 		if len(tailBytes) == 0 && len(gapBytes) == 0 {
 			content = string(headBytes)
 		} else {

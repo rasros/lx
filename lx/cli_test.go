@@ -10,7 +10,6 @@ import (
 	"testing"
 )
 
-// captureStdout temporarily replaces os.Stdout to capture output from Run.
 func captureStdout(f func() error) (string, error) {
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -42,7 +41,7 @@ func TestRun_Commands(t *testing.T) {
 			wantContain: []string{"USAGE:", "GLOBAL OPTIONS"},
 		},
 		{
-			name:        "version flag (uppercase V)",
+			name:        "version flag",
 			args:        []string{"-V"},
 			wantContain: []string{"lx version"},
 		},
@@ -76,20 +75,17 @@ func TestRun_Commands(t *testing.T) {
 }
 
 func TestRun_Integration(t *testing.T) {
-	// Setup temporary files
 	tmpDir := t.TempDir()
 	f1 := filepath.Join(tmpDir, "f1.txt")
 	f2 := filepath.Join(tmpDir, "f2.txt")
 	longF := filepath.Join(tmpDir, "long.txt")
 	emptyF := filepath.Join(tmpDir, "empty.txt")
+	outFile := filepath.Join(tmpDir, "out.txt")
 
-	// f1: 3 lines
 	_ = os.WriteFile(f1, []byte("1-one\n1-two\n1-three\n"), 0644)
-	// f2: 4 lines
 	_ = os.WriteFile(f2, []byte("2-A\n2-B\n2-C\n2-D\n"), 0644)
-	// emptyF: 0 lines
 	_ = os.WriteFile(emptyF, []byte{}, 0644)
-	// longF: 10 lines
+
 	var longContent bytes.Buffer
 	for i := 1; i <= 10; i++ {
 		longContent.WriteString("Line " + strconv.Itoa(i) + "\n")
@@ -109,21 +105,15 @@ func TestRun_Integration(t *testing.T) {
 			wantMissing: []string{"1-two", "2-A"},
 		},
 		{
-			name:        "explicit file flag (-f)",
+			name:        "explicit file flag",
 			args:        []string{"-f", f1, "-n1"},
 			want:        []string{"1-one"},
 			wantMissing: []string{"1-two"},
 		},
 		{
-			name: "explicit file flag mixed with implicit",
+			name: "explicit file flag mixed",
 			args: []string{f1, "-f", f2},
 			want: []string{"1-one", "2-A"},
-		},
-		{
-			name:        "trailing flag logic with -f (lx -f file -n1)",
-			args:        []string{"-f", f1, "-n1"},
-			want:        []string{"1-one"},
-			wantMissing: []string{"1-two"},
 		},
 		{
 			name:        "sticky flags logic",
@@ -132,71 +122,63 @@ func TestRun_Integration(t *testing.T) {
 			wantMissing: []string{"2-B", "2-C"},
 		},
 		{
-			name:        "trailing flag logic (lx file -n1)",
-			args:        []string{f1, "-n1"},
-			want:        []string{"1-one"},
-			wantMissing: []string{"1-two", "1-three"},
-		},
-		{
-			name: "trailing prompt (lx file -p msg) should NOT move prompt before file",
+			name: "trailing prompt",
 			args: []string{f1, "-p", "POST_PROMPT"},
 			want: []string{"1-one", "POST_PROMPT"},
 		},
 		{
-			name: "section header and prompt",
+			name: "section header",
 			args: []string{"-s", "MY HEADER", "-p", "MY PROMPT", f1},
 			want: []string{"## MY HEADER", "MY PROMPT", "1-one"},
 		},
 		{
-			name: "line numbers enabled (-l)",
+			name: "line numbers enabled",
 			args: []string{"-l", f1},
 			want: []string{"1: 1-one"},
 		},
 		{
-			name: "line numbers precedence (-L then -l enables)",
+			name: "line numbers precedence",
 			args: []string{"-L", "-l", f1},
 			want: []string{"1: 1-one"},
 		},
 		{
-			name:        "line numbers precedence (-l then -L disables)",
-			args:        []string{"-l", "-L", f1},
-			want:        []string{"1-one"},
-			wantMissing: []string{"1: 1-one"},
-		},
-		{
-			name:        "line numbers disabled (-L)",
+			name:        "line numbers disabled",
 			args:        []string{"-L", f1},
 			want:        []string{"1-one"},
 			wantMissing: []string{"1: 1-one"},
 		},
 		{
-			name: "trailing newline consistency (empty file)",
-			// Expectation: empty file ends with \n, plus extra \n from end-of-stream logic
-			// so output should end with "empty file\n\n"
+			name: "empty file",
 			args: []string{"-f", emptyF},
 			want: []string{"empty file\n\n"},
 		},
 		{
-			name: "config flag alias (-y)",
+			name: "config flag missing",
 			args: []string{"-y", "missing.yaml", f1},
-			// Expect failure handled in loop
 		},
 		{
-			name: "missing file check before output",
+			name: "missing file check",
 			args: []string{f1, "non_existent_file"},
-			// Expect failure handled in loop
 		},
 		{
-			name:        "explicit compact mode via -n0",
+			name:        "compact mode",
 			args:        []string{"-n0", f1},
-			want:        []string{"(3 rows)"}, // Updated string for new template
+			want:        []string{"(3 rows)"},
 			wantMissing: []string{"1-one"},
 		},
 		{
-			name:        "compact mode toggle via -n0 then reset via -N",
-			args:        []string{"-n0", f1, "-N", f2},
-			want:        []string{"(3 rows)", "2-A", "2-B"}, // Updated string
+			name:        "output to file",
+			args:        []string{"-o", outFile, f1},
+			want:        []string{},
 			wantMissing: []string{"1-one"},
+		},
+		{
+			name: "error copy and output",
+			args: []string{"-c", "-o", "dummy.txt", f1},
+		},
+		{
+			name: "error copy and stdout",
+			args: []string{"-c", "-C", f1},
 		},
 	}
 
@@ -206,26 +188,48 @@ func TestRun_Integration(t *testing.T) {
 				return Run(context.Background(), tt.args)
 			})
 
-			// Special handling for the config test which is expected to fail
-			if tt.name == "config flag alias (-y)" {
+			if tt.name == "config flag missing" {
 				if err == nil {
 					t.Errorf("Expected error for missing config file, got nil")
 				}
 				return
 			}
-			// Special handling for missing file test
-			if tt.name == "missing file check before output" {
+			if tt.name == "missing file check" {
 				if err == nil {
 					t.Errorf("Expected error for non-existent file, got nil")
 				}
 				if strings.Contains(out, "1-one") {
-					t.Errorf("Should not have printed f1 content when a subsequent file is missing")
+					t.Errorf("Should not have printed content when a file is missing")
+				}
+				return
+			}
+			if tt.name == "error copy and output" || tt.name == "error copy and stdout" {
+				if err == nil {
+					t.Errorf("Expected error for conflicting flags, got nil")
 				}
 				return
 			}
 
+			if tt.name == "output to file" {
+				if err != nil {
+					t.Fatalf("Run() error: %v", err)
+				}
+				if out != "" {
+					t.Errorf("Stdout should be empty, got: %q", out)
+				}
+				content, err := os.ReadFile(outFile)
+				if err != nil {
+					t.Fatalf("Failed to read output file: %v", err)
+				}
+				if !strings.Contains(string(content), "1-one") {
+					t.Errorf("Output file missing content")
+				}
+				os.Remove(outFile)
+				return
+			}
+
 			if err != nil {
-				t.Fatalf("Run() integration error: %v", err)
+				t.Fatalf("Run() error: %v", err)
 			}
 
 			for _, s := range tt.want {

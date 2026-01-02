@@ -10,10 +10,8 @@ import (
 )
 
 func TestEstimateLineCount(t *testing.T) {
-	// 4096 is the sample size in lines.go
 	smallData := []byte("1\n2\n3\n4\n5\n")
 
-	// Create large data > 4096 bytes
 	var largeBuilder bytes.Buffer
 	for i := 0; i < 1000; i++ {
 		largeBuilder.WriteString("this is a reasonably long line to fill up the buffer fast\n")
@@ -28,7 +26,7 @@ func TestEstimateLineCount(t *testing.T) {
 	}{
 		{"empty", []byte{}, 0, true},
 		{"small exact", smallData, 5, true},
-		{"large estimate", largeData, 0, false}, // 0 indicates we don't check specific count, just !exact
+		{"large estimate", largeData, 0, false},
 	}
 
 	for _, tt := range tests {
@@ -47,7 +45,6 @@ func TestEstimateLineCount(t *testing.T) {
 				t.Errorf("EstimateLineCount count = %d, want %d", count, tt.wantCount)
 			}
 
-			// For estimation, we just ensure it returns a positive number
 			if !tt.wantExact && count <= 0 {
 				t.Errorf("EstimateLineCount estimated count <= 0: %d", count)
 			}
@@ -64,36 +61,11 @@ func TestReadHead(t *testing.T) {
 		wantBytes string
 		wantLines int
 	}{
-		{
-			name:      "read subset",
-			n:         2,
-			wantBytes: "line1\nline2\n",
-			wantLines: 2,
-		},
-		{
-			name:      "read all exactly",
-			n:         5,
-			wantBytes: input,
-			wantLines: 5,
-		},
-		{
-			name:      "read more than available",
-			n:         10,
-			wantBytes: input,
-			wantLines: 5,
-		},
-		{
-			name:      "read unlimited (-1)",
-			n:         -1,
-			wantBytes: input,
-			wantLines: 5,
-		},
-		{
-			name:      "read zero",
-			n:         0,
-			wantBytes: "",
-			wantLines: 0,
-		},
+		{"read subset", 2, "line1\nline2\n", 2},
+		{"read all", 5, input, 5},
+		{"read more", 10, input, 5},
+		{"read unlimited", -1, input, 5},
+		{"read zero", 0, "", 0},
 	}
 
 	for _, tt := range tests {
@@ -115,7 +87,6 @@ func TestReadHead(t *testing.T) {
 }
 
 func TestReadTailSeek(t *testing.T) {
-	// ReadTailSeek requires an *os.File, so we must write to disk
 	dir := t.TempDir()
 	fpath := filepath.Join(dir, "test.txt")
 	content := "1\n2\n3\n4\n5\n"
@@ -130,7 +101,7 @@ func TestReadTailSeek(t *testing.T) {
 	}{
 		{"subset", 2, "4\n5\n"},
 		{"all", 5, "1\n2\n3\n4\n5\n"},
-		{"more than all", 10, "1\n2\n3\n4\n5\n"},
+		{"more", 10, "1\n2\n3\n4\n5\n"},
 		{"zero", 0, ""},
 	}
 
@@ -155,7 +126,6 @@ func TestReadTailSeek(t *testing.T) {
 }
 
 func TestLineNumberFormatter(t *testing.T) {
-	// This tests the fmt.Formatter interface implementation
 	lnf := LineNumberFormatter{
 		Head:      []byte("one\ntwo\n"),
 		Gap:       []byte("... gap ...\n"),
@@ -166,13 +136,6 @@ func TestLineNumberFormatter(t *testing.T) {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%v", lnf)
 	got := buf.String()
-
-	// We expect padding for width 2 (since TotalRows is 10)
-	// 1: one
-	// 2: two
-	// ... gap ...
-	// 9: nine
-	//10: ten
 
 	expects := []string{
 		" 1: one",

@@ -9,9 +9,9 @@ import (
 type CmdType int
 
 const (
-	CmdGlobal      CmdType = iota
-	CmdInterleaved         // State modifiers (sticky settings like --head, --tail)
-	CmdAction              // Immediate actions (like --section, --prompt)
+	CmdGlobal CmdType = iota
+	CmdInterleaved
+	CmdAction
 )
 
 type ValueType int
@@ -41,7 +41,6 @@ type ParsedArgs struct {
 	Ops     []Op
 }
 
-// Parse processes arguments into a linear sequence of operations.
 func Parse(args []string, defs []CommandDef) (*ParsedArgs, error) {
 	longMap := make(map[string]CommandDef)
 	shortMap := make(map[rune]CommandDef)
@@ -61,10 +60,8 @@ func Parse(args []string, defs []CommandDef) (*ParsedArgs, error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
-		// POSIX "--" delimiter: end of flags
 		if arg == "--" {
 			for j := i + 1; j < len(args); j++ {
-				// File is treated as an Action implicitly for ordering purposes
 				res.Ops = append(res.Ops, Op{Action: "FILE", Value: args[j], Type: CmdAction})
 			}
 			break
@@ -149,10 +146,8 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 
 		val := ""
 		if j+1 < len(chars) {
-			// Sticky value
 			val = string(chars[j+1:])
 		} else {
-			// Next arg value
 			if idx+1 >= len(args) {
 				return 0, fmt.Errorf("flag -%c requires a value", char)
 			}
