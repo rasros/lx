@@ -5,11 +5,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/rasros/lx/lx"
+	"github.com/rasros/lx/internal/cli"
 )
 
 func main() {
-	if err := lx.Run(context.Background(), os.Args[1:]); err != nil {
+	if err := cli.Run(context.Background(), os.Args[1:]); err != nil {
 		log.Fatal(err)
 	}
 }

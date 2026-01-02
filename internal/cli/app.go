@@ -1,4 +1,4 @@
-package lx
+package cli
 
 import (
 	"bytes"
@@ -9,9 +9,11 @@ import (
 	"strconv"
 
 	"github.com/atotto/clipboard"
+	"github.com/rasros/lx/pkg/lx"
 )
 
 func Run(ctx context.Context, args []string) error {
+	// Parse logic is now internal to this package
 	parsed, err := Parse(args, definitions)
 	if err != nil {
 		return err
@@ -78,11 +80,12 @@ func gatherInputs(parsed *ParsedArgs) error {
 }
 
 func processStream(parsed *ParsedArgs) error {
-	var opts Options
+	var opts lx.Options
 	if cfg, ok := parsed.Globals["config"]; ok {
 		opts.ConfigPath = cfg
 	}
 
+	// lx.Options is used to compile templates from the library
 	tmplEngine, cfg, err := opts.CompileTemplates()
 	if err != nil {
 		return err
@@ -111,7 +114,7 @@ func processStream(parsed *ParsedArgs) error {
 	return nil
 }
 
-func determineOutput(globals map[string]string, cfg *Config) (io.Writer, *bytes.Buffer, error) {
+func determineOutput(globals map[string]string, cfg *lx.Config) (io.Writer, *bytes.Buffer, error) {
 	outputPath, hasOutput := globals["output"]
 	_, hasCopy := globals["copy"]
 	_, hasStdout := globals["stdout"]
@@ -161,7 +164,7 @@ func determineOutput(globals map[string]string, cfg *Config) (io.Writer, *bytes.
 	return out, clipboardBuf, nil
 }
 
-func executeOps(ops []Op, out io.Writer, opts Options, tmplEngine *TemplateEngine) error {
+func executeOps(ops []Op, out io.Writer, opts lx.Options, tmplEngine *lx.TemplateEngine) error {
 	for _, op := range ops {
 		if op.Action == "FILE" || op.Action == "file" {
 			if _, err := os.Stat(op.Value); err != nil {
@@ -184,7 +187,9 @@ func executeOps(ops []Op, out io.Writer, opts Options, tmplEngine *TemplateEngin
 		switch op.Action {
 		case "FILE", "file":
 			runCfg := opts.ToRunnerConfig()
-			runner := NewRunner(runCfg, tmplEngine)
+
+			// Use the Library Runner
+			runner := lx.NewRunner(runCfg, tmplEngine)
 
 			isCompact, err := runner.RunFile(op.Value, fileIndex, totalFiles, prevCompact, out)
 			if err != nil {
@@ -194,7 +199,7 @@ func executeOps(ops []Op, out io.Writer, opts Options, tmplEngine *TemplateEngin
 			fileIndex++
 
 		case "section":
-			runner := NewRunner(opts.ToRunnerConfig(), tmplEngine)
+			runner := lx.NewRunner(opts.ToRunnerConfig(), tmplEngine)
 
 			if prevCompact {
 				fmt.Fprintln(out)
@@ -205,7 +210,7 @@ func executeOps(ops []Op, out io.Writer, opts Options, tmplEngine *TemplateEngin
 			prevCompact = false
 
 		case "prompt":
-			runner := NewRunner(opts.ToRunnerConfig(), tmplEngine)
+			runner := lx.NewRunner(opts.ToRunnerConfig(), tmplEngine)
 
 			if prevCompact {
 				fmt.Fprintln(out)
@@ -215,6 +220,7 @@ func executeOps(ops []Op, out io.Writer, opts Options, tmplEngine *TemplateEngin
 			}
 			prevCompact = false
 
+		// State machine updates the local `opts` variable for the next iteration
 		case "line-numbers":
 			opts.LineNumbers = true
 		case "no-line-numbers":
