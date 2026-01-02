@@ -10,7 +10,6 @@ import (
 	"strconv"
 )
 
-// LineNumberFormatter handles printing distinct chunks (Head/Tail) with correct line numbers.
 type LineNumberFormatter struct {
 	Head      []byte
 	Gap       []byte
@@ -78,8 +77,6 @@ func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
 	}
 }
 
-// EstimateLineCount reads the first 4KB to calculate an average line length.
-// Returns isExact=true if the file was smaller than the sample buffer.
 func EstimateLineCount(r io.ReaderAt, fileSize int64) (int, bool, error) {
 	if fileSize == 0 {
 		return 0, true, nil
@@ -111,8 +108,6 @@ func EstimateLineCount(r io.ReaderAt, fileSize int64) (int, bool, error) {
 	return estimated, false, nil
 }
 
-// ReadHead reads the first N lines. If n < 0, reads the entire file.
-// Returns the data and the exact number of lines read.
 func ReadHead(r io.Reader, n int) ([]byte, int, error) {
 	if n == 0 {
 		return nil, 0, nil
@@ -121,7 +116,6 @@ func ReadHead(r io.Reader, n int) ([]byte, int, error) {
 	var buf bytes.Buffer
 	sc := bufio.NewScanner(r)
 
-	// Increase buffer size to handle reasonably long lines in large files
 	scanBuf := make([]byte, 0, 64*1024)
 	sc.Buffer(scanBuf, 10*1024*1024)
 
@@ -129,7 +123,6 @@ func ReadHead(r io.Reader, n int) ([]byte, int, error) {
 	readAll := n < 0
 
 	for sc.Scan() {
-		// Scanned bytes are overwritten on next call, so we must write to buffer immediately
 		buf.Write(sc.Bytes())
 		buf.WriteByte('\n')
 		linesRead++
@@ -156,7 +149,6 @@ func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 		return nil, nil
 	}
 
-	// Store chunks in a list to avoid repetitive prepend allocations (O(N^2))
 	var chunks [][]byte
 	linesFound := 0
 	offset := fileSize
@@ -179,7 +171,6 @@ func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 		chunks = append(chunks, buf)
 	}
 
-	// Calculate total size and allocate once
 	totalLen := 0
 	for _, chunk := range chunks {
 		totalLen += len(chunk)
@@ -188,7 +179,6 @@ func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 	result := make([]byte, totalLen)
 	currentPos := 0
 
-	// Assemble result: iterate backwards because chunks were appended from end of file to start
 	for i := len(chunks) - 1; i >= 0; i-- {
 		copy(result[currentPos:], chunks[i])
 		currentPos += len(chunks[i])

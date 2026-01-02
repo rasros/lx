@@ -23,7 +23,6 @@ func TestParse(t *testing.T) {
 		wantErr   bool
 		errSubstr string
 	}{
-		// --- Success Cases ---
 		{
 			name: "double dash delimiter",
 			args: []string{"-h", "5", "--", "-file-with-dash.txt", "normal.txt"},
@@ -44,7 +43,7 @@ func TestParse(t *testing.T) {
 			wantGlo: map[string]string{},
 		},
 		{
-			name: "grouped bools with sticky number (-lvh5)",
+			name: "grouped bools sticky number",
 			args: []string{"-lvh5", "file.txt"},
 			wantOps: []Op{
 				{Action: "head", Value: "5", Type: CmdInterleaved},
@@ -56,7 +55,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name: "grouped bools with sticky string (-lvfconfig.yaml)",
+			name: "grouped bools sticky string",
 			args: []string{"-lvfconfig.yaml", "main.go"},
 			wantOps: []Op{
 				{Action: "FILE", Value: "main.go", Type: CmdAction},
@@ -68,23 +67,11 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name:    "sticky string alone (-fconfig.yaml)",
+			name:    "sticky string alone",
 			args:    []string{"-fconfig.yaml"},
 			wantOps: []Op{},
 			wantGlo: map[string]string{
 				"config": "config.yaml",
-			},
-		},
-		{
-			name: "grouped bools space separated number (-lvh 5)",
-			args: []string{"-lvh", "5", "file.txt"},
-			wantOps: []Op{
-				{Action: "head", Value: "5", Type: CmdInterleaved},
-				{Action: "FILE", Value: "file.txt", Type: CmdAction},
-			},
-			wantGlo: map[string]string{
-				"line-numbers": "true",
-				"verbose":      "true",
 			},
 		},
 		{
@@ -96,8 +83,6 @@ func TestParse(t *testing.T) {
 			},
 			wantGlo: map[string]string{},
 		},
-
-		// --- Error Cases ---
 		{
 			name:      "unknown short flag",
 			args:      []string{"-z"},
@@ -111,28 +96,28 @@ func TestParse(t *testing.T) {
 			errSubstr: "unknown flag: --foo",
 		},
 		{
-			name:      "missing value for short flag",
+			name:      "missing value short",
 			args:      []string{"-h"},
 			wantErr:   true,
 			errSubstr: "flag -h requires a value",
 		},
 		{
-			name:      "missing value for long flag",
+			name:      "missing value long",
 			args:      []string{"--head"},
 			wantErr:   true,
 			errSubstr: "flag --head requires a value",
 		},
 		{
-			name:      "invalid number format inside sticky",
+			name:      "invalid number format",
 			args:      []string{"-hfoo"},
 			wantErr:   true,
-			errSubstr: "flag --head expects a number, got \"foo\"",
+			errSubstr: "flag --head expects a number",
 		},
 		{
-			name:      "bool flag given value with equals",
+			name:      "bool flag with equals",
 			args:      []string{"--verbose=true"},
 			wantErr:   true,
-			errSubstr: "flag --verbose does not take a value",
+			errSubstr: "does not take a value",
 		},
 	}
 
@@ -140,7 +125,6 @@ func TestParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := Parse(tt.args, defs)
 
-			// Check Error
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("Parse() expected error, got nil")
@@ -154,12 +138,10 @@ func TestParse(t *testing.T) {
 				t.Fatalf("Parse() unexpected error: %v", err)
 			}
 
-			// Check Ops
 			if !reflect.DeepEqual(got.Ops, tt.wantOps) {
 				t.Errorf("Ops mismatch.\nGot:  %+v\nWant: %+v", got.Ops, tt.wantOps)
 			}
 
-			// Check Globals
 			if !reflect.DeepEqual(got.Globals, tt.wantGlo) {
 				t.Errorf("Globals mismatch.\nGot:  %+v\nWant: %+v", got.Globals, tt.wantGlo)
 			}

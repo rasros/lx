@@ -43,7 +43,7 @@ func TestRunner_DefaultTemplate(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := newTestRunner(-1, -1, "") // Unlimited default
+	r := newTestRunner(-1, -1, "")
 
 	if _, err := r.RunFile(path, 1, 1, false, &buf); err != nil {
 		t.Fatalf("RunFile error: %v", err)
@@ -67,15 +67,13 @@ func TestRunner_CompactModeViaZero(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	r := newTestRunner(0, 0, "") // Explicit Compact
+	r := newTestRunner(0, 0, "")
 
 	if _, err := r.RunFile(path, 1, 1, false, &buf); err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
 	out := buf.String()
-	// Depending on logic, compact might now use ~ for estimate or not.
-	// Small files are exact, so "3 rows" should be exact.
 	if !strings.Contains(out, "rows)") {
 		t.Errorf("Expected row count in compact mode, got:\n%s", out)
 	}
@@ -141,7 +139,6 @@ func TestRunner_HeadOnly(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	// Using default template to ensure template doesn't crash on partial content
 	r := newTestRunner(2, 0, "")
 
 	if _, err := r.RunFile(path, 1, 1, false, &buf); err != nil {
