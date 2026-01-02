@@ -23,7 +23,7 @@ func TestOptionsEffective_NoN_UsesHeadTail(t *testing.T) {
 	}
 }
 
-func TestOptionsEffective_NOnly_SplitsTotalNBetweenHeadAndTail(t *testing.T) {
+func TestOptionsEffective_NOnly(t *testing.T) {
 	opts := Options{
 		Head:    0,
 		Tail:    0,
@@ -107,7 +107,7 @@ template: |
 		ConfigPath: configPath,
 	}
 
-	engine, err := opts.CompileTemplates()
+	engine, _, err := opts.CompileTemplates()
 	if err != nil {
 		t.Fatalf("CompileTemplates() error: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestOptionsEffective_MissingConfig(t *testing.T) {
 		ConfigPath: "/path/to/non/existent/file.yaml",
 	}
 
-	_, err := opts.CompileTemplates()
+	_, _, err := opts.CompileTemplates()
 	if err == nil {
 		t.Fatal("Expected error for missing config file, got nil")
 	}
@@ -154,7 +154,7 @@ template: "CLI_TEMPLATE"
 		ConfigPath: cliCfgPath,
 	}
 
-	engine, err := opts.CompileTemplates()
+	engine, _, err := opts.CompileTemplates()
 	if err != nil {
 		t.Fatalf("CompileTemplates failed: %v", err)
 	}

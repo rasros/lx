@@ -9,14 +9,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// RunnerConfig holds the lightweight, mutable options for a specific file run.
 type RunnerConfig struct {
 	Head        int
 	Tail        int
 	LineNumbers bool
 }
 
-// TemplateEngine holds the heavy, immutable parsed templates.
 type TemplateEngine struct {
 	Main    *template.Template
 	Section *template.Template
@@ -27,6 +25,7 @@ type Config struct {
 	Template        string `yaml:"template"`
 	SectionTemplate string `yaml:"section_template"`
 	PromptTemplate  string `yaml:"prompt_template"`
+	OutputMode      string `yaml:"output_mode"`
 }
 
 type Options struct {
@@ -42,9 +41,8 @@ type Options struct {
 	LineNumbers bool
 }
 
-// ToRunnerConfig calculates the effective head/tail numbers for the current state.
 func (o Options) ToRunnerConfig() RunnerConfig {
-	effHead, effTail := -1, -1 // Unlimited
+	effHead, effTail := -1, -1
 
 	if o.NSet {
 		if o.NBoth == 0 {
@@ -94,34 +92,26 @@ func (o Options) ToRunnerConfig() RunnerConfig {
 	}
 }
 
-// CompileTemplates loads config files and compiles templates.
-// Priority: ~/.config/lx/config.yaml -> LX_CONFIG -> --config/-y
-func (o Options) CompileTemplates() (*TemplateEngine, error) {
+func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 	var cfg Config
 
-	// 1. Default: ~/.config/lx/config.yaml
 	configDir, err := os.UserConfigDir()
 	if err == nil {
-		// On Linux: ~/.config/lx/config.yaml
-		// On Mac:   ~/Library/Application Support/lx/config.yaml
-		// On Win:   %APPDATA%\lx\config.yaml
 		defPath := filepath.Join(configDir, "lx", "config.yaml")
 		if err := mergeConfig(&cfg, defPath, false); err != nil {
-			return nil, fmt.Errorf("load default config: %w", err)
+			return nil, nil, fmt.Errorf("load default config: %w", err)
 		}
 	}
 
-	// 2. Env: LX_CONFIG
 	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
 		if err := mergeConfig(&cfg, envPath, false); err != nil {
-			return nil, fmt.Errorf("load env config: %w", err)
+			return nil, nil, fmt.Errorf("load env config: %w", err)
 		}
 	}
 
-	// 3. CLI: --config
 	if o.ConfigPath != "" {
 		if err := mergeConfig(&cfg, o.ConfigPath, true); err != nil {
-			return nil, fmt.Errorf("load cli config: %w", err)
+			return nil, nil, fmt.Errorf("load cli config: %w", err)
 		}
 	}
 
@@ -143,28 +133,26 @@ func (o Options) CompileTemplates() (*TemplateEngine, error) {
 	funcs := TemplateFuncs()
 	tMain, err := template.New("lx").Funcs(funcs).Parse(tmplStr)
 	if err != nil {
-		return nil, fmt.Errorf("parse template: %w", err)
+		return nil, nil, fmt.Errorf("parse template: %w", err)
 	}
 
 	tSection, err := template.New("section").Funcs(funcs).Parse(sectionTmplStr)
 	if err != nil {
-		return nil, fmt.Errorf("parse section template: %w", err)
+		return nil, nil, fmt.Errorf("parse section template: %w", err)
 	}
 
 	tPrompt, err := template.New("prompt").Funcs(funcs).Parse(promptTmplStr)
 	if err != nil {
-		return nil, fmt.Errorf("parse prompt template: %w", err)
+		return nil, nil, fmt.Errorf("parse prompt template: %w", err)
 	}
 
 	return &TemplateEngine{
 		Main:    tMain,
 		Section: tSection,
 		Prompt:  tPrompt,
-	}, nil
+	}, &cfg, nil
 }
 
-// mergeConfig decodes a YAML file into the provided Config struct.
-// strict determines if a missing file returns an error.
 func mergeConfig(cfg *Config, path string, strict bool) error {
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {
