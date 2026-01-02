@@ -1,51 +1,15 @@
 package lx
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"runtime"
-	"runtime/debug"
-	"runtime/pprof"
 	"strconv"
-	"text/template"
+
+	"github.com/atotto/clipboard"
 )
-
-var Version = "(devel)"
-
-func init() {
-	if Version != "(devel)" {
-		return
-	}
-	if info, ok := debug.ReadBuildInfo(); ok {
-		v := info.Main.Version
-		if v != "" && v != "(devel)" {
-			Version = v
-		}
-	}
-}
-
-var definitions = []CommandDef{
-	// Global Config
-	{Name: "config", Short: "y", Type: CmdGlobal, ValueType: ValueAny, Usage: "path to yaml config file"},
-	{Name: "version", Short: "V", Type: CmdGlobal, ValueType: ValueNone, Usage: "print the version"},
-	{Name: "help", Short: "h", Type: CmdGlobal, ValueType: ValueNone, Usage: "show help"},
-	{Name: "cpuprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "write cpu profile to file"},
-	{Name: "memprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "write memory profile to file"},
-
-	// Interleaved Options
-	{Name: "line-numbers", Short: "l", Type: CmdInterleaved, ValueType: ValueNone, Usage: "print line numbers"},
-	{Name: "no-line-numbers", Short: "L", Type: CmdInterleaved, ValueType: ValueNone, Usage: "don't print line numbers"},
-	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print first N lines (0 = compact/skip)"},
-	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print last N lines (0 = compact/skip)"},
-	{Name: "lines", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
-	{Name: "reset-lines", Short: "N", Type: CmdInterleaved, ValueType: ValueNone, Usage: "reset lines limits (and head/tail)"},
-
-	// Actions
-	{Name: "file", Short: "f", Type: CmdAction, ValueType: ValueAny, Usage: "explicit file path"},
-	{Name: "section", Short: "s", Type: CmdAction, ValueType: ValueAny, Usage: "print a section header"},
-	{Name: "prompt", Short: "p", Type: CmdAction, ValueType: ValueAny, Usage: "print custom text directly"},
-}
 
 func Run(ctx context.Context, args []string) error {
 	parsed, err := Parse(args, definitions)
@@ -73,57 +37,6 @@ func Run(ctx context.Context, args []string) error {
 	}
 
 	return processStream(parsed)
-}
-
-// setupProfiling returns a cleanup function that must be deferred by the caller.
-func setupProfiling(parsed *ParsedArgs) (func(), error) {
-	var onExit []func()
-
-	// Helper to execute all cleanup functions in LIFO order
-	cleanup := func() {
-		for i := len(onExit) - 1; i >= 0; i-- {
-			onExit[i]()
-		}
-	}
-
-	// 1. CPU Profiling
-	if path, ok := parsed.Globals["cpuprofile"]; ok {
-		f, err := os.Create(path)
-		if err != nil {
-			return cleanup, fmt.Errorf("create cpu profile: %w", err)
-		}
-
-		if err := pprof.StartCPUProfile(f); err != nil {
-			f.Close()
-			return cleanup, fmt.Errorf("start cpu profile: %w", err)
-		}
-
-		onExit = append(onExit, func() {
-			pprof.StopCPUProfile()
-			f.Close()
-		})
-	}
-
-	// 2. Memory Profiling
-	if path, ok := parsed.Globals["memprofile"]; ok {
-		onExit = append(onExit, func() {
-			f, err := os.Create(path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "create mem profile: %v\n", err)
-				return
-			}
-			defer f.Close()
-
-			// Run GC to exclude transient objects from the profile
-			runtime.GC()
-
-			if err := pprof.WriteHeapProfile(f); err != nil {
-				fmt.Fprintf(os.Stderr, "write mem profile: %v\n", err)
-			}
-		})
-	}
-
-	return cleanup, nil
 }
 
 func handleGlobals(parsed *ParsedArgs) bool {
@@ -170,9 +83,85 @@ func processStream(parsed *ParsedArgs) error {
 		opts.ConfigPath = cfg
 	}
 
-	ops := reorderTrailingOps(parsed.Ops)
+	tmplEngine, cfg, err := opts.CompileTemplates()
+	if err != nil {
+		return err
+	}
 
-	// --- Pass 1: Validate all inputs ---
+	out, clipboardBuf, err := determineOutput(parsed.Globals, cfg)
+	if err != nil {
+		return err
+	}
+
+	if f, ok := out.(*os.File); ok && f != os.Stdout {
+		defer f.Close()
+	}
+
+	ops := reorderTrailingOps(parsed.Ops)
+	if err := executeOps(ops, out, opts, tmplEngine); err != nil {
+		return err
+	}
+
+	if clipboardBuf != nil {
+		if err := clipboard.WriteAll(clipboardBuf.String()); err != nil {
+			return fmt.Errorf("clipboard write: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func determineOutput(globals map[string]string, cfg *Config) (io.Writer, *bytes.Buffer, error) {
+	outputPath, hasOutput := globals["output"]
+	_, hasCopy := globals["copy"]
+	_, hasStdout := globals["stdout"]
+
+	flagsSet := 0
+	if hasOutput {
+		flagsSet++
+	}
+	if hasCopy {
+		flagsSet++
+	}
+	if hasStdout {
+		flagsSet++
+	}
+	if flagsSet > 1 {
+		return nil, nil, fmt.Errorf("flags -o/--output, -c/--copy, and -C/--stdout are mutually exclusive")
+	}
+
+	useClipboard := false
+	var out io.Writer = os.Stdout
+	var clipboardBuf *bytes.Buffer
+
+	if hasOutput {
+		f, err := os.Create(outputPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("create output file: %w", err)
+		}
+		out = f
+	} else if hasCopy {
+		useClipboard = true
+	} else if hasStdout {
+		useClipboard = false
+	} else {
+		if cfg.OutputMode == "copy" {
+			useClipboard = true
+		}
+	}
+
+	if useClipboard {
+		if clipboard.Unsupported {
+			return nil, nil, fmt.Errorf("clipboard support is not available on this system (install xclip or wl-copy on Linux)")
+		}
+		clipboardBuf = new(bytes.Buffer)
+		out = clipboardBuf
+	}
+
+	return out, clipboardBuf, nil
+}
+
+func executeOps(ops []Op, out io.Writer, opts Options, tmplEngine *TemplateEngine) error {
 	for _, op := range ops {
 		if op.Action == "FILE" || op.Action == "file" {
 			if _, err := os.Stat(op.Value); err != nil {
@@ -181,13 +170,6 @@ func processStream(parsed *ParsedArgs) error {
 		}
 	}
 
-	// --- Pass 2: Compile Templates Once ---
-	tmplEngine, err := opts.CompileTemplates()
-	if err != nil {
-		return err
-	}
-
-	// --- Pass 3: Execute and Print ---
 	totalFiles := 0
 	for _, op := range ops {
 		if op.Action == "FILE" || op.Action == "file" {
@@ -196,7 +178,7 @@ func processStream(parsed *ParsedArgs) error {
 	}
 
 	fileIndex := 1
-	prevCompact := false // Track if previous output was a compact line
+	prevCompact := false
 
 	for _, op := range ops {
 		switch op.Action {
@@ -204,7 +186,7 @@ func processStream(parsed *ParsedArgs) error {
 			runCfg := opts.ToRunnerConfig()
 			runner := NewRunner(runCfg, tmplEngine)
 
-			isCompact, err := runner.RunFile(op.Value, fileIndex, totalFiles, prevCompact, os.Stdout)
+			isCompact, err := runner.RunFile(op.Value, fileIndex, totalFiles, prevCompact, out)
 			if err != nil {
 				return err
 			}
@@ -215,9 +197,9 @@ func processStream(parsed *ParsedArgs) error {
 			runner := NewRunner(opts.ToRunnerConfig(), tmplEngine)
 
 			if prevCompact {
-				fmt.Fprintln(os.Stdout)
+				fmt.Fprintln(out)
 			}
-			if err := runner.RunSection(op.Value, os.Stdout); err != nil {
+			if err := runner.RunSection(op.Value, out); err != nil {
 				return err
 			}
 			prevCompact = false
@@ -226,9 +208,9 @@ func processStream(parsed *ParsedArgs) error {
 			runner := NewRunner(opts.ToRunnerConfig(), tmplEngine)
 
 			if prevCompact {
-				fmt.Fprintln(os.Stdout)
+				fmt.Fprintln(out)
 			}
-			if err := runner.RunPrompt(op.Value, os.Stdout); err != nil {
+			if err := runner.RunPrompt(op.Value, out); err != nil {
 				return err
 			}
 			prevCompact = false
@@ -262,17 +244,14 @@ func processStream(parsed *ParsedArgs) error {
 		}
 	}
 
-	// If the stream ends with a compact file (which only prints \n),
-	// add one more newline to visually separate it from the shell prompt.
 	if prevCompact {
-		fmt.Fprintln(os.Stdout)
+		fmt.Fprintln(out)
 	}
 
 	return nil
 }
 
 func reorderTrailingOps(ops []Op) []Op {
-	// 1. Identify the last action in the stream.
 	lastActionIdx := -1
 	for i := len(ops) - 1; i >= 0; i-- {
 		if ops[i].Type == CmdAction {
@@ -281,12 +260,10 @@ func reorderTrailingOps(ops []Op) []Op {
 		}
 	}
 
-	// If no actions or last action is the very last element, nothing to reorder.
 	if lastActionIdx == -1 || lastActionIdx == len(ops)-1 {
 		return ops
 	}
 
-	// 2. Separate subsequent items into modifiers (Interleaved) and others.
 	modifiers := make([]Op, 0)
 	others := make([]Op, 0)
 
@@ -302,8 +279,6 @@ func reorderTrailingOps(ops []Op) []Op {
 		return ops
 	}
 
-	// 3. Find the *start* of the contiguous block of Actions ending at lastActionIdx.
-	// We scan backwards from lastActionIdx to find where the sequence of Actions began.
 	firstActionIdx := lastActionIdx
 	for i := lastActionIdx - 1; i >= 0; i-- {
 		if ops[i].Type == CmdAction {
@@ -313,7 +288,6 @@ func reorderTrailingOps(ops []Op) []Op {
 		}
 	}
 
-	// 4. Construct new sequence: [Before Block] + [Modifiers] + [Block] + [Others]
 	newOps := make([]Op, 0, len(ops))
 	newOps = append(newOps, ops[:firstActionIdx]...)
 	newOps = append(newOps, modifiers...)
@@ -321,56 +295,4 @@ func reorderTrailingOps(ops []Op) []Op {
 	newOps = append(newOps, others...)
 
 	return newOps
-}
-
-const helpTmpl = `NAME:
-   lx - print files with headers, slicing, using go-templates
-
-USAGE:
-   lx [global options] [command state options] [files/actions...]
-
-GLOBAL OPTIONS:
-{{- range .Globals }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
-{{- end }}
-
-INTERLEAVED OPTIONS (apply to subsequent files):
-{{- range .Interleaved }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
-{{- end }}
-
-ACTIONS (printed in order):
-{{- range .Actions }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
-{{- end }}
-
-EXAMPLE:
-   lx -n5 file1.txt -s "Section 2" -n2 file2.txt
-   (Prints 5 lines of file1, a section header, then 2 lines of file2)
-`
-
-func printHelp() {
-	var globals, interleaved, actions []CommandDef
-
-	for _, d := range definitions {
-		switch d.Type {
-		case CmdGlobal:
-			globals = append(globals, d)
-		case CmdInterleaved:
-			interleaved = append(interleaved, d)
-		case CmdAction:
-			actions = append(actions, d)
-		}
-	}
-
-	data := struct {
-		Globals     []CommandDef
-		Interleaved []CommandDef
-		Actions     []CommandDef
-	}{globals, interleaved, actions}
-
-	t := template.Must(template.New("help").Parse(helpTmpl))
-	if err := t.Execute(os.Stdout, data); err != nil {
-		fmt.Fprintf(os.Stderr, "help template error: %v\n", err)
-	}
 }
