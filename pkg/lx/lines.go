@@ -82,7 +82,7 @@ func EstimateLineCount(r io.ReaderAt, fileSize int64) (int, bool, error) {
 		return 0, true, nil
 	}
 
-	const sampleSize = 4096
+	const sampleSize = 32768
 	buf := make([]byte, sampleSize)
 
 	n, err := r.ReadAt(buf, 0)
