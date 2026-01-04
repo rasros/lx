@@ -6,7 +6,6 @@ import (
 )
 
 func TestPrintHelp(t *testing.T) {
-	// Capture output
 	out, err := captureStdout(func() error {
 		printHelp()
 		return nil

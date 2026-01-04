@@ -34,6 +34,8 @@ func newTestRunner(head, tail int, tmplStr string) *Runner {
 	global := GlobalContext{
 		TotalFiles:    1,
 		TotalSize:     1024,
+		TotalRows:     100,
+		TokenEstimate: 256,
 		TotalSections: 1,
 		RootPath:      ".",
 		AbsRootPath:   "/tmp",
@@ -193,7 +195,6 @@ func TestRunner_RunFile_Indexing(t *testing.T) {
 
 	var buf bytes.Buffer
 	r := newTestRunner(-1, -1, "")
-	// Update global context to simulate multiple files
 	r.Global.TotalFiles = 100
 
 	_, err := r.RunFile(path, 42, false, &buf)

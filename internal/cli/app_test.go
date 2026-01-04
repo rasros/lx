@@ -169,14 +169,14 @@ func TestRun_Integration(t *testing.T) {
 		{
 			name:        "output to file",
 			args:        []string{"-o", outFile, f1},
-			want:        []string{"Files: 1"}, // Debug output on stdout by default for file output
-			wantMissing: []string{"1-one"},    // Content should NOT be in stdout
+			want:        []string{"Files: 1"},
+			wantMissing: []string{"1-one"},
 		},
 		{
 			name:        "quiet output to file",
 			args:        []string{"-q", "-o", outFile, f1},
-			want:        []string{},         // Empty stdout
-			wantMissing: []string{"Files:"}, // No debug output
+			want:        []string{},
+			wantMissing: []string{"Files:"},
 		},
 		{
 			name: "error copy and output",
@@ -220,7 +220,7 @@ func TestRun_Integration(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Run() error: %v", err)
 				}
-				// Verify stdout content (debug info or empty)
+
 				for _, s := range tt.want {
 					if !strings.Contains(out, s) {
 						t.Errorf("Stdout missing %q. Got:\n%s", s, out)
@@ -232,7 +232,6 @@ func TestRun_Integration(t *testing.T) {
 					}
 				}
 
-				// Verify file content matches input
 				content, err := os.ReadFile(outFile)
 				if err != nil {
 					t.Fatalf("Failed to read output file: %v", err)

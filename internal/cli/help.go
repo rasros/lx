@@ -14,17 +14,17 @@ USAGE:
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 INTERLEAVED OPTIONS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 ACTIONS (printed in order):
 {{- range .Actions }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 EXAMPLE:

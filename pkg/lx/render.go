@@ -57,11 +57,9 @@ func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer
 		isStdin       bool
 	)
 
-	// Handle Stdin vs File
 	if path == "-" {
 		isStdin = true
 		absPath = "stdin"
-		// Read entire stdin to memory to allow Seeking/ReadAt (required for Tail/Estimate)
 		data, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			return false, fmt.Errorf("read stdin: %w", err)
@@ -117,7 +115,6 @@ func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer
 		isBin = IsBinary(header[:n])
 
 		if !isBin {
-			// Helper to create a ReadSeeker for ReadHead logic
 			var reader io.ReadSeeker
 			if isStdin {
 				reader = contentReader.(*bytes.Reader)
@@ -197,7 +194,7 @@ func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer
 		Size:          fileSize,
 		ModTime:       modTime,
 		TotalRows:     totalRows,
-		TokenEstimate: EstimateTokens(fileSize), // Use central logic
+		TokenEstimate: EstimateTokens(fileSize),
 		IsEstimate:    isEstimate,
 		Language:      language,
 		Content:       content,
@@ -214,22 +211,18 @@ func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer
 	return ctx.IsCompactView, nil
 }
 
-// Helper for in-memory tail (stdin)
 func tailFromBuffer(data []byte, lines int) []byte {
 	if lines <= 0 || len(data) == 0 {
 		return nil
 	}
 	count := 0
-	// Scan backwards
 	for i := len(data) - 1; i >= 0; i-- {
 		if data[i] == '\n' {
 			count++
 			if i < len(data)-1 && count >= lines {
-				// found break point
 			}
 		}
 	}
-	// Fallback/Simplicity: simple logic, find Nth newline from end
 	newlinesFound := 0
 	start := 0
 	for i := len(data) - 1; i >= 0; i-- {

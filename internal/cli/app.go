@@ -234,7 +234,6 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 				absFilePaths = append(absFilePaths, op.Value)
 			}
 
-			// Estimate rows for the global context
 			f, err := os.Open(op.Value)
 			if err == nil {
 				rows, _, _ := lx.EstimateLineCount(f, info.Size())
@@ -398,6 +397,7 @@ func findCommonRoot(paths []string) string {
 	for _, p := range paths[1:] {
 		for !strings.HasPrefix(p, root+string(filepath.Separator)) && root != "." && root != "/" {
 			parent := filepath.Dir(root)
+			// Prevent infinite loop at system root
 			if parent == root {
 				return "."
 			}
