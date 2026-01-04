@@ -1,0 +1,48 @@
+# lx Default Configuration
+# Place this file at:
+#   - Linux/Mac: ~/.config/lx/config.yaml
+#   - Windows: %APPDATA%\lx\config.yaml
+#   - Or set LX_CONFIG environment variable to point to this file.
+
+# The main template used for rendering files.
+template: |
+  {{ if eq .Size 0 }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - empty file
+  {{ else if .IsBinary }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})
+  {{ else if .IsCompactView }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
+  {{ else }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
+  ---
+  ```{{ .Language }}
+  {{ .Content | endNewline -}}```
+  
+  {{ end }}
+
+# Template used when the -s/--section flag is provided.
+section_template: |
+  ## {{ .Body | endNewline }}---
+
+
+# Template used when the -p/--prompt flag is provided.
+prompt_template: |
+  {{ .Body | endNewline }}
+
+
+# Template used for the debug summary (printed to stderr, or stdout if redirected).
+debug_template: |
+  Files: {{ .Global.TotalFiles }}
+  Total Rows: {{ .Global.TotalRows }}
+  Size: {{ .Global.TotalSize | humanize }}
+  Est. Tokens: {{ .Global.TokenEstimate }}
+
+
+# Output mode.
+# Options:
+#   ""      (default) - Print to stdout.
+#   "copy"  - Copy to system clipboard.
+output_mode: ""
+
+# Debug mode.
+# Options:
+#   "auto"   (default) - Show debug stats only when output is redirected (to file or clipboard).
+#   "always" - Always show debug stats (equivalent to -v).
+#   "never"  - Never show debug stats (equivalent to -q).
+debug_mode: "auto"

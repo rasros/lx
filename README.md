@@ -4,13 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rasros/lx)](https://goreportcard.com/report/github.com/rasros/lx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-The goal of `lx` is to make prompt setup **repeatable** and **precise**. Instead of letting an agent guess context or manually selecting files in a UI, you define the exact context you want in one shell command and rerun it whenever you need a fresh session. It works smoothly with modern tools like `rg -l`, `fd` (or `grep` and `find`), and recursive shell globs.
-
-This gives you a stable, controllable workflow:
-
-- You decide exactly what context the model sees.
-- If a conversation drifts, you restart instantly with the same context.
-- Adjust the command, rerun it, and paste the updated output.
+`lx` makes prompt setup **repeatable** and **precise**. Instead of letting an agent guess context or manually selecting files in a UI, define the exact context in one shell command and rerun it whenever you need a fresh session. It works smoothly with standard tools like `rg -l`, `fd`, `grep`, `find`, and shell globs.
 
 ---
 
@@ -18,12 +12,12 @@ This gives you a stable, controllable workflow:
 
 Via go install:
 ```bash
-go install github.com/rasros/lx/cmd/lx@latest
-````
-
-Or via curl into `$HOME/.local/bin/lx`:
+go install [github.com/rasros/lx/cmd/lx@latest](https://github.com/rasros/lx/cmd/lx@latest)
 ```
-curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
+
+Or via curl:
+```bash
+curl -fsSL [https://raw.githubusercontent.com/rasros/lx/main/install.sh](https://raw.githubusercontent.com/rasros/lx/main/install.sh) | bash
 ```
 
 ---
@@ -36,158 +30,80 @@ Format a single file as an LLM-ready snippet:
 lx cmd/lx/main.go
 ```
 
-Example output (trimmed):
-
-~~~text
-cmd/lx/main.go (18 rows)
----
-```go
-package main
-
-import (
-    "fmt"
-... (rest omitted)
-```
-~~~
-
-You can put it directly in your clipboard by piping it to a copy tool:
-```bash
-# Wayland (Ubuntu, Debian)
-lx file.py | wl-copy
-```
+Copy output directly to clipboard:
 
 ```bash
-# X11
-lx file.py | xclip -selection clipboard
-# or
-lx file.py | xsel --clipboard --input
+lx -c cmd/lx/main.go
 ```
 
-```bash
-# macOS
-lx file.py | pbcopy
-```
+Write output to a file:
 
 ```bash
-# MSYS2
-lx file.py | clip
+lx -o prompt.md cmd/lx/main.go
 ```
 
 ---
 
 ## Features
 
-* Generates Markdown headers for one or many files.
-* Automatically detects language from file extension.
-* Supports simple licing (`-h`, `-t`, `-n`).
-* Optional line numbers when needed.
-* Reads filenames from CLI args or stdin.
-* Customizable delimiters with placeholders.
+* **Smart Formatting:** Generates Markdown headers with row counts and language detection.
+* **Context Control:** Add custom prompts (`-p`) and section headers (`-s`) directly in the stream.
+* **Slicing:** Use `-n` to limit output lines or `-n0` for compact views.
+* **Line Numbers:** Optional `-l` flag for referencing specific lines.
+* **Input Flexibility:** Reads filenames from arguments or stdin pipe.
+* **Configurable:** Fully template-based output via `config.yaml`.
 
 ---
 
-## More examples
+## Examples
 
-### Filtering file names
-We can select multiple files in shells that allow recursive glob:
+### Filtering files
+Select multiple files using globs or pipe from other tools:
+
 ```bash
+# Shell glob
 lx **/*.py
-```
 
-If you need to exclude certain files we rely on standard tools for file selection.
-
-This example uses includes all python files except those with name ending in `_test.py`. Here `fd` or `find`:
-```bash
-# find using stdin-mode
-find . -name '*.py' ! -name '*_test.py' | lx
-
-# fd using stdin-mode
+# Using fd (exclude tests)
 fd -e py -E "*_test.py" | lx
+
+# Using grep (files containing "TODO")
+grep -rl "TODO" src | lx
 ```
 
-Or through shell glob syntax:
-```bash
-# zsh glob
-lx **/*.py~*_test.py 
-
-# bash glob
-shopt -s globstar extglob
-lx **/!(*_test).py
-
-# fish glob
-lx **/*.py ^**/*_test.py
-
-# MSYS2 glob
-shopt -s globstar extglob
-lx **/!(*_test).py
-```
-
-### Pattern search
-Searching for patterns is easily done through `grep -l` and pipe matching files to `lx`.
-
-This example searches for files with a function starting with `save` under the src folder:
-```bash
-# grep
-grep -rl "def save" src | lx
-
-# ripgrep
-rg -l "def save" src | lx
-```
-
-### Line numbers: `-l`
-
-TOON supports line numbers so we do too 🤷.
-
-This is actually very useful for letting the LLM reference where in a big log dump something is wrong. Or if you specifically include prompting about instructions about line number references.
+### Adding Context
+Inject instructions and headers into the prompt stream:
 
 ```bash
-lx -l server.log
+lx -p "Refactor the following code to use interfaces:" \
+   -s "Current Implementation" \
+   src/old_impl.go
 ```
 
-### Slicing: `-t -h -n`
-
-While iterating on the command it's convenient to slice files so you can more easily see what's included:
+### Slicing & Compact Mode
+Useful for large logs or getting a quick overview:
 
 ```bash
-# First 40 lines
-lx -h40 server.log
+# Print N lines (split between head and tail)
+lx -n 20 server.log
 
-# Last 80 lines
-lx -t80 server.log
-
-# Both ends (split 60 lines between head & tail)
-lx -n60 server.log
+# Compact mode (print filename and stats only, no content)
+lx -n 0 server.log
 ```
 
-Short forms like `-h5`, `-t10`, `-n2` are supported.
+Binary files are written in compact mode.
 
-### Custom delimiters and placeholders
+### Line Numbers
+Helpful for asking the LLM to point out specific errors:
 
-Default delimiters (excluding new-lines):
+```bash
+lx -l main.go
+```
 
-~~~text
-{filename} ({row_count} rows)
 ---
-```{language}
-...file contents...
-```
-~~~
 
-Override them:
+## Configuration
 
-~~~bash
-lx \
-  --prefix-delimiter="### {filename}{n}```{language}{n}" \
-  --postfix-delimiter="```{n}{n}" \
-  file.go
-~~~
+`lx` uses Go templates for rendering. You can customize the output format by creating a config file at `~/.config/lx/config.yaml` (Linux/Mac) or `%APPDATA%\lx\config.yaml` (Windows).
 
-Placeholders:
-
-* `{n}` – OS specific newline character(s)
-* `{filename}` – relative path of the file from current directory
-* `{row_count}`
-* `{byte_size}`
-* `{last_modified}`
-* `{language}` – derived from file ending used for markdown syntax highlighting
-
+See `default_config.yaml` in the repo for all available options and template variables.

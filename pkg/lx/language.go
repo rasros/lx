@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 var extToLang = map[string]string{
@@ -150,9 +151,20 @@ var shebangToLang = map[string]string{
 	"make":    "makefile",
 }
 
-// DetectLanguage returns a language identifier based on file path and content.
-// It prioritizes exact filenames, then pattern matching (Dockerfile.*),
-// then file extensions, and finally falls back to Shebang detection.
+func IsBinary(data []byte) bool {
+	limit := 1024
+	if len(data) < limit {
+		limit = len(data)
+	}
+	if len(data) == 0 {
+		return false
+	}
+	if bytes.IndexByte(data[:limit], 0) != -1 {
+		return true
+	}
+	return !utf8.Valid(data)
+}
+
 func DetectLanguage(path string, data []byte) string {
 	base := strings.ToLower(filepath.Base(path))
 	if lang, ok := filenameToLang[base]; ok {
@@ -167,7 +179,6 @@ func DetectLanguage(path string, data []byte) string {
 	return parseShebang(data)
 }
 
-// parseShebang reads the first line of data to detect standard interpreters.
 func parseShebang(data []byte) string {
 	if len(data) < 2 || data[0] != '#' || data[1] != '!' {
 		return ""

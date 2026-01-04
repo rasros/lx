@@ -1,4 +1,4 @@
-package lx
+package cli
 
 import (
 	"bufio"
@@ -6,15 +6,12 @@ import (
 	"strings"
 )
 
-// readFilenamesFromStdin reads filenames (one per line) from stdin when stdin
-// is a pipe or redirection. If stdin is a TTY, it returns (nil, nil).
 func readFilenamesFromStdin() ([]string, error) {
 	info, err := os.Stdin.Stat()
 	if err != nil {
 		return nil, err
 	}
 
-	// If stdin is a character device, there is no piped input.
 	if info.Mode()&os.ModeCharDevice != 0 {
 		return nil, nil
 	}
