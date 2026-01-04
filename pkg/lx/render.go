@@ -1,38 +1,87 @@
 package lx
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"time"
 )
 
 type Runner struct {
 	Config RunnerConfig
 	Engine *TemplateEngine
+	Global GlobalContext
 }
 
-func NewRunner(cfg RunnerConfig, engine *TemplateEngine) *Runner {
+func NewRunner(cfg RunnerConfig, engine *TemplateEngine, global GlobalContext) *Runner {
 	return &Runner{
 		Config: cfg,
 		Engine: engine,
+		Global: global,
 	}
 }
 
 func (r *Runner) RunSection(body string, out io.Writer) error {
-	return r.Engine.Section.Execute(out, struct{ Body string }{Body: body})
+	ctx := SectionContext{
+		Body:   body,
+		Global: r.Global,
+	}
+	return r.Engine.Section.Execute(out, ctx)
 }
 
 func (r *Runner) RunPrompt(body string, out io.Writer) error {
-	return r.Engine.Prompt.Execute(out, struct{ Body string }{Body: body})
+	ctx := PromptContext{
+		Body:   body,
+		Global: r.Global,
+	}
+	return r.Engine.Prompt.Execute(out, ctx)
 }
 
-func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io.Writer) (bool, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false, fmt.Errorf("stat %q: %w", path, err)
-	}
+func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer) (bool, error) {
+	var (
+		contentReader io.ReaderAt
+		fileSize      int64
+		modTime       time.Time
+		absPath       string
+		isStdin       bool
+	)
 
-	fileSize := info.Size()
+	// Handle Stdin vs File
+	if path == "-" {
+		isStdin = true
+		absPath = "stdin"
+		// Read entire stdin to memory to allow Seeking/ReadAt (required for Tail/Estimate)
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return false, fmt.Errorf("read stdin: %w", err)
+		}
+		contentReader = bytes.NewReader(data)
+		fileSize = int64(len(data))
+		modTime = time.Now()
+	} else {
+		info, err := os.Stat(path)
+		if err != nil {
+			return false, fmt.Errorf("stat %q: %w", path, err)
+		}
+		fileSize = info.Size()
+		modTime = info.ModTime()
+
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			absPath = path
+		} else {
+			absPath = abs
+		}
+
+		f, err := os.Open(path)
+		if err != nil {
+			return false, err
+		}
+		defer f.Close()
+		contentReader = f
+	}
 
 	isExplicitCompact := r.Config.Head == 0 && r.Config.Tail == 0
 	isUnlimited := r.Config.Head < 0 && r.Config.Tail < 0
@@ -49,33 +98,35 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 		out.Write([]byte("\n"))
 	}
 
-	f, err := os.Open(path)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-
 	if isExplicitCompact {
 		var exact bool
-		totalRows, exact, _ = EstimateLineCount(f, fileSize)
+		totalRows, exact, _ = EstimateLineCount(contentReader, fileSize)
 		isEstimate = !exact
 	} else {
 		header := make([]byte, 1024)
-		n, _ := f.ReadAt(header, 0)
+		n, _ := contentReader.ReadAt(header, 0)
 		isBin = IsBinary(header[:n])
 
 		if !isBin {
+			// Helper to create a ReadSeeker for ReadHead logic
+			var reader io.ReadSeeker
+			if isStdin {
+				reader = contentReader.(*bytes.Reader)
+			} else {
+				reader = contentReader.(*os.File)
+			}
+
 			if isUnlimited {
-				f.Seek(0, 0)
-				headBytes, totalRows, _ = ReadHead(f, -1)
+				reader.Seek(0, 0)
+				headBytes, totalRows, _ = ReadHead(reader, -1)
 			} else {
 				var exact bool
-				totalRows, exact, _ = EstimateLineCount(f, fileSize)
+				totalRows, exact, _ = EstimateLineCount(contentReader, fileSize)
 				isEstimate = !exact
 
 				if r.Config.Head > 0 {
-					f.Seek(0, 0)
-					headBytes, _, _ = ReadHead(f, r.Config.Head)
+					reader.Seek(0, 0)
+					headBytes, _, _ = ReadHead(reader, r.Config.Head)
 				}
 
 				if r.Config.Tail > 0 {
@@ -91,7 +142,22 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 						}
 						gapBytes = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
 					}
-					tailBytes, _ = ReadTailSeek(f, r.Config.Tail)
+					// ReadTailSeek expects *os.File for optimization, but we can make it work
+					// If it's stdin, we already have the bytes in memory, so we can slice directly.
+					// However, reusing ReadTailSeek requires refactoring it to accept ReadAt.
+					// For simplicity in this diff, we can use the reader we have.
+					if isStdin {
+						// For stdin/bytes.Reader, we can implement a simple tail logic
+						// or update ReadTailSeek to take io.ReaderAt.
+						// Given "Release Cleanup", let's use a specialized check here.
+						rdr := contentReader.(*bytes.Reader)
+						allData := make([]byte, fileSize)
+						rdr.ReadAt(allData, 0)
+						// Manual tail on buffer
+						tailBytes = tailFromBuffer(allData, r.Config.Tail)
+					} else {
+						tailBytes, _ = ReadTailSeek(contentReader.(*os.File), r.Config.Tail)
+					}
 				}
 			}
 
@@ -126,8 +192,9 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 
 	ctx := FileContext{
 		Path:          path,
+		AbsPath:       absPath,
 		Size:          fileSize,
-		ModTime:       info.ModTime(),
+		ModTime:       modTime,
 		TotalRows:     totalRows,
 		IsEstimate:    isEstimate,
 		Language:      language,
@@ -135,7 +202,7 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 		IsBinary:      isBin,
 		IsCompactView: isExplicitCompact || isBin || fileSize == 0,
 		FileIndex:     index,
-		TotalFiles:    total,
+		Global:        r.Global,
 	}
 
 	if err := r.Engine.Main.Execute(out, ctx); err != nil {
@@ -143,4 +210,37 @@ func (r *Runner) RunFile(path string, index, total int, prevCompact bool, out io
 	}
 
 	return ctx.IsCompactView, nil
+}
+
+// Helper for in-memory tail (stdin)
+func tailFromBuffer(data []byte, lines int) []byte {
+	if lines <= 0 || len(data) == 0 {
+		return nil
+	}
+	count := 0
+	// Scan backwards
+	for i := len(data) - 1; i >= 0; i-- {
+		if data[i] == '\n' {
+			count++
+			// If we found N newlines, we take everything after this index
+			// Note: If file ends with newline, that counts as line 1
+			if i < len(data)-1 && count >= lines {
+				// check edge case for trailing newline
+				// logic mirrors countLines roughly
+			}
+		}
+	}
+	// Fallback: simple logic, find Nth newline from end
+	newlinesFound := 0
+	start := 0
+	for i := len(data) - 1; i >= 0; i-- {
+		if data[i] == '\n' {
+			newlinesFound++
+			if newlinesFound > lines {
+				start = i + 1
+				break
+			}
+		}
+	}
+	return data[start:]
 }

@@ -19,13 +19,16 @@ type TemplateEngine struct {
 	Main    *template.Template
 	Section *template.Template
 	Prompt  *template.Template
+	Debug   *template.Template
 }
 
 type Config struct {
 	Template        string `yaml:"template"`
 	SectionTemplate string `yaml:"section_template"`
 	PromptTemplate  string `yaml:"prompt_template"`
+	DebugTemplate   string `yaml:"debug_template"`
 	OutputMode      string `yaml:"output_mode"`
+	DebugMode       string `yaml:"debug_mode"` // values: auto, always, never
 }
 
 type Options struct {
@@ -130,6 +133,11 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		promptTmplStr = cfg.PromptTemplate
 	}
 
+	debugTmplStr := DefaultDebugTemplate
+	if cfg.DebugTemplate != "" {
+		debugTmplStr = cfg.DebugTemplate
+	}
+
 	funcs := TemplateFuncs()
 	tMain, err := template.New("lx").Funcs(funcs).Parse(tmplStr)
 	if err != nil {
@@ -146,10 +154,16 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		return nil, nil, fmt.Errorf("parse prompt template: %w", err)
 	}
 
+	tDebug, err := template.New("debug").Funcs(funcs).Parse(debugTmplStr)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse debug template: %w", err)
+	}
+
 	return &TemplateEngine{
 		Main:    tMain,
 		Section: tSection,
 		Prompt:  tPrompt,
+		Debug:   tDebug,
 	}, &cfg, nil
 }
 

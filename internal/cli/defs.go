@@ -22,6 +22,8 @@ var definitions = []CommandDef{
 	{Name: "config", Short: "y", Type: CmdGlobal, ValueType: ValueAny, Usage: "path to yaml config file"},
 	{Name: "version", Short: "V", Type: CmdGlobal, ValueType: ValueNone, Usage: "print the version"},
 	{Name: "help", Short: "h", Type: CmdGlobal, ValueType: ValueNone, Usage: "show help"},
+	{Name: "quiet", Short: "q", Type: CmdGlobal, ValueType: ValueNone, Usage: "suppress debug output"},
+	{Name: "verbose", Short: "v", Type: CmdGlobal, ValueType: ValueNone, Usage: "enable verbose debug output"},
 	{Name: "cpuprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "write cpu profile to file"},
 	{Name: "memprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "write memory profile to file"},
 

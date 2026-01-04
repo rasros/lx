@@ -9,22 +9,35 @@ import (
 )
 
 const DefaultTemplate = `{{ if eq .Size 0 }}` +
-	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - empty file` + "\n" +
+	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - empty file` + "\n" +
 	`{{ else if .IsBinary }}` +
-	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` + "\n" +
+	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` + "\n" +
 	`{{ else if .IsCompactView }}` +
-	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)` + "\n" +
+	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)` + "\n" +
 	`{{ else }}` +
-	`{{ if gt .TotalFiles 1 }}[{{ .FileIndex }}/{{ .TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
+	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
 ---
 ` + "```{{ .Language }}" + `
 {{ .Content | endNewline -}}` + "```\n\n" + `{{ end }}`
 
 const DefaultSectionTemplate = `## {{ .Body | endNewline }}` + "---\n\n"
 const DefaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
+const DefaultDebugTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
+	`Size: {{ .Global.TotalSize | humanize }}` + "\n"
+
+type GlobalContext struct {
+	TotalFiles    int
+	TotalSize     int64
+	TotalSections int
+	RootPath      string
+	AbsRootPath   string
+	Args          map[string]string
+	Config        Config
+}
 
 type FileContext struct {
 	Path          string
+	AbsPath       string
 	Size          int64
 	ModTime       time.Time
 	TotalRows     int
@@ -34,7 +47,21 @@ type FileContext struct {
 	IsBinary      bool
 	IsCompactView bool
 	FileIndex     int
-	TotalFiles    int
+	Global        GlobalContext
+}
+
+type SectionContext struct {
+	Body   string
+	Global GlobalContext
+}
+
+type PromptContext struct {
+	Body   string
+	Global GlobalContext
+}
+
+type DebugContext struct {
+	Global GlobalContext
 }
 
 func TemplateFuncs() template.FuncMap {
