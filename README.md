@@ -12,12 +12,12 @@
 
 Via go install:
 ```bash
-go install [github.com/rasros/lx/cmd/lx@latest](https://github.com/rasros/lx/cmd/lx@latest)
+go install https://github.com/rasros/lx/cmd/lx@latest
 ```
 
 Or via curl:
 ```bash
-curl -fsSL [https://raw.githubusercontent.com/rasros/lx/main/install.sh](https://raw.githubusercontent.com/rasros/lx/main/install.sh) | bash
+curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
 ```
 
 ---
