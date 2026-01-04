@@ -75,9 +75,11 @@ grep -rl "TODO" src | lx
 Inject instructions and headers into the prompt stream:
 
 ```bash
-lx -p "Refactor the following code to use interfaces:" \
-   -s "Current Implementation" \
-   src/old_impl.go
+lx -p "Refactor the following code to new structure." \
+   -s "Current implementation" \
+   legacy/**/*.py \
+   -s "New code base" \
+   src/**/*.py
 ```
 
 ### Slicing & Compact Mode
@@ -94,10 +96,10 @@ lx -n 0 server.log
 Binary files are written in compact mode.
 
 ### Line Numbers
-Helpful for asking the LLM to point out specific errors:
+Helpful for asking the LLM to point out log file issies:
 
 ```bash
-lx -l main.go
+lx -l server.log
 ```
 
 ---
