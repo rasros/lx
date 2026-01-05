@@ -4,18 +4,22 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rasros/lx)](https://goreportcard.com/report/github.com/rasros/lx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`lx` makes prompt setup **repeatable** and **precise**. Instead of letting an agent guess context or manually selecting files in a UI, define the exact context in one shell command and rerun it whenever you need a fresh session. It works smoothly with standard tools like `rg -l`, `fd`, `grep`, `find`, and shell globs.
+`lx` makes prompt setup **repeatable** and **precise**. Instead of letting an agent guess context or manually selecting
+files in a UI, define the exact context in one shell command and rerun it whenever you need a fresh session. It works
+smoothly with standard tools like `grep` and shell globs.
 
 ---
 
 ## Installation
 
 Via go install:
+
 ```bash
 go install https://github.com/rasros/lx/cmd/lx@latest
 ```
 
 Or via curl:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
 ```
@@ -24,22 +28,28 @@ curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
 
 ## Basic usage
 
-Format a single file as an LLM-ready snippet:
+Format a single file:
 
 ```bash
 lx cmd/lx/main.go
 ```
 
+Recursively walk a directory (respects `.gitignore` by default):
+
+```bash
+lx src/
+```
+
 Copy output directly to clipboard:
 
 ```bash
-lx -c cmd/lx/main.go
+lx -c .
 ```
 
 Write output to a file:
 
 ```bash
-lx -o prompt.md cmd/lx/main.go
+lx -o prompt.md src/
 ```
 
 ---
@@ -47,6 +57,8 @@ lx -o prompt.md cmd/lx/main.go
 ## Features
 
 * **Smart Formatting:** Generates Markdown headers with row counts and language detection.
+* **Recursive Discovery:** Walks directories similar to `fd` or `ripgrep`.
+* **Ignore Logic:** Respects `.gitignore`, `.ignore`, and `.lxignore` automatically.
 * **Context Control:** Add custom prompts (`-p`) and section headers (`-s`) directly in the stream.
 * **Slicing:** Use `-n` to limit output lines or `-n0` for compact views.
 * **Line Numbers:** Optional `-l` flag for referencing specific lines.
@@ -57,46 +69,51 @@ lx -o prompt.md cmd/lx/main.go
 
 ## Examples
 
-### Filtering files
-Select multiple files using globs or pipe from other tools:
+### Discovery & Filtering
 
 ```bash
-# Shell glob
-lx **/*.py
+# Walk current directory, respecting gitignore
+lx .
 
-# Using fd (exclude tests)
-fd -e py -E "*_test.py" | lx
+# Include hidden files
+lx -H .
 
-# Using grep (files containing "TODO")
-grep -rl "TODO" src | lx
+# Include ignored files (disable gitignore logic)
+lx -I .
+
+# Follow symbolic links
+lx -L .
 ```
 
 ### Adding Context
+
 Inject instructions and headers into the prompt stream:
 
 ```bash
-lx -p "Refactor the following code to new structure." \
-   -s "Current implementation" \
-   legacy/**/*.py \
-   -s "New code base" \
-   src/**/*.py
+lx -p "Implement pytests for the following files. Follow the same structure as in the existing tests." \
+   -s "Files to test" \
+   src/foo/*.py \
+   -s "Test fixtures and sample tests." \
+   src/tests/fixtures src/tests/bar_test.py
 ```
 
 ### Slicing & Compact Mode
+
 Useful for large logs or getting a quick overview:
 
 ```bash
-# Print N lines (split between head and tail)
-lx -n 20 server.log
+# Print N lines (split between head and tail), --head and --tail are also supported
+lx -n100 server.log
 
 # Compact mode (print filename and stats only, no content)
-lx -n 0 server.log
+lx -n0
 ```
 
-Binary files are written in compact mode.
+Binary files are written in compact mode automatically.
 
 ### Line Numbers
-Helpful for asking the LLM to point out log file issies:
+
+Helpful for asking the LLM to point out log file issues:
 
 ```bash
 lx -l server.log
@@ -106,6 +123,7 @@ lx -l server.log
 
 ## Configuration
 
-`lx` uses Go templates for rendering. You can customize the output format by creating a config file at `~/.config/lx/config.yaml` (Linux/Mac) or `%APPDATA%\lx\config.yaml` (Windows).
+`lx` uses Go templates for rendering. You can customize the output format by creating a config file at
+`~/.config/lx/config.yaml` (Linux/Mac) or `%APPDATA%\lx\config.yaml` (Windows).
 
 See `default_config.yaml` in the repo for all available options and template variables.

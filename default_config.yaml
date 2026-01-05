@@ -29,7 +29,6 @@ prompt_template: |
 # Template used for the debug summary (printed to stderr, or stdout if redirected).
 debug_template: |
   Files: {{ .Global.TotalFiles }}
-  Total Rows: {{ .Global.TotalRows }}
   Size: {{ .Global.TotalSize | humanize }}
   Est. Tokens: {{ .Global.TokenEstimate }}
 
@@ -46,3 +45,18 @@ output_mode: ""
 #   "always" - Always show debug stats (equivalent to -v).
 #   "never"  - Never show debug stats (equivalent to -q).
 debug_mode: "auto"
+
+# Discovery Options
+
+# Follow symbolic links during directory traversal.
+# Equivalent to -L / --follow flag.
+follow_symlinks: false
+
+# Include hidden files and directories (starting with ".").
+# Equivalent to -H / --hidden flag.
+show_hidden: false
+
+# Disable .gitignore, .ignore, and .lxignore logic.
+# Set to true to include ignored files.
+# Equivalent to -I / --no-ignore flag.
+no_ignore: false
