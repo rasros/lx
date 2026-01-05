@@ -14,31 +14,40 @@ USAGE:
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
 {{- end }}
 
 INTERLEAVED OPTIONS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
 {{- end }}
 
 ACTIONS (printed in order):
 {{- range .Actions }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
 {{- end }}
+   -                        format stdin as a text file
+
+DISCOVERY:
+   lx recursively walks directories found in arguments.
+   It respects .gitignore, .ignore, and .lxignore files by default.
+   Hidden files and directories are skipped unless -H is provided.
 
 EXAMPLE:
    lx -n5 file1.txt -s "Section 2" -n2 file2.txt
    (Prints 5 lines of file1, a section header, then 2 lines of file2)
 
-   lx -c file.txt
-   (Copy file content to clipboard)
+   lx -c src/
+   (Walk src directory and copy content to clipboard)
 `
 
 func printHelp() {
 	var globals, interleaved, actions []CommandDef
 
 	for _, d := range definitions {
+		if d.Internal {
+			continue
+		}
 		switch d.Type {
 		case CmdGlobal:
 			globals = append(globals, d)

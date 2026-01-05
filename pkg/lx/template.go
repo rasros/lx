@@ -23,14 +23,12 @@ const DefaultTemplate = `{{ if eq .Size 0 }}` +
 const DefaultSectionTemplate = `## {{ .Body | endNewline }}` + "---\n\n"
 const DefaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
 const DefaultDebugTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
-	`Total Rows: {{ .Global.TotalRows }}` + "\n" +
 	`Size: {{ .Global.TotalSize | humanize }}` + "\n" +
 	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"
 
 type GlobalContext struct {
 	TotalFiles    int
 	TotalSize     int64
-	TotalRows     int
 	TokenEstimate int64
 	TotalSections int
 	RootPath      string

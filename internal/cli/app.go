@@ -31,6 +31,7 @@ func Run(ctx context.Context, args []string) error {
 	}
 
 	if err := gatherInputs(parsed); err != nil {
+		// Fallback for stdin errors (rare)
 		if len(args) == 0 {
 			printHelp()
 			return nil
@@ -73,8 +74,9 @@ func gatherInputs(parsed *ParsedArgs) error {
 		}
 	}
 
+	// If no inputs provided via args or stdin, default to current directory "."
 	if !hasFilesOrGenerators {
-		return fmt.Errorf("no input files provided")
+		parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: ".", Type: CmdAction})
 	}
 	return nil
 }
@@ -90,23 +92,19 @@ func processStream(parsed *ParsedArgs) error {
 		return err
 	}
 
+	cfg.ApplyGlobals(parsed.Globals)
+
 	out, clipboardBuf, debugOut, err := determineOutput(parsed.Globals, cfg)
 	if err != nil {
 		return err
 	}
 
+	showDebug := false
 	mode := cfg.DebugMode
 	if mode == "" {
 		mode = "auto"
 	}
 
-	if _, ok := parsed.Globals["quiet"]; ok {
-		mode = "never"
-	} else if _, ok := parsed.Globals["verbose"]; ok {
-		mode = "always"
-	}
-
-	showDebug := false
 	switch mode {
 	case "always":
 		showDebug = true
@@ -202,57 +200,58 @@ func determineOutput(globals map[string]string, cfg *lx.Config) (io.Writer, *byt
 }
 
 func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opts lx.Options, tmplEngine *lx.TemplateEngine, globals map[string]string, cfg *lx.Config) error {
-	totalFiles := 0
-	var totalSize int64
-	totalRows := 0
 	sectionCount := 0
-	var filePaths []string
-	var absFilePaths []string
-
 	for _, op := range ops {
-		if op.Action == "FILE" || op.Action == "file" {
-			totalFiles++
-
-			if op.Value == "-" {
-				continue
-			}
-
-			info, err := os.Stat(op.Value)
-			if err != nil {
-				return fmt.Errorf("stat %q: %w", op.Value, err)
-			}
-			if info.IsDir() {
-				return fmt.Errorf("read %q: is a directory", op.Value)
-			}
-
-			totalSize += info.Size()
-			filePaths = append(filePaths, op.Value)
-
-			if abs, err := filepath.Abs(op.Value); err == nil {
-				absFilePaths = append(absFilePaths, abs)
-			} else {
-				absFilePaths = append(absFilePaths, op.Value)
-			}
-
-			f, err := os.Open(op.Value)
-			if err == nil {
-				rows, _, _ := lx.EstimateLineCount(f, info.Size())
-				totalRows += rows
-				f.Close()
-			}
-
-		} else if op.Action == "section" {
+		if op.Action == "section" {
 			sectionCount++
 		}
 	}
 
+	// Eagerly walk directories to calculate total stats for the header
+	walker := lx.NewWalker(*cfg)
+	opMap := make(map[int][]lx.InputFile)
+	var allFiles []lx.InputFile
+
+	var totalSize int64
+	var absFilePaths []string
+
+	for i, op := range ops {
+		if op.Action == "FILE" || op.Action == "file" {
+			if op.Value == "-" {
+				// Read stdin immediately
+				data, err := io.ReadAll(os.Stdin)
+				if err != nil {
+					return fmt.Errorf("read stdin: %w", err)
+				}
+				f := lx.StdinInputFile{Content: data}.ToInputFile()
+
+				opMap[i] = []lx.InputFile{f}
+				allFiles = append(allFiles, f)
+				totalSize += f.Size
+				continue
+			}
+
+			var gathered []lx.InputFile
+			for f := range walker.Walk([]string{op.Value}) {
+				if f.LoadError != nil {
+					fmt.Fprintf(debugOut, "lx: %v\n", f.LoadError)
+					continue
+				}
+				gathered = append(gathered, f)
+				allFiles = append(allFiles, f)
+				absFilePaths = append(absFilePaths, f.AbsPath)
+				totalSize += f.Size
+			}
+			opMap[i] = gathered
+		}
+	}
+
 	globalCtx := lx.GlobalContext{
-		TotalFiles:    totalFiles,
+		TotalFiles:    len(allFiles),
 		TotalSize:     totalSize,
-		TotalRows:     totalRows,
 		TokenEstimate: lx.EstimateTokens(totalSize),
 		TotalSections: sectionCount + 1,
-		RootPath:      findCommonRoot(filePaths),
+		RootPath:      findCommonRoot(absFilePaths),
 		AbsRootPath:   findCommonRoot(absFilePaths),
 		Args:          globals,
 		Config:        *cfg,
@@ -267,22 +266,25 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 	fileIndex := 1
 	prevCompact := false
 
-	for _, op := range ops {
+	for i, op := range ops {
 		switch op.Action {
 		case "FILE", "file":
+			files := opMap[i]
 			runCfg := opts.ToRunnerConfig()
 			runner := lx.NewRunner(runCfg, tmplEngine, globalCtx)
 
-			isCompact, err := runner.RunFile(op.Value, fileIndex, prevCompact, out)
-			if err != nil {
-				return err
+			for _, f := range files {
+				isCompact, err := runner.RunFile(f, fileIndex, prevCompact, out)
+				if err != nil {
+					fmt.Fprintf(debugOut, "error processing %s: %v\n", f.Path, err)
+					continue
+				}
+				prevCompact = isCompact
+				fileIndex++
 			}
-			prevCompact = isCompact
-			fileIndex++
 
 		case "section":
 			runner := lx.NewRunner(opts.ToRunnerConfig(), tmplEngine, globalCtx)
-
 			if prevCompact {
 				fmt.Fprintln(out)
 			}
@@ -293,7 +295,6 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 
 		case "prompt":
 			runner := lx.NewRunner(opts.ToRunnerConfig(), tmplEngine, globalCtx)
-
 			if prevCompact {
 				fmt.Fprintln(out)
 			}

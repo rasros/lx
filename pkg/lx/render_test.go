@@ -34,7 +34,6 @@ func newTestRunner(head, tail int, tmplStr string) *Runner {
 	global := GlobalContext{
 		TotalFiles:    1,
 		TotalSize:     1024,
-		TotalRows:     100,
 		TokenEstimate: 256,
 		TotalSections: 1,
 		RootPath:      ".",
@@ -43,6 +42,15 @@ func newTestRunner(head, tail int, tmplStr string) *Runner {
 	}
 
 	return NewRunner(cfg, engine, global)
+}
+
+func mustInputFile(t *testing.T, path string) InputFile {
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat error: %v", err)
+	}
+	abs, _ := filepath.Abs(path)
+	return NewOsInputFile(path, abs, info)
 }
 
 func TestRunner_DefaultTemplate(t *testing.T) {
@@ -56,7 +64,7 @@ func TestRunner_DefaultTemplate(t *testing.T) {
 	var buf bytes.Buffer
 	r := newTestRunner(-1, -1, "")
 
-	if _, err := r.RunFile(path, 1, false, &buf); err != nil {
+	if _, err := r.RunFile(mustInputFile(t, path), 1, false, &buf); err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
@@ -80,7 +88,7 @@ func TestRunner_CompactModeViaZero(t *testing.T) {
 	var buf bytes.Buffer
 	r := newTestRunner(0, 0, "")
 
-	if _, err := r.RunFile(path, 1, false, &buf); err != nil {
+	if _, err := r.RunFile(mustInputFile(t, path), 1, false, &buf); err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
@@ -103,7 +111,7 @@ func TestRunner_EmptyFile(t *testing.T) {
 	var buf bytes.Buffer
 	r := newTestRunner(-1, -1, "")
 
-	if _, err := r.RunFile(path, 1, false, &buf); err != nil {
+	if _, err := r.RunFile(mustInputFile(t, path), 1, false, &buf); err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
@@ -125,7 +133,7 @@ func TestRunner_CustomTemplate(t *testing.T) {
 	tmpl := "START {{ .Path }}\n{{ .Content }}END"
 	r := newTestRunner(-1, -1, tmpl)
 
-	if _, err := r.RunFile(path, 1, false, &buf); err != nil {
+	if _, err := r.RunFile(mustInputFile(t, path), 1, false, &buf); err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
@@ -152,7 +160,7 @@ func TestRunner_HeadOnly(t *testing.T) {
 	var buf bytes.Buffer
 	r := newTestRunner(2, 0, "")
 
-	if _, err := r.RunFile(path, 1, false, &buf); err != nil {
+	if _, err := r.RunFile(mustInputFile(t, path), 1, false, &buf); err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
@@ -177,7 +185,7 @@ func TestRunner_BinaryDetection(t *testing.T) {
 	tmpl := "{{ if .IsBinary }}BINARY{{ else }}TEXT{{ end }}"
 	r := newTestRunner(-1, -1, tmpl)
 
-	if _, err := r.RunFile(path, 1, false, &buf); err != nil {
+	if _, err := r.RunFile(mustInputFile(t, path), 1, false, &buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -197,7 +205,7 @@ func TestRunner_RunFile_Indexing(t *testing.T) {
 	r := newTestRunner(-1, -1, "")
 	r.Global.TotalFiles = 100
 
-	_, err := r.RunFile(path, 42, false, &buf)
+	_, err := r.RunFile(mustInputFile(t, path), 42, false, &buf)
 	if err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}

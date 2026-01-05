@@ -29,6 +29,10 @@ type Config struct {
 	DebugTemplate   string `yaml:"debug_template"`
 	OutputMode      string `yaml:"output_mode"`
 	DebugMode       string `yaml:"debug_mode"` // values: auto, always, never
+
+	FollowSymlinks bool `yaml:"follow_symlinks"`
+	ShowHidden     bool `yaml:"show_hidden"`
+	NoIgnore       bool `yaml:"no_ignore"`
 }
 
 type Options struct {
@@ -165,6 +169,32 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		Prompt:  tPrompt,
 		Debug:   tDebug,
 	}, &cfg, nil
+}
+
+func (c *Config) ApplyGlobals(globals map[string]string) {
+	if _, ok := globals["follow"]; ok {
+		c.FollowSymlinks = true
+	} else if _, ok := globals["no-follow"]; ok {
+		c.FollowSymlinks = false
+	}
+
+	if _, ok := globals["hidden"]; ok {
+		c.ShowHidden = true
+	} else if _, ok := globals["no-hidden"]; ok {
+		c.ShowHidden = false
+	}
+
+	if _, ok := globals["no-ignore"]; ok {
+		c.NoIgnore = true
+	} else if _, ok := globals["ignore"]; ok {
+		c.NoIgnore = false
+	}
+
+	if _, ok := globals["quiet"]; ok {
+		c.DebugMode = "never"
+	} else if _, ok := globals["verbose"]; ok {
+		c.DebugMode = "always"
+	}
 }
 
 func mergeConfig(cfg *Config, path string, strict bool) error {
