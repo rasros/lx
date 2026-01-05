@@ -70,7 +70,8 @@ func (w *Walker) walkDir(
 		visited[absPath] = true
 	}
 
-	if !w.Config.NoIgnore && isIgnored(ignoreStack, path, true) {
+	// Respect ignore files if enabled
+	if w.Config.IgnoreEnabled() && isIgnored(ignoreStack, path, true) {
 		return
 	}
 
@@ -79,7 +80,7 @@ func (w *Walker) walkDir(
 	}
 
 	newStack := ignoreStack
-	if !w.Config.NoIgnore {
+	if w.Config.IgnoreEnabled() {
 		matchers := w.loadLocalIgnores(path)
 		if len(matchers) > 0 {
 			ns := make([]gitignore.IgnoreMatcher, len(ignoreStack)+len(matchers))
@@ -138,7 +139,7 @@ func (w *Walker) walkDir(
 				continue
 			}
 
-			if !w.Config.NoIgnore && isIgnored(newStack, childPath, false) {
+			if w.Config.IgnoreEnabled() && isIgnored(newStack, childPath, false) {
 				continue
 			}
 
@@ -150,7 +151,7 @@ func (w *Walker) walkDir(
 }
 
 func (w *Walker) loadGlobalIgnores() gitignore.IgnoreMatcher {
-	if w.Config.NoIgnore {
+	if !w.Config.IgnoreEnabled() {
 		return nil
 	}
 

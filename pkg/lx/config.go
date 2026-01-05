@@ -9,6 +9,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Config represents the file-based configuration.
+type Config struct {
+	Template        string `yaml:"template"`
+	SectionTemplate string `yaml:"section_template"`
+	PromptTemplate  string `yaml:"prompt_template"`
+	DebugTemplate   string `yaml:"debug_template"`
+
+	OutputMode string `yaml:"output_mode"` // "stdout" (default) or "copy"
+	DebugMode  string `yaml:"debug_mode"`  // "auto", "always", "never"
+
+	FollowSymlinks bool  `yaml:"follow_symlinks"`
+	ShowHidden     bool  `yaml:"show_hidden"`
+	Ignore         *bool `yaml:"ignore"` // Pointer to distinguish between unset (nil) and false
+}
+
+// RunnerConfig is the runtime configuration for a specific file/operation.
 type RunnerConfig struct {
 	Head        int
 	Tail        int
@@ -22,19 +38,7 @@ type TemplateEngine struct {
 	Debug   *template.Template
 }
 
-type Config struct {
-	Template        string `yaml:"template"`
-	SectionTemplate string `yaml:"section_template"`
-	PromptTemplate  string `yaml:"prompt_template"`
-	DebugTemplate   string `yaml:"debug_template"`
-	OutputMode      string `yaml:"output_mode"`
-	DebugMode       string `yaml:"debug_mode"` // values: auto, always, never
-
-	FollowSymlinks bool `yaml:"follow_symlinks"`
-	ShowHidden     bool `yaml:"show_hidden"`
-	NoIgnore       bool `yaml:"no_ignore"`
-}
-
+// Options represents CLI flags that override Config.
 type Options struct {
 	Head  int
 	Tail  int
@@ -48,117 +52,98 @@ type Options struct {
 	LineNumbers bool
 }
 
+// ToRunnerConfig resolves the specific head/tail counts based on CLI flags.
 func (o Options) ToRunnerConfig() RunnerConfig {
-	effHead, effTail := -1, -1
+	head, tail := -1, -1 // -1 indicates "read all"
 
+	// 1. If -n/--lines is set, it acts as a total budget split between head and tail.
 	if o.NSet {
-		if o.NBoth == 0 {
-			effHead, effTail = 0, 0
-		} else {
-			total := o.NBoth
-			switch {
-			case o.HeadSet:
-				h := o.Head
-				if h < 0 {
-					h = 0
-				} else if h > total {
-					h = total
-				}
-				effHead, effTail = h, total-h
-			case o.TailSet:
-				t := o.Tail
-				if t < 0 {
-					t = 0
-				} else if t > total {
-					t = total
-				}
-				effTail, effHead = t, total-t
-			default:
-				effHead, effTail = (total+1)/2, total/2
-			}
+		total := o.NBoth
+		if total < 0 {
+			total = 0
+		}
+
+		switch {
+		// User specified -n and --head: Tail gets the remainder.
+		case o.HeadSet:
+			head = clamp(o.Head, 0, total)
+			tail = total - head
+
+		// User specified -n and --tail: Head gets the remainder.
+		case o.TailSet:
+			tail = clamp(o.Tail, 0, total)
+			head = total - tail
+
+		// User specified only -n: Split evenly (favoring Head if odd).
+		default:
+			head = (total + 1) / 2
+			tail = total / 2
 		}
 	} else {
+		// 2. Standard --head / --tail behavior (independent).
 		if o.HeadSet {
-			effHead = o.Head
+			head = o.Head
+			// If head is set but tail isn't, default tail to 0 (unless explicit)
 			if !o.TailSet {
-				effTail = 0
+				tail = 0
 			}
 		}
 		if o.TailSet {
-			effTail = o.Tail
+			tail = o.Tail
+			// If tail is set but head isn't, default head to 0
 			if !o.HeadSet {
-				effHead = 0
+				head = 0
 			}
 		}
 	}
 
 	return RunnerConfig{
-		Head:        effHead,
-		Tail:        effTail,
+		Head:        head,
+		Tail:        tail,
 		LineNumbers: o.LineNumbers,
 	}
 }
 
 func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
-	var cfg Config
+	cfg, err := loadConfigChain(o.ConfigPath)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	configDir, err := os.UserConfigDir()
-	if err == nil {
-		defPath := filepath.Join(configDir, "lx", "config.yaml")
-		if err := mergeConfig(&cfg, defPath, false); err != nil {
-			return nil, nil, fmt.Errorf("load default config: %w", err)
+	// Set defaults for strings if empty
+	if cfg.OutputMode == "" {
+		cfg.OutputMode = "stdout"
+	}
+
+	// Helper to pick template or default
+	pick := func(user, def string) string {
+		if user != "" {
+			return user
 		}
-	}
-
-	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
-		if err := mergeConfig(&cfg, envPath, false); err != nil {
-			return nil, nil, fmt.Errorf("load env config: %w", err)
-		}
-	}
-
-	if o.ConfigPath != "" {
-		if err := mergeConfig(&cfg, o.ConfigPath, true); err != nil {
-			return nil, nil, fmt.Errorf("load cli config: %w", err)
-		}
-	}
-
-	tmplStr := DefaultTemplate
-	if cfg.Template != "" {
-		tmplStr = cfg.Template
-	}
-
-	sectionTmplStr := DefaultSectionTemplate
-	if cfg.SectionTemplate != "" {
-		sectionTmplStr = cfg.SectionTemplate
-	}
-
-	promptTmplStr := DefaultPromptTemplate
-	if cfg.PromptTemplate != "" {
-		promptTmplStr = cfg.PromptTemplate
-	}
-
-	debugTmplStr := DefaultDebugTemplate
-	if cfg.DebugTemplate != "" {
-		debugTmplStr = cfg.DebugTemplate
+		return def
 	}
 
 	funcs := TemplateFuncs()
-	tMain, err := template.New("lx").Funcs(funcs).Parse(tmplStr)
-	if err != nil {
-		return nil, nil, fmt.Errorf("parse template: %w", err)
+	parse := func(name, tmpl string) (*template.Template, error) {
+		return template.New(name).Funcs(funcs).Parse(tmpl)
 	}
 
-	tSection, err := template.New("section").Funcs(funcs).Parse(sectionTmplStr)
+	tMain, err := parse("lx", pick(cfg.Template, DefaultTemplate))
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse main template: %w", err)
+	}
+
+	tSection, err := parse("section", pick(cfg.SectionTemplate, DefaultSectionTemplate))
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse section template: %w", err)
 	}
 
-	tPrompt, err := template.New("prompt").Funcs(funcs).Parse(promptTmplStr)
+	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, DefaultPromptTemplate))
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse prompt template: %w", err)
 	}
 
-	tDebug, err := template.New("debug").Funcs(funcs).Parse(debugTmplStr)
+	tDebug, err := parse("debug", pick(cfg.DebugTemplate, DefaultDebugTemplate))
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse debug template: %w", err)
 	}
@@ -168,7 +153,33 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		Section: tSection,
 		Prompt:  tPrompt,
 		Debug:   tDebug,
-	}, &cfg, nil
+	}, cfg, nil
+}
+
+// loadConfigChain loads config from Default -> Env -> CLI.
+func loadConfigChain(cliPath string) (*Config, error) {
+	cfg := &Config{}
+
+	// 1. Load Defaults (User Config Dir)
+	if configDir, err := os.UserConfigDir(); err == nil {
+		_ = mergeConfig(cfg, filepath.Join(configDir, "lx", "config.yaml"), false)
+	}
+
+	// 2. Load Env
+	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
+		if err := mergeConfig(cfg, envPath, false); err != nil {
+			return nil, fmt.Errorf("load env config: %w", err)
+		}
+	}
+
+	// 3. Load CLI
+	if cliPath != "" {
+		if err := mergeConfig(cfg, cliPath, true); err != nil {
+			return nil, fmt.Errorf("load cli config: %w", err)
+		}
+	}
+
+	return cfg, nil
 }
 
 func (c *Config) ApplyGlobals(globals map[string]string) {
@@ -184,10 +195,13 @@ func (c *Config) ApplyGlobals(globals map[string]string) {
 		c.ShowHidden = false
 	}
 
-	if _, ok := globals["no-ignore"]; ok {
-		c.NoIgnore = true
-	} else if _, ok := globals["ignore"]; ok {
-		c.NoIgnore = false
+	// Handle Ignore (pointer bool)
+	if _, ok := globals["ignore"]; ok {
+		t := true
+		c.Ignore = &t
+	} else if _, ok := globals["no-ignore"]; ok {
+		f := false
+		c.Ignore = &f
 	}
 
 	if _, ok := globals["quiet"]; ok {
@@ -195,6 +209,15 @@ func (c *Config) ApplyGlobals(globals map[string]string) {
 	} else if _, ok := globals["verbose"]; ok {
 		c.DebugMode = "always"
 	}
+}
+
+// IgnoreEnabled returns the effective boolean value for Ignore.
+// Defaults to true if nil.
+func (c *Config) IgnoreEnabled() bool {
+	if c.Ignore == nil {
+		return true
+	}
+	return *c.Ignore
 }
 
 func mergeConfig(cfg *Config, path string, strict bool) error {
@@ -209,6 +232,15 @@ func mergeConfig(cfg *Config, path string, strict bool) error {
 		return err
 	}
 	defer f.Close()
-
 	return yaml.NewDecoder(f).Decode(cfg)
+}
+
+func clamp(val, min, max int) int {
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
 }

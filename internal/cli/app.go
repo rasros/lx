@@ -265,6 +265,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 
 	fileIndex := 1
 	prevCompact := false
+	section := 1
 
 	for i, op := range ops {
 		switch op.Action {
@@ -274,7 +275,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 			runner := lx.NewRunner(runCfg, tmplEngine, globalCtx)
 
 			for _, f := range files {
-				isCompact, err := runner.RunFile(f, fileIndex, prevCompact, out)
+				isCompact, err := runner.RunFile(f, fileIndex, prevCompact, section, out)
 				if err != nil {
 					fmt.Fprintf(debugOut, "error processing %s: %v\n", f.Path, err)
 					continue
@@ -288,7 +289,8 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 			if prevCompact {
 				fmt.Fprintln(out)
 			}
-			if err := runner.RunSection(op.Value, out); err != nil {
+			section++ // Increment on each new section
+			if err := runner.RunSection(op.Value, section, out); err != nil {
 				return err
 			}
 			prevCompact = false
@@ -298,7 +300,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 			if prevCompact {
 				fmt.Fprintln(out)
 			}
-			if err := runner.RunPrompt(op.Value, out); err != nil {
+			if err := runner.RunPrompt(op.Value, section, out); err != nil {
 				return err
 			}
 			prevCompact = false

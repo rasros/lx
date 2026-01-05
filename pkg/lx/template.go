@@ -38,29 +38,32 @@ type GlobalContext struct {
 }
 
 type FileContext struct {
-	Path          string
-	AbsPath       string
-	Size          int64
-	ModTime       time.Time
-	TotalRows     int
-	TokenEstimate int64
-	IsEstimate    bool
-	Language      string
-	Content       interface{}
-	IsBinary      bool
-	IsCompactView bool
-	FileIndex     int
-	Global        GlobalContext
+	Path           string
+	AbsPath        string
+	Size           int64
+	ModTime        time.Time
+	TotalRows      int
+	TokenEstimate  int64
+	IsEstimate     bool
+	Language       string
+	Content        interface{}
+	IsBinary       bool
+	IsCompactView  bool
+	FileIndex      int
+	CurrentSection int
+	Global         GlobalContext
 }
 
 type SectionContext struct {
-	Body   string
-	Global GlobalContext
+	Body    string
+	Section int
+	Global  GlobalContext
 }
 
 type PromptContext struct {
-	Body   string
-	Global GlobalContext
+	Body    string
+	Section int
+	Global  GlobalContext
 }
 
 type DebugContext struct {

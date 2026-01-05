@@ -31,24 +31,26 @@ func NewRunner(cfg RunnerConfig, engine *TemplateEngine, global GlobalContext) *
 	}
 }
 
-func (r *Runner) RunSection(body string, out io.Writer) error {
+func (r *Runner) RunSection(body string, section int, out io.Writer) error {
 	ctx := SectionContext{
-		Body:   body,
-		Global: r.Global,
+		Body:    body,
+		Section: section,
+		Global:  r.Global,
 	}
 	return r.Engine.Section.Execute(out, ctx)
 }
 
-func (r *Runner) RunPrompt(body string, out io.Writer) error {
+func (r *Runner) RunPrompt(body string, section int, out io.Writer) error {
 	ctx := PromptContext{
-		Body:   body,
-		Global: r.Global,
+		Body:    body,
+		Section: section,
+		Global:  r.Global,
 	}
 	return r.Engine.Prompt.Execute(out, ctx)
 }
 
 // RunFile now accepts the abstract InputFile
-func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, out io.Writer) (bool, error) {
+func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSection int, out io.Writer) (bool, error) {
 	var (
 		contentReader io.ReaderAt
 		fileSize      int64     = file.Size
@@ -205,19 +207,20 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, out io.Wri
 	}
 
 	ctx := FileContext{
-		Path:          path,
-		AbsPath:       absPath,
-		Size:          fileSize,
-		ModTime:       modTime,
-		TotalRows:     totalRows,
-		TokenEstimate: EstimateTokens(fileSize),
-		IsEstimate:    isEstimate,
-		Language:      language,
-		Content:       content,
-		IsBinary:      isBin,
-		IsCompactView: isExplicitCompact || isBin || fileSize == 0,
-		FileIndex:     index,
-		Global:        r.Global,
+		Path:           path,
+		AbsPath:        absPath,
+		Size:           fileSize,
+		ModTime:        modTime,
+		TotalRows:      totalRows,
+		TokenEstimate:  EstimateTokens(fileSize),
+		IsEstimate:     isEstimate,
+		Language:       language,
+		Content:        content,
+		IsBinary:       isBin,
+		IsCompactView:  isExplicitCompact || isBin || fileSize == 0,
+		FileIndex:      index,
+		CurrentSection: currentSection,
+		Global:         r.Global,
 	}
 
 	if err := r.Engine.Main.Execute(out, ctx); err != nil {

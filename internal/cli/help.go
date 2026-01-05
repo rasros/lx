@@ -7,38 +7,38 @@ import (
 )
 
 const helpTmpl = `NAME:
-   lx - print files with headers, slicing, using go-templates
+   lx - file discovery and formatting tool for LLM prompting
 
-USAGE:
-   lx [global options] [command state options] [files/actions...]
+SYNOPSIS:
+   lx [options] [files/globs]
+
+DESCRIPTION:
+   lx recursively discovers files, slices content, and formats output with 
+   markdown fences and headers for use with Large Language Models.
+
+   It integrates .gitignore logic, binary file detection, and token estimation 
+   into a single stream suitable for piping or clipboard copy.
 
 GLOBAL OPTIONS:
 {{- range .Globals }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 INTERLEAVED OPTIONS (apply to subsequent files):
 {{- range .Interleaved }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
 
 ACTIONS (printed in order):
 {{- range .Actions }}
-   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}     {{ end }} {{ .Usage }}
+   --{{ .Name | printf "%-16s" }}{{ if .Short }}-{{ .Short | printf "%-4s" }}{{ else }}      {{ end }} {{ .Usage }}
 {{- end }}
-   -                        format stdin as a text file
+                     -     read from stdin
 
-DISCOVERY:
-   lx recursively walks directories found in arguments.
-   It respects .gitignore, .ignore, and .lxignore files by default.
-   Hidden files and directories are skipped unless -H is provided.
-
-EXAMPLE:
-   lx -n5 file1.txt -s "Section 2" -n2 file2.txt
-   (Prints 5 lines of file1, a section header, then 2 lines of file2)
-
-   lx -c src/
-   (Walk src directory and copy content to clipboard)
+EXAMPLES:
+   lx -c src/                         # Copy all non-ignored files in src/
+   lx -n50 server.log                 # Print first/last 25 lines of log
+   lx -p "Refactor:" file.go          # Prepend instruction to file content
 `
 
 func printHelp() {

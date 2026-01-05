@@ -1,0 +1,18 @@
+# lx XML Configuration
+
+template: |
+  <file path="{{ .Path }}"
+  {{- if eq .Size 0 }} empty="true" />
+  {{- else if .IsBinary }} binary="true" size="{{ .Size }}" />
+  {{- else if .IsCompactView }} rows="{{ .TotalRows }}" />
+  {{- else }} rows="{{ .TotalRows }}">
+  {{ .Content | endNewline -}}</file>
+  {{- end }}{{ "\n" }}
+
+section_template: |
+  <section>
+  {{ .Body | endNewline -}}</section>{{ "\n" }}
+
+prompt_template: |
+  <instruction>
+  {{ .Body | endNewline -}}</instruction>{{ "\n" }}

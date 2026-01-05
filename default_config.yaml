@@ -35,9 +35,9 @@ debug_template: |
 
 # Output mode.
 # Options:
-#   ""      (default) - Print to stdout.
-#   "copy"  - Copy to system clipboard.
-output_mode: ""
+#   "stdout" (default) - Print to stdout.
+#   "copy"   - Copy to system clipboard.
+output_mode: "stdout"
 
 # Debug mode.
 # Options:
@@ -56,7 +56,7 @@ follow_symlinks: false
 # Equivalent to -H / --hidden flag.
 show_hidden: false
 
-# Disable .gitignore, .ignore, and .lxignore logic.
-# Set to true to include ignored files.
-# Equivalent to -I / --no-ignore flag.
-no_ignore: false
+# Respect .gitignore, .ignore, and .lxignore files.
+# Set to false to include ignored files.
+# Equivalent to the inverse of -I / --no-ignore flag.
+ignore: true

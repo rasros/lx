@@ -27,16 +27,16 @@ var definitions = []CommandDef{
 	{Name: "cpuprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "write cpu profile to file", Internal: true},
 	{Name: "memprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "write memory profile to file", Internal: true},
 
-	{Name: "copy", Short: "c", Type: CmdGlobal, ValueType: ValueNone, Usage: "copy output to clipboard"},
-	{Name: "stdout", Short: "C", Type: CmdGlobal, ValueType: ValueNone, Usage: "force output to stdout (overrides config)"},
+	{Name: "copy", Short: "c", Type: CmdGlobal, ValueType: ValueNone, Usage: "write output to clipboard"},
+	{Name: "stdout", Short: "C", Type: CmdGlobal, ValueType: ValueNone, Usage: "write output to stdout"},
 	{Name: "output", Short: "o", Type: CmdGlobal, ValueType: ValueAny, Usage: "write output to file"},
 
 	{Name: "follow", Short: "L", Type: CmdGlobal, ValueType: ValueNone, Usage: "follow symbolic links"},
 	{Name: "hidden", Short: "H", Type: CmdGlobal, ValueType: ValueNone, Usage: "search hidden files/directories"},
-	{Name: "ignore", Type: CmdGlobal, ValueType: ValueNone, Usage: "respect ignore files (overrides config)"},
-	{Name: "no-ignore", Short: "I", Type: CmdGlobal, ValueType: ValueNone, Usage: "show ignored files (disable gitignore logic)"},
-	{Name: "no-follow", Type: CmdGlobal, ValueType: ValueNone, Usage: "do not follow symbolic links (overrides config)"},
-	{Name: "no-hidden", Type: CmdGlobal, ValueType: ValueNone, Usage: "ignore hidden files (overrides config)"},
+	{Name: "ignore", Type: CmdGlobal, ValueType: ValueNone, Usage: "respect ignore files"},
+	{Name: "no-ignore", Short: "I", Type: CmdGlobal, ValueType: ValueNone, Usage: "disable ignore logic"},
+	{Name: "no-follow", Type: CmdGlobal, ValueType: ValueNone, Usage: "do not follow symbolic links"},
+	{Name: "no-hidden", Type: CmdGlobal, ValueType: ValueNone, Usage: "ignore hidden files"},
 
 	{Name: "line-numbers", Short: "l", Type: CmdInterleaved, ValueType: ValueNone, Usage: "print line numbers"},
 	{Name: "no-line-numbers", Short: "L", Type: CmdInterleaved, ValueType: ValueNone, Usage: "don't print line numbers"},
