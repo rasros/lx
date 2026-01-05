@@ -21,10 +21,21 @@ jobs:
         with:
           go-version: "1.25.4"
 
-      - name: Derive version from tag
+      - name: Derive version info
+        id: version
         run: |
+          # Strip the 'v' prefix
           VERSION="${GITHUB_REF_NAME#v}"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          
+          # Logic: If tag contains a hyphen (e.g. 1.0.0-beta.1), it's a pre-release
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "IS_PRERELEASE=true" >> "$GITHUB_ENV"
+            echo "Detected Pre-release: Yes"
+          else
+            echo "IS_PRERELEASE=false" >> "$GITHUB_ENV"
+            echo "Detected Pre-release: No"
+          fi
 
       - name: Build multi-platform archives
         run: |
@@ -32,7 +43,7 @@ jobs:
 
           mkdir -p dist
 
-          ldflags="-X 'github.com/rasros/lx/lx.Version=${VERSION}'"
+          ldflags="-s -w -X 'github.com/rasros/lx/internal/cli.Version=${VERSION}'"
 
           for GOOS in linux darwin windows; do
             for GOARCH in amd64 arm64; do
@@ -61,11 +72,17 @@ jobs:
               rm "$out_bin"
             done
           done
+          
+          # Generate checksums
+          cd dist
+          sha256sum * > checksums.txt
 
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          # This reads the flag we calculated in step 3
+          prerelease: ${{ env.IS_PRERELEASE }}
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
