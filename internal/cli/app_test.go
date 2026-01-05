@@ -46,9 +46,9 @@ func TestRun_Commands(t *testing.T) {
 			wantContain: []string{"lx version"},
 		},
 		{
-			name:        "no args prints help",
+			name:        "no args implies dot",
 			args:        []string{},
-			wantContain: []string{"USAGE:"},
+			wantContain: []string{"app.go"},
 		},
 		{
 			name:        "prompt only",
@@ -158,7 +158,11 @@ func TestRun_Integration(t *testing.T) {
 		},
 		{
 			name: "missing file check",
-			args: []string{f1, "non_existent_file"},
+			// Note: missing files now print errors to stderr and proceed with valid files.
+			// Run() returns nil in this case.
+			args:        []string{f1, "non_existent_file"},
+			want:        []string{"1-one"},
+			wantMissing: []string{},
 		},
 		{
 			name:        "compact mode",
@@ -201,11 +205,15 @@ func TestRun_Integration(t *testing.T) {
 				return
 			}
 			if tt.name == "missing file check" {
-				if err == nil {
-					t.Errorf("Expected error for non-existent file, got nil")
+				// We expect success (nil error) because lx is tolerant of missing files in discovery mode.
+				// Content of valid files should be printed.
+				// The error message for the missing file goes to Stderr which we aren't capturing here,
+				// but we verify the valid file content exists.
+				if err != nil {
+					t.Errorf("Expected nil error for missing file in discovery mode, got %v", err)
 				}
-				if strings.Contains(out, "1-one") {
-					t.Errorf("Should not have printed content when a file is missing")
+				if !strings.Contains(out, "1-one") {
+					t.Errorf("Should have printed content for valid file f1")
 				}
 				return
 			}

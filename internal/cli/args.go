@@ -28,6 +28,7 @@ type CommandDef struct {
 	Type      CmdType
 	ValueType ValueType
 	Usage     string
+	Internal  bool
 }
 
 type Op struct {

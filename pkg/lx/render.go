@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -48,46 +47,59 @@ func (r *Runner) RunPrompt(body string, out io.Writer) error {
 	return r.Engine.Prompt.Execute(out, ctx)
 }
 
-func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer) (bool, error) {
+// RunFile now accepts the abstract InputFile
+func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, out io.Writer) (bool, error) {
 	var (
 		contentReader io.ReaderAt
-		fileSize      int64
-		modTime       time.Time
-		absPath       string
-		isStdin       bool
+		fileSize      int64     = file.Size
+		modTime       time.Time = file.ModTime
+		path          string    = file.Path
+		absPath       string    = file.AbsPath
 	)
 
-	if path == "-" {
-		isStdin = true
-		absPath = "stdin"
-		data, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			return false, fmt.Errorf("read stdin: %w", err)
-		}
-		contentReader = bytes.NewReader(data)
-		fileSize = int64(len(data))
-		modTime = time.Now()
-	} else {
-		info, err := os.Stat(path)
-		if err != nil {
-			return false, fmt.Errorf("stat %q: %w", path, err)
-		}
-		fileSize = info.Size()
-		modTime = info.ModTime()
-
-		abs, err := filepath.Abs(path)
-		if err != nil {
-			absPath = path
-		} else {
-			absPath = abs
-		}
-
-		f, err := os.Open(path)
+	if path == "-" || path == "stdin" {
+		// Stdin content is buffered in memory to support random access (ReaderAt),
+		// which is required for line counting, slicing, and token estimation.
+		rc, err := file.Open()
 		if err != nil {
 			return false, err
 		}
-		defer f.Close()
-		contentReader = f
+		defer rc.Close()
+
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			return false, err
+		}
+		contentReader = bytes.NewReader(data)
+		fileSize = int64(len(data))
+
+		// Ensure it is formatted as "stdin" in output
+		path = "stdin"
+	} else {
+		// For standard files (and Archives later), we need ReadAt for head/tail.
+		// The generic Open() returns ReadCloser.
+		// If it's an OS file, we can cast.
+		// If it's a Zip entry, we might need to read all if it doesn't support Seek.
+
+		rc, err := file.Open()
+		if err != nil {
+			return false, err
+		}
+
+		// Attempt to upgrade to ReaderAt/Seeker
+		if f, ok := rc.(*os.File); ok {
+			contentReader = f
+			defer f.Close()
+		} else {
+			// Fallback for non-OS files (e.g. Zip streams): Read All into buffer
+			// because our Slicing logic depends on ReadAt.
+			data, err := io.ReadAll(rc)
+			rc.Close()
+			if err != nil {
+				return false, err
+			}
+			contentReader = bytes.NewReader(data)
+		}
 	}
 
 	isExplicitCompact := r.Config.Head == 0 && r.Config.Tail == 0
@@ -116,10 +128,11 @@ func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer
 
 		if !isBin {
 			var reader io.ReadSeeker
-			if isStdin {
-				reader = contentReader.(*bytes.Reader)
+			if rdr, ok := contentReader.(io.ReadSeeker); ok {
+				reader = rdr
 			} else {
-				reader = contentReader.(*os.File)
+				// Should not happen with bytes.Reader or os.File
+				return false, fmt.Errorf("reader does not support seeking")
 			}
 
 			if isUnlimited {
@@ -148,13 +161,16 @@ func (r *Runner) RunFile(path string, index int, prevCompact bool, out io.Writer
 						}
 						gapBytes = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
 					}
-					if isStdin {
+
+					// Tail logic
+					if f, ok := contentReader.(*os.File); ok {
+						tailBytes, _ = ReadTailSeek(f, r.Config.Tail)
+					} else {
+						// For bytes.Reader (Stdin or Zip buffer)
 						rdr := contentReader.(*bytes.Reader)
 						allData := make([]byte, fileSize)
 						rdr.ReadAt(allData, 0)
 						tailBytes = tailFromBuffer(allData, r.Config.Tail)
-					} else {
-						tailBytes, _ = ReadTailSeek(contentReader.(*os.File), r.Config.Tail)
 					}
 				}
 			}
@@ -215,14 +231,7 @@ func tailFromBuffer(data []byte, lines int) []byte {
 	if lines <= 0 || len(data) == 0 {
 		return nil
 	}
-	count := 0
-	for i := len(data) - 1; i >= 0; i-- {
-		if data[i] == '\n' {
-			count++
-			if i < len(data)-1 && count >= lines {
-			}
-		}
-	}
+	// (Existing tail logic is fine)
 	newlinesFound := 0
 	start := 0
 	for i := len(data) - 1; i >= 0; i-- {
