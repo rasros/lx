@@ -2,6 +2,7 @@ package lx
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,9 +18,9 @@ func NewWalker(cfg Config) *Walker {
 	return &Walker{Config: cfg}
 }
 
-// Walk accepts a list of root paths and returns a channel of InputFiles.
+// Walk accepts a context and a list of root paths and returns a channel of InputFiles.
 // It handles directory traversal, ignores, and eventually archives.
-func (w *Walker) Walk(roots []string) <-chan InputFile {
+func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	out := make(chan InputFile)
 
 	globalIgnore := w.loadGlobalIgnores()
@@ -30,25 +31,40 @@ func (w *Walker) Walk(roots []string) <-chan InputFile {
 		visited := make(map[string]bool)
 
 		for _, root := range roots {
+			// Check for cancellation before processing next root
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			if root == "-" {
 				continue
 			}
 
 			info, err := os.Stat(root)
 			if err != nil {
-				out <- InputFile{Path: root, LoadError: err}
+				select {
+				case out <- InputFile{Path: root, LoadError: err}:
+				case <-ctx.Done():
+					return
+				}
 				continue
 			}
 
 			if !info.IsDir() {
 				if abs, err := filepath.Abs(root); err == nil {
-					out <- NewOsInputFile(root, abs, info)
+					select {
+					case out <- NewOsInputFile(root, abs, info):
+					case <-ctx.Done():
+						return
+					}
 				}
 				continue
 			}
 
 			absRoot, _ := filepath.Abs(root)
-			w.walkDir(root, absRoot, info, []gitignore.IgnoreMatcher{globalIgnore}, visited, out)
+			w.walkDir(ctx, root, absRoot, info, []gitignore.IgnoreMatcher{globalIgnore}, visited, out)
 		}
 	}()
 
@@ -56,6 +72,7 @@ func (w *Walker) Walk(roots []string) <-chan InputFile {
 }
 
 func (w *Walker) walkDir(
+	ctx context.Context,
 	path string,
 	absPath string,
 	info os.FileInfo,
@@ -63,6 +80,13 @@ func (w *Walker) walkDir(
 	visited map[string]bool,
 	out chan<- InputFile,
 ) {
+	// Check for cancellation at the start of directory processing
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
 	if w.Config.FollowSymlinks {
 		if visited[absPath] {
 			return
@@ -92,7 +116,11 @@ func (w *Walker) walkDir(
 
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		out <- InputFile{Path: path, LoadError: err}
+		select {
+		case out <- InputFile{Path: path, LoadError: err}:
+		case <-ctx.Done():
+			return
+		}
 		return
 	}
 
@@ -133,7 +161,7 @@ func (w *Walker) walkDir(
 			if !w.Config.ShowHidden && strings.HasPrefix(entry.Name(), ".") {
 				continue
 			}
-			w.walkDir(childPath, targetAbs, info, newStack, visited, out)
+			w.walkDir(ctx, childPath, targetAbs, info, newStack, visited, out)
 		} else {
 			if !w.Config.ShowHidden && strings.HasPrefix(entry.Name(), ".") {
 				continue
@@ -145,7 +173,11 @@ func (w *Walker) walkDir(
 
 			// TODO: Archive Handling Check (Zip, etc) goes here later
 
-			out <- NewOsInputFile(childPath, targetAbs, info)
+			select {
+			case out <- NewOsInputFile(childPath, targetAbs, info):
+			case <-ctx.Done():
+				return
+			}
 		}
 	}
 }
@@ -161,12 +193,17 @@ func (w *Walker) loadGlobalIgnores() gitignore.IgnoreMatcher {
 	configDir, _ := os.UserConfigDir()
 
 	candidates := []string{
-		filepath.Join(configDir, "git", "ignore"),
 		filepath.Join(configDir, "lx", "ignore"),
 	}
 
-	if home != "" {
-		candidates = append(candidates, filepath.Join(home, ".config", "git", "ignore"))
+	// XDG Support for global gitignore
+	xdgConfig := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfig == "" && home != "" {
+		xdgConfig = filepath.Join(home, ".config")
+	}
+
+	if xdgConfig != "" {
+		candidates = append(candidates, filepath.Join(xdgConfig, "git", "ignore"))
 	}
 
 	for _, c := range candidates {

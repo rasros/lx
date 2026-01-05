@@ -232,7 +232,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 			}
 
 			var gathered []lx.InputFile
-			for f := range walker.Walk([]string{op.Value}) {
+			for f := range walker.Walk(context.TODO(), []string{op.Value}) {
 				if f.LoadError != nil {
 					fmt.Fprintf(debugOut, "lx: %v\n", f.LoadError)
 					continue

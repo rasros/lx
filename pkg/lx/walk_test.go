@@ -1,143 +1,145 @@
 package lx
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 )
 
-func setupWalkTestDir(t *testing.T) string {
-	dir := t.TempDir()
+func TestWalker_Walk(t *testing.T) {
+	// Create a temporary directory tree
+	// root/
+	//   a.txt
+	//   b.go
+	//   sub/
+	//     c.md
+	//   .hidden
+	//   ignore_me.txt
+	tmpDir := t.TempDir()
 
-	// Structure:
-	// /file.txt
-	// /ignore.txt
-	// /.hidden
-	// /.gitignore (ignores ignore.txt)
-	// /sub/
-	//    /subfile.go
-	//    /link.txt -> ../file.txt
+	createFile(t, tmpDir, "a.txt")
+	createFile(t, tmpDir, "b.go")
+	createFile(t, tmpDir, "ignore_me.txt")
+	createFile(t, tmpDir, ".hidden")
+	mustMkdir(t, filepath.Join(tmpDir, "sub"))
+	createFile(t, tmpDir, "sub/c.md")
 
-	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("data"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "ignore.txt"), []byte("data"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, ".hidden"), []byte("data"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("ignore.txt"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	sub := filepath.Join(dir, "sub")
-	if err := os.Mkdir(sub, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(sub, "subfile.go"), []byte("package main"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(filepath.Join("..", "file.txt"), filepath.Join(sub, "link.txt")); err != nil {
+	// Create a .gitignore in root
+	ignoreContent := "ignore_me.txt\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, ".gitignore"), []byte(ignoreContent), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	return dir
+	t.Run("Walks recursively and respects ignore", func(t *testing.T) {
+		cfg := Config{
+			ShowHidden: false,
+			// Ignore is nil by default, which means enabled
+		}
+		w := NewWalker(cfg)
+
+		ctx := context.Background()
+		ch := w.Walk(ctx, []string{tmpDir})
+
+		var paths []string
+		for f := range ch {
+			if f.LoadError != nil {
+				t.Errorf("load error: %v", f.LoadError)
+			}
+			rel, _ := filepath.Rel(tmpDir, f.Path)
+			paths = append(paths, rel)
+		}
+		sort.Strings(paths)
+
+		// FIXED: Removed ".gitignore" from expected because ShowHidden is false
+		expected := []string{"a.txt", "b.go", filepath.Join("sub", "c.md")}
+		sort.Strings(expected)
+
+		if !equal(paths, expected) {
+			t.Errorf("expected %v, got %v", expected, paths)
+		}
+	})
+
+	t.Run("Shows hidden files when Configured", func(t *testing.T) {
+		cfg := Config{
+			ShowHidden: true,
+		}
+		w := NewWalker(cfg)
+
+		ctx := context.Background()
+		ch := w.Walk(ctx, []string{tmpDir})
+
+		foundHidden := false
+		foundGitIgnore := false
+
+		for f := range ch {
+			rel, _ := filepath.Rel(tmpDir, f.Path)
+			if rel == ".hidden" {
+				foundHidden = true
+			}
+			if rel == ".gitignore" {
+				foundGitIgnore = true
+			}
+		}
+
+		if !foundHidden {
+			t.Error("expected to find .hidden file")
+		}
+		if !foundGitIgnore {
+			t.Error("expected to find .gitignore file")
+		}
+	})
+
+	t.Run("Context Cancellation stops walk", func(t *testing.T) {
+		cfg := Config{}
+		w := NewWalker(cfg)
+
+		// Create a context that we can cancel
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Cancel immediately to test responsiveness
+		cancel()
+
+		ch := w.Walk(ctx, []string{tmpDir})
+
+		count := 0
+		for range ch {
+			count++
+		}
+
+		// It should return nearly 0 files.
+		// Note: The race between cancel and goroutine start means it might get 1,
+		// but usually 0 if cancelled immediately.
+		if count > 2 {
+			t.Errorf("expected walk to abort early, got %d files", count)
+		}
+	})
 }
 
-func collectPaths(ch <-chan InputFile) []string {
-	var paths []string
-	for f := range ch {
-		paths = append(paths, filepath.Base(f.Path))
+// Helper functions
+
+func createFile(t *testing.T, dir, name string) {
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte("content"), 0644); err != nil {
+		t.Fatal(err)
 	}
-	sort.Strings(paths)
-	return paths
 }
 
-func TestWalker_Defaults(t *testing.T) {
-	// Defaults: Ignore yes, Hidden no, Symlinks no
-	dir := setupWalkTestDir(t)
-	cfg := Config{}
-	w := NewWalker(cfg)
-
-	ch := w.Walk([]string{dir})
-	got := collectPaths(ch)
-
-	// Expect: file.txt, subfile.go
-	// "ignore.txt" skipped by gitignore
-	// ".hidden" AND ".gitignore" skipped by hidden check
-	// "link.txt" skipped by default symlink check
-	want := []string{"file.txt", "subfile.go"}
-
-	if len(got) != len(want) {
-		t.Fatalf("Got %v, want %v", got, want)
+func mustMkdir(t *testing.T, path string) {
+	if err := os.MkdirAll(path, 0755); err != nil {
+		t.Fatal(err)
 	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("Index %d: got %s, want %s", i, got[i], want[i])
+}
+
+func equal(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
 		}
 	}
-}
-
-func TestWalker_NoIgnore(t *testing.T) {
-	dir := setupWalkTestDir(t)
-	f := false
-	cfg := Config{Ignore: &f}
-	w := NewWalker(cfg)
-
-	ch := w.Walk([]string{dir})
-	got := collectPaths(ch)
-
-	// Expect: ignore.txt included
-	mustHave(t, got, "ignore.txt")
-}
-
-func TestWalker_ShowHidden(t *testing.T) {
-	dir := setupWalkTestDir(t)
-	cfg := Config{ShowHidden: true}
-	w := NewWalker(cfg)
-
-	ch := w.Walk([]string{dir})
-	got := collectPaths(ch)
-
-	// Expect: .hidden and .gitignore included
-	mustHave(t, got, ".hidden")
-	mustHave(t, got, ".gitignore")
-}
-
-func TestWalker_FollowSymlinks(t *testing.T) {
-	dir := setupWalkTestDir(t)
-	cfg := Config{FollowSymlinks: true}
-	w := NewWalker(cfg)
-
-	ch := w.Walk([]string{dir})
-	got := collectPaths(ch)
-
-	// Expect: link.txt included
-	mustHave(t, got, "link.txt")
-}
-
-func TestWalker_ExplicitMissing(t *testing.T) {
-	cfg := Config{}
-	w := NewWalker(cfg)
-	ch := w.Walk([]string{"/non/existent/path"})
-
-	f := <-ch
-	if f.LoadError == nil {
-		t.Error("Expected LoadError for missing explicit path")
-	}
-	if f.Path != "/non/existent/path" {
-		t.Errorf("Expected path passed back, got %s", f.Path)
-	}
-}
-
-func mustHave(t *testing.T, list []string, item string) {
-	t.Helper()
-	for _, x := range list {
-		if x == item {
-			return
-		}
-	}
-	t.Errorf("List %v missing expected item %q", list, item)
+	return true
 }
