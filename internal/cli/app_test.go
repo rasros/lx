@@ -38,7 +38,7 @@ func TestRun_Commands(t *testing.T) {
 		{
 			name:        "help flag",
 			args:        []string{"--help"},
-			wantContain: []string{"USAGE:", "GLOBAL OPTIONS"},
+			wantContain: []string{"SYNOPSIS:", "GLOBAL OPTIONS"},
 		},
 		{
 			name:        "version flag",
@@ -205,10 +205,6 @@ func TestRun_Integration(t *testing.T) {
 				return
 			}
 			if tt.name == "missing file check" {
-				// We expect success (nil error) because lx is tolerant of missing files in discovery mode.
-				// Content of valid files should be printed.
-				// The error message for the missing file goes to Stderr which we aren't capturing here,
-				// but we verify the valid file content exists.
 				if err != nil {
 					t.Errorf("Expected nil error for missing file in discovery mode, got %v", err)
 				}

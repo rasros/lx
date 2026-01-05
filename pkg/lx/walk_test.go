@@ -16,8 +16,8 @@ func setupWalkTestDir(t *testing.T) string {
 	// /.hidden
 	// /.gitignore (ignores ignore.txt)
 	// /sub/
-	//   /subfile.go
-	//   /link.txt -> ../file.txt
+	//    /subfile.go
+	//    /link.txt -> ../file.txt
 
 	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("data"), 0644); err != nil {
 		t.Fatal(err)
@@ -82,7 +82,8 @@ func TestWalker_Defaults(t *testing.T) {
 
 func TestWalker_NoIgnore(t *testing.T) {
 	dir := setupWalkTestDir(t)
-	cfg := Config{NoIgnore: true}
+	f := false
+	cfg := Config{Ignore: &f}
 	w := NewWalker(cfg)
 
 	ch := w.Walk([]string{dir})
