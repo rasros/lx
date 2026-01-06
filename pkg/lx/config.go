@@ -16,8 +16,9 @@ type Config struct {
 	PromptTemplate  string `yaml:"prompt_template"`
 	DebugTemplate   string `yaml:"debug_template"`
 
-	OutputMode string `yaml:"output_mode"` // "stdout" (default) or "copy"
-	DebugMode  string `yaml:"debug_mode"`  // "auto", "always", "never"
+	OutputMode   string `yaml:"output_mode"`   // "stdout" (default) or "copy"
+	DebugMode    string `yaml:"debug_mode"`    // "auto", "always", "never"
+	OutputFormat string `yaml:"output_format"` // "markdown" (default) or "xml"
 
 	FollowSymlinks bool  `yaml:"follow_symlinks"`
 	ShowHidden     bool  `yaml:"show_hidden"`
@@ -48,8 +49,9 @@ type Options struct {
 	TailSet bool
 	NSet    bool
 
-	ConfigPath  string
-	LineNumbers bool
+	ConfigPath   string
+	LineNumbers  bool
+	OutputFormat string // "markdown" or "xml" (overrides config)
 }
 
 // ToRunnerConfig resolves the specific head/tail counts based on CLI flags.
@@ -110,12 +112,31 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		return nil, nil, err
 	}
 
-	// Set defaults for strings if empty
 	if cfg.OutputMode == "" {
 		cfg.OutputMode = "stdout"
 	}
 
-	// Helper to pick template or default
+	format := cfg.OutputFormat
+	if o.OutputFormat != "" {
+		format = o.OutputFormat
+	}
+	if format == "" {
+		format = "markdown"
+	}
+	cfg.OutputFormat = format
+
+	var defMain, defSection, defPrompt string
+	switch format {
+	case "xml":
+		defMain = DefaultXMLTemplate
+		defSection = DefaultXMLSectionTemplate
+		defPrompt = DefaultXMLPromptTemplate
+	default:
+		defMain = DefaultTemplate
+		defSection = DefaultSectionTemplate
+		defPrompt = DefaultPromptTemplate
+	}
+
 	pick := func(user, def string) string {
 		if user != "" {
 			return user
@@ -128,17 +149,17 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		return template.New(name).Funcs(funcs).Parse(tmpl)
 	}
 
-	tMain, err := parse("lx", pick(cfg.Template, DefaultTemplate))
+	tMain, err := parse("lx", pick(cfg.Template, defMain))
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse main template: %w", err)
 	}
 
-	tSection, err := parse("section", pick(cfg.SectionTemplate, DefaultSectionTemplate))
+	tSection, err := parse("section", pick(cfg.SectionTemplate, defSection))
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse section template: %w", err)
 	}
 
-	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, DefaultPromptTemplate))
+	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, defPrompt))
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse prompt template: %w", err)
 	}
