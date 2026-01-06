@@ -15,7 +15,7 @@ smoothly with standard tools like `grep` and shell globs.
 Via go install:
 
 ```bash
-go install github.com/rasros/lx/cmd/lx@v1.1.0-rc.1
+go install github.com/rasros/lx/cmd/lx@v1.1.0-rc.2
 ```
 
 Or via curl:
