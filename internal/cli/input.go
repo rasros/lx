@@ -2,11 +2,13 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
+	"fmt"
 	"os"
 	"strings"
 )
 
-func readFilenamesFromStdin() ([]string, error) {
+func readFilenamesFromStdin(useNull bool) ([]string, error) {
 	info, err := os.Stdin.Stat()
 	if err != nil {
 		return nil, err
@@ -17,16 +19,42 @@ func readFilenamesFromStdin() ([]string, error) {
 	}
 
 	sc := bufio.NewScanner(os.Stdin)
+	if useNull {
+		sc.Split(scanNullTerminated)
+	}
+
 	var paths []string
 	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" {
+		text := sc.Text()
+		// Only trim space for standard newline-separated input.
+		// For -0, filenames preserve whitespace (though we still skip empty).
+		if !useNull {
+			text = strings.TrimSpace(text)
+		}
+
+		if text == "" {
 			continue
 		}
-		paths = append(paths, line)
+		paths = append(paths, text)
 	}
 	if err := sc.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read stdin: %w", err)
 	}
 	return paths, nil
+}
+
+func scanNullTerminated(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	if i := bytes.IndexByte(data, 0); i >= 0 {
+		// We have a full null-terminated token.
+		return i + 1, data[0:i], nil
+	}
+	// If we're at EOF, we have a final, non-terminated token.
+	if atEOF {
+		return len(data), data, nil
+	}
+	// Request more data.
+	return 0, nil, nil
 }
