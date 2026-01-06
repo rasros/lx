@@ -88,6 +88,13 @@ func processStream(parsed *ParsedArgs) error {
 		opts.ConfigPath = cfg
 	}
 
+	if _, ok := parsed.Globals["xml"]; ok {
+		opts.OutputFormat = "xml"
+	}
+	if _, ok := parsed.Globals["md"]; ok {
+		opts.OutputFormat = "markdown"
+	}
+
 	tmplEngine, cfg, err := opts.CompileTemplates()
 	if err != nil {
 		return err

@@ -22,6 +22,27 @@ const DefaultTemplate = `{{ if eq .Size 0 }}` +
 
 const DefaultSectionTemplate = `## {{ .Body | endNewline }}` + "---\n\n"
 const DefaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
+
+const DefaultXMLTemplate = `<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
+	`  <source>{{ .Path }}</source>` + "\n" +
+	`  {{- if .IsBinary }}` + "\n" +
+	`  <error>Binary file skipped ({{ .Size | humanize }})</error>` + "\n" +
+	`  {{- else if .IsCompactView }}` + "\n" +
+	`  <description>Compact view</description>` + "\n" +
+	`  {{- else }}` + "\n" +
+	`  <document_content>` + "\n" +
+	`{{ .Content | endNewline }}  </document_content>` + "\n" +
+	`  {{- end }}` + "\n" +
+	`</document>` + "\n\n"
+
+const DefaultXMLSectionTemplate = `<section_header>` + "\n" +
+	`{{ .Body | endNewline -}}` +
+	`</section_header>` + "\n\n"
+
+const DefaultXMLPromptTemplate = `<instruction>` + "\n" +
+	`{{ .Body | endNewline -}}` +
+	`</instruction>` + "\n\n"
+
 const DefaultDebugTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
 	`Size: {{ .Global.TotalSize | humanize }}` + "\n" +
 	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"

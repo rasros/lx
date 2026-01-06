@@ -46,6 +46,12 @@ output_mode: "stdout"
 #   "never"  - Never show debug stats (equivalent to -q).
 debug_mode: "auto"
 
+# Output format.
+# Options:
+#   "markdown" (default) - Print markdown.
+#   "xml"                - Claude style XML.
+output_format: "markdown"
+
 # Discovery Options
 
 # Follow symbolic links during directory traversal.
