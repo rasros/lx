@@ -64,7 +64,8 @@ func gatherInputs(parsed *ParsedArgs) error {
 	}
 
 	if !hasFilesOrGenerators {
-		stdinFiles, err := readFilenamesFromStdin()
+		_, useNull := parsed.Globals["null"]
+		stdinFiles, err := readFilenamesFromStdin(useNull)
 		if err != nil {
 			return fmt.Errorf("read stdin: %w", err)
 		}

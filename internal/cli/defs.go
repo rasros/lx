@@ -31,6 +31,8 @@ var definitions = []CommandDef{
 	{Name: "stdout", Short: "C", Type: CmdGlobal, ValueType: ValueNone, Usage: "write output to stdout"},
 	{Name: "output", Short: "o", Type: CmdGlobal, ValueType: ValueAny, Usage: "write output to file"},
 
+	{Name: "null", Short: "0", Type: CmdGlobal, ValueType: ValueNone, Usage: "expect NUL-terminated filenames from stdin"},
+
 	{Name: "follow", Short: "L", Type: CmdGlobal, ValueType: ValueNone, Usage: "follow symbolic links"},
 	{Name: "hidden", Short: "H", Type: CmdGlobal, ValueType: ValueNone, Usage: "search hidden files/directories"},
 	{Name: "ignore", Type: CmdGlobal, ValueType: ValueNone, Usage: "respect ignore files"},
