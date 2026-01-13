@@ -28,7 +28,6 @@ func TestReadFilenamesFromStdin_Piped(t *testing.T) {
 		}
 	}()
 
-	// Pass false for standard newline splitting
 	got, err := readFilenamesFromStdin(false)
 	if err != nil {
 		t.Fatalf("readFilenamesFromStdin error: %v", err)
@@ -53,8 +52,7 @@ func TestReadFilenamesFromStdin_Null(t *testing.T) {
 
 	os.Stdin = r
 
-	// Simulate output from 'find . -print0' or similar
-	// Note: Spaces are preserved in filenames, only \0 splits
+	// Simulate 'find . -print0'. Spaces are preserved.
 	input := []byte("file 1.txt\x00file\n2.txt\x00file3\x00")
 
 	go func() {
@@ -64,7 +62,6 @@ func TestReadFilenamesFromStdin_Null(t *testing.T) {
 		}
 	}()
 
-	// Pass true for null byte splitting
 	got, err := readFilenamesFromStdin(true)
 	if err != nil {
 		t.Fatalf("readFilenamesFromStdin(true) error: %v", err)

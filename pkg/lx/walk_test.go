@@ -11,12 +11,12 @@ import (
 func TestWalker_Walk(t *testing.T) {
 	// Create a temporary directory tree
 	// root/
-	//   a.txt
-	//   b.go
-	//   sub/
-	//     c.md
-	//   .hidden
-	//   ignore_me.txt
+	//    a.txt
+	//    b.go
+	//    sub/
+	//      c.md
+	//    .hidden
+	//    ignore_me.txt
 	tmpDir := t.TempDir()
 
 	createFile(t, tmpDir, "a.txt")
@@ -52,7 +52,6 @@ func TestWalker_Walk(t *testing.T) {
 		}
 		sort.Strings(paths)
 
-		// FIXED: Removed ".gitignore" from expected because ShowHidden is false
 		expected := []string{"a.txt", "b.go", filepath.Join("sub", "c.md")}
 		sort.Strings(expected)
 
@@ -95,10 +94,7 @@ func TestWalker_Walk(t *testing.T) {
 		cfg := Config{}
 		w := NewWalker(cfg)
 
-		// Create a context that we can cancel
 		ctx, cancel := context.WithCancel(context.Background())
-
-		// Cancel immediately to test responsiveness
 		cancel()
 
 		ch := w.Walk(ctx, []string{tmpDir})

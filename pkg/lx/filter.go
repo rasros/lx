@@ -7,7 +7,6 @@ import (
 
 // IsKept returns true if the path should be included based on include/exclude patterns.
 func IsKept(path string, includes, excludes []string) bool {
-	// 1. If includes are specified, the path MUST match at least one
 	if len(includes) > 0 {
 		matched := false
 		for _, pattern := range includes {
@@ -21,7 +20,6 @@ func IsKept(path string, includes, excludes []string) bool {
 		}
 	}
 
-	// 2. If excludes are specified, the path MUST NOT match any
 	for _, pattern := range excludes {
 		if matchPattern(pattern, path) {
 			return false

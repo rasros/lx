@@ -157,9 +157,7 @@ func TestRun_Integration(t *testing.T) {
 			args: []string{"-y", "missing.yaml", f1},
 		},
 		{
-			name: "missing file check",
-			// Note: missing files now print errors to stderr and proceed with valid files.
-			// Run() returns nil in this case.
+			name:        "missing file check",
 			args:        []string{f1, "non_existent_file"},
 			want:        []string{"1-one"},
 			wantMissing: []string{},

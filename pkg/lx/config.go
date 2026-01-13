@@ -16,13 +16,10 @@ type Config struct {
 	PromptTemplate  string `yaml:"prompt_template"`
 	StatsTemplate   string `yaml:"stats_template"`
 
-	OutputMode   string `yaml:"output_mode"`   // "stdout" (default) or "copy"
-	OutputFormat string `yaml:"output_format"` // "markdown" (default) or "xml"
+	OutputMode   string `yaml:"output_mode"`
+	OutputFormat string `yaml:"output_format"`
 
-	// Stats Control
-	ShowStats string `yaml:"show_stats"` // "auto" (default), "always", "never"
-
-	// Logging Verbosity (string in yaml)
+	ShowStats string `yaml:"show_stats"`
 	Verbosity string `yaml:"verbosity"`
 
 	FollowSymlinks bool  `yaml:"follow_symlinks"`
@@ -32,7 +29,7 @@ type Config struct {
 	// Runtime only
 	Logger        *Logger  `yaml:"-"`
 	LogLevel      LogLevel `yaml:"-"`
-	LoadedConfigs []string `yaml:"-"` // Tracks loaded config files
+	LoadedConfigs []string `yaml:"-"`
 }
 
 // RunnerConfig is the runtime configuration for a specific file/operation.
@@ -61,7 +58,7 @@ type Options struct {
 
 	ConfigPath   string
 	LineNumbers  bool
-	OutputFormat string // "markdown" or "xml" (overrides config)
+	OutputFormat string
 
 	// Filter state
 	Includes []string
@@ -72,7 +69,7 @@ type Options struct {
 func (o Options) ToRunnerConfig() RunnerConfig {
 	head, tail := -1, -1 // -1 indicates "read all"
 
-	// 1. If -n/--lines is set, it acts as a total budget split between head and tail.
+	// -n/--lines splits budget between head and tail.
 	if o.NSet {
 		total := o.NBoth
 		if total < 0 {
@@ -80,33 +77,28 @@ func (o Options) ToRunnerConfig() RunnerConfig {
 		}
 
 		switch {
-		// User specified -n and --head: Tail gets the remainder.
 		case o.HeadSet:
 			head = clamp(o.Head, 0, total)
 			tail = total - head
 
-		// User specified -n and --tail: Head gets the remainder.
 		case o.TailSet:
 			tail = clamp(o.Tail, 0, total)
 			head = total - tail
 
-		// User specified only -n: Split evenly (favoring Head if odd).
+		// Split evenly, favoring Head.
 		default:
 			head = (total + 1) / 2
 			tail = total / 2
 		}
 	} else {
-		// 2. Standard --head / --tail behavior (independent).
 		if o.HeadSet {
 			head = o.Head
-			// If head is set but tail isn't, default tail to 0 (unless explicit)
 			if !o.TailSet {
 				tail = 0
 			}
 		}
 		if o.TailSet {
 			tail = o.Tail
-			// If tail is set but head isn't, default head to 0
 			if !o.HeadSet {
 				head = 0
 			}
@@ -195,20 +187,17 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 func loadConfigChain(cliPath string) (*Config, error) {
 	cfg := &Config{}
 
-	// 1. Load Defaults (User Config Dir)
 	if configDir, err := os.UserConfigDir(); err == nil {
 		path := filepath.Join(configDir, "lx", "config.yaml")
 		_ = mergeConfig(cfg, path, false)
 	}
 
-	// 2. Load Env
 	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
 		if err := mergeConfig(cfg, envPath, false); err != nil {
 			return nil, fmt.Errorf("load env config: %w", err)
 		}
 	}
 
-	// 3. Load CLI
 	if cliPath != "" {
 		if err := mergeConfig(cfg, cliPath, true); err != nil {
 			return nil, fmt.Errorf("load cli config: %w", err)
@@ -231,7 +220,6 @@ func (c *Config) ApplyGlobals(globals map[string]string) {
 		c.ShowHidden = false
 	}
 
-	// Handle Ignore (pointer bool)
 	if _, ok := globals["ignore"]; ok {
 		t := true
 		c.Ignore = &t
@@ -240,22 +228,18 @@ func (c *Config) ApplyGlobals(globals map[string]string) {
 		c.Ignore = &f
 	}
 
-	// Logging Level Logic
-	// Default Logic: Start with Config value, fallback to Warn
 	if c.Verbosity != "" {
 		c.LogLevel = ParseLevel(c.Verbosity)
 	} else {
 		c.LogLevel = LevelWarn
 	}
 
-	// CLI Overrides
 	if _, ok := globals["quiet"]; ok {
 		c.LogLevel = LevelSilent
 	} else if v, ok := globals["verbose"]; ok {
 		c.LogLevel = ParseLevel(v)
 	}
 
-	// Stats Logic
 	if _, ok := globals["stats"]; ok {
 		c.ShowStats = "always"
 	} else if _, ok := globals["no-stats"]; ok {
@@ -292,7 +276,6 @@ func mergeConfig(cfg *Config, path string, strict bool) error {
 		return err
 	}
 
-	// Track successfully loaded config path
 	cfg.LoadedConfigs = append(cfg.LoadedConfigs, path)
 	return nil
 }

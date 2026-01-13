@@ -107,10 +107,8 @@ func processStream(parsed *ParsedArgs) error {
 		return err
 	}
 
-	// 1. Initialize Logger
 	cfg.Logger = lx.NewLogger(debugOut, cfg.LogLevel)
 
-	// 2. Log loaded configurations
 	cfg.Logger.Debugf("lx version: %s", Version)
 	for _, path := range cfg.LoadedConfigs {
 		cfg.Logger.Infof("loaded config: %s", path)
@@ -122,7 +120,6 @@ func processStream(parsed *ParsedArgs) error {
 		cfg.Logger.Warnf("ignore logic disabled (hidden and gitignored files will be shown)")
 	}
 
-	// 3. Determine Stats Visibility
 	showStats := false
 	switch cfg.ShowStats {
 	case "always":
@@ -253,7 +250,6 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			cfg.Logger.Debugf("filters reset")
 		case "FILE", "file":
 			if op.Value == "-" {
-				// Read stdin immediately
 				cfg.Logger.Debugf("reading from stdin")
 				data, err := io.ReadAll(os.Stdin)
 				if err != nil {
@@ -335,7 +331,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			if prevCompact {
 				fmt.Fprintln(out)
 			}
-			section++ // Increment on each new section
+			section++
 			cfg.Logger.Debugf("rendering section: %s", op.Value)
 			if err := runner.RunSection(op.Value, section, out); err != nil {
 				return err

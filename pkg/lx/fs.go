@@ -8,7 +8,7 @@ import (
 )
 
 // InputFile represents a file to be processed.
-// It abstracts the difference between a real file on disk and a virtual file (e.g. inside a Zip).
+// It abstracts the difference between a real file on disk and a virtual file.
 type InputFile struct {
 	Path      string
 	AbsPath   string

@@ -19,7 +19,6 @@ func NewWalker(cfg Config) *Walker {
 }
 
 // Walk accepts a context and a list of root paths and returns a channel of InputFiles.
-// It handles directory traversal, ignores, and eventually archives.
 func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	out := make(chan InputFile)
 
@@ -31,7 +30,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 		visited := make(map[string]bool)
 
 		for _, root := range roots {
-			// Check for cancellation before processing next root
 			select {
 			case <-ctx.Done():
 				return
@@ -87,7 +85,6 @@ func (w *Walker) walkDir(
 	visited map[string]bool,
 	out chan<- InputFile,
 ) {
-	// Check for cancellation at the start of directory processing
 	select {
 	case <-ctx.Done():
 		return
@@ -104,7 +101,6 @@ func (w *Walker) walkDir(
 		visited[absPath] = true
 	}
 
-	// Respect ignore files if enabled
 	if w.Config.IgnoreEnabled() && isIgnored(ignoreStack, path, true) {
 		if w.Config.Logger != nil {
 			w.Config.Logger.Debugf("ignored directory: %s", path)
@@ -195,8 +191,6 @@ func (w *Walker) walkDir(
 				}
 				continue
 			}
-
-			// TODO: Archive Handling Check (Zip, etc) goes here later
 
 			select {
 			case out <- NewOsInputFile(childPath, targetAbs, info):

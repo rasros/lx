@@ -42,8 +42,7 @@ func ParseLevel(s string) LogLevel {
 	case "silent", "quiet", "off":
 		return LevelSilent
 	default:
-		// Default to Info if an unknown string is passed via -v,
-		// as -v typically implies "verbose" (info)
+		// Default to Info if unknown string.
 		return LevelInfo
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// Humanize helper needed for app.go logging
 func Humanize(s int64) string {
 	return TemplateFuncs()["humanize"].(func(int64) string)(s)
 }
@@ -56,7 +55,6 @@ func (r *Runner) RunPrompt(body string, section int, out io.Writer) error {
 
 // RunFile now accepts the abstract InputFile
 func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSection int, out io.Writer) (bool, error) {
-	// Logger helper
 	log := r.Global.Config.Logger
 	if log != nil {
 		log.Debugf("[%d] processing file: %s", index, file.Path)
@@ -85,23 +83,18 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 		}
 		contentReader = bytes.NewReader(data)
 		fileSize = int64(len(data))
-
-		// Ensure it is formatted as "stdin" in output
 		path = "stdin"
 	} else {
-		// For standard files (and Archives later), we need ReadAt for head/tail.
-		// The generic Open() returns ReadCloser.
 		rc, err := file.Open()
 		if err != nil {
 			return false, err
 		}
 
-		// Attempt to upgrade to ReaderAt/Seeker
 		if f, ok := rc.(*os.File); ok {
 			contentReader = f
 			defer f.Close()
 		} else {
-			// Fallback for non-OS files (e.g. Zip streams): Read All into buffer
+			// Fallback for non-seekable streams: buffer all
 			if log != nil {
 				log.Debugf("buffering stream for random access: %s", path)
 			}
@@ -208,7 +201,6 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 		}
 
 		if len(headBytes) > 0 {
-			// Refine language detection with more content
 			language = DetectLanguage(path, headBytes)
 		}
 	}
