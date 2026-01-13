@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+// Humanize helper needed for app.go logging
+func Humanize(s int64) string {
+	return TemplateFuncs()["humanize"].(func(int64) string)(s)
+}
+
 // EstimateTokens returns a rough estimate of the number of tokens in the given size.
 // Currently uses the heuristic: ~4 characters (bytes) per token.
 func EstimateTokens(size int64) int64 {
@@ -51,6 +56,12 @@ func (r *Runner) RunPrompt(body string, section int, out io.Writer) error {
 
 // RunFile now accepts the abstract InputFile
 func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSection int, out io.Writer) (bool, error) {
+	// Logger helper
+	log := r.Global.Config.Logger
+	if log != nil {
+		log.Debugf("[%d] processing file: %s", index, file.Path)
+	}
+
 	var (
 		contentReader io.ReaderAt
 		fileSize      int64     = file.Size
@@ -91,6 +102,9 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 			defer f.Close()
 		} else {
 			// Fallback for non-OS files (e.g. Zip streams): Read All into buffer
+			if log != nil {
+				log.Debugf("buffering stream for random access: %s", path)
+			}
 			data, err := io.ReadAll(rc)
 			rc.Close()
 			if err != nil {
@@ -120,8 +134,15 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 		n, _ := contentReader.ReadAt(header, 0)
 		isBin = IsBinary(header[:n])
 
-		if !isBin && n > 0 {
+		if isBin {
+			if log != nil {
+				log.Infof("binary file detected: %s", path)
+			}
+		} else if n > 0 {
 			language = DetectLanguage(path, header[:n])
+			if log != nil && language != "" {
+				log.Debugf("language detected: %s (%s)", language, path)
+			}
 		}
 	}
 
@@ -130,6 +151,9 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 			var exact bool
 			totalRows, exact, _ = EstimateLineCount(contentReader, fileSize)
 			isEstimate = !exact
+			if log != nil {
+				log.Debugf("compact view line count (estimate=%v): %d", isEstimate, totalRows)
+			}
 		}
 	} else if !isBin {
 		var reader io.ReadSeeker
@@ -148,6 +172,9 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 			isEstimate = !exact
 
 			if r.Config.Head > 0 {
+				if log != nil {
+					log.Debugf("reading head: %d lines", r.Config.Head)
+				}
 				reader.Seek(0, 0)
 				headBytes, _, _ = ReadHead(reader, r.Config.Head)
 			}
@@ -166,6 +193,9 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 					gapBytes = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
 				}
 
+				if log != nil {
+					log.Debugf("reading tail: %d lines", r.Config.Tail)
+				}
 				if f, ok := contentReader.(*os.File); ok {
 					tailBytes, _ = ReadTailSeek(f, r.Config.Tail)
 				} else {
@@ -178,6 +208,7 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 		}
 
 		if len(headBytes) > 0 {
+			// Refine language detection with more content
 			language = DetectLanguage(path, headBytes)
 		}
 	}

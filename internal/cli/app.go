@@ -111,8 +111,15 @@ func processStream(parsed *ParsedArgs) error {
 	cfg.Logger = lx.NewLogger(debugOut, cfg.LogLevel)
 
 	// 2. Log loaded configurations
+	cfg.Logger.Debugf("lx version: %s", Version)
 	for _, path := range cfg.LoadedConfigs {
-		cfg.Logger.Infof("using config: %s", path)
+		cfg.Logger.Infof("loaded config: %s", path)
+	}
+
+	if cfg.IgnoreEnabled() {
+		cfg.Logger.Debugf("ignore logic enabled")
+	} else {
+		cfg.Logger.Warnf("ignore logic disabled (hidden and gitignored files will be shown)")
 	}
 
 	// 3. Determine Stats Visibility
@@ -136,7 +143,10 @@ func processStream(parsed *ParsedArgs) error {
 	}
 
 	if f, ok := out.(*os.File); ok && f != os.Stdout {
+		cfg.Logger.Infof("writing output to file: %s", f.Name())
 		defer f.Close()
+	} else if clipboardBuf != nil {
+		cfg.Logger.Infof("writing output to clipboard")
 	}
 
 	ops := reorderTrailingOps(parsed.Ops)
@@ -148,6 +158,7 @@ func processStream(parsed *ParsedArgs) error {
 		if err := clipboard.WriteAll(clipboardBuf.String()); err != nil {
 			return fmt.Errorf("clipboard write: %w", err)
 		}
+		cfg.Logger.Infof("copied %d bytes to clipboard", clipboardBuf.Len())
 	}
 
 	return nil
@@ -217,8 +228,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 	}
 
 	// Discovery Phase
-	// We run a discovery pass first to calculate totals.
-	// Since filters are interleaved, we need to simulate the option state changes during discovery.
+	cfg.Logger.Debugf("starting discovery phase...")
 	walker := lx.NewWalker(*cfg)
 	opMap := make(map[int][]lx.InputFile)
 	var allFiles []lx.InputFile
@@ -233,14 +243,18 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		switch op.Action {
 		case "include":
 			discOpts.Includes = append(discOpts.Includes, op.Value)
+			cfg.Logger.Debugf("filter added: include '%s'", op.Value)
 		case "exclude":
 			discOpts.Excludes = append(discOpts.Excludes, op.Value)
+			cfg.Logger.Debugf("filter added: exclude '%s'", op.Value)
 		case "reset-filters":
 			discOpts.Includes = nil
 			discOpts.Excludes = nil
+			cfg.Logger.Debugf("filters reset")
 		case "FILE", "file":
 			if op.Value == "-" {
 				// Read stdin immediately
+				cfg.Logger.Debugf("reading from stdin")
 				data, err := io.ReadAll(os.Stdin)
 				if err != nil {
 					return fmt.Errorf("read stdin: %w", err)
@@ -262,6 +276,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 
 				// Apply interleaved filters
 				if !lx.IsKept(f.Path, discOpts.Includes, discOpts.Excludes) {
+					cfg.Logger.Debugf("filtered out: %s", f.Path)
 					continue
 				}
 
@@ -284,6 +299,8 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		Args:          globals,
 		Config:        *cfg,
 	}
+
+	cfg.Logger.Infof("discovery complete: %d files found, %s total size", globalCtx.TotalFiles, lx.Humanize(globalCtx.TotalSize))
 
 	if showStats {
 		if err := tmplEngine.Stats.Execute(debugOut, lx.StatsContext{Global: globalCtx}); err != nil {
@@ -319,6 +336,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 				fmt.Fprintln(out)
 			}
 			section++ // Increment on each new section
+			cfg.Logger.Debugf("rendering section: %s", op.Value)
 			if err := runner.RunSection(op.Value, section, out); err != nil {
 				return err
 			}
@@ -329,6 +347,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			if prevCompact {
 				fmt.Fprintln(out)
 			}
+			cfg.Logger.Debugf("rendering prompt")
 			if err := runner.RunPrompt(op.Value, section, out); err != nil {
 				return err
 			}
@@ -361,9 +380,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			opts.Tail, opts.TailSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
 
-		// Filter flags (update state for next iterations if we were doing deferred discovery,
-		// but since we do eager discovery above, these are effectively no-ops here,
-		// kept for completeness/debugging)
+		// Filter flags (state maintained but action is no-op during execution phase)
 		case "include":
 			opts.Includes = append(opts.Includes, op.Value)
 		case "exclude":

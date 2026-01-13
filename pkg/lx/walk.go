@@ -42,8 +42,15 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				continue
 			}
 
+			if w.Config.Logger != nil {
+				w.Config.Logger.Debugf("walking root: %s", root)
+			}
+
 			info, err := os.Stat(root)
 			if err != nil {
+				if w.Config.Logger != nil {
+					w.Config.Logger.Warnf("failed to stat root %s: %v", root, err)
+				}
 				select {
 				case out <- InputFile{Path: root, LoadError: err}:
 				case <-ctx.Done():
@@ -122,6 +129,9 @@ func (w *Walker) walkDir(
 
 	entries, err := os.ReadDir(path)
 	if err != nil {
+		if w.Config.Logger != nil {
+			w.Config.Logger.Errorf("read dir %s: %v", path, err)
+		}
 		select {
 		case out <- InputFile{Path: path, LoadError: err}:
 		case <-ctx.Done():
@@ -223,6 +233,9 @@ func (w *Walker) loadGlobalIgnores() gitignore.IgnoreMatcher {
 
 	for _, c := range candidates {
 		if data, err := os.ReadFile(c); err == nil {
+			if w.Config.Logger != nil {
+				w.Config.Logger.Debugf("loaded global ignore: %s", c)
+			}
 			lines = append(lines, strings.Split(string(data), "\n")...)
 		}
 	}
@@ -242,12 +255,18 @@ func (w *Walker) loadLocalIgnores(dir string) []gitignore.IgnoreMatcher {
 	for _, name := range names {
 		path := filepath.Join(dir, name)
 		if m, err := gitignore.NewGitIgnore(path); err == nil {
+			if w.Config.Logger != nil {
+				w.Config.Logger.Debugf("loaded ignore file: %s", path)
+			}
 			matchers = append(matchers, m)
 		}
 	}
 
 	gitInfo := filepath.Join(dir, ".git", "info", "exclude")
 	if m, err := gitignore.NewGitIgnore(gitInfo); err == nil {
+		if w.Config.Logger != nil {
+			w.Config.Logger.Debugf("loaded git exclude: %s", gitInfo)
+		}
 		matchers = append(matchers, m)
 	}
 
