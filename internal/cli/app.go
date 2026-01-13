@@ -107,30 +107,31 @@ func processStream(parsed *ParsedArgs) error {
 		return err
 	}
 
-	showDebug := false
-	mode := cfg.DebugMode
-	if mode == "" {
-		mode = "auto"
+	// 1. Initialize Logger
+	cfg.Logger = lx.NewLogger(debugOut, cfg.LogLevel)
+
+	// 2. Log loaded configurations
+	for _, path := range cfg.LoadedConfigs {
+		cfg.Logger.Infof("using config: %s", path)
 	}
 
-	switch mode {
+	// 3. Determine Stats Visibility
+	showStats := false
+	switch cfg.ShowStats {
 	case "always":
-		showDebug = true
+		showStats = true
 	case "never":
-		showDebug = false
-	case "auto":
+		showStats = false
+	case "auto", "":
+		// Default Auto behavior:
+		// Show stats if output is redirected (to clipboard or file)
 		_, hasCopy := parsed.Globals["copy"]
 		_, hasOutput := parsed.Globals["output"]
+		isClipboardMode := cfg.OutputMode == "copy"
 		_, hasStdout := parsed.Globals["stdout"]
 
-		isClipboardMode := cfg.OutputMode == "copy"
-
-		if hasCopy || hasOutput {
-			showDebug = true
-		} else if isClipboardMode && !hasStdout {
-			showDebug = true
-		} else {
-			showDebug = false
+		if hasCopy || hasOutput || (isClipboardMode && !hasStdout) {
+			showStats = true
 		}
 	}
 
@@ -139,7 +140,7 @@ func processStream(parsed *ParsedArgs) error {
 	}
 
 	ops := reorderTrailingOps(parsed.Ops)
-	if err := executeOps(ops, out, debugOut, showDebug, opts, tmplEngine, parsed.Globals, cfg); err != nil {
+	if err := executeOps(ops, out, debugOut, opts, tmplEngine, parsed.Globals, cfg, showStats); err != nil {
 		return err
 	}
 
@@ -207,7 +208,7 @@ func determineOutput(globals map[string]string, cfg *lx.Config) (io.Writer, *byt
 	return out, clipboardBuf, debugOut, nil
 }
 
-func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opts lx.Options, tmplEngine *lx.TemplateEngine, globals map[string]string, cfg *lx.Config) error {
+func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tmplEngine *lx.TemplateEngine, globals map[string]string, cfg *lx.Config, showStats bool) error {
 	sectionCount := 0
 	for _, op := range ops {
 		if op.Action == "section" {
@@ -242,7 +243,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 			var gathered []lx.InputFile
 			for f := range walker.Walk(context.TODO(), []string{op.Value}) {
 				if f.LoadError != nil {
-					fmt.Fprintf(debugOut, "lx: %v\n", f.LoadError)
+					cfg.Logger.Errorf("%v", f.LoadError)
 					continue
 				}
 				gathered = append(gathered, f)
@@ -265,9 +266,9 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 		Config:        *cfg,
 	}
 
-	if showDebug {
-		if err := tmplEngine.Debug.Execute(debugOut, lx.DebugContext{Global: globalCtx}); err != nil {
-			return fmt.Errorf("debug template error: %w", err)
+	if showStats {
+		if err := tmplEngine.Stats.Execute(debugOut, lx.StatsContext{Global: globalCtx}); err != nil {
+			return fmt.Errorf("stats template error: %w", err)
 		}
 	}
 
@@ -285,7 +286,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, showDebug bool, opt
 			for _, f := range files {
 				isCompact, err := runner.RunFile(f, fileIndex, prevCompact, section, out)
 				if err != nil {
-					fmt.Fprintf(debugOut, "error processing %s: %v\n", f.Path, err)
+					cfg.Logger.Errorf("processing %s: %v", f.Path, err)
 					continue
 				}
 				prevCompact = isCompact

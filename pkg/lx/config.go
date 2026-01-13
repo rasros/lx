@@ -14,15 +14,25 @@ type Config struct {
 	Template        string `yaml:"template"`
 	SectionTemplate string `yaml:"section_template"`
 	PromptTemplate  string `yaml:"prompt_template"`
-	DebugTemplate   string `yaml:"debug_template"`
+	StatsTemplate   string `yaml:"stats_template"`
 
 	OutputMode   string `yaml:"output_mode"`   // "stdout" (default) or "copy"
-	DebugMode    string `yaml:"debug_mode"`    // "auto", "always", "never"
 	OutputFormat string `yaml:"output_format"` // "markdown" (default) or "xml"
+
+	// Stats Control
+	ShowStats string `yaml:"show_stats"` // "auto" (default), "always", "never"
+
+	// Logging Verbosity (string in yaml)
+	Verbosity string `yaml:"verbosity"`
 
 	FollowSymlinks bool  `yaml:"follow_symlinks"`
 	ShowHidden     bool  `yaml:"show_hidden"`
 	Ignore         *bool `yaml:"ignore"` // Pointer to distinguish between unset (nil) and false
+
+	// Runtime only
+	Logger        *Logger  `yaml:"-"`
+	LogLevel      LogLevel `yaml:"-"`
+	LoadedConfigs []string `yaml:"-"` // Tracks loaded config files
 }
 
 // RunnerConfig is the runtime configuration for a specific file/operation.
@@ -36,7 +46,7 @@ type TemplateEngine struct {
 	Main    *template.Template
 	Section *template.Template
 	Prompt  *template.Template
-	Debug   *template.Template
+	Stats   *template.Template
 }
 
 // Options represents CLI flags that override Config.
@@ -164,16 +174,16 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		return nil, nil, fmt.Errorf("parse prompt template: %w", err)
 	}
 
-	tDebug, err := parse("debug", pick(cfg.DebugTemplate, DefaultDebugTemplate))
+	tStats, err := parse("stats", pick(cfg.StatsTemplate, DefaultStatsTemplate))
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse debug template: %w", err)
+		return nil, nil, fmt.Errorf("parse stats template: %w", err)
 	}
 
 	return &TemplateEngine{
 		Main:    tMain,
 		Section: tSection,
 		Prompt:  tPrompt,
-		Debug:   tDebug,
+		Stats:   tStats,
 	}, cfg, nil
 }
 
@@ -183,7 +193,8 @@ func loadConfigChain(cliPath string) (*Config, error) {
 
 	// 1. Load Defaults (User Config Dir)
 	if configDir, err := os.UserConfigDir(); err == nil {
-		_ = mergeConfig(cfg, filepath.Join(configDir, "lx", "config.yaml"), false)
+		path := filepath.Join(configDir, "lx", "config.yaml")
+		_ = mergeConfig(cfg, path, false)
 	}
 
 	// 2. Load Env
@@ -225,10 +236,29 @@ func (c *Config) ApplyGlobals(globals map[string]string) {
 		c.Ignore = &f
 	}
 
+	// Logging Level Logic
+	// Default Logic: Start with Config value, fallback to Warn
+	if c.Verbosity != "" {
+		c.LogLevel = ParseLevel(c.Verbosity)
+	} else {
+		c.LogLevel = LevelWarn
+	}
+
+	// CLI Overrides
 	if _, ok := globals["quiet"]; ok {
-		c.DebugMode = "never"
-	} else if _, ok := globals["verbose"]; ok {
-		c.DebugMode = "always"
+		c.LogLevel = LevelSilent
+	} else if v, ok := globals["verbose"]; ok {
+		c.LogLevel = ParseLevel(v)
+	}
+
+	// Stats Logic
+	if _, ok := globals["stats"]; ok {
+		c.ShowStats = "always"
+	} else if _, ok := globals["no-stats"]; ok {
+		c.ShowStats = "never"
+	} else if c.LogLevel == LevelSilent {
+		// Quiet suppresses stats too unless forced
+		c.ShowStats = "never"
 	}
 }
 
@@ -253,7 +283,14 @@ func mergeConfig(cfg *Config, path string, strict bool) error {
 		return err
 	}
 	defer f.Close()
-	return yaml.NewDecoder(f).Decode(cfg)
+
+	if err := yaml.NewDecoder(f).Decode(cfg); err != nil {
+		return err
+	}
+
+	// Track successfully loaded config path
+	cfg.LoadedConfigs = append(cfg.LoadedConfigs, path)
+	return nil
 }
 
 func clamp(val, min, max int) int {

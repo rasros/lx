@@ -89,6 +89,9 @@ func (w *Walker) walkDir(
 
 	if w.Config.FollowSymlinks {
 		if visited[absPath] {
+			if w.Config.Logger != nil {
+				w.Config.Logger.Infof("cycle detected, skipping: %s", path)
+			}
 			return
 		}
 		visited[absPath] = true
@@ -96,6 +99,9 @@ func (w *Walker) walkDir(
 
 	// Respect ignore files if enabled
 	if w.Config.IgnoreEnabled() && isIgnored(ignoreStack, path, true) {
+		if w.Config.Logger != nil {
+			w.Config.Logger.Debugf("ignored directory: %s", path)
+		}
 		return
 	}
 
@@ -129,6 +135,9 @@ func (w *Walker) walkDir(
 
 		info, err := entry.Info()
 		if err != nil {
+			if w.Config.Logger != nil {
+				w.Config.Logger.Warnf("stat failed for %s: %v", childPath, err)
+			}
 			continue
 		}
 
@@ -141,6 +150,9 @@ func (w *Walker) walkDir(
 			}
 			resolved, err := filepath.EvalSymlinks(childPath)
 			if err != nil {
+				if w.Config.Logger != nil {
+					w.Config.Logger.Warnf("broken symlink: %s", childPath)
+				}
 				continue
 			}
 			targetInfo, err := os.Stat(resolved)
@@ -168,6 +180,9 @@ func (w *Walker) walkDir(
 			}
 
 			if w.Config.IgnoreEnabled() && isIgnored(newStack, childPath, false) {
+				if w.Config.Logger != nil {
+					w.Config.Logger.Debugf("ignored file: %s", childPath)
+				}
 				continue
 			}
 

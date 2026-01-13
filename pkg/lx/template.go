@@ -43,7 +43,7 @@ const DefaultXMLPromptTemplate = `<instruction>` + "\n" +
 	`{{ .Body | endNewline -}}` +
 	`</instruction>` + "\n\n"
 
-const DefaultDebugTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
+const DefaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
 	`Size: {{ .Global.TotalSize | humanize }}` + "\n" +
 	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"
 
@@ -87,7 +87,7 @@ type PromptContext struct {
 	Global  GlobalContext
 }
 
-type DebugContext struct {
+type StatsContext struct {
 	Global GlobalContext
 }
 

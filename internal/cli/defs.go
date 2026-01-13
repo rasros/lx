@@ -23,8 +23,15 @@ var definitions = []CommandDef{
 	{Name: "config", Short: "y", Type: CmdGlobal, ValueType: ValueAny, Usage: "path to yaml config file"},
 	{Name: "version", Short: "V", Type: CmdGlobal, ValueType: ValueNone, Usage: "print the version"},
 	{Name: "help", Short: "h", Type: CmdGlobal, ValueType: ValueNone, Usage: "show help"},
-	{Name: "quiet", Short: "q", Type: CmdGlobal, ValueType: ValueNone, Usage: "suppress debug output"},
-	{Name: "verbose", Short: "v", Type: CmdGlobal, ValueType: ValueNone, Usage: "enable verbose output"},
+
+	// Logging
+	{Name: "quiet", Short: "q", Type: CmdGlobal, ValueType: ValueNone, Usage: "silence all log output"},
+	{Name: "verbose", Short: "v", Type: CmdGlobal, ValueType: ValueAny, Usage: "log level (debug, info, warn, error)"},
+
+	// Stats Control
+	{Name: "stats", Type: CmdGlobal, ValueType: ValueNone, Usage: "force show summary stats"},
+	{Name: "no-stats", Type: CmdGlobal, ValueType: ValueNone, Usage: "disable summary stats"},
+
 	{Name: "null", Short: "0", Type: CmdGlobal, ValueType: ValueNone, Usage: "expect NUL-terminated filenames from stdin"},
 
 	// Format flags
