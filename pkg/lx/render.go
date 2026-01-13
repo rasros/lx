@@ -80,9 +80,6 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 	} else {
 		// For standard files (and Archives later), we need ReadAt for head/tail.
 		// The generic Open() returns ReadCloser.
-		// If it's an OS file, we can cast.
-		// If it's a Zip entry, we might need to read all if it doesn't support Seek.
-
 		rc, err := file.Open()
 		if err != nil {
 			return false, err
@@ -94,7 +91,6 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 			defer f.Close()
 		} else {
 			// Fallback for non-OS files (e.g. Zip streams): Read All into buffer
-			// because our Slicing logic depends on ReadAt.
 			data, err := io.ReadAll(rc)
 			rc.Close()
 			if err != nil {
@@ -119,69 +115,70 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 		out.Write([]byte("\n"))
 	}
 
-	if isExplicitCompact {
-		var exact bool
-		totalRows, exact, _ = EstimateLineCount(contentReader, fileSize)
-		isEstimate = !exact
-	} else {
+	if fileSize > 0 {
 		header := make([]byte, 1024)
 		n, _ := contentReader.ReadAt(header, 0)
 		isBin = IsBinary(header[:n])
 
+		if !isBin && n > 0 {
+			language = DetectLanguage(path, header[:n])
+		}
+	}
+
+	if isExplicitCompact {
 		if !isBin {
-			var reader io.ReadSeeker
-			if rdr, ok := contentReader.(io.ReadSeeker); ok {
-				reader = rdr
-			} else {
-				// Should not happen with bytes.Reader or os.File
-				return false, fmt.Errorf("reader does not support seeking")
-			}
+			var exact bool
+			totalRows, exact, _ = EstimateLineCount(contentReader, fileSize)
+			isEstimate = !exact
+		}
+	} else if !isBin {
+		var reader io.ReadSeeker
+		if rdr, ok := contentReader.(io.ReadSeeker); ok {
+			reader = rdr
+		} else {
+			return false, fmt.Errorf("reader does not support seeking")
+		}
 
-			if isUnlimited {
+		if isUnlimited {
+			reader.Seek(0, 0)
+			headBytes, totalRows, _ = ReadHead(reader, -1)
+		} else {
+			var exact bool
+			totalRows, exact, _ = EstimateLineCount(contentReader, fileSize)
+			isEstimate = !exact
+
+			if r.Config.Head > 0 {
 				reader.Seek(0, 0)
-				headBytes, totalRows, _ = ReadHead(reader, -1)
-			} else {
-				var exact bool
-				totalRows, exact, _ = EstimateLineCount(contentReader, fileSize)
-				isEstimate = !exact
+				headBytes, _, _ = ReadHead(reader, r.Config.Head)
+			}
 
+			if r.Config.Tail > 0 {
 				if r.Config.Head > 0 {
-					reader.Seek(0, 0)
-					headBytes, _, _ = ReadHead(reader, r.Config.Head)
-				}
-
-				if r.Config.Tail > 0 {
-					if r.Config.Head > 0 {
-						skipped := totalRows - r.Config.Head - r.Config.Tail
-						if skipped < 0 {
-							skipped = 0
-						}
-
-						tilde := ""
-						if isEstimate {
-							tilde = "~"
-						}
-						gapBytes = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
+					skipped := totalRows - r.Config.Head - r.Config.Tail
+					if skipped < 0 {
+						skipped = 0
 					}
 
-					// Tail logic
-					if f, ok := contentReader.(*os.File); ok {
-						tailBytes, _ = ReadTailSeek(f, r.Config.Tail)
-					} else {
-						// For bytes.Reader (Stdin or Zip buffer)
-						rdr := contentReader.(*bytes.Reader)
-						allData := make([]byte, fileSize)
-						rdr.ReadAt(allData, 0)
-						tailBytes = tailFromBuffer(allData, r.Config.Tail)
+					tilde := ""
+					if isEstimate {
+						tilde = "~"
 					}
+					gapBytes = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
+				}
+
+				if f, ok := contentReader.(*os.File); ok {
+					tailBytes, _ = ReadTailSeek(f, r.Config.Tail)
+				} else {
+					rdr := contentReader.(*bytes.Reader)
+					allData := make([]byte, fileSize)
+					rdr.ReadAt(allData, 0)
+					tailBytes = tailFromBuffer(allData, r.Config.Tail)
 				}
 			}
+		}
 
-			if len(headBytes) > 0 {
-				language = DetectLanguage(path, headBytes)
-			} else if n > 0 {
-				language = DetectLanguage(path, header[:n])
-			}
+		if len(headBytes) > 0 {
+			language = DetectLanguage(path, headBytes)
 		}
 	}
 
@@ -234,7 +231,6 @@ func tailFromBuffer(data []byte, lines int) []byte {
 	if lines <= 0 || len(data) == 0 {
 		return nil
 	}
-	// (Existing tail logic is fine)
 	newlinesFound := 0
 	start := 0
 	for i := len(data) - 1; i >= 0; i-- {
