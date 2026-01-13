@@ -26,7 +26,7 @@ const DefaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
 const DefaultXMLTemplate = `<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
 	`  <source>{{ .Path }}</source>` + "\n" +
 	`  {{- if .IsBinary }}` + "\n" +
-	`  <error>Binary file skipped ({{ .Size | humanize }})</error>` + "\n" +
+	`  <error>Binary file ({{ .Size | humanize }})</error>` + "\n" +
 	`  {{- else if .IsCompactView }}` + "\n" +
 	`  <description>Compact view</description>` + "\n" +
 	`  {{- else }}` + "\n" +

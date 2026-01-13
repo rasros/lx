@@ -7,7 +7,7 @@
 # The main template used for rendering files.
 template: |
   {{ if eq .Size 0 }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - empty file
-  {{ else if .IsBinary }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})
+  {{ else if .IsBinary }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - binary file ({{ .Size | humanize }})
   {{ else if .IsCompactView }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
   {{ else }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
   ---

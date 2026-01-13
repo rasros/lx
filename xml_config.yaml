@@ -2,7 +2,7 @@ template: |
   <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
     <source>{{ .Path }}</source>
     {{- if .IsBinary }}
-    <error>Binary file skipped ({{ .Size | humanize }})</error>
+    <error>Binary file ({{ .Size | humanize }})</error>
     {{- else if .IsCompactView }}
     <description>Compact view</description>
     {{- else }}
