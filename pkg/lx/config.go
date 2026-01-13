@@ -62,6 +62,10 @@ type Options struct {
 	ConfigPath   string
 	LineNumbers  bool
 	OutputFormat string // "markdown" or "xml" (overrides config)
+
+	// Filter state
+	Includes []string
+	Excludes []string
 }
 
 // ToRunnerConfig resolves the specific head/tail counts based on CLI flags.

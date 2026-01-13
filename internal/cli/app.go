@@ -216,7 +216,9 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		}
 	}
 
-	// Eagerly walk directories to calculate total stats for the header
+	// Discovery Phase
+	// We run a discovery pass first to calculate totals.
+	// Since filters are interleaved, we need to simulate the option state changes during discovery.
 	walker := lx.NewWalker(*cfg)
 	opMap := make(map[int][]lx.InputFile)
 	var allFiles []lx.InputFile
@@ -224,8 +226,19 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 	var totalSize int64
 	var absFilePaths []string
 
+	// Temporary options state for discovery
+	discOpts := opts
+
 	for i, op := range ops {
-		if op.Action == "FILE" || op.Action == "file" {
+		switch op.Action {
+		case "include":
+			discOpts.Includes = append(discOpts.Includes, op.Value)
+		case "exclude":
+			discOpts.Excludes = append(discOpts.Excludes, op.Value)
+		case "reset-filters":
+			discOpts.Includes = nil
+			discOpts.Excludes = nil
+		case "FILE", "file":
 			if op.Value == "-" {
 				// Read stdin immediately
 				data, err := io.ReadAll(os.Stdin)
@@ -246,6 +259,12 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 					cfg.Logger.Errorf("%v", f.LoadError)
 					continue
 				}
+
+				// Apply interleaved filters
+				if !lx.IsKept(f.Path, discOpts.Includes, discOpts.Excludes) {
+					continue
+				}
+
 				gathered = append(gathered, f)
 				allFiles = append(allFiles, f)
 				absFilePaths = append(absFilePaths, f.AbsPath)
@@ -276,6 +295,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 	prevCompact := false
 	section := 1
 
+	// Execution Phase
 	for i, op := range ops {
 		switch op.Action {
 		case "FILE", "file":
@@ -340,6 +360,17 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			opts.Head, opts.HeadSet = 0, false
 			opts.Tail, opts.TailSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
+
+		// Filter flags (update state for next iterations if we were doing deferred discovery,
+		// but since we do eager discovery above, these are effectively no-ops here,
+		// kept for completeness/debugging)
+		case "include":
+			opts.Includes = append(opts.Includes, op.Value)
+		case "exclude":
+			opts.Excludes = append(opts.Excludes, op.Value)
+		case "reset-filters":
+			opts.Includes = nil
+			opts.Excludes = nil
 		}
 	}
 

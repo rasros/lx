@@ -63,6 +63,11 @@ var definitions = []CommandDef{
 	{Name: "lines", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "print N lines split between head and tail"},
 	{Name: "reset-lines", Short: "N", Type: CmdInterleaved, ValueType: ValueNone, Usage: "reset lines limits (and head/tail)"},
 
+	// Filter flags
+	{Name: "include", Short: "i", Type: CmdInterleaved, ValueType: ValueAny, Usage: "include only files matching glob"},
+	{Name: "exclude", Short: "e", Type: CmdInterleaved, ValueType: ValueAny, Usage: "exclude files matching glob"},
+	{Name: "reset-filters", Short: "E", Type: CmdInterleaved, ValueType: ValueNone, Usage: "reset include/exclude filters"},
+
 	// Actions
 	{Name: "file", Short: "f", Type: CmdAction, ValueType: ValueAny, Usage: "explicit file path"},
 	{Name: "section", Short: "s", Type: CmdAction, ValueType: ValueAny, Usage: "print a section header"},
