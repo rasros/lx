@@ -167,12 +167,8 @@ alias lxt='lx -p "$(cat ~/prompts/tests.md)"'
 
 ### 5. Stats Output
 
-`lx` prints a summary of file counts, total size, and estimated tokens to stderr.
-
-```bash
-# Force stats to appear (it automatically appears with -c or -o output but not if piping to a file)
-lx --stats src/ > context.md
-```
+`lx` prints a summary of file counts, total size, and estimated tokens to stderr. This appears automatically when
+output is redirected from stdout. You can disable it by `--no-stats`.
 
 ---
 
