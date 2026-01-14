@@ -30,7 +30,14 @@ The copy-to-clipboard feature (`-c` / `--copy`) depends on the following:
 
 * **macOS**: Native support via `pbcopy`.
 * **Windows**: Native support via `clip`.
-* **Linux**: Requires `xclip` or `wl-clipboard` (for `wl-copy`) to be installed.
+* **Linux**: Requires `xclip` for X11 or `wl-clipboard` for Wayland to be installed.
+
+If you're on Linux and not sure, do this:
+```bash
+echo $XDG_SESSION_TYPE
+```
+
+If it outputs wayland, install wl-clipboard. If it outputs x11, install xclip.
 
 ---
 

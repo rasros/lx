@@ -1,7 +1,6 @@
 package lx
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +8,7 @@ import (
 	"text/template"
 )
 
+// newTestRunner simplifies creating a runner for unit tests
 func newTestRunner(head, tail int, tmplStr string) *Runner {
 	if tmplStr == "" {
 		tmplStr = defaultTemplate
@@ -40,7 +40,6 @@ func newTestRunner(head, tail int, tmplStr string) *Runner {
 		Metadata:      make(map[string]string),
 	}
 
-	// Pass nil logger; NewRunner handles the default no-op logger creation
 	return NewRunner(cfg, engine, global, nil)
 }
 
@@ -61,18 +60,18 @@ func TestRunner_DefaultTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
 	r := newTestRunner(-1, -1, "")
 
-	if _, err := r.RunFile(mustInputFile(t, path), 1, false, 1, &buf); err != nil {
+	// Fix: Changed from r.RunFile(..., &buf) to receiving RenderedItem
+	item, err := r.RunFile(mustInputFile(t, path), 1, 1)
+	if err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
-	out := buf.String()
-	if !strings.Contains(out, "test.txt (3 rows)") {
-		t.Errorf("missing default header info, got:\n%s", out)
+	if !strings.Contains(item.Body, "test.txt (3 rows)") {
+		t.Errorf("missing default header info, got:\n%s", item.Body)
 	}
-	if !strings.Contains(out, content) {
+	if !strings.Contains(item.Body, content) {
 		t.Errorf("missing content")
 	}
 }
@@ -85,19 +84,21 @@ func TestRunner_CompactModeViaZero(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
 	r := newTestRunner(0, 0, "")
 
-	if _, err := r.RunFile(mustInputFile(t, path), 1, false, 1, &buf); err != nil {
+	item, err := r.RunFile(mustInputFile(t, path), 1, 1)
+	if err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
-	out := buf.String()
-	if !strings.Contains(out, "rows)") {
-		t.Errorf("Expected row count in compact mode, got:\n%s", out)
+	if !strings.Contains(item.Body, "rows)") {
+		t.Errorf("Expected row count in compact mode, got:\n%s", item.Body)
 	}
-	if strings.Contains(out, "```") {
+	if strings.Contains(item.Body, "```") {
 		t.Errorf("Should not contain code block in compact mode")
+	}
+	if !item.IsCompactView {
+		t.Errorf("Expected IsCompactView to be true")
 	}
 }
 
@@ -108,16 +109,15 @@ func TestRunner_EmptyFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
 	r := newTestRunner(-1, -1, "")
 
-	if _, err := r.RunFile(mustInputFile(t, path), 1, false, 1, &buf); err != nil {
+	item, err := r.RunFile(mustInputFile(t, path), 1, 1)
+	if err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
-	out := buf.String()
-	if !strings.Contains(out, "empty.txt - empty file") {
-		t.Errorf("Expected 'empty file' notice, got:\n%s", out)
+	if !strings.Contains(item.Body, "empty.txt - empty file") {
+		t.Errorf("Expected 'empty file' notice, got:\n%s", item.Body)
 	}
 }
 
@@ -129,22 +129,21 @@ func TestRunner_CustomTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
 	tmpl := "START {{ .Path }}\n{{ .Content }}END"
 	r := newTestRunner(-1, -1, tmpl)
 
-	if _, err := r.RunFile(mustInputFile(t, path), 1, false, 1, &buf); err != nil {
+	item, err := r.RunFile(mustInputFile(t, path), 1, 1)
+	if err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
-	out := buf.String()
-	if !strings.Contains(out, "START "+path) {
-		t.Errorf("template header incorrect, got:\n%s", out)
+	if !strings.Contains(item.Body, "START "+path) {
+		t.Errorf("template header incorrect, got:\n%s", item.Body)
 	}
-	if !strings.Contains(out, "line1\nline2\n") {
+	if !strings.Contains(item.Body, "line1\nline2\n") {
 		t.Errorf("missing content")
 	}
-	if !strings.HasSuffix(out, "END") {
+	if !strings.HasSuffix(strings.TrimSpace(item.Body), "END") {
 		t.Errorf("missing template footer")
 	}
 }
@@ -157,18 +156,17 @@ func TestRunner_HeadOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
 	r := newTestRunner(2, 0, "")
 
-	if _, err := r.RunFile(mustInputFile(t, path), 1, false, 1, &buf); err != nil {
+	item, err := r.RunFile(mustInputFile(t, path), 1, 1)
+	if err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
-	out := buf.String()
-	if !strings.Contains(out, "a\nb\n") {
-		t.Errorf("missing first two lines, got:\n%s", out)
+	if !strings.Contains(item.Body, "a\nb\n") {
+		t.Errorf("missing first two lines, got:\n%s", item.Body)
 	}
-	if strings.Contains(out, "c\n") {
+	if strings.Contains(item.Body, "c\n") {
 		t.Errorf("unexpected extra line")
 	}
 }
@@ -181,16 +179,16 @@ func TestRunner_BinaryDetection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
 	tmpl := "{{ if .IsBinary }}BINARY{{ else }}TEXT{{ end }}"
 	r := newTestRunner(-1, -1, tmpl)
 
-	if _, err := r.RunFile(mustInputFile(t, path), 1, false, 1, &buf); err != nil {
+	item, err := r.RunFile(mustInputFile(t, path), 1, 1)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if buf.String() != "BINARY" {
-		t.Errorf("Failed to detect binary file, got: %s", buf.String())
+	if item.Body != "BINARY" {
+		t.Errorf("Failed to detect binary file, got: %s", item.Body)
 	}
 }
 
@@ -201,16 +199,15 @@ func TestRunner_RunFile_Indexing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var buf bytes.Buffer
 	r := newTestRunner(-1, -1, "")
 	r.Global.TotalFiles = 100
 
-	if _, err := r.RunFile(mustInputFile(t, path), 42, false, 1, &buf); err != nil {
+	item, err := r.RunFile(mustInputFile(t, path), 42, 1)
+	if err != nil {
 		t.Fatalf("RunFile error: %v", err)
 	}
 
-	out := buf.String()
-	if !strings.Contains(out, "[42/100]") {
-		t.Errorf("Output missing file index [42/100], got:\n%s", out)
+	if !strings.Contains(item.Body, "[42/100]") {
+		t.Errorf("Output missing file index [42/100], got:\n%s", item.Body)
 	}
 }
