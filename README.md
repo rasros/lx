@@ -40,7 +40,6 @@ This produces the following fenced output:
 ````markdown
 go.mod (10 rows)
 ---
-
 ```gomod
 module github.com/rasros/lx
 
@@ -55,7 +54,7 @@ require (
 ```
 ````
 
-Recursively walk a directory (respects `.gitignore`):
+Recursively walk a directory and output contents (respects `.gitignore`):
 
 ```bash
 lx src/
@@ -178,6 +177,11 @@ alias lxt='lx -p "$(cat ~/prompts/tests.md)"'
 
 `lx` prints a summary of file counts, total size, and estimated tokens to stderr. This appears automatically when
 output is redirected from stdout. You can disable it by `--no-stats`.
+
+### 6. File Support
+
+binary files
+language detection
 
 ---
 
