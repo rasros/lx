@@ -32,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
 Format a single file:
 
 ```bash
-lx go.mod -n2
+lx go.mod
 ```
 
 This produces the following fenced output:
