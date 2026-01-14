@@ -16,7 +16,7 @@ estimation automatically.
 Via go install:
 
 ```bash
-go install github.com/rasros/lx/cmd/lx@v1.1.0-rc.3
+go install github.com/rasros/lx/cmd/lx@v1.1.0-rc.4
 ```
 
 Or via curl:
