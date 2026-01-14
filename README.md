@@ -13,8 +13,16 @@ estimation automatically.
 
 ## Installation
 
+Via go install:
+
 ```bash
-go install [github.com/rasros/lx/cmd/lx@latest](https://github.com/rasros/lx/cmd/lx@latest)
+go install github.com/rasros/lx/cmd/lx@v1.1.0-rc.3
+```
+
+Or via curl:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
 ```
 
 ---
