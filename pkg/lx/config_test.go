@@ -109,3 +109,62 @@ func TestApplyOptions(t *testing.T) {
 		t.Errorf("ApplyOptions failed to override format. Got %s, want xml", cfg.OutputFormat)
 	}
 }
+
+func TestMerge(t *testing.T) {
+	tests := []struct {
+		name string
+		dst  Config
+		src  Config
+		want Config
+	}{
+		{
+			name: "strings override if non-empty",
+			dst:  Config{Template: "old", OutputFormat: "json"},
+			src:  Config{Template: "new", OutputFormat: ""},
+			want: Config{Template: "new", OutputFormat: "json"},
+		},
+		{
+			name: "bools override if true",
+			dst:  Config{FollowSymlinks: false, ShowHidden: false},
+			src:  Config{FollowSymlinks: true, ShowHidden: true},
+			want: Config{FollowSymlinks: true, ShowHidden: true},
+		},
+		{
+			name: "bools do not override if false",
+			dst:  Config{FollowSymlinks: true},
+			src:  Config{FollowSymlinks: false},
+			want: Config{FollowSymlinks: true},
+		},
+		{
+			name: "ignore pointer overrides",
+			dst:  Config{Ignore: nil},
+			src:  Config{Ignore: boolPtr(false)},
+			want: Config{Ignore: boolPtr(false)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Merge(&tt.dst, &tt.src)
+
+			// Simple field checks
+			if tt.dst.Template != tt.want.Template {
+				t.Errorf("Template = %q, want %q", tt.dst.Template, tt.want.Template)
+			}
+			if tt.dst.OutputFormat != tt.want.OutputFormat {
+				t.Errorf("OutputFormat = %q, want %q", tt.dst.OutputFormat, tt.want.OutputFormat)
+			}
+			if tt.dst.FollowSymlinks != tt.want.FollowSymlinks {
+				t.Errorf("FollowSymlinks = %v, want %v", tt.dst.FollowSymlinks, tt.want.FollowSymlinks)
+			}
+			// Pointer check
+			if tt.want.Ignore != nil {
+				if tt.dst.Ignore == nil || *tt.dst.Ignore != *tt.want.Ignore {
+					t.Errorf("Ignore = %v, want %v", tt.dst.Ignore, tt.want.Ignore)
+				}
+			}
+		})
+	}
+}
+
+func boolPtr(b bool) *bool { return &b }

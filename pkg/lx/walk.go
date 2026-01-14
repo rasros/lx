@@ -12,17 +12,21 @@ import (
 
 type Walker struct {
 	Config Config
+	Logger *slog.Logger
 }
 
-func NewWalker(cfg Config) *Walker {
-	cfg.EnsureLogger()
-	return &Walker{Config: cfg}
+func NewWalker(cfg Config, logger *slog.Logger) *Walker {
+	if logger == nil {
+		// Fallback to pure config if logger wasn't provided (backwards compat if needed, though session handles this)
+		// Ideally we rely on Session to provide a valid logger.
+	}
+	return &Walker{Config: cfg, Logger: logger}
 }
 
 // Walk accepts a context and a list of root paths and returns a channel of InputFiles.
 func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	out := make(chan InputFile)
-	log := w.Config.Logger
+	log := w.Logger
 
 	go func() {
 		defer close(out)
@@ -91,7 +95,7 @@ func (w *Walker) walkDir(
 	visited map[string]bool,
 	out chan<- InputFile,
 ) {
-	log := w.Config.Logger
+	log := w.Logger
 
 	// Trace level
 	log.Log(ctx, slog.LevelDebug-1, "entering dir", "path", path)
@@ -220,7 +224,7 @@ func (w *Walker) walkDir(
 func (w *Walker) loadLocalIgnores(dir string) []gitignore.IgnoreMatcher {
 	names := []string{".gitignore", ".ignore", ".lxignore"}
 	var matchers []gitignore.IgnoreMatcher
-	log := w.Config.Logger
+	log := w.Logger
 
 	for _, name := range names {
 		path := filepath.Join(dir, name)

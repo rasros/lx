@@ -115,19 +115,8 @@ func processStream(parsed *ParsedArgs) error {
 	lx.ApplyOptions(cfg, opts)
 	applyGlobalsToConfig(cfg, parsed.Globals)
 
-	// 3. Compile Templates
-	tmplEngine, err := lx.CompileTemplates(cfg)
-	if err != nil {
-		return err
-	}
-
 	// Configure Logger
-	// Priority:
-	// 1. CLI Flags (--quiet, --verbose, -v)
-	// 2. Config File (verbosity: "debug")
-	// 3. Default (Warn)
 	level := determineLogLevel(parsed.Globals, cfg.Verbosity)
-
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
@@ -138,24 +127,29 @@ func processStream(parsed *ParsedArgs) error {
 			return a
 		},
 	}))
-	cfg.Logger = logger
+
+	// 3. Initialize Session
+	session, err := lx.NewSession(cfg, logger)
+	if err != nil {
+		return err
+	}
 
 	out, clipboardBuf, debugOut, err := determineOutput(parsed.Globals, cfg)
 	if err != nil {
 		return err
 	}
 
-	cfg.Logger.Debug("started", "version", Version)
-	cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "details", "format", cfg.OutputFormat, "mode", cfg.OutputMode)
+	logger.Debug("started", "version", Version)
+	logger.Log(context.Background(), slog.LevelDebug-1, "details", "format", cfg.OutputFormat, "mode", cfg.OutputMode)
 
 	for _, path := range cfg.LoadedConfigs {
-		cfg.Logger.Info("loaded config", "path", path)
+		logger.Info("loaded config", "path", path)
 	}
 
 	if cfg.IgnoreEnabled() {
-		cfg.Logger.Debug("ignore logic enabled")
+		logger.Debug("ignore logic enabled")
 	} else {
-		cfg.Logger.Warn("ignore logic disabled (hidden and gitignored files will be shown)")
+		logger.Warn("ignore logic disabled (hidden and gitignored files will be shown)")
 	}
 
 	showStats := false
@@ -180,21 +174,19 @@ func processStream(parsed *ParsedArgs) error {
 		}
 	}
 
-	// Critical Fix: If logging is explicitly silent (via -q), suppress stats unless forced via --stats
-	// level > slog.LevelError means LevelError+1 (Silent) or higher.
 	if level > slog.LevelError && cfg.ShowStats != "always" {
 		showStats = false
 	}
 
 	if f, ok := out.(*os.File); ok && f != os.Stdout {
-		cfg.Logger.Info("writing output to file", "path", f.Name())
+		logger.Info("writing output to file", "path", f.Name())
 		defer f.Close()
 	} else if clipboardBuf != nil {
-		cfg.Logger.Info("writing output to clipboard")
+		logger.Info("writing output to clipboard")
 	}
 
 	ops := reorderTrailingOps(parsed.Ops)
-	if err := executeOps(ops, out, debugOut, opts, tmplEngine, parsed.Globals, cfg, showStats); err != nil {
+	if err := executeOps(ops, out, debugOut, opts, session, parsed.Globals, showStats); err != nil {
 		return err
 	}
 
@@ -202,7 +194,7 @@ func processStream(parsed *ParsedArgs) error {
 		if err := clipboard.WriteAll(clipboardBuf.String()); err != nil {
 			return fmt.Errorf("clipboard write: %w", err)
 		}
-		cfg.Logger.Info("copied to clipboard", "bytes", clipboardBuf.Len())
+		logger.Info("copied to clipboard", "bytes", clipboardBuf.Len())
 	}
 
 	return nil
@@ -237,17 +229,12 @@ func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
 }
 
 func determineLogLevel(globals map[string]string, configVerbosity string) slog.Level {
-	// 1. Quiet flag overrides everything
 	if _, ok := globals["quiet"]; ok {
 		return slog.LevelError + 1 // Silent
 	}
-
-	// 2. Explicit --verbose="debug"
 	if v, ok := globals["verbose"]; ok {
 		return parseLevelString(v)
 	}
-
-	// 3. Counter -v / -vv / -vvv
 	if v, ok := globals["verbosity"]; ok {
 		count, _ := strconv.Atoi(v)
 		if count >= 3 {
@@ -258,13 +245,9 @@ func determineLogLevel(globals map[string]string, configVerbosity string) slog.L
 			return slog.LevelInfo
 		}
 	}
-
-	// 4. Config file setting
 	if configVerbosity != "" {
 		return parseLevelString(configVerbosity)
 	}
-
-	// 5. Default
 	return slog.LevelWarn
 }
 
@@ -323,7 +306,6 @@ func determineOutput(globals map[string]string, cfg *lx.Config) (io.Writer, *byt
 		debugOut = os.Stdout
 	} else if hasStdout {
 		useClipboard = false
-		// debugOut remains Stderr
 	} else {
 		if cfg.OutputMode == "copy" {
 			useClipboard = true
@@ -342,7 +324,7 @@ func determineOutput(globals map[string]string, cfg *lx.Config) (io.Writer, *byt
 	return out, clipboardBuf, debugOut, nil
 }
 
-func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tmplEngine *lx.TemplateEngine, globals map[string]string, cfg *lx.Config, showStats bool) error {
+func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, session *lx.Session, globals map[string]string, showStats bool) error {
 	sectionCount := 0
 	for _, op := range ops {
 		if op.Action == "section" {
@@ -350,34 +332,32 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		}
 	}
 
-	cfg.Logger.Debug("starting discovery phase", "operations", len(ops))
-	walker := lx.NewWalker(*cfg)
+	session.Logger.Debug("starting discovery phase", "operations", len(ops))
+	walker := session.NewWalker()
 	opMap := make(map[int][]lx.InputFile)
 	var allFiles []lx.InputFile
-
-	var totalSize int64
 
 	// Temporary options state for discovery
 	discOpts := opts
 
 	for i, op := range ops {
 		// Trace
-		cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "parsing op", "index", i, "action", op.Action, "value", op.Value)
+		session.Logger.Log(context.Background(), slog.LevelDebug-1, "parsing op", "index", i, "action", op.Action, "value", op.Value)
 
 		switch op.Action {
 		case "include":
 			discOpts.Includes = append(discOpts.Includes, op.Value)
-			cfg.Logger.Debug("filter added", "type", "include", "pattern", op.Value)
+			session.Logger.Debug("filter added", "type", "include", "pattern", op.Value)
 		case "exclude":
 			discOpts.Excludes = append(discOpts.Excludes, op.Value)
-			cfg.Logger.Debug("filter added", "type", "exclude", "pattern", op.Value)
+			session.Logger.Debug("filter added", "type", "exclude", "pattern", op.Value)
 		case "reset-filters":
 			discOpts.Includes = nil
 			discOpts.Excludes = nil
-			cfg.Logger.Debug("filters reset")
+			session.Logger.Debug("filters reset")
 		case "FILE", "file":
 			if op.Value == "-" {
-				cfg.Logger.Debug("reading from stdin")
+				session.Logger.Debug("reading from stdin")
 				data, err := io.ReadAll(os.Stdin)
 				if err != nil {
 					return fmt.Errorf("read stdin: %w", err)
@@ -386,28 +366,26 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 
 				opMap[i] = []lx.InputFile{f}
 				allFiles = append(allFiles, f)
-				totalSize += f.Size
 				continue
 			}
 
 			var gathered []lx.InputFile
-			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "walking target", "target", op.Value)
+			session.Logger.Log(context.Background(), slog.LevelDebug-1, "walking target", "target", op.Value)
 
 			for f := range walker.Walk(context.TODO(), []string{op.Value}) {
 				if f.LoadError != nil {
-					cfg.Logger.Error("load error", "error", f.LoadError)
+					session.Logger.Error("load error", "error", f.LoadError)
 					continue
 				}
 
 				// Apply interleaved filters
 				if !lx.IsKept(f.Path, discOpts.Includes, discOpts.Excludes) {
-					cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "filtered out by interleaved rules", "path", f.Path)
+					session.Logger.Log(context.Background(), slog.LevelDebug-1, "filtered out by interleaved rules", "path", f.Path)
 					continue
 				}
 
 				gathered = append(gathered, f)
 				allFiles = append(allFiles, f)
-				totalSize += f.Size
 			}
 			opMap[i] = gathered
 		}
@@ -416,28 +394,20 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 	cwd, err := os.Getwd()
 	if err != nil {
 		cwd = "."
-		cfg.Logger.Warn("failed to get current working directory", "error", err)
+		session.Logger.Warn("failed to get current working directory", "error", err)
 	}
 
-	globalCtx := lx.GlobalContext{
-		TotalFiles:    len(allFiles),
-		TotalSize:     totalSize,
-		TokenEstimate: lx.EstimateTokens(totalSize),
-		TotalSections: sectionCount + 1,
-		WorkDir:       cwd,
-		Args:          globals,
-		Config:        *cfg,
-	}
+	globalCtx := session.CalculateGlobalContext(allFiles, sectionCount+1, cwd, globals)
 
-	cfg.Logger.Info("discovery complete", "files", globalCtx.TotalFiles, "size", lx.Humanize(globalCtx.TotalSize))
+	session.Logger.Info("discovery complete", "files", globalCtx.TotalFiles, "size", lx.Humanize(globalCtx.TotalSize))
 
 	if showStats {
-		if err := tmplEngine.Stats.Execute(debugOut, lx.StatsContext{Global: globalCtx}); err != nil {
+		if err := session.Engine.Stats.Execute(debugOut, lx.StatsContext{Global: globalCtx}); err != nil {
 			return fmt.Errorf("stats template error: %w", err)
 		}
 	}
 
-	if err := tmplEngine.Header.Execute(out, lx.HeaderContext{Global: globalCtx}); err != nil {
+	if err := session.Engine.Header.Execute(out, lx.HeaderContext{Global: globalCtx}); err != nil {
 		return fmt.Errorf("header template error: %w", err)
 	}
 
@@ -451,12 +421,12 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		case "FILE", "file":
 			files := opMap[i]
 			runCfg := opts.ToRunnerConfig()
-			runner := lx.NewRunner(runCfg, tmplEngine, globalCtx)
+			runner := session.NewRunner(runCfg, globalCtx)
 
 			for _, f := range files {
 				isCompact, err := runner.RunFile(f, fileIndex, prevCompact, section, out)
 				if err != nil {
-					cfg.Logger.Error("processing failed", "path", f.Path, "error", err)
+					session.Logger.Error("processing failed", "path", f.Path, "error", err)
 					continue
 				}
 				prevCompact = isCompact
@@ -464,23 +434,23 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			}
 
 		case "section":
-			runner := lx.NewRunner(opts.ToRunnerConfig(), tmplEngine, globalCtx)
+			runner := session.NewRunner(opts.ToRunnerConfig(), globalCtx)
 			if prevCompact {
 				fmt.Fprintln(out)
 			}
 			section++
-			cfg.Logger.Debug("rendering section", "title", op.Value)
+			session.Logger.Debug("rendering section", "title", op.Value)
 			if err := runner.RunSection(op.Value, section, out); err != nil {
 				return err
 			}
 			prevCompact = false
 
 		case "prompt":
-			runner := lx.NewRunner(opts.ToRunnerConfig(), tmplEngine, globalCtx)
+			runner := session.NewRunner(opts.ToRunnerConfig(), globalCtx)
 			if prevCompact {
 				fmt.Fprintln(out)
 			}
-			cfg.Logger.Debug("rendering prompt")
+			session.Logger.Debug("rendering prompt")
 			if err := runner.RunPrompt(op.Value, section, out); err != nil {
 				return err
 			}
@@ -488,33 +458,33 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 
 		case "line-numbers":
 			opts.LineNumbers = true
-			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "line-numbers", "val", true)
+			session.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "line-numbers", "val", true)
 		case "no-line-numbers":
 			opts.LineNumbers = false
-			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "line-numbers", "val", false)
+			session.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "line-numbers", "val", false)
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Head = &val
 			opts.Tail = nil
 			opts.NBoth = nil
-			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "head", "val", val)
+			session.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "head", "val", val)
 		case "tail":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Tail = &val
 			opts.Head = nil
 			opts.NBoth = nil
-			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "tail", "val", val)
+			session.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "tail", "val", val)
 		case "lines":
 			val, _ := strconv.Atoi(op.Value)
 			opts.NBoth = &val
 			opts.Head = nil
 			opts.Tail = nil
-			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "lines", "val", val)
+			session.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "lines", "val", val)
 		case "reset-lines":
 			opts.Head = nil
 			opts.Tail = nil
 			opts.NBoth = nil
-			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "reset-lines")
+			session.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "reset-lines")
 
 		case "include":
 			opts.Includes = append(opts.Includes, op.Value)
@@ -530,7 +500,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		fmt.Fprintln(out)
 	}
 
-	if err := tmplEngine.Footer.Execute(out, lx.FooterContext{Global: globalCtx}); err != nil {
+	if err := session.Engine.Footer.Execute(out, lx.FooterContext{Global: globalCtx}); err != nil {
 		return fmt.Errorf("footer template error: %w", err)
 	}
 

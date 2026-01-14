@@ -2,8 +2,6 @@ package lx
 
 import (
 	"fmt"
-	"io"
-	"log/slog"
 	"text/template"
 
 	"github.com/monochromegane/go-gitignore"
@@ -28,21 +26,11 @@ type Config struct {
 	ShowHidden     bool  `yaml:"show_hidden"`
 	Ignore         *bool `yaml:"ignore"`
 
-	// Logger handles debug and info output. If nil, a no-op logger is used.
-	Logger *slog.Logger `yaml:"-"`
-
 	// GlobalIgnore is an optional matcher for global excludes (e.g. from ~/.config/git/ignore).
 	GlobalIgnore gitignore.IgnoreMatcher `yaml:"-"`
 
 	// LoadedConfigs tracks which config files were successfully loaded (for debug info).
 	LoadedConfigs []string `yaml:"-"`
-}
-
-// EnsureLogger guarantees that c.Logger is non-nil.
-func (c *Config) EnsureLogger() {
-	if c.Logger == nil {
-		c.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-	}
 }
 
 // IgnoreEnabled returns the effective boolean value for Ignore.
@@ -86,15 +74,9 @@ func Merge(dst *Config, src *Config) {
 		dst.Verbosity = src.Verbosity
 	}
 
-	// Booleans and pointers are only overridden if meaningful logic applies.
-	// For simplicty in this specific app, we usually load base config then apply flags.
-	// CLI flags are handled via ApplyOptions usually, but if merging two config files:
 	if src.Ignore != nil {
 		dst.Ignore = src.Ignore
 	}
-	// Note: basic bools (FollowSymlinks) are false by default, so difficult to distinguish
-	// "unset" from "false" without pointers. For config files, last one wins if we parsed strictly,
-	// but here we assume 'dst' is the accumulator.
 	if src.FollowSymlinks {
 		dst.FollowSymlinks = true
 	}

@@ -2,6 +2,8 @@ package lx
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,12 +34,15 @@ func TestWalker_Walk(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create a discard logger for tests
+	nopLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
 	t.Run("Walks recursively and respects ignore", func(t *testing.T) {
 		cfg := Config{
 			ShowHidden: false,
 			// Ignore is nil by default, which means enabled
 		}
-		w := NewWalker(cfg)
+		w := NewWalker(cfg, nopLogger)
 
 		ctx := context.Background()
 		ch := w.Walk(ctx, []string{tmpDir})
@@ -64,7 +69,7 @@ func TestWalker_Walk(t *testing.T) {
 		cfg := Config{
 			ShowHidden: true,
 		}
-		w := NewWalker(cfg)
+		w := NewWalker(cfg, nopLogger)
 
 		ctx := context.Background()
 		ch := w.Walk(ctx, []string{tmpDir})
@@ -92,7 +97,7 @@ func TestWalker_Walk(t *testing.T) {
 
 	t.Run("Context Cancellation stops walk", func(t *testing.T) {
 		cfg := Config{}
-		w := NewWalker(cfg)
+		w := NewWalker(cfg, nopLogger)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()

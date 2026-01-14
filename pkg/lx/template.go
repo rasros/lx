@@ -151,7 +151,7 @@ type GlobalContext struct {
 	TokenEstimate int64
 	TotalSections int
 	WorkDir       string
-	Args          map[string]string
+	Metadata      map[string]string
 	Config        Config
 }
 

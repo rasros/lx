@@ -21,6 +21,7 @@ install:
 
 fmt:
 	$(GO) fmt ./...
+	$(GO) mod tidy
 
 test:
 	$(GO) test ./...

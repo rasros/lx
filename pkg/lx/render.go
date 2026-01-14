@@ -28,14 +28,18 @@ type Runner struct {
 	Config RunnerConfig
 	Engine *TemplateEngine
 	Global GlobalContext
+	Logger *slog.Logger
 }
 
-func NewRunner(cfg RunnerConfig, engine *TemplateEngine, global GlobalContext) *Runner {
-	global.Config.EnsureLogger()
+func NewRunner(cfg RunnerConfig, engine *TemplateEngine, global GlobalContext, logger *slog.Logger) *Runner {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
 	return &Runner{
 		Config: cfg,
 		Engine: engine,
 		Global: global,
+		Logger: logger,
 	}
 }
 
@@ -58,7 +62,7 @@ func (r *Runner) RunPrompt(body string, section int, out io.Writer) error {
 }
 
 func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSection int, out io.Writer) (bool, error) {
-	log := r.Global.Config.Logger
+	log := r.Logger
 	log.Debug("processing file", "index", index, "path", file.Path)
 
 	reader, fileSize, displayPath, closeFunc, err := r.openInput(file)
@@ -166,7 +170,7 @@ func (r *Runner) openInput(file InputFile) (reader io.ReaderAt, size int64, path
 		reader = f
 	} else {
 		// Buffer non-seekable streams to allow random access
-		r.Global.Config.Logger.Debug("buffering stream for random access", "path", path)
+		r.Logger.Debug("buffering stream for random access", "path", path)
 
 		data, err := io.ReadAll(rc)
 		if err != nil {
@@ -198,7 +202,7 @@ func (r *Runner) detectAttributes(path string, reader io.ReaderAt, size int64) (
 		language = detect.DetectLanguage(path, header)
 	}
 
-	log := r.Global.Config.Logger
+	log := r.Logger
 	if isBinary {
 		log.Debug("binary file detected", "path", path)
 	} else if isImage {
@@ -211,7 +215,7 @@ func (r *Runner) detectAttributes(path string, reader io.ReaderAt, size int64) (
 }
 
 func (r *Runner) readContentSlice(reader io.ReaderAt, size int64, totalRows int, isEstimate bool) (head, tail, gap []byte, err error) {
-	log := r.Global.Config.Logger
+	log := r.Logger
 	// Trace
 	log.Log(context.Background(), slog.LevelDebug-1, "reading slice", "head", r.Config.Head, "tail", r.Config.Tail)
 

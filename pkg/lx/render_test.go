@@ -37,10 +37,11 @@ func newTestRunner(head, tail int, tmplStr string) *Runner {
 		TokenEstimate: 256,
 		TotalSections: 1,
 		WorkDir:       ".",
-		Args:          make(map[string]string),
+		Metadata:      make(map[string]string),
 	}
 
-	return NewRunner(cfg, engine, global)
+	// Pass nil logger; NewRunner handles the default no-op logger creation
+	return NewRunner(cfg, engine, global, nil)
 }
 
 func mustInputFile(t *testing.T, path string) InputFile {
