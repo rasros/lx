@@ -131,7 +131,7 @@ const defaultHTMLTemplate = `    <article id="file-{{ .FileIndex }}">
       <em>Compact view detected</em>
     {{- else }}
       <pre><code{{ if .Language }} class="language-{{ .Language }}"{{ end }}>
-{{- .Content | escape | endNewline }}      </code></pre>
+{{ .Content | escape | endNewline }}      </code></pre>
     {{- end }}
     </article>
 `
@@ -144,58 +144,6 @@ const defaultHTMLPromptTemplate = `<blockquote>{{ .Body | endNewline }}</blockqu
 const defaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
 	`Size: {{ .Global.TotalSize | humanize }}` + "\n" +
 	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"
-
-type GlobalContext struct {
-	TotalFiles    int
-	TotalSize     int64
-	TokenEstimate int64
-	TotalSections int
-	WorkDir       string
-	Metadata      map[string]string
-	Config        Config
-}
-
-type FileContext struct {
-	Path           string
-	AbsPath        string
-	Size           int64
-	ModTime        time.Time
-	TotalRows      int
-	TokenEstimate  int64
-	IsEstimate     bool
-	Language       string
-	Content        interface{}
-	IsBinary       bool
-	IsImage        bool
-	IsCompactView  bool
-	FileIndex      int
-	CurrentSection int
-	Global         GlobalContext
-}
-
-type SectionContext struct {
-	Body    string
-	Section int
-	Global  GlobalContext
-}
-
-type PromptContext struct {
-	Body    string
-	Section int
-	Global  GlobalContext
-}
-
-type StatsContext struct {
-	Global GlobalContext
-}
-
-type HeaderContext struct {
-	Global GlobalContext
-}
-
-type FooterContext struct {
-	Global GlobalContext
-}
 
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{

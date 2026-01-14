@@ -15,223 +15,140 @@ type RenderedItem struct {
 	IsCompactView bool
 }
 
-type Runner struct {
-	Config RunnerConfig
-	Engine *TemplateEngine
-	Global GlobalContext
+type Processor struct {
+	engine *TemplateEngine
+	cfg    RunnerConfig
+	global GlobalContext
 }
 
-func NewRunner(cfg RunnerConfig, engine *TemplateEngine, global GlobalContext) *Runner {
-	return &Runner{
-		Config: cfg,
-		Engine: engine,
-		Global: global,
+func NewProcessor(engine *TemplateEngine, cfg RunnerConfig, global GlobalContext) *Processor {
+	return &Processor{engine: engine, cfg: cfg, global: global}
+}
+
+func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
+	switch v := item.(type) {
+	case InputFile:
+		rendered, err := p.renderFile(v, index)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprint(w, rendered.Body)
+		return err
+	case SectionContext:
+		return p.engine.Section.Execute(w, v)
+	case PromptContext:
+		return p.engine.Prompt.Execute(w, v)
+	default:
+		return nil
 	}
 }
 
-func (r *Runner) RunSection(body string, section int) (RenderedItem, error) {
-	ctx := SectionContext{
-		Body:    body,
-		Section: section,
-		Global:  r.Global,
-	}
-	var buf bytes.Buffer
-	err := r.Engine.Section.Execute(&buf, ctx)
-	return RenderedItem{Body: buf.String(), IsCompactView: false}, err
-}
-
-func (r *Runner) RunPrompt(body string, section int) (RenderedItem, error) {
-	ctx := PromptContext{
-		Body:    body,
-		Section: section,
-		Global:  r.Global,
-	}
-	var buf bytes.Buffer
-	err := r.Engine.Prompt.Execute(&buf, ctx)
-	return RenderedItem{Body: buf.String(), IsCompactView: false}, err
-}
-
-func (r *Runner) RunFile(file InputFile, index int, currentSection int) (RenderedItem, error) {
-	reader, fileSize, displayPath, closeFunc, err := r.openInput(file)
+func (p *Processor) renderFile(file InputFile, index int) (RenderedItem, error) {
+	rc, err := file.Open()
 	if err != nil {
 		return RenderedItem{}, err
 	}
-	defer closeFunc()
+	defer rc.Close()
 
-	isBinary, isImage, language := r.detectAttributes(displayPath, reader, fileSize)
-
-	isExplicitCompact := r.Config.Head == 0 && r.Config.Tail == 0
-	isCompactView := isExplicitCompact || fileSize == 0
-
-	var (
-		headBytes, tailBytes, gapBytes []byte
-		totalRows                      int
-		isEstimate                     bool
-		contentData                    interface{}
-	)
-
-	if !isBinary && fileSize > 0 {
-		var exact bool
-		totalRows, exact, err = content.EstimateLineCount(reader, fileSize)
-		// We suppress internal errors here as they are non-fatal for rendering
-		isEstimate = !exact
-
-		if !isExplicitCompact {
-			headBytes, tailBytes, gapBytes, err = r.readContentSlice(reader, fileSize, totalRows, isEstimate)
-			if err != nil {
-				return RenderedItem{}, err
-			}
-
-			if len(headBytes) > 0 {
-				language = detect.DetectLanguage(displayPath, headBytes)
-			}
-		}
+	var reader io.ReaderAt
+	var size int64
+	if f, ok := rc.(*os.File); ok {
+		reader, size = f, file.Size
+	} else {
+		data, _ := io.ReadAll(rc)
+		reader, size = bytes.NewReader(data), int64(len(data))
 	}
 
-	if !isBinary && !isExplicitCompact && fileSize > 0 {
-		contentData = r.formatContent(headBytes, tailBytes, gapBytes, totalRows)
+	header := make([]byte, 1024)
+	n, _ := reader.ReadAt(header, 0)
+	isBinary := detect.IsBinary(header[:n])
+	lang := detect.DetectLanguage(file.Path, header[:n])
+
+	isCompact := p.cfg.Head == 0 && p.cfg.Tail == 0
+	totalRows, exact, _ := content.EstimateLineCount(reader, size)
+
+	var contentData interface{}
+	if !isBinary && !isCompact && size > 0 {
+		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact)
+		if err == nil {
+			contentData = p.formatContent(head, tail, gap, totalRows)
+		}
 	}
 
 	ctx := FileContext{
-		Path:           displayPath,
-		AbsPath:        file.AbsPath,
-		Size:           fileSize,
-		ModTime:        file.ModTime,
-		TotalRows:      totalRows,
-		TokenEstimate:  fileSize / 4,
-		IsEstimate:     isEstimate,
-		Language:       language,
-		Content:        contentData,
-		IsBinary:       isBinary,
-		IsImage:        isImage,
-		IsCompactView:  isCompactView,
-		FileIndex:      index,
-		CurrentSection: currentSection,
-		Global:         r.Global,
+		Path:          file.Path,
+		AbsPath:       file.AbsPath,
+		Size:          size,
+		TotalRows:     totalRows,
+		IsEstimate:    !exact,
+		Language:      lang,
+		Content:       contentData,
+		IsBinary:      isBinary,
+		IsCompactView: isCompact,
+		FileIndex:     index,
+		Global:        p.global,
 	}
 
 	var buf bytes.Buffer
-	if err := r.Engine.Main.Execute(&buf, ctx); err != nil {
-		return RenderedItem{}, fmt.Errorf("template exec: %w", err)
-	}
-
-	return RenderedItem{Body: buf.String(), IsCompactView: isCompactView}, nil
+	err = p.engine.Main.Execute(&buf, ctx)
+	return RenderedItem{Body: buf.String(), IsCompactView: isCompact}, err
 }
 
-func (r *Runner) openInput(file InputFile) (reader io.ReaderAt, size int64, path string, cleanup func(), err error) {
-	path = file.Path
-	size = file.Size
-	rc, err := file.Open()
-	if err != nil {
-		return nil, 0, "", nil, err
-	}
-	cleanup = func() { rc.Close() }
-
-	if path == "-" || path == "stdin" {
-		path = "stdin"
-		data, err := io.ReadAll(rc)
-		if err != nil {
-			cleanup()
-			return nil, 0, "", nil, err
-		}
-		reader = bytes.NewReader(data)
-		size = int64(len(data))
-		cleanup = func() {}
-	} else if f, ok := rc.(*os.File); ok {
-		reader = f
-	} else {
-		data, err := io.ReadAll(rc)
-		if err != nil {
-			cleanup()
-			return nil, 0, "", nil, err
-		}
-		reader = bytes.NewReader(data)
-		size = int64(len(data))
-		cleanup = func() {}
-	}
-	return reader, size, path, cleanup, nil
-}
-
-func (r *Runner) detectAttributes(path string, reader io.ReaderAt, size int64) (isBinary, isImage bool, language string) {
-	isImage = detect.IsImage(path)
-	if size == 0 {
-		return false, isImage, ""
-	}
-	header := make([]byte, 1024)
-	n, _ := reader.ReadAt(header, 0)
-	header = header[:n]
-	isBinary = detect.IsBinary(header)
-	if !isBinary {
-		language = detect.DetectLanguage(path, header)
-	}
-	return isBinary, isImage, language
-}
-
-func (r *Runner) readContentSlice(reader io.ReaderAt, size int64, totalRows int, isEstimate bool) (head, tail, gap []byte, err error) {
-	if r.Config.Head < 0 && r.Config.Tail < 0 {
+func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool) (head, tail, gap []byte, err error) {
+	if p.cfg.Head < 0 {
 		sr := io.NewSectionReader(reader, 0, size)
 		head, _, err = content.ReadHead(sr, -1)
 		return head, nil, nil, err
 	}
-	if r.Config.Head > 0 {
+
+	if p.cfg.Head > 0 {
 		sr := io.NewSectionReader(reader, 0, size)
-		head, _, err = content.ReadHead(sr, r.Config.Head)
-		if err != nil {
-			return nil, nil, nil, err
-		}
+		head, _, err = content.ReadHead(sr, p.cfg.Head)
 	}
-	if r.Config.Tail > 0 {
-		skipped := totalRows - r.Config.Head - r.Config.Tail
-		if skipped > 0 && r.Config.Head > 0 {
+
+	if p.cfg.Tail > 0 {
+		skipped := totalRows - p.cfg.Head - p.cfg.Tail
+		if skipped > 0 && p.cfg.Head > 0 {
 			tilde := ""
 			if isEstimate {
 				tilde = "~"
 			}
 			gap = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
 		}
+
 		if f, ok := reader.(*os.File); ok {
-			tail, err = content.ReadTailSeek(f, r.Config.Tail)
+			tail, _ = content.ReadTailSeek(f, p.cfg.Tail)
 		} else if br, ok := reader.(*bytes.Reader); ok {
-			allData := make([]byte, size)
-			br.ReadAt(allData, 0)
-			tail = tailFromBuffer(allData, r.Config.Tail)
-		}
-		if err != nil {
-			return nil, nil, nil, err
+			tail = tailFromBuffer(br, p.cfg.Tail)
 		}
 	}
-	return head, tail, gap, nil
+	return
 }
 
-func (r *Runner) formatContent(head, tail, gap []byte, totalRows int) interface{} {
-	if r.Config.LineNumbers {
+func (p *Processor) formatContent(head, tail, gap []byte, totalRows int) interface{} {
+	if p.cfg.LineNumbers {
 		return content.LineNumberFormatter{
-			Head:      head,
-			Gap:       gap,
-			Tail:      tail,
-			TotalRows: totalRows,
+			Head: head, Gap: gap, Tail: tail, TotalRows: totalRows,
 		}
 	}
-	if len(tail) == 0 && len(gap) == 0 {
-		return string(head)
-	}
-	return string(head) + string(gap) + string(tail)
+	var res bytes.Buffer
+	res.Write(head)
+	res.Write(gap)
+	res.Write(tail)
+	return res.String()
 }
 
-func tailFromBuffer(data []byte, lines int) []byte {
-	if lines <= 0 || len(data) == 0 {
-		return nil
-	}
-	newlinesFound := 0
-	start := 0
+func tailFromBuffer(r *bytes.Reader, lines int) []byte {
+	data := make([]byte, r.Size())
+	r.ReadAt(data, 0)
+	count := 0
 	for i := len(data) - 1; i >= 0; i-- {
 		if data[i] == '\n' {
-			newlinesFound++
-			if newlinesFound > lines {
-				start = i + 1
-				break
+			count++
+			if count > lines {
+				return data[i+1:]
 			}
 		}
 	}
-	return data[start:]
+	return data
 }

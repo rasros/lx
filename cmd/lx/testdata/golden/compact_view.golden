@@ -1,10 +1,7 @@
-[1/9] README.md (2 rows)
-[2/9] binary.dat - binary file skipped (10 B)
-[3/9] large.txt (~798 rows)
-[4/9] main.go (2 rows)
-[5/9] main_test.go (2 rows)
-[6/9] myscript (2 rows)
-[7/9] output.tmp - empty file
-[8/9] pkg/util/README.md (1 rows)
-[9/9] pkg/util/util.go (1 rows)
-
+[1/7] README.md (2 rows)
+[2/7] binary.dat - binary file skipped (7 B)
+[3/7] main.go (2 rows)
+[4/7] main_test.go (2 rows)
+[5/7] myscript (2 rows)
+[6/7] pkg/util/README.md (1 rows)
+[7/7] pkg/util/util.go (1 rows)

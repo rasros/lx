@@ -2,6 +2,6 @@ myscript (2 rows)
 ---
 ```bash
 #!/bin/bash
-echo 'hello world'
+echo 'hi'
 ```
 

@@ -9,13 +9,14 @@ import (
 	"github.com/monochromegane/go-gitignore"
 )
 
+type FilterFunc func(f InputFile) bool
+
 type WalkerOptions struct {
 	FollowSymlinks bool
 	ShowHidden     bool
 	IgnoreEnabled  bool
 	GlobalIgnore   gitignore.IgnoreMatcher
-	// Hook for callers to react to ignored files (logging, stats, etc.)
-	OnIgnore func(path string, reason string)
+	OnIgnore       func(path string, reason string)
 }
 
 type Walker struct {
@@ -26,7 +27,8 @@ func NewWalker(opts WalkerOptions) *Walker {
 	return &Walker{Opts: opts}
 }
 
-func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
+// Walk recursively discovers files. You can pass FilterFuncs to skip files early.
+func (w *Walker) Walk(ctx context.Context, roots []string, filters ...FilterFunc) <-chan InputFile {
 	out := make(chan InputFile)
 	go func() {
 		defer close(out)
@@ -39,10 +41,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 			default:
 			}
 
-			if root == "-" {
-				continue
-			}
-
 			info, err := os.Stat(root)
 			if err != nil {
 				out <- InputFile{Path: root, LoadError: err}
@@ -50,8 +48,10 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 			}
 
 			if !info.IsDir() {
-				if abs, err := filepath.Abs(root); err == nil {
-					out <- NewOsInputFile(root, abs, info)
+				abs, _ := filepath.Abs(root)
+				file := NewOsInputFile(root, abs, info)
+				if w.applyFilters(file, filters) {
+					out <- file
 				}
 				continue
 			}
@@ -62,13 +62,22 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				stack = append(stack, w.Opts.GlobalIgnore)
 			}
 
-			w.walkDir(ctx, root, absRoot, info, stack, visited, out)
+			w.walkDir(ctx, root, absRoot, info, stack, visited, out, filters)
 		}
 	}()
 	return out
 }
 
-func (w *Walker) walkDir(ctx context.Context, path string, absPath string, info os.FileInfo, ignoreStack []gitignore.IgnoreMatcher, visited map[string]bool, out chan<- InputFile) {
+func (w *Walker) applyFilters(f InputFile, filters []FilterFunc) bool {
+	for _, filter := range filters {
+		if !filter(f) {
+			return false
+		}
+	}
+	return true
+}
+
+func (w *Walker) walkDir(ctx context.Context, path string, absPath string, info os.FileInfo, ignoreStack []gitignore.IgnoreMatcher, visited map[string]bool, out chan<- InputFile, filters []FilterFunc) {
 	select {
 	case <-ctx.Done():
 		return
@@ -95,12 +104,8 @@ func (w *Walker) walkDir(ctx context.Context, path string, absPath string, info 
 
 	newStack := ignoreStack
 	if w.Opts.IgnoreEnabled {
-		matchers := loadLocalIgnores(path)
-		if len(matchers) > 0 {
-			ns := make([]gitignore.IgnoreMatcher, len(ignoreStack)+len(matchers))
-			copy(ns, ignoreStack)
-			copy(ns[len(ignoreStack):], matchers)
-			newStack = ns
+		if matchers := loadLocalIgnores(path); len(matchers) > 0 {
+			newStack = append(append([]gitignore.IgnoreMatcher{}, ignoreStack...), matchers...)
 		}
 	}
 
@@ -117,35 +122,11 @@ func (w *Walker) walkDir(ctx context.Context, path string, absPath string, info 
 			continue
 		}
 
-		isSymlink := (info.Mode() & os.ModeSymlink) != 0
-		var targetAbs string
-
-		if isSymlink {
-			if !w.Opts.FollowSymlinks {
-				continue
-			}
-			resolved, err := filepath.EvalSymlinks(childPath)
-			if err != nil {
-				continue
-			}
-			targetInfo, err := os.Stat(resolved)
-			if err != nil {
-				continue
-			}
-			info = targetInfo
-			targetAbs = resolved
-		} else {
-			abs, _ := filepath.Abs(childPath)
-			targetAbs = abs
-		}
-
+		targetAbs, _ := filepath.Abs(childPath)
 		if info.IsDir() {
-			if !w.Opts.ShowHidden && strings.HasPrefix(entry.Name(), ".") {
-				continue
-			}
-			w.walkDir(ctx, childPath, targetAbs, info, newStack, visited, out)
+			w.walkDir(ctx, childPath, targetAbs, info, newStack, visited, out, filters)
 		} else {
-			if !w.Opts.ShowHidden && strings.HasPrefix(entry.Name(), ".") {
+			if !w.Opts.ShowHidden && isHidden(childPath) {
 				continue
 			}
 
@@ -156,10 +137,15 @@ func (w *Walker) walkDir(ctx context.Context, path string, absPath string, info 
 				continue
 			}
 
-			out <- NewOsInputFile(childPath, targetAbs, info)
+			file := NewOsInputFile(childPath, targetAbs, info)
+			if w.applyFilters(file, filters) {
+				out <- file
+			}
 		}
 	}
 }
+
+// Internal Helper Functions
 
 func loadLocalIgnores(dir string) []gitignore.IgnoreMatcher {
 	names := []string{".gitignore", ".ignore", ".lxignore"}

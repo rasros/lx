@@ -3,9 +3,38 @@ package lx
 import (
 	"fmt"
 	"text/template"
+	"time"
 
 	"github.com/monochromegane/go-gitignore"
 )
+
+// GlobalContext holds metadata about the entire execution across all files.
+type GlobalContext struct {
+	TotalFiles    int
+	TotalSize     int64
+	TokenEstimate int64
+	TotalSections int
+	WorkDir       string
+	Metadata      map[string]string
+	Config        Config
+}
+
+// RunnerConfig defines slicing and formatting state for the rendering processor.
+type RunnerConfig struct {
+	Head        int
+	Tail        int
+	LineNumbers bool
+}
+
+// TemplateEngine holds the parsed text/template instances for all output modes.
+type TemplateEngine struct {
+	Main    *template.Template
+	Section *template.Template
+	Prompt  *template.Template
+	Stats   *template.Template
+	Header  *template.Template
+	Footer  *template.Template
+}
 
 // Config represents the configuration for the lx engine.
 type Config struct {
@@ -26,14 +55,26 @@ type Config struct {
 	ShowHidden     bool  `yaml:"show_hidden"`
 	Ignore         *bool `yaml:"ignore"`
 
-	// GlobalIgnore is an optional matcher for global excludes (e.g. from ~/.config/git/ignore).
+	// GlobalIgnore is an optional matcher for global excludes.
 	GlobalIgnore gitignore.IgnoreMatcher `yaml:"-"`
 
-	// LoadedConfigs tracks which config files were successfully loaded (for debug info).
+	// LoadedConfigs tracks which config files were successfully loaded.
 	LoadedConfigs []string `yaml:"-"`
 }
 
-// IgnoreEnabled returns the effective boolean value for Ignore.
+// NewConfig initializes a default configuration with safe defaults.
+func NewConfig() *Config {
+	ignore := true
+	return &Config{
+		OutputFormat: "markdown",
+		OutputMode:   "stdout",
+		Ignore:       &ignore,
+		ShowStats:    "auto",
+		Verbosity:    "warn",
+	}
+}
+
+// IgnoreEnabled returns the effective boolean value for the Ignore pointer.
 func (c *Config) IgnoreEnabled() bool {
 	if c.Ignore == nil {
 		return true
@@ -41,135 +82,13 @@ func (c *Config) IgnoreEnabled() bool {
 	return *c.Ignore
 }
 
-// Merge overrides values in dst with non-zero values from src.
-func Merge(dst *Config, src *Config) {
-	if src.Template != "" {
-		dst.Template = src.Template
-	}
-	if src.SectionTemplate != "" {
-		dst.SectionTemplate = src.SectionTemplate
-	}
-	if src.PromptTemplate != "" {
-		dst.PromptTemplate = src.PromptTemplate
-	}
-	if src.StatsTemplate != "" {
-		dst.StatsTemplate = src.StatsTemplate
-	}
-	if src.HeaderTemplate != "" {
-		dst.HeaderTemplate = src.HeaderTemplate
-	}
-	if src.FooterTemplate != "" {
-		dst.FooterTemplate = src.FooterTemplate
-	}
-	if src.OutputMode != "" {
-		dst.OutputMode = src.OutputMode
-	}
-	if src.OutputFormat != "" {
-		dst.OutputFormat = src.OutputFormat
-	}
-	if src.ShowStats != "" {
-		dst.ShowStats = src.ShowStats
-	}
-	if src.Verbosity != "" {
-		dst.Verbosity = src.Verbosity
-	}
-
-	if src.Ignore != nil {
-		dst.Ignore = src.Ignore
-	}
-	if src.FollowSymlinks {
-		dst.FollowSymlinks = true
-	}
-	if src.ShowHidden {
-		dst.ShowHidden = true
-	}
-}
-
-// RunnerConfig is the runtime configuration for a specific file operation.
-type RunnerConfig struct {
-	Head        int
-	Tail        int
-	LineNumbers bool
-}
-
-// TemplateEngine holds the parsed text/template instances.
-type TemplateEngine struct {
-	Main    *template.Template
-	Section *template.Template
-	Prompt  *template.Template
-	Stats   *template.Template
-	Header  *template.Template
-	Footer  *template.Template
-}
-
-// Options represents overrides usually provided by command-line flags.
-type Options struct {
-	Head  *int
-	Tail  *int
-	NBoth *int
-
-	LineNumbers  bool
-	OutputFormat string
-
-	Includes []string
-	Excludes []string
-}
-
-// ToRunnerConfig resolves the specific head/tail counts based on flags.
-func (o Options) ToRunnerConfig() RunnerConfig {
-	head, tail := -1, -1 // -1 indicates "read all"
-
-	if o.NBoth != nil {
-		total := *o.NBoth
-		if total < 0 {
-			total = 0
-		}
-
-		switch {
-		case o.Head != nil:
-			head = clamp(*o.Head, 0, total)
-			tail = total - head
-		case o.Tail != nil:
-			tail = clamp(*o.Tail, 0, total)
-			head = total - tail
-		default:
-			head = (total + 1) / 2
-			tail = total / 2
-		}
-	} else {
-		if o.Head != nil {
-			head = *o.Head
-			if o.Tail == nil {
-				tail = 0
-			}
-		}
-		if o.Tail != nil {
-			tail = *o.Tail
-			if o.Head == nil {
-				head = 0
-			}
-		}
-	}
-
-	return RunnerConfig{
-		Head:        head,
-		Tail:        tail,
-		LineNumbers: o.LineNumbers,
-	}
-}
-
 // CompileTemplates compiles the templates defined in the Config.
 // It applies defaults for any missing templates based on the OutputFormat.
 func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
-	if cfg.OutputMode == "" {
-		cfg.OutputMode = "stdout"
-	}
-
 	format := cfg.OutputFormat
 	if format == "" {
 		format = "markdown"
 	}
-	cfg.OutputFormat = format
 
 	var defMain, defSection, defPrompt string
 	defHeader := defaultHeaderTemplate
@@ -204,34 +123,34 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 		return template.New(name).Funcs(funcs).Parse(tmpl)
 	}
 
-	tMain, err := parse("lx", pick(cfg.Template, defMain))
+	tMain, err := parse("main", pick(cfg.Template, defMain))
 	if err != nil {
-		return nil, fmt.Errorf("parse main template: %w", err)
+		return nil, fmt.Errorf("main template: %w", err)
 	}
 
 	tSection, err := parse("section", pick(cfg.SectionTemplate, defSection))
 	if err != nil {
-		return nil, fmt.Errorf("parse section template: %w", err)
+		return nil, fmt.Errorf("section template: %w", err)
 	}
 
 	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, defPrompt))
 	if err != nil {
-		return nil, fmt.Errorf("parse prompt template: %w", err)
+		return nil, fmt.Errorf("prompt template: %w", err)
 	}
 
 	tStats, err := parse("stats", pick(cfg.StatsTemplate, defaultStatsTemplate))
 	if err != nil {
-		return nil, fmt.Errorf("parse stats template: %w", err)
+		return nil, fmt.Errorf("stats template: %w", err)
 	}
 
 	tHeader, err := parse("header", pick(cfg.HeaderTemplate, defHeader))
 	if err != nil {
-		return nil, fmt.Errorf("parse header template: %w", err)
+		return nil, fmt.Errorf("header template: %w", err)
 	}
 
 	tFooter, err := parse("footer", pick(cfg.FooterTemplate, defFooter))
 	if err != nil {
-		return nil, fmt.Errorf("parse footer template: %w", err)
+		return nil, fmt.Errorf("footer template: %w", err)
 	}
 
 	return &TemplateEngine{
@@ -244,19 +163,93 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 	}, nil
 }
 
-// ApplyOptions updates the config with values from Options (CLI flags).
-func ApplyOptions(cfg *Config, opts Options) {
-	if opts.OutputFormat != "" {
-		cfg.OutputFormat = opts.OutputFormat
+// Merge overrides values in dst with non-zero values from src.
+func Merge(dst *Config, src *Config) {
+	if src.Template != "" {
+		dst.Template = src.Template
+	}
+	if src.SectionTemplate != "" {
+		dst.SectionTemplate = src.SectionTemplate
+	}
+	if src.PromptTemplate != "" {
+		dst.PromptTemplate = src.PromptTemplate
+	}
+	if src.StatsTemplate != "" {
+		dst.StatsTemplate = src.StatsTemplate
+	}
+	if src.HeaderTemplate != "" {
+		dst.HeaderTemplate = src.HeaderTemplate
+	}
+	if src.FooterTemplate != "" {
+		dst.FooterTemplate = src.FooterTemplate
+	}
+	if src.OutputMode != "" {
+		dst.OutputMode = src.OutputMode
+	}
+	if src.OutputFormat != "" {
+		dst.OutputFormat = src.OutputFormat
+	}
+	if src.ShowStats != "" {
+		dst.ShowStats = src.ShowStats
+	}
+	if src.Verbosity != "" {
+		dst.Verbosity = src.Verbosity
+	}
+	if src.Ignore != nil {
+		dst.Ignore = src.Ignore
+	}
+	if src.FollowSymlinks {
+		dst.FollowSymlinks = true
+	}
+	if src.ShowHidden {
+		dst.ShowHidden = true
 	}
 }
 
-func clamp(val, min, max int) int {
-	if val < min {
-		return min
-	}
-	if val > max {
-		return max
-	}
-	return val
+// FileContext is passed to the main template during file rendering.
+type FileContext struct {
+	Path           string
+	AbsPath        string
+	Size           int64
+	ModTime        time.Time
+	TotalRows      int
+	TokenEstimate  int64
+	IsEstimate     bool
+	Language       string
+	Content        interface{}
+	IsBinary       bool
+	IsImage        bool
+	IsCompactView  bool
+	FileIndex      int
+	CurrentSection int
+	Global         GlobalContext
+}
+
+// SectionContext is passed to the section template.
+type SectionContext struct {
+	Body    string
+	Section int
+	Global  GlobalContext
+}
+
+// PromptContext is passed to the prompt template.
+type PromptContext struct {
+	Body    string
+	Section int
+	Global  GlobalContext
+}
+
+// HeaderContext is passed to the header template.
+type HeaderContext struct {
+	Global GlobalContext
+}
+
+// FooterContext is passed to the footer template.
+type FooterContext struct {
+	Global GlobalContext
+}
+
+// StatsContext is passed to the stats template.
+type StatsContext struct {
+	Global GlobalContext
 }
