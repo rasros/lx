@@ -212,19 +212,23 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 // loadConfigChain loads config from Default -> Env -> CLI.
 func loadConfigChain(cliPath string) (*Config, error) {
 	cfg := &Config{}
+	tmpLog := NewLogger(os.Stderr, ParseLevel(os.Getenv("LX_LOG")))
 
 	if configDir, err := os.UserConfigDir(); err == nil {
 		path := filepath.Join(configDir, "lx", "config.yaml")
+		tmpLog.Tracef("checking default config: %s", path)
 		_ = mergeConfig(cfg, path, false)
 	}
 
 	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
+		tmpLog.Tracef("checking env config: %s", envPath)
 		if err := mergeConfig(cfg, envPath, false); err != nil {
 			return nil, fmt.Errorf("load env config: %w", err)
 		}
 	}
 
 	if cliPath != "" {
+		tmpLog.Tracef("checking cli config: %s", cliPath)
 		if err := mergeConfig(cfg, cliPath, true); err != nil {
 			return nil, fmt.Errorf("load cli config: %w", err)
 		}
@@ -263,18 +267,19 @@ func (c *Config) ApplyGlobals(globals map[string]string) {
 	if _, ok := globals["quiet"]; ok {
 		c.LogLevel = LevelSilent
 	} else if v, ok := globals["verbose"]; ok {
+		// Explicit --verbose="debug" takes precedence
+		c.LogLevel = ParseLevel(v)
+	} else if v, ok := globals["verbosity"]; ok {
+		// Counter -v / -vv / -vvv
 		count, err := strconv.Atoi(v)
 		if err == nil {
 			if count >= 3 {
 				c.LogLevel = LevelTrace
 			} else if count == 2 {
 				c.LogLevel = LevelDebug
-			} else if count == 1 {
+			} else if count >= 1 {
 				c.LogLevel = LevelInfo
 			}
-		} else {
-			// Fallback if somehow a string got in (e.g. from future config logic merging)
-			c.LogLevel = ParseLevel(v)
 		}
 	}
 

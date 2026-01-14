@@ -58,6 +58,9 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 			}
 
 			if !info.IsDir() {
+				if w.Config.Logger != nil {
+					w.Config.Logger.Tracef("root is file: %s", root)
+				}
 				if abs, err := filepath.Abs(root); err == nil {
 					select {
 					case out <- NewOsInputFile(root, abs, info):
@@ -85,6 +88,10 @@ func (w *Walker) walkDir(
 	visited map[string]bool,
 	out chan<- InputFile,
 ) {
+	if w.Config.Logger != nil {
+		w.Config.Logger.Tracef("entering dir: %s", path)
+	}
+
 	select {
 	case <-ctx.Done():
 		return
@@ -109,6 +116,9 @@ func (w *Walker) walkDir(
 	}
 
 	if !w.Config.ShowHidden && isHidden(path) {
+		if w.Config.Logger != nil {
+			w.Config.Logger.Tracef("skipping hidden directory: %s", path)
+		}
 		return
 	}
 
@@ -116,6 +126,9 @@ func (w *Walker) walkDir(
 	if w.Config.IgnoreEnabled() {
 		matchers := w.loadLocalIgnores(path)
 		if len(matchers) > 0 {
+			if w.Config.Logger != nil {
+				w.Config.Logger.Tracef("applying %d local ignore files in %s", len(matchers), path)
+			}
 			ns := make([]gitignore.IgnoreMatcher, len(ignoreStack)+len(matchers))
 			copy(ns, ignoreStack)
 			copy(ns[len(ignoreStack):], matchers)
@@ -152,6 +165,9 @@ func (w *Walker) walkDir(
 
 		if isSymlink {
 			if !w.Config.FollowSymlinks {
+				if w.Config.Logger != nil {
+					w.Config.Logger.Tracef("skipping symlink (follow disabled): %s", childPath)
+				}
 				continue
 			}
 			resolved, err := filepath.EvalSymlinks(childPath)
@@ -167,6 +183,9 @@ func (w *Walker) walkDir(
 			}
 			info = targetInfo
 			targetAbs = resolved
+			if w.Config.Logger != nil {
+				w.Config.Logger.Tracef("followed symlink %s -> %s", childPath, resolved)
+			}
 		} else {
 			if abs, err := filepath.Abs(childPath); err == nil {
 				targetAbs = abs
@@ -177,19 +196,29 @@ func (w *Walker) walkDir(
 
 		if info.IsDir() {
 			if !w.Config.ShowHidden && strings.HasPrefix(entry.Name(), ".") {
+				if w.Config.Logger != nil {
+					w.Config.Logger.Tracef("skipping hidden dir: %s", childPath)
+				}
 				continue
 			}
 			w.walkDir(ctx, childPath, targetAbs, info, newStack, visited, out)
 		} else {
 			if !w.Config.ShowHidden && strings.HasPrefix(entry.Name(), ".") {
+				if w.Config.Logger != nil {
+					w.Config.Logger.Tracef("skipping hidden file: %s", childPath)
+				}
 				continue
 			}
 
 			if w.Config.IgnoreEnabled() && isIgnored(newStack, childPath, false) {
 				if w.Config.Logger != nil {
-					w.Config.Logger.Debugf("ignored file: %s", childPath)
+					w.Config.Logger.Tracef("ignored file: %s", childPath)
 				}
 				continue
+			}
+
+			if w.Config.Logger != nil {
+				w.Config.Logger.Tracef("found file: %s", childPath)
 			}
 
 			select {
@@ -250,7 +279,7 @@ func (w *Walker) loadLocalIgnores(dir string) []gitignore.IgnoreMatcher {
 		path := filepath.Join(dir, name)
 		if m, err := gitignore.NewGitIgnore(path); err == nil {
 			if w.Config.Logger != nil {
-				w.Config.Logger.Debugf("loaded ignore file: %s", path)
+				w.Config.Logger.Tracef("loaded ignore file: %s", path)
 			}
 			matchers = append(matchers, m)
 		}
@@ -259,7 +288,7 @@ func (w *Walker) loadLocalIgnores(dir string) []gitignore.IgnoreMatcher {
 	gitInfo := filepath.Join(dir, ".git", "info", "exclude")
 	if m, err := gitignore.NewGitIgnore(gitInfo); err == nil {
 		if w.Config.Logger != nil {
-			w.Config.Logger.Debugf("loaded git exclude: %s", gitInfo)
+			w.Config.Logger.Tracef("loaded git exclude: %s", gitInfo)
 		}
 		matchers = append(matchers, m)
 	}

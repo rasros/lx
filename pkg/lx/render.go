@@ -83,6 +83,9 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 			log.Warnf("failed to count lines for %s: %v", displayPath, err)
 		}
 		isEstimate = !exact
+		if log != nil {
+			log.Tracef("line count: %d (exact=%v)", totalRows, exact)
+		}
 
 		if !isExplicitCompact {
 			headBytes, tailBytes, gapBytes, err = r.readContentSlice(reader, fileSize, totalRows, isEstimate)
@@ -92,6 +95,9 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 
 			if len(headBytes) > 0 {
 				language = DetectLanguage(displayPath, headBytes)
+				if log != nil {
+					log.Tracef("language refined via content: %s", language)
+				}
 			}
 		}
 	}
@@ -122,6 +128,9 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 		Global:         r.Global,
 	}
 
+	if log != nil {
+		log.Tracef("rendering template for %s", displayPath)
+	}
 	if err := r.Engine.Main.Execute(out, ctx); err != nil {
 		return false, fmt.Errorf("template exec: %w", err)
 	}
@@ -191,6 +200,8 @@ func (r *Runner) detectAttributes(path string, reader io.ReaderAt, size int64) (
 	if log != nil {
 		if isBinary {
 			log.Debugf("binary file detected: %s", path)
+		} else if isImage {
+			log.Debugf("image file detected: %s", path)
 		} else if language != "" {
 			log.Debugf("language detected: %s (%s)", language, path)
 		}
@@ -200,6 +211,11 @@ func (r *Runner) detectAttributes(path string, reader io.ReaderAt, size int64) (
 }
 
 func (r *Runner) readContentSlice(reader io.ReaderAt, size int64, totalRows int, isEstimate bool) (head, tail, gap []byte, err error) {
+	log := r.Global.Config.Logger
+	if log != nil {
+		log.Tracef("reading slice: head=%d, tail=%d", r.Config.Head, r.Config.Tail)
+	}
+
 	// Read everything
 	if r.Config.Head < 0 && r.Config.Tail < 0 {
 		sr := io.NewSectionReader(reader, 0, size)

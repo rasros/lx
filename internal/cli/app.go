@@ -13,6 +13,8 @@ import (
 )
 
 func Run(ctx context.Context, args []string) error {
+	// We don't have the configured logger yet, so we can't trace Parse/SetupProfiling easily
+	// without a temporary logger, but we can catch it immediately after config load.
 	parsed, err := Parse(args, definitions)
 	if err != nil {
 		return err
@@ -116,6 +118,8 @@ func processStream(parsed *ParsedArgs) error {
 	cfg.Logger = lx.NewLogger(debugOut, cfg.LogLevel)
 
 	cfg.Logger.Debugf("lx version: %s", Version)
+	cfg.Logger.Tracef("output format: %s, mode: %s", cfg.OutputFormat, cfg.OutputMode)
+
 	for _, path := range cfg.LoadedConfigs {
 		cfg.Logger.Infof("loaded config: %s", path)
 	}
@@ -240,7 +244,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 	}
 
 	// Discovery Phase
-	cfg.Logger.Debugf("starting discovery phase...")
+	cfg.Logger.Debugf("starting discovery phase with %d operations", len(ops))
 	walker := lx.NewWalker(*cfg)
 	opMap := make(map[int][]lx.InputFile)
 	var allFiles []lx.InputFile
@@ -251,17 +255,18 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 	discOpts := opts
 
 	for i, op := range ops {
+		cfg.Logger.Tracef("parsing op [%d]: %s %s", i, op.Action, op.Value)
 		switch op.Action {
 		case "include":
 			discOpts.Includes = append(discOpts.Includes, op.Value)
-			cfg.Logger.Debugf("filter added: include '%s'", op.Value)
+			cfg.Logger.Tracef("filter added: include '%s'", op.Value)
 		case "exclude":
 			discOpts.Excludes = append(discOpts.Excludes, op.Value)
-			cfg.Logger.Debugf("filter added: exclude '%s'", op.Value)
+			cfg.Logger.Tracef("filter added: exclude '%s'", op.Value)
 		case "reset-filters":
 			discOpts.Includes = nil
 			discOpts.Excludes = nil
-			cfg.Logger.Debugf("filters reset")
+			cfg.Logger.Tracef("filters reset")
 		case "FILE", "file":
 			if op.Value == "-" {
 				cfg.Logger.Debugf("reading from stdin")
@@ -278,6 +283,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			}
 
 			var gathered []lx.InputFile
+			cfg.Logger.Tracef("walking target: %s", op.Value)
 			for f := range walker.Walk(context.TODO(), []string{op.Value}) {
 				if f.LoadError != nil {
 					cfg.Logger.Errorf("%v", f.LoadError)
@@ -286,7 +292,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 
 				// Apply interleaved filters
 				if !lx.IsKept(f.Path, discOpts.Includes, discOpts.Excludes) {
-					cfg.Logger.Debugf("filtered out: %s", f.Path)
+					cfg.Logger.Tracef("filtered out by interleaved rules: %s", f.Path)
 					continue
 				}
 
@@ -373,30 +379,36 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 
 		case "line-numbers":
 			opts.LineNumbers = true
+			cfg.Logger.Tracef("option set: line-numbers=true")
 		case "no-line-numbers":
 			opts.LineNumbers = false
+			cfg.Logger.Tracef("option set: line-numbers=false")
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Head = val
 			opts.HeadSet = true
 			opts.Tail, opts.TailSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
+			cfg.Logger.Tracef("option set: head=%d", val)
 		case "tail":
 			val, _ := strconv.Atoi(op.Value)
 			opts.Tail = val
 			opts.TailSet = true
 			opts.Head, opts.HeadSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
+			cfg.Logger.Tracef("option set: tail=%d", val)
 		case "lines":
 			val, _ := strconv.Atoi(op.Value)
 			opts.NBoth = val
 			opts.NSet = true
 			opts.HeadSet = false
 			opts.TailSet = false
+			cfg.Logger.Tracef("option set: lines=%d", val)
 		case "reset-lines":
 			opts.Head, opts.HeadSet = 0, false
 			opts.Tail, opts.TailSet = 0, false
 			opts.NBoth, opts.NSet = 0, false
+			cfg.Logger.Tracef("option set: reset-lines")
 
 		// Filter flags (state maintained but action is no-op during execution phase)
 		case "include":
