@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 
 	"github.com/rasros/lx/pkg/lx/internal/content"
@@ -20,18 +19,13 @@ type Runner struct {
 	Config RunnerConfig
 	Engine *TemplateEngine
 	Global GlobalContext
-	Logger *slog.Logger
 }
 
-func NewRunner(cfg RunnerConfig, engine *TemplateEngine, global GlobalContext, logger *slog.Logger) *Runner {
-	if logger == nil {
-		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-	}
+func NewRunner(cfg RunnerConfig, engine *TemplateEngine, global GlobalContext) *Runner {
 	return &Runner{
 		Config: cfg,
 		Engine: engine,
 		Global: global,
-		Logger: logger,
 	}
 }
 
@@ -58,8 +52,6 @@ func (r *Runner) RunPrompt(body string, section int) (RenderedItem, error) {
 }
 
 func (r *Runner) RunFile(file InputFile, index int, currentSection int) (RenderedItem, error) {
-	r.Logger.Debug("processing file", "index", index, "path", file.Path)
-
 	reader, fileSize, displayPath, closeFunc, err := r.openInput(file)
 	if err != nil {
 		return RenderedItem{}, err
@@ -81,9 +73,7 @@ func (r *Runner) RunFile(file InputFile, index int, currentSection int) (Rendere
 	if !isBinary && fileSize > 0 {
 		var exact bool
 		totalRows, exact, err = content.EstimateLineCount(reader, fileSize)
-		if err != nil {
-			r.Logger.Warn("failed to count lines", "path", displayPath, "error", err)
-		}
+		// We suppress internal errors here as they are non-fatal for rendering
 		isEstimate = !exact
 
 		if !isExplicitCompact {

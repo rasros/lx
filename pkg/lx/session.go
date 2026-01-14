@@ -2,44 +2,32 @@ package lx
 
 import (
 	"fmt"
-	"io"
-	"log/slog"
 )
 
-// Session manages the state and lifecycle of an lx operation.
+// Session manages the template engine lifecycle.
 type Session struct {
-	Config Config
-	Logger *slog.Logger
 	Engine *TemplateEngine
 }
 
-func NewSession(cfg *Config, logger *slog.Logger) (*Session, error) {
-	if logger == nil {
-		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
-	}
-
+// NewSession initializes the template engine with the provided configuration.
+func NewSession(cfg *Config) (*Session, error) {
 	engine, err := CompileTemplates(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("compile templates: %w", err)
 	}
 
 	return &Session{
-		Config: *cfg,
-		Logger: logger,
 		Engine: engine,
 	}, nil
 }
 
-func (s *Session) NewWalker() *Walker {
-	return NewWalker(s.Config, s.Logger)
-}
-
+// NewRunner creates a rendering runner for a specific set of slicing options.
 func (s *Session) NewRunner(cfg RunnerConfig, global GlobalContext) *Runner {
-	return NewRunner(cfg, s.Engine, global, s.Logger)
+	return NewRunner(cfg, s.Engine, global)
 }
 
-// CalculateGlobalContext creates the global context for template rendering.
-func (s *Session) CalculateGlobalContext(files []InputFile, sections int, workDir string, metadata map[string]string) GlobalContext {
+// CreateGlobalContext creates the data structure used by templates for global metadata.
+func CreateGlobalContext(files []InputFile, sections int, workDir string, metadata map[string]string) GlobalContext {
 	var totalSize int64
 	for _, f := range files {
 		totalSize += f.Size
@@ -48,18 +36,8 @@ func (s *Session) CalculateGlobalContext(files []InputFile, sections int, workDi
 	return GlobalContext{
 		TotalFiles:    len(files),
 		TotalSize:     totalSize,
-		TokenEstimate: EstimateTokens(totalSize),
 		TotalSections: sections,
 		WorkDir:       workDir,
 		Metadata:      metadata,
-		Config:        s.Config,
 	}
-}
-
-// EstimateTokens provides a unified way to estimate LLM tokens (4 chars per token).
-func EstimateTokens(size int64) int64 {
-	if size <= 0 {
-		return 0
-	}
-	return size / 4
 }

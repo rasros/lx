@@ -40,7 +40,7 @@ func newTestRunner(head, tail int, tmplStr string) *Runner {
 		Metadata:      make(map[string]string),
 	}
 
-	return NewRunner(cfg, engine, global, nil)
+	return NewRunner(cfg, engine, global)
 }
 
 func mustInputFile(t *testing.T, path string) InputFile {

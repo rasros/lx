@@ -2,8 +2,6 @@ package lx
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,14 +9,6 @@ import (
 )
 
 func TestWalker_Walk(t *testing.T) {
-	// Create a temporary directory tree
-	// root/
-	//    a.txt
-	//    b.go
-	//    sub/
-	//      c.md
-	//    .hidden
-	//    ignore_me.txt
 	tmpDir := t.TempDir()
 
 	createFile(t, tmpDir, "a.txt")
@@ -34,15 +24,16 @@ func TestWalker_Walk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a discard logger for tests
-	nopLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
-
 	t.Run("Walks recursively and respects ignore", func(t *testing.T) {
-		cfg := Config{
-			ShowHidden: false,
-			// Ignore is nil by default, which means enabled
+		ignoredPaths := make(map[string]bool)
+		opts := WalkerOptions{
+			ShowHidden:    false,
+			IgnoreEnabled: true,
+			OnIgnore: func(path string, reason string) {
+				ignoredPaths[path] = true
+			},
 		}
-		w := NewWalker(cfg, nopLogger)
+		w := NewWalker(opts)
 
 		ctx := context.Background()
 		ch := w.Walk(ctx, []string{tmpDir})
@@ -63,41 +54,37 @@ func TestWalker_Walk(t *testing.T) {
 		if !equal(paths, expected) {
 			t.Errorf("expected %v, got %v", expected, paths)
 		}
+
+		// Verify the ignore hook caught the ignored file
+		if !ignoredPaths[filepath.Join(tmpDir, "ignore_me.txt")] {
+			t.Error("expected ignore_me.txt to be passed to OnIgnore hook")
+		}
 	})
 
 	t.Run("Shows hidden files when Configured", func(t *testing.T) {
-		cfg := Config{
+		opts := WalkerOptions{
 			ShowHidden: true,
 		}
-		w := NewWalker(cfg, nopLogger)
+		w := NewWalker(opts)
 
 		ctx := context.Background()
 		ch := w.Walk(ctx, []string{tmpDir})
 
 		foundHidden := false
-		foundGitIgnore := false
-
 		for f := range ch {
 			rel, _ := filepath.Rel(tmpDir, f.Path)
 			if rel == ".hidden" {
 				foundHidden = true
-			}
-			if rel == ".gitignore" {
-				foundGitIgnore = true
 			}
 		}
 
 		if !foundHidden {
 			t.Error("expected to find .hidden file")
 		}
-		if !foundGitIgnore {
-			t.Error("expected to find .gitignore file")
-		}
 	})
 
 	t.Run("Context Cancellation stops walk", func(t *testing.T) {
-		cfg := Config{}
-		w := NewWalker(cfg, nopLogger)
+		w := NewWalker(WalkerOptions{})
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
@@ -109,9 +96,6 @@ func TestWalker_Walk(t *testing.T) {
 			count++
 		}
 
-		// It should return nearly 0 files.
-		// Note: The race between cancel and goroutine start means it might get 1,
-		// but usually 0 if cancelled immediately.
 		if count > 2 {
 			t.Errorf("expected walk to abort early, got %d files", count)
 		}

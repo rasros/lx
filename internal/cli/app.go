@@ -120,7 +120,7 @@ func processStream(parsed *ParsedArgs) error {
 		},
 	}))
 
-	session, err := lx.NewSession(cfg, logger)
+	session, err := lx.NewSession(cfg)
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func processStream(parsed *ParsedArgs) error {
 	}
 
 	ops := reorderTrailingOps(parsed.Ops)
-	if err := executeOps(ops, out, debugOut, opts, session, parsed.Globals, showStats); err != nil {
+	if err := executeOps(ops, out, debugOut, opts, session, parsed.Globals, showStats, logger, cfg); err != nil {
 		return err
 	}
 
@@ -174,10 +174,19 @@ func processStream(parsed *ParsedArgs) error {
 	return nil
 }
 
-func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, session *lx.Session, globals map[string]string, showStats bool) error {
+func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, session *lx.Session, globals map[string]string, showStats bool, logger *slog.Logger, cfg *lx.Config) error {
 	// 1. DISCOVERY PHASE
-	// We walk all targets first to populate total size and file counts for the templates.
-	walker := session.NewWalker()
+	walkerOpts := lx.WalkerOptions{
+		FollowSymlinks: cfg.FollowSymlinks,
+		ShowHidden:     cfg.ShowHidden,
+		IgnoreEnabled:  cfg.IgnoreEnabled(),
+		GlobalIgnore:   cfg.GlobalIgnore,
+		OnIgnore: func(path string, reason string) {
+			logger.Debug("ignored path", "path", path, "reason", reason)
+		},
+	}
+	walker := lx.NewWalker(walkerOpts)
+
 	var allFiles []lx.InputFile
 	opFiles := make(map[int][]lx.InputFile)
 
@@ -191,8 +200,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, se
 		case "exclude":
 			activeDiscoveryOpts.Excludes = append(activeDiscoveryOpts.Excludes, op.Value)
 		case "reset-filters":
-			activeDiscoveryOpts.Includes = nil
-			activeDiscoveryOpts.Excludes = nil
+			activeDiscoveryOpts.Includes, activeDiscoveryOpts.Excludes = nil, nil
 		case "section":
 			sectionCount++
 		case "FILE", "file":
@@ -210,10 +218,9 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, se
 			var gathered []lx.InputFile
 			for f := range walker.Walk(context.TODO(), []string{op.Value}) {
 				if f.LoadError != nil {
-					session.Logger.Error("load error", "path", f.Path, "error", f.LoadError)
+					logger.Error("load error", "path", f.Path, "error", f.LoadError)
 					continue
 				}
-				// Apply interleaved filters during discovery
 				if lx.IsKept(f.Path, activeDiscoveryOpts.Includes, activeDiscoveryOpts.Excludes) {
 					gathered = append(gathered, f)
 					allFiles = append(allFiles, f)
@@ -224,9 +231,11 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, se
 	}
 
 	cwd, _ := os.Getwd()
-	globalCtx := session.CalculateGlobalContext(allFiles, sectionCount+1, cwd, globals)
+	globalCtx := lx.CreateGlobalContext(allFiles, sectionCount+1, cwd, globals)
 
-	// Start output
+	// CLI-specific heuristic for token estimation
+	globalCtx.TokenEstimate = globalCtx.TotalSize / 4
+
 	if showStats {
 		_ = session.Engine.Stats.Execute(debugOut, lx.StatsContext{Global: globalCtx})
 	}
@@ -242,22 +251,19 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, se
 	currentActiveOpts := opts
 
 	for i, op := range ops {
-		// The runner is recreated or updated with current state machine options
 		runner := session.NewRunner(currentActiveOpts.ToRunnerConfig(), globalCtx)
 		var item lx.RenderedItem
 		var err error
 
 		switch op.Action {
 		case "FILE", "file":
-			files := opFiles[i]
-			for _, f := range files {
+			for _, f := range opFiles[i] {
 				item, err = runner.RunFile(f, fileIndex, sectionIndex)
 				if err != nil {
-					session.Logger.Error("processing failed", "path", f.Path, "error", err)
+					logger.Error("processing failed", "path", f.Path, "error", err)
 					continue
 				}
 
-				// The CLI handles "Glue" logic like extra newlines between code blocks
 				if prevCompact && !item.IsCompactView {
 					fmt.Fprintln(out)
 				}
@@ -266,7 +272,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, se
 				prevCompact = item.IsCompactView
 				fileIndex++
 			}
-			continue // Handled internally
+			continue
 
 		case "section":
 			if prevCompact {
@@ -283,7 +289,6 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, se
 			item, err = runner.RunPrompt(op.Value, sectionIndex)
 			prevCompact = false
 
-		// State-machine modifiers
 		case "line-numbers":
 			currentActiveOpts.LineNumbers = true
 		case "no-line-numbers":
@@ -313,8 +318,6 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, se
 		if err != nil {
 			return err
 		}
-
-		// Write non-file actions (prompts/sections) to the stream
 		if item.Body != "" {
 			fmt.Fprint(out, item.Body)
 		}
