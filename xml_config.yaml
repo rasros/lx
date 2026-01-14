@@ -1,3 +1,5 @@
+# lx XML Configuration (Synced with v1.1.0-rc.4)
+
 template: |
   <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
     <source>{{ .Path }}</source>
@@ -7,16 +9,16 @@ template: |
     <description>Compact view</description>
     {{- else }}
     <document_content>
-  {{ .Content | endNewline }}    </document_content>
+  {{ .Content | endNewline }}  </document_content>
     {{- end }}
-  </document>{{ "\n" }}
+  </document>{{ "\n\n" }}
 
 section_template: |
   <section_header>
   {{ .Body | endNewline -}}
-  </section_header>{{ "\n" }}
+  </section_header>{{ "\n\n" }}
 
 prompt_template: |
   <instruction>
   {{ .Body | endNewline -}}
-  </instruction>{{ "\n" }}
+  </instruction>{{ "\n\n" }}
