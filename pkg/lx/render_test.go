@@ -36,8 +36,7 @@ func newTestRunner(head, tail int, tmplStr string) *Runner {
 		TotalSize:     1024,
 		TokenEstimate: 256,
 		TotalSections: 1,
-		RootPath:      ".",
-		AbsRootPath:   "/tmp",
+		WorkDir:       ".",
 		Args:          make(map[string]string),
 	}
 

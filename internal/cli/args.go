@@ -20,6 +20,7 @@ const (
 	ValueNone ValueType = iota
 	ValueAny
 	ValueNumber
+	ValueCounter
 )
 
 type CommandDef struct {
@@ -112,11 +113,11 @@ func parseLong(arg string, args []string, idx int, defs map[string]CommandDef, r
 	}
 
 	consumed := 0
-	if def.ValueType == ValueNone {
+	if def.ValueType == ValueNone || def.ValueType == ValueCounter {
 		if hasEq {
 			return 0, fmt.Errorf("flag --%s does not take a value", key)
 		}
-		val = "true"
+		val = "true" // For counter, this triggers the increment logic in addOp
 	} else if !hasEq {
 		if idx+1 >= len(args) {
 			return 0, fmt.Errorf("flag --%s requires a value", key)
@@ -138,7 +139,7 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 			return 0, fmt.Errorf("unknown short flag: -%c", char)
 		}
 
-		if def.ValueType == ValueNone {
+		if def.ValueType == ValueNone || def.ValueType == ValueCounter {
 			if err := addOp(res, def, "true"); err != nil {
 				return 0, err
 			}
@@ -176,7 +177,15 @@ func addOp(res *ParsedArgs, def CommandDef, val string) error {
 	}
 
 	if def.Type == CmdGlobal {
-		res.Globals[def.Name] = val
+		if def.ValueType == ValueCounter {
+			current := 0
+			if curStr, ok := res.Globals[def.Name]; ok {
+				current, _ = strconv.Atoi(curStr)
+			}
+			res.Globals[def.Name] = strconv.Itoa(current + 1)
+		} else {
+			res.Globals[def.Name] = val
+		}
 	} else {
 		res.Ops = append(res.Ops, Op{Action: def.Name, Value: val, Type: def.Type})
 	}

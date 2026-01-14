@@ -126,6 +126,17 @@ lx --xml src/
 
 ---
 
+## HTML Support (Recommended for Browser Viewing)
+
+`lx` can output a complete, minimalistic HTML document styled with Pico CSS. This is useful for creating shareable
+archives or viewing code in a browser. It automatically detects images and renders them too.
+
+```bash
+lx --html src/ > output.html
+```
+
+---
+
 ## Core Features
 
 ### 1. Smart Discovery
@@ -180,8 +191,9 @@ output is redirected from stdout. You can disable it by `--no-stats`.
 
 ### 6. File Support
 
-binary files
-language detection
+Binary files are printed as a single line and do not cause errors.
+
+PDF conversion and compressed archives are planned as future improvements.
 
 ---
 

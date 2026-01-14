@@ -15,6 +15,7 @@ const (
 	LevelWarn
 	LevelInfo
 	LevelDebug
+	LevelTrace
 )
 
 type Logger struct {
@@ -31,6 +32,8 @@ func NewLogger(out io.Writer, level LogLevel) *Logger {
 
 func ParseLevel(s string) LogLevel {
 	switch strings.ToLower(s) {
+	case "trace":
+		return LevelTrace
 	case "debug":
 		return LevelDebug
 	case "info":
@@ -68,5 +71,11 @@ func (l *Logger) Infof(format string, a ...interface{}) {
 func (l *Logger) Debugf(format string, a ...interface{}) {
 	if l.level >= LevelDebug {
 		fmt.Fprintf(l.out, "DEBUG: "+format+"\n", a...)
+	}
+}
+
+func (l *Logger) Tracef(format string, a ...interface{}) {
+	if l.level >= LevelTrace {
+		fmt.Fprintf(l.out, "TRACE: "+format+"\n", a...)
 	}
 }

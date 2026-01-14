@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/atotto/clipboard"
 	"github.com/rasros/lx/pkg/lx"
@@ -98,6 +96,9 @@ func processStream(parsed *ParsedArgs) error {
 	}
 	if _, ok := parsed.Globals["md"]; ok {
 		opts.OutputFormat = "markdown"
+	}
+	if _, ok := parsed.Globals["html"]; ok {
+		opts.OutputFormat = "html"
 	}
 
 	tmplEngine, cfg, err := opts.CompileTemplates()
@@ -245,7 +246,6 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 	var allFiles []lx.InputFile
 
 	var totalSize int64
-	var absFilePaths []string
 
 	// Temporary options state for discovery
 	discOpts := opts
@@ -292,11 +292,16 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 
 				gathered = append(gathered, f)
 				allFiles = append(allFiles, f)
-				absFilePaths = append(absFilePaths, f.AbsPath)
 				totalSize += f.Size
 			}
 			opMap[i] = gathered
 		}
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "."
+		cfg.Logger.Warnf("failed to get current working directory: %v", err)
 	}
 
 	globalCtx := lx.GlobalContext{
@@ -304,8 +309,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		TotalSize:     totalSize,
 		TokenEstimate: lx.EstimateTokens(totalSize),
 		TotalSections: sectionCount + 1,
-		RootPath:      findCommonRoot(absFilePaths),
-		AbsRootPath:   findCommonRoot(absFilePaths),
+		WorkDir:       cwd,
 		Args:          globals,
 		Config:        *cfg,
 	}
@@ -460,33 +464,4 @@ func reorderTrailingOps(ops []Op) []Op {
 	newOps = append(newOps, others...)
 
 	return newOps
-}
-
-func findCommonRoot(paths []string) string {
-	if len(paths) == 0 {
-		return "."
-	}
-	if len(paths) == 1 {
-		return filepath.Dir(paths[0])
-	}
-
-	root := filepath.Dir(paths[0])
-
-	for _, p := range paths[1:] {
-		for !strings.HasPrefix(p, root+string(filepath.Separator)) && root != "." && root != "/" {
-			parent := filepath.Dir(root)
-			// Prevent infinite loop at system root
-			if parent == root {
-				return "."
-			}
-			root = parent
-		}
-		if root == "/" && !strings.HasPrefix(p, "/") {
-			return "."
-		}
-	}
-	if root == "" {
-		return "."
-	}
-	return root
 }

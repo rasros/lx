@@ -26,7 +26,10 @@ var definitions = []CommandDef{
 
 	// Logging
 	{Name: "quiet", Short: "q", Type: CmdGlobal, ValueType: ValueNone, Usage: "silence all log output"},
-	{Name: "verbose", Short: "v", Type: CmdGlobal, ValueType: ValueAny, Usage: "log level (debug, info, warn, error)"},
+	// explicit --verbose level
+	{Name: "verbose", Type: CmdGlobal, ValueType: ValueAny, Usage: "log level (trace, debug, info, warn, error)"},
+	// short -v counter
+	{Name: "verbosity", Short: "v", Type: CmdGlobal, ValueType: ValueCounter, Usage: "increase verbosity (-v = info, -vv = debug, -vvv trace)"},
 
 	// Stats Control
 	{Name: "stats", Type: CmdGlobal, ValueType: ValueNone, Usage: "force show summary stats"},
@@ -37,6 +40,7 @@ var definitions = []CommandDef{
 	// Format flags
 	{Name: "md", Type: CmdGlobal, ValueType: ValueNone, Usage: "use markdown output format"},
 	{Name: "xml", Type: CmdGlobal, ValueType: ValueNone, Usage: "use xml output format"},
+	{Name: "html", Type: CmdGlobal, ValueType: ValueNone, Usage: "use html output format"},
 
 	// Profiling
 	{Name: "cpuprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "write cpu profile to file", Internal: true},

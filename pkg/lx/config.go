@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"text/template"
 
 	"gopkg.in/yaml.v3"
@@ -144,6 +145,12 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		defMain = DefaultXMLTemplate
 		defSection = DefaultXMLSectionTemplate
 		defPrompt = DefaultXMLPromptTemplate
+	case "html":
+		defMain = DefaultHTMLTemplate
+		defSection = DefaultHTMLSectionTemplate
+		defPrompt = DefaultHTMLPromptTemplate
+		defHeader = DefaultHTMLHeaderTemplate
+		defFooter = DefaultHTMLFooterTemplate
 	default:
 		defMain = DefaultTemplate
 		defSection = DefaultSectionTemplate
@@ -256,7 +263,19 @@ func (c *Config) ApplyGlobals(globals map[string]string) {
 	if _, ok := globals["quiet"]; ok {
 		c.LogLevel = LevelSilent
 	} else if v, ok := globals["verbose"]; ok {
-		c.LogLevel = ParseLevel(v)
+		count, err := strconv.Atoi(v)
+		if err == nil {
+			if count >= 3 {
+				c.LogLevel = LevelTrace
+			} else if count == 2 {
+				c.LogLevel = LevelDebug
+			} else if count == 1 {
+				c.LogLevel = LevelInfo
+			}
+		} else {
+			// Fallback if somehow a string got in (e.g. from future config logic merging)
+			c.LogLevel = ParseLevel(v)
+		}
 	}
 
 	if _, ok := globals["stats"]; ok {
