@@ -26,6 +26,13 @@ prompt_template: |
   {{ .Body | endNewline }}
 
 
+# Template rendered once at the very beginning of the output.
+header_template: ""
+
+# Template rendered once at the very end of the output.
+footer_template: ""
+
+
 # Template used for the summary stats (printed to stderr, or stdout if redirected).
 stats_template: |
   Files: {{ .Global.TotalFiles }}

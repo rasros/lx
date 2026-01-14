@@ -15,6 +15,8 @@ type Config struct {
 	SectionTemplate string `yaml:"section_template"`
 	PromptTemplate  string `yaml:"prompt_template"`
 	StatsTemplate   string `yaml:"stats_template"`
+	HeaderTemplate  string `yaml:"header_template"`
+	FooterTemplate  string `yaml:"footer_template"`
 
 	OutputMode   string `yaml:"output_mode"`
 	OutputFormat string `yaml:"output_format"`
@@ -44,6 +46,8 @@ type TemplateEngine struct {
 	Section *template.Template
 	Prompt  *template.Template
 	Stats   *template.Template
+	Header  *template.Template
+	Footer  *template.Template
 }
 
 // Options represents CLI flags that override Config.
@@ -132,6 +136,9 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 	cfg.OutputFormat = format
 
 	var defMain, defSection, defPrompt string
+	defHeader := DefaultHeaderTemplate
+	defFooter := DefaultFooterTemplate
+
 	switch format {
 	case "xml":
 		defMain = DefaultXMLTemplate
@@ -175,11 +182,23 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		return nil, nil, fmt.Errorf("parse stats template: %w", err)
 	}
 
+	tHeader, err := parse("header", pick(cfg.HeaderTemplate, defHeader))
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse header template: %w", err)
+	}
+
+	tFooter, err := parse("footer", pick(cfg.FooterTemplate, defFooter))
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse footer template: %w", err)
+	}
+
 	return &TemplateEngine{
 		Main:    tMain,
 		Section: tSection,
 		Prompt:  tPrompt,
 		Stats:   tStats,
+		Header:  tHeader,
+		Footer:  tFooter,
 	}, cfg, nil
 }
 

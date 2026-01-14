@@ -22,6 +22,8 @@ const DefaultTemplate = `{{ if eq .Size 0 }}` +
 
 const DefaultSectionTemplate = `## {{ .Body | endNewline }}` + "---\n\n"
 const DefaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
+const DefaultHeaderTemplate = ""
+const DefaultFooterTemplate = ""
 
 const DefaultXMLTemplate = `<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
 	`  <source>{{ .Path }}</source>` + "\n" +
@@ -88,6 +90,14 @@ type PromptContext struct {
 }
 
 type StatsContext struct {
+	Global GlobalContext
+}
+
+type HeaderContext struct {
+	Global GlobalContext
+}
+
+type FooterContext struct {
 	Global GlobalContext
 }
 

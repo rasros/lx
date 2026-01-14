@@ -318,6 +318,10 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		}
 	}
 
+	if err := tmplEngine.Header.Execute(out, lx.HeaderContext{Global: globalCtx}); err != nil {
+		return fmt.Errorf("header template error: %w", err)
+	}
+
 	fileIndex := 1
 	prevCompact := false
 	section := 1
@@ -403,6 +407,10 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 
 	if prevCompact {
 		fmt.Fprintln(out)
+	}
+
+	if err := tmplEngine.Footer.Execute(out, lx.FooterContext{Global: globalCtx}); err != nil {
+		return fmt.Errorf("footer template error: %w", err)
 	}
 
 	return nil
