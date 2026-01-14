@@ -63,9 +63,14 @@ func gatherInputs(parsed *ParsedArgs) error {
 		}
 	}
 
+	isPipe := false
+
 	if !hasFilesOrGenerators {
 		_, useNull := parsed.Globals["null"]
-		stdinFiles, err := readFilenamesFromStdin(useNull)
+
+		var stdinFiles []string
+		var err error
+		stdinFiles, isPipe, err = readFilenamesFromStdin(useNull)
 		if err != nil {
 			return fmt.Errorf("read stdin: %w", err)
 		}
@@ -75,8 +80,8 @@ func gatherInputs(parsed *ParsedArgs) error {
 		}
 	}
 
-	// If no inputs provided via args or stdin, default to current directory "."
-	if !hasFilesOrGenerators {
+	// If no inputs provided via args, AND no pipe was detected, default to "."
+	if !hasFilesOrGenerators && !isPipe {
 		parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: ".", Type: CmdAction})
 	}
 	return nil
@@ -128,13 +133,22 @@ func processStream(parsed *ParsedArgs) error {
 		showStats = false
 	case "auto", "":
 		// Default Auto behavior:
-		// Show stats if output is redirected (to clipboard or file)
+		// Show stats if:
+		// 1. Output is explicitly redirected via flags (-o, -c)
+		// 2. Standard Output is redirected via shell (> file or | pipe)
 		_, hasCopy := parsed.Globals["copy"]
 		_, hasOutput := parsed.Globals["output"]
 		isClipboardMode := cfg.OutputMode == "copy"
 		_, hasStdout := parsed.Globals["stdout"]
 
-		if hasCopy || hasOutput || (isClipboardMode && !hasStdout) {
+		// Check if stdout is a terminal
+		stdoutIsTerm := false
+		if stat, err := os.Stdout.Stat(); err == nil {
+			stdoutIsTerm = (stat.Mode() & os.ModeCharDevice) != 0
+		}
+
+		// If flags are used OR stdout is not a terminal (redirection), show stats.
+		if hasCopy || hasOutput || (isClipboardMode && !hasStdout) || !stdoutIsTerm {
 			showStats = true
 		}
 	}

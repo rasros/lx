@@ -8,14 +8,16 @@ import (
 	"strings"
 )
 
-func readFilenamesFromStdin(useNull bool) ([]string, error) {
+func readFilenamesFromStdin(useNull bool) ([]string, bool, error) {
 	info, err := os.Stdin.Stat()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
+	// If CharDevice is set, it's a terminal (interactive).
+	// If it is NOT set, it's a pipe or file redirection.
 	if info.Mode()&os.ModeCharDevice != 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	sc := bufio.NewScanner(os.Stdin)
@@ -26,8 +28,6 @@ func readFilenamesFromStdin(useNull bool) ([]string, error) {
 	var paths []string
 	for sc.Scan() {
 		text := sc.Text()
-		// Only trim space for standard newline-separated input.
-		// For -0, filenames preserve whitespace (though we still skip empty).
 		if !useNull {
 			text = strings.TrimSpace(text)
 		}
@@ -38,9 +38,10 @@ func readFilenamesFromStdin(useNull bool) ([]string, error) {
 		paths = append(paths, text)
 	}
 	if err := sc.Err(); err != nil {
-		return nil, fmt.Errorf("read stdin: %w", err)
+		return nil, true, fmt.Errorf("read stdin: %w", err)
 	}
-	return paths, nil
+
+	return paths, true, nil
 }
 
 func scanNullTerminated(data []byte, atEOF bool) (advance int, token []byte, err error) {
