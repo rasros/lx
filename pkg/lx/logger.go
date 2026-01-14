@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 )
 
 type LogLevel int
@@ -52,30 +53,37 @@ func ParseLevel(s string) LogLevel {
 
 func (l *Logger) Errorf(format string, a ...interface{}) {
 	if l.level >= LevelError {
-		fmt.Fprintf(l.out, "ERROR: "+format+"\n", a...)
+		l.print("ERROR", format, a...)
 	}
 }
 
 func (l *Logger) Warnf(format string, a ...interface{}) {
 	if l.level >= LevelWarn {
-		fmt.Fprintf(l.out, "WARN:  "+format+"\n", a...)
+		l.print("WARN", format, a...)
 	}
 }
 
 func (l *Logger) Infof(format string, a ...interface{}) {
 	if l.level >= LevelInfo {
-		fmt.Fprintf(l.out, "INFO:  "+format+"\n", a...)
+		l.print("INFO", format, a...)
 	}
 }
 
 func (l *Logger) Debugf(format string, a ...interface{}) {
 	if l.level >= LevelDebug {
-		fmt.Fprintf(l.out, "DEBUG: "+format+"\n", a...)
+		l.print("DEBUG", format, a...)
 	}
 }
 
 func (l *Logger) Tracef(format string, a ...interface{}) {
 	if l.level >= LevelTrace {
-		fmt.Fprintf(l.out, "TRACE: "+format+"\n", a...)
+		l.print("TRACE", format, a...)
 	}
+}
+
+func (l *Logger) print(level string, format string, a ...interface{}) {
+	// Format: 15:04:05.000 LEVEL : Message
+	ts := time.Now().Format("15:04:05.000000")
+	msg := fmt.Sprintf(format, a...)
+	fmt.Fprintf(l.out, "%s %-5s : %s\n", ts, level, msg)
 }
