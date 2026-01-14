@@ -26,6 +26,9 @@ fmt:
 test:
 	$(GO) test ./...
 
+test-update:
+	$(GO) test ./cmd/lx -update
+
 run: build
 	$(BIN_DIR)/$(BINARY_NAME)
 

@@ -1,0 +1,10 @@
+large.txt (~798 rows)
+---
+```text
+This is a line used to build a large file for testing token and line estimation logic.
+This is a line used to build a large file for testing token and line estimation logic.
+This is a line used to build a large file for testing token and line estimation logic.
+This is a line used to build a large file for testing token and line estimation logic.
+This is a line used to build a large file for testing token and line estimation logic.
+```
+

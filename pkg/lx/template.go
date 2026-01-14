@@ -106,34 +106,34 @@ const defaultHTMLFooterTemplate = `  </main>
 </body>
 </html>
 `
-const defaultHTMLTemplate = `<article id="file-{{ .FileIndex }}">
-  <header>
-    <a href="#file-{{ .FileIndex }}" aria-label="Link to this file">
-      <strong>{{ .Path }}</strong>
-    </a>
-    {{ if and (gt .Size 0) (not .IsImage) }}
-      <small>
-      {{ if .IsCompactView }}
-        ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows - compact)
-      {{ else }}
-        ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
-      {{ end }}
-      </small>
-    {{ end }}
-  </header>
-
-  {{ if eq .Size 0 }}
-    <em>Empty file</em>
-  {{ else if .IsImage }}
-    <img src="{{ .AbsPath | dataURI }}" alt="{{ .Path }}" />
-  {{ else if .IsBinary }}
-    <em>Binary file ({{ .Size | humanize }})</em>
-  {{ else if .IsCompactView }}
-    <em>Compact view detected</em>
-  {{ else }}
-    <pre><code{{ if .Language }} class="language-{{ .Language }}"{{ end }}>{{ .Content | escape }}</code></pre>
-  {{ end }}
-</article>
+const defaultHTMLTemplate = `    <article id="file-{{ .FileIndex }}">
+      <header>
+        <a href="#file-{{ .FileIndex }}" aria-label="Link to this file">
+          <strong>{{ .Path }}</strong>
+        </a>
+      {{- if and (gt .Size 0) (not .IsImage) }}
+        <small>
+        {{- if .IsCompactView }}
+          ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows - compact)
+        {{- else }}
+          ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
+        {{- end }}
+        </small>
+      {{- end }}
+      </header>
+    {{- if eq .Size 0 }}
+      <em>Empty file</em>
+    {{- else if .IsImage }}
+      <img src="{{ .AbsPath | dataURI }}" alt="{{ .Path }}" />
+    {{- else if .IsBinary }}
+      <em>Binary file ({{ .Size | humanize }})</em>
+    {{- else if .IsCompactView }}
+      <em>Compact view detected</em>
+    {{- else }}
+      <pre><code{{ if .Language }} class="language-{{ .Language }}"{{ end }}>
+{{- .Content | escape | endNewline }}      </code></pre>
+    {{- end }}
+    </article>
 `
 
 const defaultHTMLSectionTemplate = `<section id="section-{{ .Section }}">` +

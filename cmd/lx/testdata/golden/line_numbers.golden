@@ -1,0 +1,7 @@
+main.go (2 rows)
+---
+```go
+1: package main
+2: func main() {}
+```
+
