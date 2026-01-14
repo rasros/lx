@@ -88,6 +88,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		return err
 	}
 
+	// Apply CLI-specific overrides to the core library config
 	applyGlobalsToConfig(cfg, parsed.Globals)
 	if _, ok := parsed.Globals["xml"]; ok {
 		cfg.OutputFormat = "xml"
@@ -95,7 +96,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		cfg.OutputFormat = "html"
 	}
 
-	level := determineLogLevel(parsed.Globals, cfg.Verbosity)
+	// CLI handles logging/verbosity independently of the library
+	level := determineLogLevel(parsed.Globals, "warn") // default to warn
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
@@ -106,7 +108,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		},
 	}))
 
-	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, cfg)
+	// CLI handles output destinations (stdout vs file vs clipboard)
+	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, parsed.Globals["output_mode"])
 	if err != nil {
 		return err
 	}
@@ -118,6 +121,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		}
 	}
 
+	// Initial runner state
 	runCfg := lx.RunnerConfig{
 		Head:        -1,
 		Tail:        0,
@@ -140,31 +144,31 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		return err
 	}
 
+	// State-machine pattern: flags apply to subsequent files
 	ops := reorderTrailingOps(parsed.Ops)
-
 	for _, op := range ops {
 		switch op.Action {
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
 			runCfg.Head, runCfg.Tail = val, 0
-			stream = stream.WithRunnerConfig(runCfg)
+			stream.WithRunnerConfig(runCfg)
 		case "tail":
 			val, _ := strconv.Atoi(op.Value)
 			runCfg.Tail, runCfg.Head = val, 0
-			stream = stream.WithRunnerConfig(runCfg)
+			stream.WithRunnerConfig(runCfg)
 		case "lines":
 			val, _ := strconv.Atoi(op.Value)
 			runCfg.Head, runCfg.Tail = (val+1)/2, val/2
-			stream = stream.WithRunnerConfig(runCfg)
+			stream.WithRunnerConfig(runCfg)
 		case "reset-lines":
 			runCfg.Head, runCfg.Tail = -1, 0
-			stream = stream.WithRunnerConfig(runCfg)
+			stream.WithRunnerConfig(runCfg)
 		case "line-numbers":
 			runCfg.LineNumbers = true
-			stream = stream.WithRunnerConfig(runCfg)
+			stream.WithRunnerConfig(runCfg)
 		case "no-line-numbers":
 			runCfg.LineNumbers = false
-			stream = stream.WithRunnerConfig(runCfg)
+			stream.WithRunnerConfig(runCfg)
 		case "FILE", "file":
 			if op.Value == "-" {
 				data, _ := io.ReadAll(os.Stdin)
@@ -192,7 +196,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		defer f.Close()
 	}
 
-	// EXECUTE THE STREAM
+	// EXECUTION PHASE
+	// 1. Prepare (Calculate totals/tokens)
+	stream.Prepare()
+
+	// 2. Execute (Write to output)
 	err = stream.Execute(ctx, out)
 	if err != nil {
 		return err
@@ -204,29 +212,42 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		}
 	}
 
-	// EXECUTE STATS TEMPLATE AFTERWARDS
-	if cfg.ShowStats != "never" {
-		show := cfg.ShowStats == "always"
-		if !show {
-			_, hasCopy := parsed.Globals["copy"]
-			_, hasOutput := parsed.Globals["output"]
-			// Also show if stdout is not a terminal (piped)
-			stdoutIsTerm := true
-			if stat, err := os.Stdout.Stat(); err == nil {
-				stdoutIsTerm = (stat.Mode() & os.ModeCharDevice) != 0
-			}
-			if hasCopy || hasOutput || !stdoutIsTerm {
-				show = true
-			}
+	// CLI handles displaying stats to stderr
+	handleStatsDisplay(parsed, stream, debugOut)
+
+	return nil
+}
+
+func handleStatsDisplay(parsed *ParsedArgs, stream *lx.Stream, debugOut io.Writer) {
+	showStatsFlag := "auto"
+	if _, ok := parsed.Globals["stats"]; ok {
+		showStatsFlag = "always"
+	} else if _, ok := parsed.Globals["no-stats"]; ok {
+		showStatsFlag = "never"
+	}
+
+	if showStatsFlag == "never" {
+		return
+	}
+
+	show := (showStatsFlag == "always")
+	if !show {
+		_, hasCopy := parsed.Globals["copy"]
+		_, hasOutput := parsed.Globals["output"]
+		stdoutIsTerm := true
+		if stat, err := os.Stdout.Stat(); err == nil {
+			stdoutIsTerm = (stat.Mode() & os.ModeCharDevice) != 0
 		}
-		if show {
-			_ = stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
-				Global: stream.GetGlobalContext(),
-			})
+		if hasCopy || hasOutput || !stdoutIsTerm {
+			show = true
 		}
 	}
 
-	return nil
+	if show {
+		_ = stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
+			Global: stream.GetGlobalContext(),
+		})
+	}
 }
 
 func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
@@ -239,11 +260,6 @@ func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
 	if _, ok := globals["no-ignore"]; ok {
 		f := false
 		c.Ignore = &f
-	}
-	if _, ok := globals["stats"]; ok {
-		c.ShowStats = "always"
-	} else if _, ok := globals["no-stats"]; ok {
-		c.ShowStats = "never"
 	}
 }
 
@@ -263,7 +279,7 @@ func determineLogLevel(globals map[string]string, configVerbosity string) slog.L
 	return slog.LevelWarn
 }
 
-func determineOutput(globals map[string]string, cfg *lx.Config) (io.Writer, *bytes.Buffer, io.Writer, error) {
+func determineOutput(globals map[string]string, defaultMode string) (io.Writer, *bytes.Buffer, io.Writer, error) {
 	outputPath, hasOutput := globals["output"]
 	_, hasCopy := globals["copy"]
 
@@ -278,7 +294,7 @@ func determineOutput(globals map[string]string, cfg *lx.Config) (io.Writer, *byt
 		}
 		out = f
 		debugOut = os.Stdout
-	} else if hasCopy || cfg.OutputMode == "copy" {
+	} else if hasCopy || defaultMode == "copy" {
 		clipBuf = new(bytes.Buffer)
 		out = clipBuf
 		debugOut = os.Stdout

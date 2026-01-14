@@ -16,13 +16,19 @@ type RenderedItem struct {
 }
 
 type Processor struct {
-	engine *TemplateEngine
-	cfg    RunnerConfig
-	global GlobalContext
+	engine       *TemplateEngine
+	cfg          RunnerConfig
+	global       GlobalContext
+	tokenCounter TokenCounter
 }
 
 func NewProcessor(engine *TemplateEngine, cfg RunnerConfig, global GlobalContext) *Processor {
-	return &Processor{engine: engine, cfg: cfg, global: global}
+	return &Processor{
+		engine:       engine,
+		cfg:          cfg,
+		global:       global,
+		tokenCounter: DefaultTokenCounter,
+	}
 }
 
 func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
@@ -35,8 +41,10 @@ func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
 		_, err = fmt.Fprint(w, rendered.Body)
 		return err
 	case SectionContext:
+		v.Global = p.global // Sync global state
 		return p.engine.Section.Execute(w, v)
 	case PromptContext:
+		v.Global = p.global // Sync global state
 		return p.engine.Prompt.Execute(w, v)
 	default:
 		return nil
@@ -83,6 +91,7 @@ func (p *Processor) renderFile(file InputFile, index int) (RenderedItem, error) 
 		IsEstimate:    !exact,
 		Language:      lang,
 		Content:       contentData,
+		TokenEstimate: p.tokenCounter(size, contentData),
 		IsBinary:      isBinary,
 		IsCompactView: isCompact,
 		FileIndex:     index,

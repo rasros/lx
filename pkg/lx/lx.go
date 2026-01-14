@@ -14,8 +14,9 @@ func (SectionContext) isStreamItem() {}
 func (PromptContext) isStreamItem()  {}
 
 type Stream struct {
-	processor *Processor
-	items     []StreamItem
+	processor    *Processor
+	items        []StreamItem
+	tokenCounter TokenCounter
 }
 
 func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
@@ -23,8 +24,20 @@ func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
 	if err != nil {
 		return nil, err
 	}
-	global := GlobalContext{WorkDir: ".", Metadata: make(map[string]string), Config: *cfg}
-	return &Stream{processor: NewProcessor(engine, runnerCfg, global)}, nil
+	global := GlobalContext{
+		WorkDir:  ".",
+		Metadata: make(map[string]string),
+	}
+	return &Stream{
+		processor:    NewProcessor(engine, runnerCfg, global),
+		tokenCounter: DefaultTokenCounter,
+	}, nil
+}
+
+// WithTokenCounter allows overriding the default token estimation logic.
+func (s *Stream) WithTokenCounter(tc TokenCounter) *Stream {
+	s.tokenCounter = tc
+	return s
 }
 
 func (s *Stream) WithRunnerConfig(cfg RunnerConfig) *Stream {
@@ -33,18 +46,20 @@ func (s *Stream) WithRunnerConfig(cfg RunnerConfig) *Stream {
 }
 
 func (s *Stream) AddFile(f InputFile) *Stream { s.items = append(s.items, f); return s }
+
 func (s *Stream) AddSection(title string) *Stream {
-	s.items = append(s.items, SectionContext{Body: title, Global: s.processor.global})
+	s.items = append(s.items, SectionContext{Body: title})
 	return s
 }
+
 func (s *Stream) AddPrompt(text string) *Stream {
-	s.items = append(s.items, PromptContext{Body: text, Global: s.processor.global})
+	s.items = append(s.items, PromptContext{Body: text})
 	return s
 }
 
 func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
-	// Re-calculate all totals right before starting the stream
-	_ = s.GetGlobalContext()
+	// Preparation: Sync totals and global context into items
+	s.Prepare()
 
 	if err := s.processor.engine.Header.Execute(w, HeaderContext{Global: s.processor.global}); err != nil {
 		return err
@@ -52,6 +67,7 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 
 	fileIdx := 1
 	for _, item := range s.items {
+		// Ensure current global state is passed to the renderer
 		if err := s.processor.Render(w, item, fileIdx); err != nil {
 			return err
 		}
@@ -63,22 +79,18 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	return s.processor.engine.Footer.Execute(w, FooterContext{Global: s.processor.global})
 }
 
-func (s *Stream) GetItems() []StreamItem {
-	return s.items
-}
-
-func (s *Stream) GetEngine() *TemplateEngine {
-	return s.processor.engine
-}
-
-func (s *Stream) GetGlobalContext() GlobalContext {
+// Prepare calculates totals and updates the internal global context.
+func (s *Stream) Prepare() GlobalContext {
 	var totalSize int64
+	var totalTokens int64
 	fileCount := 0
 	sectionCount := 0
+
 	for _, item := range s.items {
 		switch v := item.(type) {
 		case InputFile:
 			totalSize += v.Size
+			totalTokens += s.tokenCounter(v.Size, nil)
 			fileCount++
 		case SectionContext:
 			sectionCount++
@@ -88,14 +100,29 @@ func (s *Stream) GetGlobalContext() GlobalContext {
 	s.processor.global.TotalFiles = fileCount
 	s.processor.global.TotalSize = totalSize
 	s.processor.global.TotalSections = sectionCount
-	// Ensure TokenEstimate is actually set here
-	s.processor.global.TokenEstimate = totalSize / 4
+	s.processor.global.TokenEstimate = totalTokens
+
+	// Update items with the calculated global context
+	for i, item := range s.items {
+		switch v := item.(type) {
+		case SectionContext:
+			v.Global = s.processor.global
+			v.Section = i + 1
+			s.items[i] = v
+		case PromptContext:
+			v.Global = s.processor.global
+			v.Section = i + 1
+			s.items[i] = v
+		}
+	}
 
 	return s.processor.global
 }
 
-func (s *Stream) UpdateStats(count int, size int64) {
-	s.processor.global.TotalFiles = count
-	s.processor.global.TotalSize = size
-	s.processor.global.TokenEstimate = size / 4
+func (s *Stream) GetEngine() *TemplateEngine {
+	return s.processor.engine
+}
+
+func (s *Stream) GetGlobalContext() GlobalContext {
+	return s.processor.global
 }
