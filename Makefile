@@ -1,4 +1,5 @@
-BINARY_NAME  := lx
+GO           ?= go
+BINARY_NAME  ?= lx
 CMD_DIR      := ./cmd/lx
 BIN_DIR      := ./bin
 
@@ -11,6 +12,22 @@ all: build
 
 build:
 	@mkdir -p $(BIN_DIR)
-	go build -ldflags="$(LDFLAGS)" -o $(OR_OUT) $(CMD_DIR)
+	$(GO) build -ldflags="$(LDFLAGS)" -o $(OR_OUT) $(CMD_DIR)
 
 OR_OUT ?= $(BIN_DIR)/$(BINARY_NAME)
+
+install:
+	$(GO) install $(CMD_DIR)
+
+fmt:
+	$(GO) fmt ./...
+
+test:
+	$(GO) test ./...
+
+run: build
+	$(BIN_DIR)/$(BINARY_NAME)
+
+clean:
+	rm -rf $(BIN_DIR)
+

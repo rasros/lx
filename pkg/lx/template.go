@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const DefaultTemplate = `{{ if eq .Size 0 }}` +
+const defaultTemplate = `{{ if eq .Size 0 }}` +
 	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - empty file` + "\n" +
 	`{{ else if .IsBinary }}` +
 	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` + "\n" +
@@ -25,12 +25,12 @@ const DefaultTemplate = `{{ if eq .Size 0 }}` +
 ` + "```{{ .Language }}" + `
 {{ .Content | endNewline -}}` + "```\n\n" + `{{ end }}`
 
-const DefaultSectionTemplate = `## {{ .Body | endNewline }}` + "---\n\n"
-const DefaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
-const DefaultHeaderTemplate = ""
-const DefaultFooterTemplate = ""
+const defaultSectionTemplate = `## {{ .Body | endNewline }}` + "---\n\n"
+const defaultPromptTemplate = `{{ .Body | endNewline }}` + "\n"
+const defaultHeaderTemplate = ""
+const defaultFooterTemplate = ""
 
-const DefaultXMLTemplate = `<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
+const defaultXMLTemplate = `<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
 	`  <source>{{ .Path }}</source>` + "\n" +
 	`  {{- if .IsBinary }}` + "\n" +
 	`  <error>Binary file ({{ .Size | humanize }})</error>` + "\n" +
@@ -42,15 +42,15 @@ const DefaultXMLTemplate = `<document index="{{ .FileIndex }}"{{ if .Language }}
 	`  {{- end }}` + "\n" +
 	`</document>` + "\n\n"
 
-const DefaultXMLSectionTemplate = `<section_header>` + "\n" +
+const defaultXMLSectionTemplate = `<section_header>` + "\n" +
 	`{{ .Body | endNewline -}}` +
 	`</section_header>` + "\n\n"
 
-const DefaultXMLPromptTemplate = `<instruction>` + "\n" +
+const defaultXMLPromptTemplate = `<instruction>` + "\n" +
 	`{{ .Body | endNewline -}}` +
 	`</instruction>` + "\n\n"
 
-const DefaultHTMLHeaderTemplate = `<!DOCTYPE html>
+const defaultHTMLHeaderTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -100,13 +100,13 @@ const DefaultHTMLHeaderTemplate = `<!DOCTYPE html>
   </header>
   <main>
 `
-const DefaultHTMLFooterTemplate = `  </main>
+const defaultHTMLFooterTemplate = `  </main>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script>hljs.highlightAll();</script>
 </body>
 </html>
 `
-const DefaultHTMLTemplate = `<article id="file-{{ .FileIndex }}">
+const defaultHTMLTemplate = `<article id="file-{{ .FileIndex }}">
   <header>
     <a href="#file-{{ .FileIndex }}" aria-label="Link to this file">
       <strong>{{ .Path }}</strong>
@@ -136,12 +136,12 @@ const DefaultHTMLTemplate = `<article id="file-{{ .FileIndex }}">
 </article>
 `
 
-const DefaultHTMLSectionTemplate = `<section id="section-{{ .Section }}">` +
+const defaultHTMLSectionTemplate = `<section id="section-{{ .Section }}">` +
 	`<h2><a href="#section-{{ .Section }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>` +
 	`</section>` + "\n"
-const DefaultHTMLPromptTemplate = `<blockquote>{{ .Body | endNewline }}</blockquote>` + "\n"
+const defaultHTMLPromptTemplate = `<blockquote>{{ .Body | endNewline }}</blockquote>` + "\n"
 
-const DefaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
+const defaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
 	`Size: {{ .Global.TotalSize | humanize }}` + "\n" +
 	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"
 
@@ -197,7 +197,7 @@ type FooterContext struct {
 	Global GlobalContext
 }
 
-func TemplateFuncs() template.FuncMap {
+func templateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"date": func(layout string, t time.Time) string {
 			return t.Format(layout)

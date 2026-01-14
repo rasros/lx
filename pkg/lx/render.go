@@ -2,13 +2,18 @@ package lx
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
+
+	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal/detect"
 )
 
 func Humanize(s int64) string {
-	return TemplateFuncs()["humanize"].(func(int64) string)(s)
+	return templateFuncs()["humanize"].(func(int64) string)(s)
 }
 
 // EstimateTokens returns a rough estimate of the number of tokens (approx 4 chars/token).
@@ -26,6 +31,7 @@ type Runner struct {
 }
 
 func NewRunner(cfg RunnerConfig, engine *TemplateEngine, global GlobalContext) *Runner {
+	global.Config.EnsureLogger()
 	return &Runner{
 		Config: cfg,
 		Engine: engine,
@@ -53,9 +59,7 @@ func (r *Runner) RunPrompt(body string, section int, out io.Writer) error {
 
 func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSection int, out io.Writer) (bool, error) {
 	log := r.Global.Config.Logger
-	if log != nil {
-		log.Debugf("[%d] processing file: %s", index, file.Path)
-	}
+	log.Debug("processing file", "index", index, "path", file.Path)
 
 	reader, fileSize, displayPath, closeFunc, err := r.openInput(file)
 	if err != nil {
@@ -72,20 +76,20 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 		headBytes, tailBytes, gapBytes []byte
 		totalRows                      int
 		isEstimate                     bool
-		content                        interface{}
+		contentData                    interface{}
 	)
 
 	// Process text content if not binary/image
 	if !isBinary && fileSize > 0 {
 		var exact bool
-		totalRows, exact, err = EstimateLineCount(reader, fileSize)
-		if err != nil && log != nil {
-			log.Warnf("failed to count lines for %s: %v", displayPath, err)
+		totalRows, exact, err = content.EstimateLineCount(reader, fileSize)
+		if err != nil {
+			log.Warn("failed to count lines", "path", displayPath, "error", err)
 		}
 		isEstimate = !exact
-		if log != nil {
-			log.Tracef("line count: %d (exact=%v)", totalRows, exact)
-		}
+
+		// Trace
+		log.Log(context.Background(), slog.LevelDebug-1, "line count", "rows", totalRows, "exact", exact)
 
 		if !isExplicitCompact {
 			headBytes, tailBytes, gapBytes, err = r.readContentSlice(reader, fileSize, totalRows, isEstimate)
@@ -94,16 +98,15 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 			}
 
 			if len(headBytes) > 0 {
-				language = DetectLanguage(displayPath, headBytes)
-				if log != nil {
-					log.Tracef("language refined via content: %s", language)
-				}
+				language = detect.DetectLanguage(displayPath, headBytes)
+				// Trace
+				log.Log(context.Background(), slog.LevelDebug-1, "language refined via content", "lang", language)
 			}
 		}
 	}
 
 	if !isBinary && !isExplicitCompact && fileSize > 0 {
-		content = r.formatContent(headBytes, tailBytes, gapBytes, totalRows)
+		contentData = r.formatContent(headBytes, tailBytes, gapBytes, totalRows)
 	}
 
 	if prevCompact && !isCompactView {
@@ -119,7 +122,7 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 		TokenEstimate:  EstimateTokens(fileSize),
 		IsEstimate:     isEstimate,
 		Language:       language,
-		Content:        content,
+		Content:        contentData,
 		IsBinary:       isBinary,
 		IsImage:        isImage,
 		IsCompactView:  isCompactView,
@@ -128,9 +131,9 @@ func (r *Runner) RunFile(file InputFile, index int, prevCompact bool, currentSec
 		Global:         r.Global,
 	}
 
-	if log != nil {
-		log.Tracef("rendering template for %s", displayPath)
-	}
+	// Trace
+	log.Log(context.Background(), slog.LevelDebug-1, "rendering template", "path", displayPath)
+
 	if err := r.Engine.Main.Execute(out, ctx); err != nil {
 		return false, fmt.Errorf("template exec: %w", err)
 	}
@@ -163,9 +166,8 @@ func (r *Runner) openInput(file InputFile) (reader io.ReaderAt, size int64, path
 		reader = f
 	} else {
 		// Buffer non-seekable streams to allow random access
-		if r.Global.Config.Logger != nil {
-			r.Global.Config.Logger.Debugf("buffering stream for random access: %s", path)
-		}
+		r.Global.Config.Logger.Debug("buffering stream for random access", "path", path)
+
 		data, err := io.ReadAll(rc)
 		if err != nil {
 			cleanup()
@@ -180,7 +182,7 @@ func (r *Runner) openInput(file InputFile) (reader io.ReaderAt, size int64, path
 }
 
 func (r *Runner) detectAttributes(path string, reader io.ReaderAt, size int64) (isBinary, isImage bool, language string) {
-	isImage = IsImage(path)
+	isImage = detect.IsImage(path)
 
 	if size == 0 {
 		return false, isImage, ""
@@ -190,21 +192,19 @@ func (r *Runner) detectAttributes(path string, reader io.ReaderAt, size int64) (
 	n, _ := reader.ReadAt(header, 0)
 	header = header[:n]
 
-	isBinary = IsBinary(header)
+	isBinary = detect.IsBinary(header)
 
 	if !isBinary {
-		language = DetectLanguage(path, header)
+		language = detect.DetectLanguage(path, header)
 	}
 
 	log := r.Global.Config.Logger
-	if log != nil {
-		if isBinary {
-			log.Debugf("binary file detected: %s", path)
-		} else if isImage {
-			log.Debugf("image file detected: %s", path)
-		} else if language != "" {
-			log.Debugf("language detected: %s (%s)", language, path)
-		}
+	if isBinary {
+		log.Debug("binary file detected", "path", path)
+	} else if isImage {
+		log.Debug("image file detected", "path", path)
+	} else if language != "" {
+		log.Debug("language detected", "lang", language, "path", path)
 	}
 
 	return isBinary, isImage, language
@@ -212,20 +212,19 @@ func (r *Runner) detectAttributes(path string, reader io.ReaderAt, size int64) (
 
 func (r *Runner) readContentSlice(reader io.ReaderAt, size int64, totalRows int, isEstimate bool) (head, tail, gap []byte, err error) {
 	log := r.Global.Config.Logger
-	if log != nil {
-		log.Tracef("reading slice: head=%d, tail=%d", r.Config.Head, r.Config.Tail)
-	}
+	// Trace
+	log.Log(context.Background(), slog.LevelDebug-1, "reading slice", "head", r.Config.Head, "tail", r.Config.Tail)
 
 	// Read everything
 	if r.Config.Head < 0 && r.Config.Tail < 0 {
 		sr := io.NewSectionReader(reader, 0, size)
-		head, _, err = ReadHead(sr, -1)
+		head, _, err = content.ReadHead(sr, -1)
 		return head, nil, nil, err
 	}
 
 	if r.Config.Head > 0 {
 		sr := io.NewSectionReader(reader, 0, size)
-		head, _, err = ReadHead(sr, r.Config.Head)
+		head, _, err = content.ReadHead(sr, r.Config.Head)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -242,7 +241,7 @@ func (r *Runner) readContentSlice(reader io.ReaderAt, size int64, totalRows int,
 		}
 
 		if f, ok := reader.(*os.File); ok {
-			tail, err = ReadTailSeek(f, r.Config.Tail)
+			tail, err = content.ReadTailSeek(f, r.Config.Tail)
 		} else if br, ok := reader.(*bytes.Reader); ok {
 			allData := make([]byte, size)
 			br.ReadAt(allData, 0)
@@ -259,7 +258,7 @@ func (r *Runner) readContentSlice(reader io.ReaderAt, size int64, totalRows int,
 
 func (r *Runner) formatContent(head, tail, gap []byte, totalRows int) interface{} {
 	if r.Config.LineNumbers {
-		return LineNumberFormatter{
+		return content.LineNumberFormatter{
 			Head:      head,
 			Gap:       gap,
 			Tail:      tail,

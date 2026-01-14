@@ -1,4 +1,4 @@
-package lx
+package detect
 
 import (
 	"path/filepath"

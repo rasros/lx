@@ -2,15 +2,16 @@ package lx
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
 	"text/template"
 
 	"gopkg.in/yaml.v3"
 )
 
-// Config represents the file-based configuration.
+// Config represents the configuration for the lx engine.
 type Config struct {
 	Template        string `yaml:"template"`
 	SectionTemplate string `yaml:"section_template"`
@@ -27,21 +28,38 @@ type Config struct {
 
 	FollowSymlinks bool  `yaml:"follow_symlinks"`
 	ShowHidden     bool  `yaml:"show_hidden"`
-	Ignore         *bool `yaml:"ignore"` // Pointer to distinguish between unset (nil) and false
+	Ignore         *bool `yaml:"ignore"`
 
-	// Runtime only
-	Logger        *Logger  `yaml:"-"`
-	LogLevel      LogLevel `yaml:"-"`
+	// Logger handles debug and info output. If nil, a no-op logger is used.
+	Logger *slog.Logger `yaml:"-"`
+
+	// LoadedConfigs tracks which config files were successfully loaded
 	LoadedConfigs []string `yaml:"-"`
 }
 
-// RunnerConfig is the runtime configuration for a specific file/operation.
+// EnsureLogger guarantees that c.Logger is non-nil.
+func (c *Config) EnsureLogger() {
+	if c.Logger == nil {
+		c.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+}
+
+// IgnoreEnabled returns the effective boolean value for Ignore.
+func (c *Config) IgnoreEnabled() bool {
+	if c.Ignore == nil {
+		return true
+	}
+	return *c.Ignore
+}
+
+// RunnerConfig is the runtime configuration for a specific file operation.
 type RunnerConfig struct {
 	Head        int
 	Tail        int
 	LineNumbers bool
 }
 
+// TemplateEngine holds the parsed text/template instances.
 type TemplateEngine struct {
 	Main    *template.Template
 	Section *template.Template
@@ -51,60 +69,51 @@ type TemplateEngine struct {
 	Footer  *template.Template
 }
 
-// Options represents CLI flags that override Config.
+// Options represents overrides usually provided by command-line flags.
 type Options struct {
-	Head  int
-	Tail  int
-	NBoth int
-
-	HeadSet bool
-	TailSet bool
-	NSet    bool
+	Head  *int
+	Tail  *int
+	NBoth *int
 
 	ConfigPath   string
 	LineNumbers  bool
 	OutputFormat string
 
-	// Filter state
 	Includes []string
 	Excludes []string
 }
 
-// ToRunnerConfig resolves the specific head/tail counts based on CLI flags.
+// ToRunnerConfig resolves the specific head/tail counts based on flags.
 func (o Options) ToRunnerConfig() RunnerConfig {
 	head, tail := -1, -1 // -1 indicates "read all"
 
-	// -n/--lines splits budget between head and tail.
-	if o.NSet {
-		total := o.NBoth
+	if o.NBoth != nil {
+		total := *o.NBoth
 		if total < 0 {
 			total = 0
 		}
 
 		switch {
-		case o.HeadSet:
-			head = clamp(o.Head, 0, total)
+		case o.Head != nil:
+			head = clamp(*o.Head, 0, total)
 			tail = total - head
-
-		case o.TailSet:
-			tail = clamp(o.Tail, 0, total)
+		case o.Tail != nil:
+			tail = clamp(*o.Tail, 0, total)
 			head = total - tail
-
-		// Split evenly, favoring Head.
 		default:
 			head = (total + 1) / 2
 			tail = total / 2
 		}
 	} else {
-		if o.HeadSet {
-			head = o.Head
-			if !o.TailSet {
+		if o.Head != nil {
+			head = *o.Head
+			if o.Tail == nil {
 				tail = 0
 			}
 		}
-		if o.TailSet {
-			tail = o.Tail
-			if !o.HeadSet {
+		if o.Tail != nil {
+			tail = *o.Tail
+			if o.Head == nil {
 				head = 0
 			}
 		}
@@ -117,6 +126,7 @@ func (o Options) ToRunnerConfig() RunnerConfig {
 	}
 }
 
+// CompileTemplates loads configuration and parses all required templates.
 func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 	cfg, err := loadConfigChain(o.ConfigPath)
 	if err != nil {
@@ -137,24 +147,24 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 	cfg.OutputFormat = format
 
 	var defMain, defSection, defPrompt string
-	defHeader := DefaultHeaderTemplate
-	defFooter := DefaultFooterTemplate
+	defHeader := defaultHeaderTemplate
+	defFooter := defaultFooterTemplate
 
 	switch format {
 	case "xml":
-		defMain = DefaultXMLTemplate
-		defSection = DefaultXMLSectionTemplate
-		defPrompt = DefaultXMLPromptTemplate
+		defMain = defaultXMLTemplate
+		defSection = defaultXMLSectionTemplate
+		defPrompt = defaultXMLPromptTemplate
 	case "html":
-		defMain = DefaultHTMLTemplate
-		defSection = DefaultHTMLSectionTemplate
-		defPrompt = DefaultHTMLPromptTemplate
-		defHeader = DefaultHTMLHeaderTemplate
-		defFooter = DefaultHTMLFooterTemplate
+		defMain = defaultHTMLTemplate
+		defSection = defaultHTMLSectionTemplate
+		defPrompt = defaultHTMLPromptTemplate
+		defHeader = defaultHTMLHeaderTemplate
+		defFooter = defaultHTMLFooterTemplate
 	default:
-		defMain = DefaultTemplate
-		defSection = DefaultSectionTemplate
-		defPrompt = DefaultPromptTemplate
+		defMain = defaultTemplate
+		defSection = defaultSectionTemplate
+		defPrompt = defaultPromptTemplate
 	}
 
 	pick := func(user, def string) string {
@@ -164,7 +174,7 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		return def
 	}
 
-	funcs := TemplateFuncs()
+	funcs := templateFuncs()
 	parse := func(name, tmpl string) (*template.Template, error) {
 		return template.New(name).Funcs(funcs).Parse(tmpl)
 	}
@@ -184,7 +194,7 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		return nil, nil, fmt.Errorf("parse prompt template: %w", err)
 	}
 
-	tStats, err := parse("stats", pick(cfg.StatsTemplate, DefaultStatsTemplate))
+	tStats, err := parse("stats", pick(cfg.StatsTemplate, defaultStatsTemplate))
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse stats template: %w", err)
 	}
@@ -212,94 +222,25 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 // loadConfigChain loads config from Default -> Env -> CLI.
 func loadConfigChain(cliPath string) (*Config, error) {
 	cfg := &Config{}
-	tmpLog := NewLogger(os.Stderr, ParseLevel(os.Getenv("LX_LOG")))
 
 	if configDir, err := os.UserConfigDir(); err == nil {
 		path := filepath.Join(configDir, "lx", "config.yaml")
-		tmpLog.Tracef("checking default config: %s", path)
 		_ = mergeConfig(cfg, path, false)
 	}
 
 	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
-		tmpLog.Tracef("checking env config: %s", envPath)
 		if err := mergeConfig(cfg, envPath, false); err != nil {
 			return nil, fmt.Errorf("load env config: %w", err)
 		}
 	}
 
 	if cliPath != "" {
-		tmpLog.Tracef("checking cli config: %s", cliPath)
 		if err := mergeConfig(cfg, cliPath, true); err != nil {
 			return nil, fmt.Errorf("load cli config: %w", err)
 		}
 	}
 
 	return cfg, nil
-}
-
-func (c *Config) ApplyGlobals(globals map[string]string) {
-	if _, ok := globals["follow"]; ok {
-		c.FollowSymlinks = true
-	} else if _, ok := globals["no-follow"]; ok {
-		c.FollowSymlinks = false
-	}
-
-	if _, ok := globals["hidden"]; ok {
-		c.ShowHidden = true
-	} else if _, ok := globals["no-hidden"]; ok {
-		c.ShowHidden = false
-	}
-
-	if _, ok := globals["ignore"]; ok {
-		t := true
-		c.Ignore = &t
-	} else if _, ok := globals["no-ignore"]; ok {
-		f := false
-		c.Ignore = &f
-	}
-
-	if c.Verbosity != "" {
-		c.LogLevel = ParseLevel(c.Verbosity)
-	} else {
-		c.LogLevel = LevelWarn
-	}
-
-	if _, ok := globals["quiet"]; ok {
-		c.LogLevel = LevelSilent
-	} else if v, ok := globals["verbose"]; ok {
-		// Explicit --verbose="debug" takes precedence
-		c.LogLevel = ParseLevel(v)
-	} else if v, ok := globals["verbosity"]; ok {
-		// Counter -v / -vv / -vvv
-		count, err := strconv.Atoi(v)
-		if err == nil {
-			if count >= 3 {
-				c.LogLevel = LevelTrace
-			} else if count == 2 {
-				c.LogLevel = LevelDebug
-			} else if count >= 1 {
-				c.LogLevel = LevelInfo
-			}
-		}
-	}
-
-	if _, ok := globals["stats"]; ok {
-		c.ShowStats = "always"
-	} else if _, ok := globals["no-stats"]; ok {
-		c.ShowStats = "never"
-	} else if c.LogLevel == LevelSilent {
-		// Quiet suppresses stats too unless forced
-		c.ShowStats = "never"
-	}
-}
-
-// IgnoreEnabled returns the effective boolean value for Ignore.
-// Defaults to true if nil.
-func (c *Config) IgnoreEnabled() bool {
-	if c.Ignore == nil {
-		return true
-	}
-	return *c.Ignore
 }
 
 func mergeConfig(cfg *Config, path string, strict bool) error {

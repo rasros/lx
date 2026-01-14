@@ -7,8 +7,9 @@ import (
 	"time"
 )
 
-// InputFile represents a file to be processed.
-// It abstracts the difference between a real file on disk and a virtual file.
+// InputFile represents a file discovered by the Walker or provided via Stdin.
+// It abstracts the difference between a real file on disk and virtual content,
+// allowing lazy opening of file streams.
 type InputFile struct {
 	Path      string
 	AbsPath   string
@@ -34,19 +35,16 @@ func NewOsInputFile(path, absPath string, info os.FileInfo) InputFile {
 	}
 }
 
-// StdinInputFile represents content from Stdin.
-type StdinInputFile struct {
-	Content []byte
-}
-
-func (s StdinInputFile) ToInputFile() InputFile {
+// NewBufferInputFile creates an InputFile from an in-memory byte slice.
+// Useful for processing stdin or generated content.
+func NewBufferInputFile(name string, data []byte) InputFile {
 	return InputFile{
-		Path:    "stdin",
-		AbsPath: "stdin",
-		Size:    int64(len(s.Content)),
+		Path:    name,
+		AbsPath: name, // usually just a label like "stdin"
+		Size:    int64(len(data)),
 		ModTime: time.Now(),
 		Open: func() (io.ReadCloser, error) {
-			return io.NopCloser(bytes.NewReader(s.Content)), nil
+			return io.NopCloser(bytes.NewReader(data)), nil
 		},
 	}
 }

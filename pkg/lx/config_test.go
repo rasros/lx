@@ -6,14 +6,13 @@ import (
 	"testing"
 )
 
+func intPtr(i int) *int { return &i }
+
 func TestOptionsEffective_NoN_UsesHeadTail(t *testing.T) {
 	opts := Options{
-		Head:    2,
-		Tail:    3,
-		NBoth:   5,
-		HeadSet: true,
-		TailSet: true,
-		NSet:    false,
+		Head:  intPtr(2),
+		Tail:  intPtr(3),
+		NBoth: nil,
 	}
 
 	r := opts.ToRunnerConfig()
@@ -25,12 +24,9 @@ func TestOptionsEffective_NoN_UsesHeadTail(t *testing.T) {
 
 func TestOptionsEffective_NOnly(t *testing.T) {
 	opts := Options{
-		Head:    0,
-		Tail:    0,
-		NBoth:   5,
-		HeadSet: false,
-		TailSet: false,
-		NSet:    true,
+		Head:  nil,
+		Tail:  nil,
+		NBoth: intPtr(5),
 	}
 
 	r := opts.ToRunnerConfig()
@@ -42,12 +38,9 @@ func TestOptionsEffective_NOnly(t *testing.T) {
 
 func TestOptionsEffective_NWithHeadOverride(t *testing.T) {
 	opts := Options{
-		Head:    2,
-		Tail:    0,
-		NBoth:   5,
-		HeadSet: true,
-		TailSet: false,
-		NSet:    true,
+		Head:  intPtr(2),
+		Tail:  nil,
+		NBoth: intPtr(5),
 	}
 
 	r := opts.ToRunnerConfig()
@@ -59,12 +52,9 @@ func TestOptionsEffective_NWithHeadOverride(t *testing.T) {
 
 func TestOptionsEffective_NWithTailOverride(t *testing.T) {
 	opts := Options{
-		Head:    0,
-		Tail:    7,
-		NBoth:   5,
-		HeadSet: false,
-		TailSet: true,
-		NSet:    true,
+		Head:  nil,
+		Tail:  intPtr(7),
+		NBoth: intPtr(5),
 	}
 
 	r := opts.ToRunnerConfig()
@@ -76,12 +66,9 @@ func TestOptionsEffective_NWithTailOverride(t *testing.T) {
 
 func TestOptionsEffective_NWithBothOverrides(t *testing.T) {
 	opts := Options{
-		Head:    2,
-		Tail:    7,
-		NBoth:   5,
-		HeadSet: true,
-		TailSet: true,
-		NSet:    true,
+		Head:  intPtr(2),
+		Tail:  intPtr(7),
+		NBoth: intPtr(5),
 	}
 
 	r := opts.ToRunnerConfig()

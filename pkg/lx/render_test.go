@@ -11,13 +11,13 @@ import (
 
 func newTestRunner(head, tail int, tmplStr string) *Runner {
 	if tmplStr == "" {
-		tmplStr = DefaultTemplate
+		tmplStr = defaultTemplate
 	}
 
-	funcs := TemplateFuncs()
+	funcs := templateFuncs()
 	tMain := template.Must(template.New("test").Funcs(funcs).Parse(tmplStr))
-	tSection := template.Must(template.New("section").Funcs(funcs).Parse(DefaultSectionTemplate))
-	tPrompt := template.Must(template.New("prompt").Funcs(funcs).Parse(DefaultPromptTemplate))
+	tSection := template.Must(template.New("section").Funcs(funcs).Parse(defaultSectionTemplate))
+	tPrompt := template.Must(template.New("prompt").Funcs(funcs).Parse(defaultPromptTemplate))
 
 	engine := &TemplateEngine{
 		Main:    tMain,

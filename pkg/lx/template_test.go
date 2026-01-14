@@ -6,7 +6,7 @@ import (
 )
 
 func TestTemplateFuncs_Humanize(t *testing.T) {
-	humanize := TemplateFuncs()["humanize"].(func(int64) string)
+	humanize := templateFuncs()["humanize"].(func(int64) string)
 
 	tests := []struct {
 		in   int64
@@ -29,7 +29,7 @@ func TestTemplateFuncs_Humanize(t *testing.T) {
 }
 
 func TestTemplateFuncs_Date(t *testing.T) {
-	dateFn := TemplateFuncs()["date"].(func(string, time.Time) string)
+	dateFn := templateFuncs()["date"].(func(string, time.Time) string)
 
 	ts := time.Date(2025, 12, 17, 14, 0, 0, 0, time.UTC)
 	got := dateFn("2006-01-02", ts)

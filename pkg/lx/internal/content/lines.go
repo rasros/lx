@@ -1,4 +1,4 @@
-package lx
+package content
 
 import (
 	"bufio"
@@ -10,6 +10,7 @@ import (
 	"strconv"
 )
 
+// LineNumberFormatter is an internal helper for formatting text with line numbers.
 type LineNumberFormatter struct {
 	Head      []byte
 	Gap       []byte
@@ -77,6 +78,7 @@ func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
 	}
 }
 
+// EstimateLineCount estimates the number of lines in a file by reading a sample.
 func EstimateLineCount(r io.ReaderAt, fileSize int64) (int, bool, error) {
 	if fileSize == 0 {
 		return 0, true, nil
@@ -108,6 +110,7 @@ func EstimateLineCount(r io.ReaderAt, fileSize int64) (int, bool, error) {
 	return estimated, false, nil
 }
 
+// ReadHead reads the first n lines from r.
 func ReadHead(r io.Reader, n int) ([]byte, int, error) {
 	if n == 0 {
 		return nil, 0, nil
@@ -133,6 +136,7 @@ func ReadHead(r io.Reader, n int) ([]byte, int, error) {
 	return buf.Bytes(), linesRead, sc.Err()
 }
 
+// ReadTailSeek reads the last linesWanted from f using Seek.
 func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 	if linesWanted <= 0 {
 		return nil, nil

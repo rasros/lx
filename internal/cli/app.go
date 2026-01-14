@@ -5,16 +5,16 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/atotto/clipboard"
 	"github.com/rasros/lx/pkg/lx"
 )
 
 func Run(ctx context.Context, args []string) error {
-	// We don't have the configured logger yet, so we can't trace Parse/SetupProfiling easily
-	// without a temporary logger, but we can catch it immediately after config load.
 	parsed, err := Parse(args, definitions)
 	if err != nil {
 		return err
@@ -108,26 +108,43 @@ func processStream(parsed *ParsedArgs) error {
 		return err
 	}
 
-	cfg.ApplyGlobals(parsed.Globals)
+	applyGlobalsToConfig(cfg, parsed.Globals)
+
+	// Configure Logger
+	// Priority:
+	// 1. CLI Flags (--quiet, --verbose, -v)
+	// 2. Config File (verbosity: "debug")
+	// 3. Default (Warn)
+	level := determineLogLevel(parsed.Globals, cfg.Verbosity)
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: level,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			// Remove time for cleaner CLI output unless very verbose (debug/trace)
+			if a.Key == slog.TimeKey && level > slog.LevelDebug {
+				return slog.Attr{}
+			}
+			return a
+		},
+	}))
+	cfg.Logger = logger
 
 	out, clipboardBuf, debugOut, err := determineOutput(parsed.Globals, cfg)
 	if err != nil {
 		return err
 	}
 
-	cfg.Logger = lx.NewLogger(debugOut, cfg.LogLevel)
-
-	cfg.Logger.Debugf("lx version: %s", Version)
-	cfg.Logger.Tracef("output format: %s, mode: %s", cfg.OutputFormat, cfg.OutputMode)
+	cfg.Logger.Debug("started", "version", Version)
+	cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "details", "format", cfg.OutputFormat, "mode", cfg.OutputMode)
 
 	for _, path := range cfg.LoadedConfigs {
-		cfg.Logger.Infof("loaded config: %s", path)
+		cfg.Logger.Info("loaded config", "path", path)
 	}
 
 	if cfg.IgnoreEnabled() {
-		cfg.Logger.Debugf("ignore logic enabled")
+		cfg.Logger.Debug("ignore logic enabled")
 	} else {
-		cfg.Logger.Warnf("ignore logic disabled (hidden and gitignored files will be shown)")
+		cfg.Logger.Warn("ignore logic disabled (hidden and gitignored files will be shown)")
 	}
 
 	showStats := false
@@ -137,32 +154,32 @@ func processStream(parsed *ParsedArgs) error {
 	case "never":
 		showStats = false
 	case "auto", "":
-		// Default Auto behavior:
-		// Show stats if:
-		// 1. Output is explicitly redirected via flags (-o, -c)
-		// 2. Standard Output is redirected via shell (> file or | pipe)
 		_, hasCopy := parsed.Globals["copy"]
 		_, hasOutput := parsed.Globals["output"]
 		isClipboardMode := cfg.OutputMode == "copy"
 		_, hasStdout := parsed.Globals["stdout"]
 
-		// Check if stdout is a terminal
 		stdoutIsTerm := false
 		if stat, err := os.Stdout.Stat(); err == nil {
 			stdoutIsTerm = (stat.Mode() & os.ModeCharDevice) != 0
 		}
 
-		// If flags are used OR stdout is not a terminal (redirection), show stats.
 		if hasCopy || hasOutput || (isClipboardMode && !hasStdout) || !stdoutIsTerm {
 			showStats = true
 		}
 	}
 
+	// Critical Fix: If logging is explicitly silent (via -q), suppress stats unless forced via --stats
+	// level > slog.LevelError means LevelError+1 (Silent) or higher.
+	if level > slog.LevelError && cfg.ShowStats != "always" {
+		showStats = false
+	}
+
 	if f, ok := out.(*os.File); ok && f != os.Stdout {
-		cfg.Logger.Infof("writing output to file: %s", f.Name())
+		cfg.Logger.Info("writing output to file", "path", f.Name())
 		defer f.Close()
 	} else if clipboardBuf != nil {
-		cfg.Logger.Infof("writing output to clipboard")
+		cfg.Logger.Info("writing output to clipboard")
 	}
 
 	ops := reorderTrailingOps(parsed.Ops)
@@ -174,10 +191,89 @@ func processStream(parsed *ParsedArgs) error {
 		if err := clipboard.WriteAll(clipboardBuf.String()); err != nil {
 			return fmt.Errorf("clipboard write: %w", err)
 		}
-		cfg.Logger.Infof("copied %d bytes to clipboard", clipboardBuf.Len())
+		cfg.Logger.Info("copied to clipboard", "bytes", clipboardBuf.Len())
 	}
 
 	return nil
+}
+
+func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
+	if _, ok := globals["follow"]; ok {
+		c.FollowSymlinks = true
+	} else if _, ok := globals["no-follow"]; ok {
+		c.FollowSymlinks = false
+	}
+
+	if _, ok := globals["hidden"]; ok {
+		c.ShowHidden = true
+	} else if _, ok := globals["no-hidden"]; ok {
+		c.ShowHidden = false
+	}
+
+	if _, ok := globals["ignore"]; ok {
+		t := true
+		c.Ignore = &t
+	} else if _, ok := globals["no-ignore"]; ok {
+		f := false
+		c.Ignore = &f
+	}
+
+	if _, ok := globals["stats"]; ok {
+		c.ShowStats = "always"
+	} else if _, ok := globals["no-stats"]; ok {
+		c.ShowStats = "never"
+	}
+}
+
+func determineLogLevel(globals map[string]string, configVerbosity string) slog.Level {
+	// 1. Quiet flag overrides everything
+	if _, ok := globals["quiet"]; ok {
+		return slog.LevelError + 1 // Silent
+	}
+
+	// 2. Explicit --verbose="debug"
+	if v, ok := globals["verbose"]; ok {
+		return parseLevelString(v)
+	}
+
+	// 3. Counter -v / -vv / -vvv
+	if v, ok := globals["verbosity"]; ok {
+		count, _ := strconv.Atoi(v)
+		if count >= 3 {
+			return slog.LevelDebug - 1 // Trace
+		} else if count == 2 {
+			return slog.LevelDebug
+		} else if count == 1 {
+			return slog.LevelInfo
+		}
+	}
+
+	// 4. Config file setting
+	if configVerbosity != "" {
+		return parseLevelString(configVerbosity)
+	}
+
+	// 5. Default
+	return slog.LevelWarn
+}
+
+func parseLevelString(s string) slog.Level {
+	switch strings.ToLower(s) {
+	case "trace":
+		return slog.LevelDebug - 1
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	case "silent", "quiet", "off":
+		return slog.LevelError + 1
+	default:
+		return slog.LevelInfo
+	}
 }
 
 func determineOutput(globals map[string]string, cfg *lx.Config) (io.Writer, *bytes.Buffer, io.Writer, error) {
@@ -243,8 +339,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		}
 	}
 
-	// Discovery Phase
-	cfg.Logger.Debugf("starting discovery phase with %d operations", len(ops))
+	cfg.Logger.Debug("starting discovery phase", "operations", len(ops))
 	walker := lx.NewWalker(*cfg)
 	opMap := make(map[int][]lx.InputFile)
 	var allFiles []lx.InputFile
@@ -255,26 +350,28 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 	discOpts := opts
 
 	for i, op := range ops {
-		cfg.Logger.Tracef("parsing op [%d]: %s %s", i, op.Action, op.Value)
+		// Trace
+		cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "parsing op", "index", i, "action", op.Action, "value", op.Value)
+
 		switch op.Action {
 		case "include":
 			discOpts.Includes = append(discOpts.Includes, op.Value)
-			cfg.Logger.Tracef("filter added: include '%s'", op.Value)
+			cfg.Logger.Debug("filter added", "type", "include", "pattern", op.Value)
 		case "exclude":
 			discOpts.Excludes = append(discOpts.Excludes, op.Value)
-			cfg.Logger.Tracef("filter added: exclude '%s'", op.Value)
+			cfg.Logger.Debug("filter added", "type", "exclude", "pattern", op.Value)
 		case "reset-filters":
 			discOpts.Includes = nil
 			discOpts.Excludes = nil
-			cfg.Logger.Tracef("filters reset")
+			cfg.Logger.Debug("filters reset")
 		case "FILE", "file":
 			if op.Value == "-" {
-				cfg.Logger.Debugf("reading from stdin")
+				cfg.Logger.Debug("reading from stdin")
 				data, err := io.ReadAll(os.Stdin)
 				if err != nil {
 					return fmt.Errorf("read stdin: %w", err)
 				}
-				f := lx.StdinInputFile{Content: data}.ToInputFile()
+				f := lx.NewBufferInputFile("stdin", data)
 
 				opMap[i] = []lx.InputFile{f}
 				allFiles = append(allFiles, f)
@@ -283,16 +380,17 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			}
 
 			var gathered []lx.InputFile
-			cfg.Logger.Tracef("walking target: %s", op.Value)
+			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "walking target", "target", op.Value)
+
 			for f := range walker.Walk(context.TODO(), []string{op.Value}) {
 				if f.LoadError != nil {
-					cfg.Logger.Errorf("%v", f.LoadError)
+					cfg.Logger.Error("load error", "error", f.LoadError)
 					continue
 				}
 
 				// Apply interleaved filters
 				if !lx.IsKept(f.Path, discOpts.Includes, discOpts.Excludes) {
-					cfg.Logger.Tracef("filtered out by interleaved rules: %s", f.Path)
+					cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "filtered out by interleaved rules", "path", f.Path)
 					continue
 				}
 
@@ -307,7 +405,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 	cwd, err := os.Getwd()
 	if err != nil {
 		cwd = "."
-		cfg.Logger.Warnf("failed to get current working directory: %v", err)
+		cfg.Logger.Warn("failed to get current working directory", "error", err)
 	}
 
 	globalCtx := lx.GlobalContext{
@@ -320,7 +418,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 		Config:        *cfg,
 	}
 
-	cfg.Logger.Infof("discovery complete: %d files found, %s total size", globalCtx.TotalFiles, lx.Humanize(globalCtx.TotalSize))
+	cfg.Logger.Info("discovery complete", "files", globalCtx.TotalFiles, "size", lx.Humanize(globalCtx.TotalSize))
 
 	if showStats {
 		if err := tmplEngine.Stats.Execute(debugOut, lx.StatsContext{Global: globalCtx}); err != nil {
@@ -347,7 +445,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			for _, f := range files {
 				isCompact, err := runner.RunFile(f, fileIndex, prevCompact, section, out)
 				if err != nil {
-					cfg.Logger.Errorf("processing %s: %v", f.Path, err)
+					cfg.Logger.Error("processing failed", "path", f.Path, "error", err)
 					continue
 				}
 				prevCompact = isCompact
@@ -360,7 +458,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 				fmt.Fprintln(out)
 			}
 			section++
-			cfg.Logger.Debugf("rendering section: %s", op.Value)
+			cfg.Logger.Debug("rendering section", "title", op.Value)
 			if err := runner.RunSection(op.Value, section, out); err != nil {
 				return err
 			}
@@ -371,7 +469,7 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 			if prevCompact {
 				fmt.Fprintln(out)
 			}
-			cfg.Logger.Debugf("rendering prompt")
+			cfg.Logger.Debug("rendering prompt")
 			if err := runner.RunPrompt(op.Value, section, out); err != nil {
 				return err
 			}
@@ -379,38 +477,34 @@ func executeOps(ops []Op, out io.Writer, debugOut io.Writer, opts lx.Options, tm
 
 		case "line-numbers":
 			opts.LineNumbers = true
-			cfg.Logger.Tracef("option set: line-numbers=true")
+			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "line-numbers", "val", true)
 		case "no-line-numbers":
 			opts.LineNumbers = false
-			cfg.Logger.Tracef("option set: line-numbers=false")
+			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "line-numbers", "val", false)
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
-			opts.Head = val
-			opts.HeadSet = true
-			opts.Tail, opts.TailSet = 0, false
-			opts.NBoth, opts.NSet = 0, false
-			cfg.Logger.Tracef("option set: head=%d", val)
+			opts.Head = &val
+			opts.Tail = nil
+			opts.NBoth = nil
+			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "head", "val", val)
 		case "tail":
 			val, _ := strconv.Atoi(op.Value)
-			opts.Tail = val
-			opts.TailSet = true
-			opts.Head, opts.HeadSet = 0, false
-			opts.NBoth, opts.NSet = 0, false
-			cfg.Logger.Tracef("option set: tail=%d", val)
+			opts.Tail = &val
+			opts.Head = nil
+			opts.NBoth = nil
+			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "tail", "val", val)
 		case "lines":
 			val, _ := strconv.Atoi(op.Value)
-			opts.NBoth = val
-			opts.NSet = true
-			opts.HeadSet = false
-			opts.TailSet = false
-			cfg.Logger.Tracef("option set: lines=%d", val)
+			opts.NBoth = &val
+			opts.Head = nil
+			opts.Tail = nil
+			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "lines", "val", val)
 		case "reset-lines":
-			opts.Head, opts.HeadSet = 0, false
-			opts.Tail, opts.TailSet = 0, false
-			opts.NBoth, opts.NSet = 0, false
-			cfg.Logger.Tracef("option set: reset-lines")
+			opts.Head = nil
+			opts.Tail = nil
+			opts.NBoth = nil
+			cfg.Logger.Log(context.Background(), slog.LevelDebug-1, "option set", "key", "reset-lines")
 
-		// Filter flags (state maintained but action is no-op during execution phase)
 		case "include":
 			opts.Includes = append(opts.Includes, op.Value)
 		case "exclude":

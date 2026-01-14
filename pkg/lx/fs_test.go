@@ -9,8 +9,7 @@ import (
 
 func TestStdinInputFile(t *testing.T) {
 	content := []byte("hello stdin")
-	s := StdinInputFile{Content: content}
-	f := s.ToInputFile()
+	f := NewBufferInputFile("stdin", content)
 
 	if f.Path != "stdin" {
 		t.Errorf("Path = %q, want stdin", f.Path)
