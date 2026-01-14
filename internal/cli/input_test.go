@@ -28,7 +28,7 @@ func TestReadFilenamesFromStdin_Piped(t *testing.T) {
 		}
 	}()
 
-	got, err := readFilenamesFromStdin(false)
+	got, _, err := readFilenamesFromStdin(false)
 	if err != nil {
 		t.Fatalf("readFilenamesFromStdin error: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestReadFilenamesFromStdin_Null(t *testing.T) {
 		}
 	}()
 
-	got, err := readFilenamesFromStdin(true)
+	got, _, err := readFilenamesFromStdin(true)
 	if err != nil {
 		t.Fatalf("readFilenamesFromStdin(true) error: %v", err)
 	}
