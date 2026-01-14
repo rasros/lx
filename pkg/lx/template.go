@@ -204,10 +204,10 @@ func templateFuncs() template.FuncMap {
 		},
 		"humanize": func(s int64) string {
 			sizes := []string{"B", "kB", "MB", "GB", "TB"}
-			if s < 1000 {
+			if s < 1024 {
 				return fmt.Sprintf("%d B", s)
 			}
-			e := math.Floor(math.Log(float64(s)) / math.Log(1000))
+			e := math.Floor(math.Log(float64(s)) / math.Log(1024))
 			suffix := sizes[int(e)]
 			val := float64(s) / math.Pow(1000, e)
 			return fmt.Sprintf("%.1f %s", val, suffix)
