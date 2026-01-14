@@ -35,7 +35,7 @@ Format a single file:
 lx go.mod -n2
 ```
 
-This produces the following output:
+This produces the following fenced output:
 
 ````markdown
 go.mod (10 rows)
@@ -52,6 +52,7 @@ require (
         github.com/atotto/clipboard v0.1.4
         github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00
 )
+```
 ````
 
 Recursively walk a directory (respects `.gitignore`):
