@@ -43,33 +43,41 @@ jobs:
 
           mkdir -p dist
 
-          ldflags="-s -w -X 'github.com/rasros/lx/internal/cli.Version=${VERSION}'"
-
+          # Loop over platforms
           for GOOS in linux darwin windows; do
             for GOARCH in amd64 arm64; do
-              bin="lx"
+              
+              # Windows extension handling
+              bin_name="lx"
               ext=""
               if [ "$GOOS" = "windows" ]; then
                 ext=".exe"
+                bin_name="lx.exe"
               fi
 
-              out_bin="lx-${VERSION}-${GOOS}-${GOARCH}${ext}"
+              # The final asset name (e.g., lx-v1.0.0-linux-amd64)
+              asset_name="lx-${VERSION}-${GOOS}-${GOARCH}${ext}"
+              
+              echo "Building $asset_name ..."
 
-              echo "Building $out_bin ..."
-              GOOS=$GOOS GOARCH=$GOARCH go build \
-                -ldflags="$ldflags" \
-                -o "$out_bin" \
-                ./cmd/lx
+              # We pass the VERSION and the custom output path (OR_OUT) to make.
+              # make will inherit GOOS and GOARCH from the env vars below.
+              GOOS=$GOOS GOARCH=$GOARCH make build \
+                VERSION=${VERSION} \
+                OR_OUT="$asset_name"
 
+              # Archive naming
               archive="lx_${VERSION}_${GOOS}_${GOARCH}"
 
+              # Create archive including the binary, README, and LICENSE
               if [ "$GOOS" = "windows" ]; then
-                zip "dist/${archive}.zip" "$out_bin" README.md LICENSE
+                zip "dist/${archive}.zip" "$asset_name" README.md LICENSE
               else
-                tar -czf "dist/${archive}.tar.gz" "$out_bin" README.md LICENSE
+                tar -czf "dist/${archive}.tar.gz" "$asset_name" README.md LICENSE
               fi
 
-              rm "$out_bin"
+              # Cleanup the raw binary so it doesn't clutter the next loop
+              rm "$asset_name"
             done
           done
           
