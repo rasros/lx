@@ -4,37 +4,49 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rasros/lx)](https://goreportcard.com/report/github.com/rasros/lx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`lx` makes prompt setup **repeatable** and **precise**. Instead of letting an agent guess context or manually selecting
-files in a UI, define the exact context in one shell command and rerun it whenever you need a fresh session. It works
-smoothly with standard tools like `grep` and shell globs.
+`lx` is a CLI tool that formats file system content for Large Language Models.
+
+It replaces manual copy-pasting with a precise shell command, handling recursive discovery, formatting, and token
+estimation automatically.
 
 ---
 
 ## Installation
 
-Via go install:
-
 ```bash
-go install github.com/rasros/lx/cmd/lx@v1.1.0-rc.2
-```
-
-Or via curl:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
+go install [github.com/rasros/lx/cmd/lx@latest](https://github.com/rasros/lx/cmd/lx@latest)
 ```
 
 ---
 
-## Basic usage
+## Basic Usage
 
 Format a single file:
 
 ```bash
-lx cmd/lx/main.go
+lx go.mod -n2
 ```
 
-Recursively walk a directory (respects `.gitignore` by default):
+This produces the following output:
+
+````markdown
+go.mod (10 rows)
+---
+
+```gomod
+module github.com/rasros/lx
+
+go 1.25.5
+
+require gopkg.in/yaml.v3 v3.0.1
+
+require (
+        github.com/atotto/clipboard v0.1.4
+        github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00
+)
+````
+
+Recursively walk a directory (respects `.gitignore`):
 
 ```bash
 lx src/
@@ -43,7 +55,7 @@ lx src/
 Copy output directly to clipboard:
 
 ```bash
-lx -c .
+lx -c . # . is also the default if no arguments are provided
 ```
 
 Write output to a file:
@@ -54,76 +66,117 @@ lx -o prompt.md src/
 
 ---
 
-## Features
+## Power Usage
 
-* **Smart Formatting:** Generates Markdown headers with row counts and language detection.
-* **Recursive Discovery:** Walks directories similar to `fd` or `ripgrep`.
-* **Ignore Logic:** Respects `.gitignore`, `.ignore`, and `.lxignore` automatically.
-* **Context Control:** Add custom prompts (`-p`) and section headers (`-s`) directly in the stream.
-* **Slicing:** Use `-n` to limit output lines or `-n0` for compact views.
-* **Line Numbers:** Optional `-l` flag for referencing specific lines.
-* **Input Flexibility:** Reads filenames from arguments or stdin pipe.
-* **Configurable:** Fully template-based output via `config.yaml`.
+`lx` allows you to compose context from multiple sources with specific ordering.
+
+For example, to grab all server code (excluding tests), add the dependency file, organize them with headers, and
+copy the result to your clipboard:
+
+```bash
+lx -s "Server Code" -i "*.py" -e "test_*.py" src/server -E -s "Libs" requirements.txt -c
+```
+
+**What just happened?**
+
+1. **`-s "..."`**: Injects a Markdown section header.
+2. **`-i` / `-e`**: Sets up filters to only include Python files and exclude tests.
+3. **`src/server`**: Recursively walks the source directory using those filters.
+4. **`-E`**: Resets the active filters so subsequent files aren't filtered.
+5. **`-s`**: Injects a new section header.
+6. **`requirements.txt`**: Appends the specific dependency file.
+7. **`-c`**: Copies the entire formatted output to your clipboard.
 
 ---
 
-## Examples
+## Piping & Integration
 
-### Discovery & Filtering
+`lx` plays nicely with other tools. You can pipe a list of filenames from `fd`, `find`, or `ripgrep` directly into `lx`.
 
-```bash
-# Walk current directory, respecting gitignore
-lx .
-
-# Include hidden files
-lx -H .
-
-# Include ignored files (disable gitignore logic)
-lx -I .
-
-# Follow symbolic links
-lx -L .
-```
-
-### Adding Context
-
-Inject instructions and headers into the prompt stream:
+**Using `ripgrep` to find files containing "TODO":**
 
 ```bash
-lx -p "Implement pytests for the following files. Follow the same structure as in the existing tests." \
-   -s "Files to test" \
-   src/foo/*.py \
-   -s "Test fixtures and sample tests." \
-   src/tests/fixtures src/tests/bar_test.py
+rg -l "TODO" | lx -c
 ```
 
-### Slicing & Compact Mode
-
-Useful for large logs or getting a quick overview:
+**Using `fd` to find all Rust files:**
 
 ```bash
-# Print N lines (split between head and tail), --head and --tail are also supported
-lx -n100 server.log
-
-# Compact mode (print filename and stats only, no content)
-lx -n0
+fd -e rs | lx
 ```
 
-Binary files are written in compact mode automatically.
+---
 
-### Line Numbers
+## XML Support (Recommended for Claude)
 
-Helpful for asking the LLM to point out log file issues:
+You can switch to XML formatting, which is recommended by Anthropic's documentation for Claude to ensure better parsing
+of long contexts.
+
+```bash
+lx --xml src/
+```
+
+---
+
+## Core Features
+
+### 1. Smart Discovery
+
+`lx` works like `ripgrep` or `fd`. It recursively walks directories while automatically respecting `.gitignore`,
+`.ignore`, and `.lxignore` files.
+
+```bash
+lx src/  # Walks src/, skipping ignored files
+lx -H .  # Includes hidden files
+```
+
+### 2. Slicing Files
+
+Limit output to specific lines to save tokens.
+
+```bash
+# Get 50 lines from the middle of a file
+lx --lines 50 error.log
+
+# Compact mode: List filenames and sizes only (no content)
+lx -n0 src/
+```
+
+### 3. Line Referencing
+
+Add line numbers to help the LLM pinpoint specific locations in code or logs.
 
 ```bash
 lx -l server.log
+```
+
+### 4. Prompt Injection
+
+Inject custom instructions directly into the stream without leaving the terminal with `-s` or `-p`.
+
+```bash
+lx -p "Refactor the following code to use Pydantic:" main.py
+```
+
+**Tip:** You can create aliases for common prompts. Add this to your shell profile to quickly inject your test
+prompt:
+
+```bash
+alias lxt='lx -p "$(cat ~/prompts/tests.md)"'
+```
+
+### 5. Stats Output
+
+`lx` prints a summary of file counts, total size, and estimated tokens to stderr.
+
+```bash
+# Force stats to appear (it automatically appears with -c or -o output but not if piping to a file)
+lx --stats src/ > context.md
 ```
 
 ---
 
 ## Configuration
 
-`lx` uses Go templates for rendering. You can customize the output format by creating a config file at
-`~/.config/lx/config.yaml` (Linux/Mac) or `%APPDATA%\lx\config.yaml` (Windows).
-
-See `default_config.yaml` in the repo for all available options and template variables.
+`lx` is fully template-driven. You can customize the Markdown output format by creating a config file at
+`~/.config/lx/config.yaml`.
