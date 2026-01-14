@@ -38,7 +38,7 @@ func TestRun_Commands(t *testing.T) {
 		{
 			name:        "help flag",
 			args:        []string{"--help"},
-			wantContain: []string{"SYNOPSIS:", "GLOBAL OPTIONS"},
+			wantContain: []string{"USAGE:", "GLOBAL OPTIONS"},
 		},
 		{
 			name:        "version flag",

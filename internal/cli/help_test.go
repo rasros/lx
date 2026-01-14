@@ -16,7 +16,7 @@ func TestPrintHelp(t *testing.T) {
 
 	required := []string{
 		"NAME:",
-		"SYNOPSIS:",
+		"USAGE:",
 		"GLOBAL OPTIONS:",
 		"INTERLEAVED OPTIONS",
 		"ACTIONS",
