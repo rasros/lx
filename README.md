@@ -24,6 +24,13 @@ Or via curl:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
 ```
+### System Dependencies (Clipboard)
+
+The copy-to-clipboard feature (`-c` / `--copy`) depends on the following:
+
+* **macOS**: Native support via `pbcopy`.
+* **Windows**: Native support via `clip`.
+* **Linux**: Requires `xclip` or `wl-clipboard` (for `wl-copy`) to be installed.
 
 ---
 
