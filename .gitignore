@@ -1,2 +1,34 @@
-/bin
-.idea
+# --- Build Artifacts ---
+/bin/
+/dist/
+/build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# --- Testing & Code Quality ---
+*.test
+*.out
+*.coverprofile
+
+# --- Dependency Management ---
+go.work
+go.work.sum
+
+# --- IDE & Editors ---
+.idea/
+*.iml
+.vscode/
+*.swp
+*~
+\#*\#
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+# --- Security ---
+.env
+.env.local
