@@ -1,7 +1,6 @@
 package lx
 
 import (
-	"bytes"
 	"context"
 	"log/slog"
 	"os"
@@ -24,8 +23,6 @@ func NewWalker(cfg Config) *Walker {
 func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	out := make(chan InputFile)
 	log := w.Config.Logger
-
-	globalIgnore := w.loadGlobalIgnores()
 
 	go func() {
 		defer close(out)
@@ -71,7 +68,14 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 			}
 
 			absRoot, _ := filepath.Abs(root)
-			w.walkDir(ctx, root, absRoot, info, []gitignore.IgnoreMatcher{globalIgnore}, visited, out)
+
+			// Initialize ignore stack with GlobalIgnore if it exists
+			var stack []gitignore.IgnoreMatcher
+			if w.Config.GlobalIgnore != nil {
+				stack = append(stack, w.Config.GlobalIgnore)
+			}
+
+			w.walkDir(ctx, root, absRoot, info, stack, visited, out)
 		}
 	}()
 
@@ -211,46 +215,6 @@ func (w *Walker) walkDir(
 			}
 		}
 	}
-}
-
-func (w *Walker) loadGlobalIgnores() gitignore.IgnoreMatcher {
-	if !w.Config.IgnoreEnabled() {
-		return nil
-	}
-
-	var lines []string
-	log := w.Config.Logger
-
-	home, _ := os.UserHomeDir()
-	configDir, _ := os.UserConfigDir()
-
-	candidates := []string{
-		filepath.Join(configDir, "lx", "ignore"),
-	}
-
-	// XDG Support for global gitignore
-	xdgConfig := os.Getenv("XDG_CONFIG_HOME")
-	if xdgConfig == "" && home != "" {
-		xdgConfig = filepath.Join(home, ".config")
-	}
-
-	if xdgConfig != "" {
-		candidates = append(candidates, filepath.Join(xdgConfig, "git", "ignore"))
-	}
-
-	for _, c := range candidates {
-		if data, err := os.ReadFile(c); err == nil {
-			log.Debug("loaded global ignore", "path", c)
-			lines = append(lines, strings.Split(string(data), "\n")...)
-		}
-	}
-
-	if len(lines) == 0 {
-		return nil
-	}
-
-	buf := bytes.NewBufferString(strings.Join(lines, "\n"))
-	return gitignore.NewGitIgnoreFromReader(".", buf)
 }
 
 func (w *Walker) loadLocalIgnores(dir string) []gitignore.IgnoreMatcher {

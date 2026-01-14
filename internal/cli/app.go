@@ -89,8 +89,10 @@ func gatherInputs(parsed *ParsedArgs) error {
 
 func processStream(parsed *ParsedArgs) error {
 	var opts lx.Options
+	var configPath string
+
 	if cfg, ok := parsed.Globals["config"]; ok {
-		opts.ConfigPath = cfg
+		configPath = cfg
 	}
 
 	if _, ok := parsed.Globals["xml"]; ok {
@@ -103,12 +105,21 @@ func processStream(parsed *ParsedArgs) error {
 		opts.OutputFormat = "html"
 	}
 
-	tmplEngine, cfg, err := opts.CompileTemplates()
+	// 1. Load Configuration (Default -> Env -> CLI File)
+	cfg, err := LoadConfigChain(configPath)
 	if err != nil {
 		return err
 	}
 
+	// 2. Apply CLI Flag overrides (verbosity, etc)
+	lx.ApplyOptions(cfg, opts)
 	applyGlobalsToConfig(cfg, parsed.Globals)
+
+	// 3. Compile Templates
+	tmplEngine, err := lx.CompileTemplates(cfg)
+	if err != nil {
+		return err
+	}
 
 	// Configure Logger
 	// Priority:

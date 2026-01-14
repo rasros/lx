@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"text/template"
 
-	"gopkg.in/yaml.v3"
+	"github.com/monochromegane/go-gitignore"
 )
 
 // Config represents the configuration for the lx engine.
@@ -33,7 +31,10 @@ type Config struct {
 	// Logger handles debug and info output. If nil, a no-op logger is used.
 	Logger *slog.Logger `yaml:"-"`
 
-	// LoadedConfigs tracks which config files were successfully loaded
+	// GlobalIgnore is an optional matcher for global excludes (e.g. from ~/.config/git/ignore).
+	GlobalIgnore gitignore.IgnoreMatcher `yaml:"-"`
+
+	// LoadedConfigs tracks which config files were successfully loaded (for debug info).
 	LoadedConfigs []string `yaml:"-"`
 }
 
@@ -50,6 +51,56 @@ func (c *Config) IgnoreEnabled() bool {
 		return true
 	}
 	return *c.Ignore
+}
+
+// Merge overrides values in dst with non-zero values from src.
+func Merge(dst *Config, src *Config) {
+	if src.Template != "" {
+		dst.Template = src.Template
+	}
+	if src.SectionTemplate != "" {
+		dst.SectionTemplate = src.SectionTemplate
+	}
+	if src.PromptTemplate != "" {
+		dst.PromptTemplate = src.PromptTemplate
+	}
+	if src.StatsTemplate != "" {
+		dst.StatsTemplate = src.StatsTemplate
+	}
+	if src.HeaderTemplate != "" {
+		dst.HeaderTemplate = src.HeaderTemplate
+	}
+	if src.FooterTemplate != "" {
+		dst.FooterTemplate = src.FooterTemplate
+	}
+	if src.OutputMode != "" {
+		dst.OutputMode = src.OutputMode
+	}
+	if src.OutputFormat != "" {
+		dst.OutputFormat = src.OutputFormat
+	}
+	if src.ShowStats != "" {
+		dst.ShowStats = src.ShowStats
+	}
+	if src.Verbosity != "" {
+		dst.Verbosity = src.Verbosity
+	}
+
+	// Booleans and pointers are only overridden if meaningful logic applies.
+	// For simplicty in this specific app, we usually load base config then apply flags.
+	// CLI flags are handled via ApplyOptions usually, but if merging two config files:
+	if src.Ignore != nil {
+		dst.Ignore = src.Ignore
+	}
+	// Note: basic bools (FollowSymlinks) are false by default, so difficult to distinguish
+	// "unset" from "false" without pointers. For config files, last one wins if we parsed strictly,
+	// but here we assume 'dst' is the accumulator.
+	if src.FollowSymlinks {
+		dst.FollowSymlinks = true
+	}
+	if src.ShowHidden {
+		dst.ShowHidden = true
+	}
 }
 
 // RunnerConfig is the runtime configuration for a specific file operation.
@@ -75,7 +126,6 @@ type Options struct {
 	Tail  *int
 	NBoth *int
 
-	ConfigPath   string
 	LineNumbers  bool
 	OutputFormat string
 
@@ -126,21 +176,14 @@ func (o Options) ToRunnerConfig() RunnerConfig {
 	}
 }
 
-// CompileTemplates loads configuration and parses all required templates.
-func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
-	cfg, err := loadConfigChain(o.ConfigPath)
-	if err != nil {
-		return nil, nil, err
-	}
-
+// CompileTemplates compiles the templates defined in the Config.
+// It applies defaults for any missing templates based on the OutputFormat.
+func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 	if cfg.OutputMode == "" {
 		cfg.OutputMode = "stdout"
 	}
 
 	format := cfg.OutputFormat
-	if o.OutputFormat != "" {
-		format = o.OutputFormat
-	}
 	if format == "" {
 		format = "markdown"
 	}
@@ -181,32 +224,32 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 
 	tMain, err := parse("lx", pick(cfg.Template, defMain))
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse main template: %w", err)
+		return nil, fmt.Errorf("parse main template: %w", err)
 	}
 
 	tSection, err := parse("section", pick(cfg.SectionTemplate, defSection))
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse section template: %w", err)
+		return nil, fmt.Errorf("parse section template: %w", err)
 	}
 
 	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, defPrompt))
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse prompt template: %w", err)
+		return nil, fmt.Errorf("parse prompt template: %w", err)
 	}
 
 	tStats, err := parse("stats", pick(cfg.StatsTemplate, defaultStatsTemplate))
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse stats template: %w", err)
+		return nil, fmt.Errorf("parse stats template: %w", err)
 	}
 
 	tHeader, err := parse("header", pick(cfg.HeaderTemplate, defHeader))
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse header template: %w", err)
+		return nil, fmt.Errorf("parse header template: %w", err)
 	}
 
 	tFooter, err := parse("footer", pick(cfg.FooterTemplate, defFooter))
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse footer template: %w", err)
+		return nil, fmt.Errorf("parse footer template: %w", err)
 	}
 
 	return &TemplateEngine{
@@ -216,52 +259,14 @@ func (o Options) CompileTemplates() (*TemplateEngine, *Config, error) {
 		Stats:   tStats,
 		Header:  tHeader,
 		Footer:  tFooter,
-	}, cfg, nil
+	}, nil
 }
 
-// loadConfigChain loads config from Default -> Env -> CLI.
-func loadConfigChain(cliPath string) (*Config, error) {
-	cfg := &Config{}
-
-	if configDir, err := os.UserConfigDir(); err == nil {
-		path := filepath.Join(configDir, "lx", "config.yaml")
-		_ = mergeConfig(cfg, path, false)
+// ApplyOptions updates the config with values from Options (CLI flags).
+func ApplyOptions(cfg *Config, opts Options) {
+	if opts.OutputFormat != "" {
+		cfg.OutputFormat = opts.OutputFormat
 	}
-
-	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
-		if err := mergeConfig(cfg, envPath, false); err != nil {
-			return nil, fmt.Errorf("load env config: %w", err)
-		}
-	}
-
-	if cliPath != "" {
-		if err := mergeConfig(cfg, cliPath, true); err != nil {
-			return nil, fmt.Errorf("load cli config: %w", err)
-		}
-	}
-
-	return cfg, nil
-}
-
-func mergeConfig(cfg *Config, path string, strict bool) error {
-	f, err := os.Open(path)
-	if os.IsNotExist(err) {
-		if strict {
-			return err
-		}
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	if err := yaml.NewDecoder(f).Decode(cfg); err != nil {
-		return err
-	}
-
-	cfg.LoadedConfigs = append(cfg.LoadedConfigs, path)
-	return nil
 }
 
 func clamp(val, min, max int) int {

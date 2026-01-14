@@ -1,8 +1,6 @@
 package lx
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -78,23 +76,15 @@ func TestOptionsEffective_NWithBothOverrides(t *testing.T) {
 	}
 }
 
-func TestOptionsEffective_LoadYaml(t *testing.T) {
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "lx.yaml")
-	yamlContent := `
-template: |
-  MY CUSTOM HEADER
-  {{ .Content }}
-`
-	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
-		t.Fatal(err)
+func TestCompileTemplates_CustomContent(t *testing.T) {
+	cfg := &Config{
+		Template: `
+MY CUSTOM HEADER
+{{ .Content }}
+`,
 	}
 
-	opts := Options{
-		ConfigPath: configPath,
-	}
-
-	engine, _, err := opts.CompileTemplates()
+	engine, err := CompileTemplates(cfg)
 	if err != nil {
 		t.Fatalf("CompileTemplates() error: %v", err)
 	}
@@ -104,49 +94,18 @@ template: |
 	}
 }
 
-func TestOptionsEffective_MissingConfig(t *testing.T) {
-	opts := Options{
-		ConfigPath: "/path/to/non/existent/file.yaml",
+func TestApplyOptions(t *testing.T) {
+	cfg := &Config{
+		OutputFormat: "markdown",
 	}
-
-	_, _, err := opts.CompileTemplates()
-	if err == nil {
-		t.Fatal("Expected error for missing config file, got nil")
-	}
-}
-
-func TestOptionsEffective_ConfigMerging(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	envCfgPath := filepath.Join(tmpDir, "env_config.yaml")
-	envContent := `
-template: "ENV_TEMPLATE"
-section_template: "ENV_SECTION"
-`
-	if err := os.WriteFile(envCfgPath, []byte(envContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cliCfgPath := filepath.Join(tmpDir, "cli_config.yaml")
-	cliContent := `
-template: "CLI_TEMPLATE"
-`
-	if err := os.WriteFile(cliCfgPath, []byte(cliContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	t.Setenv("LX_CONFIG", envCfgPath)
 
 	opts := Options{
-		ConfigPath: cliCfgPath,
+		OutputFormat: "xml",
 	}
 
-	engine, _, err := opts.CompileTemplates()
-	if err != nil {
-		t.Fatalf("CompileTemplates failed: %v", err)
-	}
+	ApplyOptions(cfg, opts)
 
-	if engine.Main == nil {
-		t.Fatal("Engine Main is nil")
+	if cfg.OutputFormat != "xml" {
+		t.Errorf("ApplyOptions failed to override format. Got %s, want xml", cfg.OutputFormat)
 	}
 }
