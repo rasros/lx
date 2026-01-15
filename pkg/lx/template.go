@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+// ... (defaultTemplate, defaultSectionTemplate, defaultPromptTemplate unchanged) ...
+
 const defaultTemplate = `{{ .Separator }}{{ if eq .Size 0 }}` +
 	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - empty file` +
 	`{{ else if .IsBinary }}` +
@@ -31,30 +33,45 @@ const defaultPromptTemplate = `{{ .Separator }}{{ .Body | endNewline }}`
 const defaultHeaderTemplate = ""
 const defaultFooterTemplate = "\n\n"
 
-// XML and HTML templates can utilize the new Section stats if desired,
-// but sticking to global index is often safer for strict XML parsing
-// unless the schema supports sections.
-// For now, we update XML to use global index still to ensure uniqueness across doc.
+// defaultXMLTemplate handles the file content.
+const defaultXMLTemplate = `{{ .Separator }}` +
+	`  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
+	`    <source>{{ .Path }}</source>` + "\n" +
+	`{{- if .IsBinary }}` + "\n" +
+	`    <error>Binary file ({{ .Size | humanize }})</error>` + "\n" +
+	`{{- else if .IsCompactView }}` + "\n" +
+	`    <description>Compact view</description>` + "\n" +
+	`{{- else }}` + "\n" +
+	`    <document_content>` + "\n" +
+	`{{ .Content | endNewline }}` +
+	`    </document_content>` + "\n" +
+	`{{- end }}` + "\n" +
+	`  </document>`
 
-const defaultXMLTemplate = `{{ .Separator }}<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
-	`  <source>{{ .Path }}</source>` + "\n" +
-	`  {{- if .IsBinary }}` + "\n" +
-	`  <error>Binary file ({{ .Size | humanize }})</error>` + "\n" +
-	`  {{- else if .IsCompactView }}` + "\n" +
-	`  <description>Compact view</description>` + "\n" +
-	`  {{- else }}` + "\n" +
-	`  <document_content>` + "\n" +
-	`{{ .Content | endNewline }}  </document_content>` + "\n" +
-	`  {{- end }}` + "\n" +
-	`</document>`
+// defaultXMLSectionHeaderTemplate handles the outer container.
+// - Implicit mode uses <documents> as the root container.
+// - Explicit mode uses <section> as the root container.
+const defaultXMLSectionHeaderTemplate = `{{ if .IsImplicit }}` +
+	`{{ .Separator }}<content>` +
+	`{{ else }}` +
+	`{{ .Separator }}<section>` +
+	`{{ end }}` + "\n"
 
-const defaultXMLSectionTemplate = `{{ .Separator }}<section_header>` + "\n" +
-	`{{ .Body | endNewline -}}` +
-	`</section_header>`
+const defaultXMLSectionTemplate = `{{ if not .IsImplicit }}` +
+	`  <section_name>{{ .Body }}</section_name>` +
+	`{{ end }}`
 
-const defaultXMLPromptTemplate = `{{ .Separator }}<instruction>` + "\n" +
-	`{{ .Body | endNewline -}}` +
-	`</instruction>`
+// defaultXMLSectionFooterTemplate closes the container opened in the header.
+const defaultXMLSectionFooterTemplate = `{{ if .IsImplicit }}` +
+	"\n" + `</content>` +
+	`{{ else }}` +
+	"\n" + `</section>` +
+	`{{ end }}`
+
+const defaultXMLPromptTemplate = `{{ .Separator }}` +
+	`  <instruction>` + "\n" +
+	`{{ .Body | endNewline }}` +
+	`  </instruction>`
 
 const defaultHTMLHeaderTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -137,8 +154,8 @@ const defaultHTMLTemplate = `<article id="file-{{ .FileIndex }}">
 </article>
 `
 
-const defaultHTMLSectionTemplate = `<section id="section-{{ .Section }}">` +
-	`<h2><a href="#section-{{ .Section }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>` +
+const defaultHTMLSectionTemplate = `<section id="section-{{ .Index }}">` +
+	`<h2><a href="#section-{{ .Index }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>` +
 	`</section>`
 
 const defaultHTMLPromptTemplate = `<blockquote>{{ .Body | endNewline }}</blockquote>`

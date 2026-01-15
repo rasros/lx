@@ -97,6 +97,8 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 		defMain = defaultXMLTemplate
 		defSection = defaultXMLSectionTemplate
 		defPrompt = defaultXMLPromptTemplate
+		defSecHeader = defaultXMLSectionHeaderTemplate
+		defSecFooter = defaultXMLSectionFooterTemplate
 	case "html":
 		defMain = defaultHTMLTemplate
 		defSection = defaultHTMLSectionTemplate
