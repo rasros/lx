@@ -8,7 +8,7 @@ import (
 	"github.com/monochromegane/go-gitignore"
 )
 
-// TokenCounter is a function type that allows plugging in different LLM tokenizers.
+// TokenCounter allows plugging in different LLM tokenizers.
 type TokenCounter func(size int64, content interface{}) int64
 
 // DefaultTokenCounter provides a simple 4-char-per-token heuristic.
@@ -57,24 +57,19 @@ type TemplateEngine struct {
 
 // Config represents the core library configuration.
 type Config struct {
-	Template        string
-	SectionTemplate string
-	PromptTemplate  string
-	StatsTemplate   string
-	HeaderTemplate  string
-	FooterTemplate  string
-
-	// New templates
+	Template              string
+	SectionTemplate       string
+	PromptTemplate        string
+	StatsTemplate         string
+	HeaderTemplate        string
+	FooterTemplate        string
 	SectionHeaderTemplate string
 	SectionFooterTemplate string
-
-	OutputFormat string
-
-	FollowSymlinks bool
-	ShowHidden     bool
-	IgnoreEnabled  bool
-
-	GlobalIgnore gitignore.IgnoreMatcher
+	OutputFormat          string
+	FollowSymlinks        bool
+	ShowHidden            bool
+	IgnoreEnabled         bool
+	GlobalIgnore          gitignore.IgnoreMatcher
 }
 
 // NewConfig returns a default configuration.
@@ -108,8 +103,6 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 		defPrompt = defaultHTMLPromptTemplate
 		defHeader = defaultHTMLHeaderTemplate
 		defFooter = defaultHTMLFooterTemplate
-		// HTML technically uses section tags in the Item template,
-		// but we can add container logic here if needed.
 	default:
 		defMain = defaultTemplate
 		defSection = defaultSectionTemplate
