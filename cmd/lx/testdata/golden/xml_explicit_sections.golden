@@ -1,0 +1,24 @@
+<section>
+  <section_name>Docs</section_name>
+
+  <document index="1" language="markdown" rows="2">
+    <source>README.md</source>
+    <document_content>
+# Hello World
+Readme content.
+    </document_content>
+  </document>
+</section>
+
+<section>
+  <section_name>Code</section_name>
+
+  <document index="2" language="go" rows="2">
+    <source>main.go</source>
+    <document_content>
+package main
+func main() {}
+    </document_content>
+  </document>
+</section>
+

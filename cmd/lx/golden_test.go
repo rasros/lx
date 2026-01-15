@@ -35,8 +35,71 @@ func TestGolden(t *testing.T) {
 		{name: "show_hidden", args: []string{"-H", "."}},
 		{name: "ignore_disabled", args: []string{"--no-ignore", "-n0", "."}},
 		{name: "compact_view", args: []string{"-n0", "."}},
-		{name: "xml_format", args: []string{"--xml", "."}},
-		{name: "html_format", args: []string{"--html", "."}},
+
+		{
+			name: "md_mixed_prompts_files",
+			args: []string{"-p", "Analyze these:", ".", "-p", "End of list"},
+		},
+		{
+			name: "md_explicit_sections",
+			args: []string{
+				"-s", "Docs", "README.md",
+				"-s", "Code", "main.go",
+			},
+		},
+
+		// --- XML Format Tests ---
+		// 1. Implicit Only (Default behavior)
+		{
+			name: "xml_implicit_basic",
+			args: []string{"--xml", "main.go", "README.md"},
+		},
+		// 2. Implicit with Prompts
+		{
+			name: "xml_implicit_with_prompts",
+			args: []string{"--xml", "-p", "Start", "main.go", "-p", "End"},
+		},
+		// 3. Explicit Sections Only
+		{
+			name: "xml_explicit_sections",
+			args: []string{"--xml", "-s", "Docs", "README.md", "-s", "Code", "main.go"},
+		},
+		// 4. Explicit Sections with Prompts inside
+		{
+			name: "xml_explicit_with_prompts",
+			args: []string{
+				"--xml",
+				"-s", "Context", "-p", "Here is the readme", "README.md",
+				"-s", "Task", "-p", "Refactor this", "main.go",
+			},
+		},
+		// 5. Prompts Only (No files)
+		{
+			name: "xml_prompts_only",
+			args: []string{"--xml", "-p", "Just instructions", "-p", "More instructions"},
+		},
+		// 6. Mixed Implicit then Explicit (Not typical but possible)
+		// lx treats the first batch as implicit section 0, then switches to explicit.
+		{
+			name: "xml_mixed_implicit_explicit",
+			args: []string{"--xml", "README.md", "-s", "Code", "main.go"},
+		},
+
+		// --- HTML Format Tests ---
+		{
+			name: "html_basic",
+			args: []string{"--html", "main.go"},
+		},
+		{
+			name: "html_explicit_sections",
+			args: []string{"--html", "-s", "Documentation", "README.md", "-s", "Code", "main.go"},
+		},
+		{
+			name: "html_prompts_mixed",
+			args: []string{"--html", "-p", "Header Prompt", "README.md", "-s", "Code", "-p", "Inner Prompt", "main.go"},
+		},
+
+		// --- Complex Filter Logic ---
 		{name: "line_numbers", args: []string{"-l", "main.go"}},
 		{
 			name: "complex_structure",
@@ -46,7 +109,6 @@ func TestGolden(t *testing.T) {
 				"-s", "Source Code", "-i", "*.go", "-e", "*_test.go", ".",
 			},
 		},
-		{name: "prompt_injection", args: []string{"-p", "Explain this code", "main.go"}},
 		{
 			name: "filter_reset_relax",
 			args: []string{
@@ -83,6 +145,8 @@ func TestGolden(t *testing.T) {
 				"-s", "Scripts", "-i", "myscript", ".",
 			},
 		},
+
+		// --- Slicing & Edge Cases ---
 		{
 			name: "progressive_slicing",
 			args: []string{

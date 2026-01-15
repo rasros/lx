@@ -37,14 +37,15 @@ article > header {
 <hgroup>
 <h1>lx output</h1>
 <p>
-  Files: 7 &bull; 
-  Size: 136 B &bull; 
+  Files: 2 &bull; 
+  Size: 56 B &bull; 
   Path: .
 </p>
 </hgroup>
 </header>
 <main>
-<article id="file-1">
+<blockquote>Header Prompt
+</blockquote><article id="file-1">
 <header>
  <a href="#file-1" aria-label="Link to this file"><strong>README.md</strong></a>
  <small>(2 rows)</small>
@@ -54,59 +55,16 @@ article > header {
 Readme content.
 </code></pre>
 </article>
-<article id="file-2">
+<section id="section-1"><h2><a href="#section-1" style="text-decoration:none; color:inherit;">Code
+</a></h2></section><blockquote>Inner Prompt
+</blockquote><article id="file-2">
 <header>
- <a href="#file-2" aria-label="Link to this file"><strong>binary.dat</strong></a>
- <small>(1 rows - compact)</small>
-</header>
-<em>Binary file (7 B)</em>
-</article>
-<article id="file-3">
-<header>
- <a href="#file-3" aria-label="Link to this file"><strong>main.go</strong></a>
+ <a href="#file-2" aria-label="Link to this file"><strong>main.go</strong></a>
  <small>(2 rows)</small>
 </header>
 <pre><code class="language-go">
 package main
 func main() {}
-</code></pre>
-</article>
-<article id="file-4">
-<header>
- <a href="#file-4" aria-label="Link to this file"><strong>main_test.go</strong></a>
- <small>(2 rows)</small>
-</header>
-<pre><code class="language-go">
-package main
-import &#34;testing&#34;
-</code></pre>
-</article>
-<article id="file-5">
-<header>
- <a href="#file-5" aria-label="Link to this file"><strong>myscript</strong></a>
- <small>(2 rows)</small>
-</header>
-<pre><code class="language-bash">
-#!/bin/bash
-echo &#39;hi&#39;
-</code></pre>
-</article>
-<article id="file-6">
-<header>
- <a href="#file-6" aria-label="Link to this file"><strong>pkg/util/README.md</strong></a>
- <small>(1 rows)</small>
-</header>
-<pre><code class="language-markdown">
-# Util Docs
-</code></pre>
-</article>
-<article id="file-7">
-<header>
- <a href="#file-7" aria-label="Link to this file"><strong>pkg/util/util.go</strong></a>
- <small>(1 rows)</small>
-</header>
-<pre><code class="language-go">
-package util
 </code></pre>
 </article>
 </main>
