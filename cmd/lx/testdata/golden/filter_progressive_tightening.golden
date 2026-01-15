@@ -1,43 +1,43 @@
 ## Round 1 (All)
 ---
 
-[1/16] README.md (2 rows)
+[1/7] README.md (2 rows)
 ---
 ```markdown
 # Hello World
 Readme content.
 ```
 
-[2/16] binary.dat - binary file skipped (7 B)
+[2/7] binary.dat - binary file skipped (7 B)
 
-[3/16] main.go (2 rows)
+[3/7] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[4/16] main_test.go (2 rows)
+[4/7] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[5/16] myscript (2 rows)
+[5/7] myscript (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo 'hi'
 ```
 
-[6/16] pkg/util/README.md (1 rows)
+[6/7] pkg/util/README.md (1 rows)
 ---
 ```markdown
 # Util Docs
 ```
 
-[7/16] pkg/util/util.go (1 rows)
+[7/7] pkg/util/util.go (1 rows)
 ---
 ```go
 package util
@@ -46,30 +46,30 @@ package util
 ## Round 2 (No Markdown)
 ---
 
-[8/16] binary.dat - binary file skipped (7 B)
+[1/5] binary.dat - binary file skipped (7 B)
 
-[9/16] main.go (2 rows)
+[2/5] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[10/16] main_test.go (2 rows)
+[3/5] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[11/16] myscript (2 rows)
+[4/5] myscript (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo 'hi'
 ```
 
-[12/16] pkg/util/util.go (1 rows)
+[5/5] pkg/util/util.go (1 rows)
 ---
 ```go
 package util
@@ -78,23 +78,23 @@ package util
 ## Round 3 (No MD, No Tests)
 ---
 
-[13/16] binary.dat - binary file skipped (7 B)
+[1/4] binary.dat - binary file skipped (7 B)
 
-[14/16] main.go (2 rows)
+[2/4] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[15/16] myscript (2 rows)
+[3/4] myscript (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo 'hi'
 ```
 
-[16/16] pkg/util/util.go (1 rows)
+[4/4] pkg/util/util.go (1 rows)
 ---
 ```go
 package util

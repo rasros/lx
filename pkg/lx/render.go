@@ -32,34 +32,38 @@ func NewProcessor(engine *TemplateEngine, global GlobalContext) *Processor {
 	}
 }
 
-// Render processes an item. If item is an InputFile, scratchBuf is used for
-// header reading and line estimation to avoid allocations.
-func (p *Processor) Render(w io.Writer, item StreamItem, index int, scratchBuf []byte) error {
+// RenderPrepared processes a preparedItem which contains pre-calculated context
+func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []byte) error {
 	var isCompact bool
 	var err error
-
 	var ctx interface{}
 	var templateToUse *template.Template
 
-	switch v := item.(type) {
+	switch v := item.raw.(type) {
 	case InputFile:
 		var fCtx FileContext
-		fCtx, err = p.prepareFileContext(v, index, scratchBuf)
+		// We pass the global index here, but section index is injected below
+		fCtx, err = p.prepareFileContext(v, item.fileIndexGlobal, scratchBuf)
 		if err != nil {
 			return err
 		}
+		// Inject Section Metadata
+		fCtx.Section = *item.section
+		fCtx.SectionFileIndex = item.fileIndexSection
+
 		isCompact = fCtx.IsCompactView
 		ctx = &fCtx
 		templateToUse = p.engine.Main
 
 	case SectionContext:
-		v.Global = p.global
+		v = *item.section
 		isCompact = false
 		ctx = &v
 		templateToUse = p.engine.Section
 
 	case PromptContext:
 		v.Global = p.global
+		v.Section = *item.section
 		isCompact = false
 		ctx = &v
 		templateToUse = p.engine.Prompt
@@ -68,22 +72,19 @@ func (p *Processor) Render(w io.Writer, item StreamItem, index int, scratchBuf [
 		return nil
 	}
 
-	separator := ""
-	if p.hasRenderedFirst {
-		if p.lastWasCompact && isCompact {
-			separator = "\n"
-		} else {
-			separator = "\n\n"
-		}
-	}
+	// Separator logic is now largely handled by the Assembler in lx.go
+	// However, templates still accept {{ .Separator }}.
+	// We can leave it empty here or allow templates to handle it.
+	// In the assembler update, we print separators *between* buffers.
+	// So passing "" is usually correct here to avoid double spacing.
 
 	switch c := ctx.(type) {
 	case *FileContext:
-		c.Separator = separator
+		c.Separator = ""
 	case *SectionContext:
-		c.Separator = separator
+		c.Separator = ""
 	case *PromptContext:
-		c.Separator = separator
+		c.Separator = ""
 	}
 
 	if err := templateToUse.Execute(w, ctx); err != nil {
@@ -92,17 +93,21 @@ func (p *Processor) Render(w io.Writer, item StreamItem, index int, scratchBuf [
 
 	p.hasRenderedFirst = true
 	p.lastWasCompact = isCompact
-
 	return nil
 }
 
-// prepareFileContext reads the file and builds the context without rendering it.
+// ... prepareFileContext (Unchanged except signature if needed, but signature matches) ...
 func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte) (FileContext, error) {
+	// (Implementation identical to previous version, it just fills FileContext)
+	// ...
+	// Note: prepareFileContext fills Global, but not Section. Section is filled in RenderPrepared.
 	rc, err := file.Open()
 	if err != nil {
 		return FileContext{}, err
 	}
 	defer rc.Close()
+
+	// ... (rest of logic: reading, detection, line estimation) ...
 
 	var reader io.ReaderAt
 	var size int64
@@ -113,33 +118,22 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 		reader, size = bytes.NewReader(data), int64(len(data))
 	}
 
-	// Use scratch buffer for detection (header read)
-	// Fallback if no scratch provided (though pipeline should always provide it)
 	if scratch == nil {
 		scratch = make([]byte, 1024)
 	}
-
 	headerLen := 1024
 	if len(scratch) < headerLen {
 		headerLen = len(scratch)
 	}
-
 	n, _ := reader.ReadAt(scratch[:headerLen], 0)
 	isBinary := detect.IsBinary(scratch[:n])
 	lang := detect.DetectLanguage(file.Path, scratch[:n])
 	isImage := detect.IsImage(file.Path)
-
 	cfg := file.Config
-
-	// Determine "Compact" status for spacing logic
-	// A file is compact if user requested -n0, OR it's binary, OR it's empty.
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
-
-	// Use the SAME scratch buffer for line counting (needs up to ~32KB)
 	totalRows, exact, _ := content.EstimateLineCount(reader, size, scratch)
 
 	var contentData interface{}
-	// Only read content slices if we actually plan to show them
 	if !isBinary && !isCompact && size > 0 && !isImage {
 		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, cfg)
 		if err == nil {
@@ -161,21 +155,22 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 		IsCompactView: isCompact,
 		FileIndex:     index,
 		Global:        p.global,
+		// Section is filled by caller
 	}, nil
 }
 
+// ... readSlices, formatContent, tailFromBuffer (Unchanged) ...
 func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg RunnerConfig) (head, tail, gap []byte, err error) {
+	// (Same as before)
 	if cfg.Head < 0 {
 		sr := io.NewSectionReader(reader, 0, size)
 		head, _, err = content.ReadHead(sr, -1)
 		return head, nil, nil, err
 	}
-
 	if cfg.Head > 0 {
 		sr := io.NewSectionReader(reader, 0, size)
 		head, _, err = content.ReadHead(sr, cfg.Head)
 	}
-
 	if cfg.Tail > 0 {
 		skipped := totalRows - cfg.Head - cfg.Tail
 		if skipped > 0 && cfg.Head > 0 {
@@ -185,7 +180,6 @@ func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, is
 			}
 			gap = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
 		}
-
 		if f, ok := reader.(*os.File); ok {
 			tail, _ = content.ReadTailSeek(f, cfg.Tail)
 		} else if br, ok := reader.(*bytes.Reader); ok {
@@ -197,9 +191,7 @@ func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, is
 
 func (p *Processor) formatContent(head, tail, gap []byte, totalRows int, cfg RunnerConfig) interface{} {
 	if cfg.LineNumbers {
-		return content.LineNumberFormatter{
-			Head: head, Gap: gap, Tail: tail, TotalRows: totalRows,
-		}
+		return content.LineNumberFormatter{Head: head, Gap: gap, Tail: tail, TotalRows: totalRows}
 	}
 	var res bytes.Buffer
 	res.Write(head)

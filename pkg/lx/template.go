@@ -14,13 +14,13 @@ import (
 )
 
 const defaultTemplate = `{{ .Separator }}{{ if eq .Size 0 }}` +
-	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - empty file` +
+	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - empty file` +
 	`{{ else if .IsBinary }}` +
-	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` +
+	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` +
 	`{{ else if .IsCompactView }}` +
-	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)` +
+	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)` +
 	`{{ else }}` +
-	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
+	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
 ---
 ` + "```{{ .Language }}" + `
 {{ .Content | endNewline -}}` + "```" + `{{ end }}`
@@ -29,8 +29,12 @@ const defaultSectionTemplate = `{{ .Separator }}## {{ .Body | endNewline }}---`
 const defaultPromptTemplate = `{{ .Separator }}{{ .Body | endNewline }}`
 
 const defaultHeaderTemplate = ""
-
 const defaultFooterTemplate = "\n\n"
+
+// XML and HTML templates can utilize the new Section stats if desired,
+// but sticking to global index is often safer for strict XML parsing
+// unless the schema supports sections.
+// For now, we update XML to use global index still to ensure uniqueness across doc.
 
 const defaultXMLTemplate = `{{ .Separator }}<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
 	`  <source>{{ .Path }}</source>` + "\n" +

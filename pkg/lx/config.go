@@ -12,11 +12,8 @@ import (
 type TokenCounter func(size int64, content interface{}) int64
 
 // DefaultTokenCounter provides a simple 4-char-per-token heuristic.
-// It prioritizes the actual content length if provided (string or byte slice).
 func DefaultTokenCounter(size int64, content interface{}) int64 {
 	var targetSize int64 = size
-
-	// If we have actual sliced content, use its length instead of file size
 	switch v := content.(type) {
 	case string:
 		targetSize = int64(len(v))
@@ -25,15 +22,14 @@ func DefaultTokenCounter(size int64, content interface{}) int64 {
 	case fmt.Stringer:
 		targetSize = int64(len(v.String()))
 	}
-
 	return targetSize / 4
 }
 
 // GlobalContext holds metadata about the entire execution.
 type GlobalContext struct {
 	TotalFiles        int
-	TotalSize         int64 // Total size of files on disk
-	TotalWrittenBytes int64 // Total bytes actually written to output
+	TotalSize         int64
+	TotalWrittenBytes int64
 	TokenEstimate     int64
 	TotalSections     int
 	WorkDir           string
@@ -49,16 +45,17 @@ type RunnerConfig struct {
 
 // TemplateEngine holds the parsed text/template instances.
 type TemplateEngine struct {
-	Main    *template.Template
-	Section *template.Template
-	Prompt  *template.Template
-	Stats   *template.Template
-	Header  *template.Template
-	Footer  *template.Template
+	Main          *template.Template
+	Section       *template.Template
+	Prompt        *template.Template
+	Stats         *template.Template
+	Header        *template.Template
+	Footer        *template.Template
+	SectionHeader *template.Template
+	SectionFooter *template.Template
 }
 
 // Config represents the core library configuration.
-// It is decoupled from serialization formats like YAML.
 type Config struct {
 	Template        string
 	SectionTemplate string
@@ -67,12 +64,15 @@ type Config struct {
 	HeaderTemplate  string
 	FooterTemplate  string
 
+	// New templates
+	SectionHeaderTemplate string
+	SectionFooterTemplate string
+
 	OutputFormat string
 
 	FollowSymlinks bool
 	ShowHidden     bool
-	// IgnoreEnabled controls whether .gitignore/.ignore/.lxignore files are respected.
-	IgnoreEnabled bool
+	IgnoreEnabled  bool
 
 	GlobalIgnore gitignore.IgnoreMatcher
 }
@@ -94,6 +94,8 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 	var defMain, defSection, defPrompt string
 	defHeader := defaultHeaderTemplate
 	defFooter := defaultFooterTemplate
+	defSecHeader := ""
+	defSecFooter := ""
 
 	switch format {
 	case "xml":
@@ -106,6 +108,8 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 		defPrompt = defaultHTMLPromptTemplate
 		defHeader = defaultHTMLHeaderTemplate
 		defFooter = defaultHTMLFooterTemplate
+		// HTML technically uses section tags in the Item template,
+		// but we can add container logic here if needed.
 	default:
 		defMain = defaultTemplate
 		defSection = defaultSectionTemplate
@@ -148,14 +152,24 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("footer template: %w", err)
 	}
+	tSecHeader, err := parse("section_header", pick(cfg.SectionHeaderTemplate, defSecHeader))
+	if err != nil {
+		return nil, fmt.Errorf("section_header template: %w", err)
+	}
+	tSecFooter, err := parse("section_footer", pick(cfg.SectionFooterTemplate, defSecFooter))
+	if err != nil {
+		return nil, fmt.Errorf("section_footer template: %w", err)
+	}
 
 	return &TemplateEngine{
-		Main:    tMain,
-		Section: tSection,
-		Prompt:  tPrompt,
-		Stats:   tStats,
-		Header:  tHeader,
-		Footer:  tFooter,
+		Main:          tMain,
+		Section:       tSection,
+		Prompt:        tPrompt,
+		Stats:         tStats,
+		Header:        tHeader,
+		Footer:        tFooter,
+		SectionHeader: tSecHeader,
+		SectionFooter: tSecFooter,
 	}, nil
 }
 
@@ -179,6 +193,12 @@ func Merge(dst *Config, src *Config) {
 	if src.FooterTemplate != "" {
 		dst.FooterTemplate = src.FooterTemplate
 	}
+	if src.SectionHeaderTemplate != "" {
+		dst.SectionHeaderTemplate = src.SectionHeaderTemplate
+	}
+	if src.SectionFooterTemplate != "" {
+		dst.SectionFooterTemplate = src.SectionFooterTemplate
+	}
 	if src.OutputFormat != "" {
 		dst.OutputFormat = src.OutputFormat
 	}
@@ -188,43 +208,45 @@ func Merge(dst *Config, src *Config) {
 	if src.ShowHidden {
 		dst.ShowHidden = true
 	}
-	// IgnoreEnabled is tricky to merge without a pointer or mask,
-	// but strictly speaking, the CLI handles the logic before calling Merge.
 }
 
 // --- Context Structs for Templates ---
 
 type FileContext struct {
-	Path           string
-	AbsPath        string
-	Size           int64
-	ModTime        time.Time
-	TotalRows      int
-	TokenEstimate  int64
-	IsEstimate     bool
-	Language       string
-	Content        interface{}
-	IsBinary       bool
-	IsImage        bool
-	IsCompactView  bool
-	FileIndex      int
-	CurrentSection int
-	Separator      string
-	Global         GlobalContext
+	Path             string
+	AbsPath          string
+	Size             int64
+	ModTime          time.Time
+	TotalRows        int
+	TokenEstimate    int64
+	IsEstimate       bool
+	Language         string
+	Content          interface{}
+	IsBinary         bool
+	IsImage          bool
+	IsCompactView    bool
+	FileIndex        int
+	SectionFileIndex int
+	Separator        string
+	Global           GlobalContext
+	Section          SectionContext
 }
 
 type SectionContext struct {
-	Body      string
-	Section   int
-	Separator string
-	Global    GlobalContext
+	Body       string
+	Index      int
+	TotalFiles int
+	TotalSize  int64
+	Separator  string
+	Global     GlobalContext
+	IsImplicit bool
 }
 
 type PromptContext struct {
 	Body      string
-	Section   int
 	Separator string
 	Global    GlobalContext
+	Section   SectionContext
 }
 
 type HeaderContext struct {

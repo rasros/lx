@@ -1,14 +1,14 @@
 ## Documentation
 ---
 
-[1/4] README.md (2 rows)
+[1/2] README.md (2 rows)
 ---
 ```markdown
 # Hello World
 Readme content.
 ```
 
-[2/4] pkg/util/README.md (1 rows)
+[2/2] pkg/util/README.md (1 rows)
 ---
 ```markdown
 # Util Docs
@@ -17,14 +17,14 @@ Readme content.
 ## Source Code
 ---
 
-[3/4] main.go (2 rows)
+[1/2] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[4/4] pkg/util/util.go (1 rows)
+[2/2] pkg/util/util.go (1 rows)
 ---
 ```go
 package util

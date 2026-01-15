@@ -12,16 +12,18 @@ import (
 )
 
 type CliConfig struct {
-	Template        string `yaml:"template"`
-	SectionTemplate string `yaml:"section_template"`
-	PromptTemplate  string `yaml:"prompt_template"`
-	StatsTemplate   string `yaml:"stats_template"`
-	HeaderTemplate  string `yaml:"header_template"`
-	FooterTemplate  string `yaml:"footer_template"`
-	OutputFormat    string `yaml:"output_format"`
-	FollowSymlinks  bool   `yaml:"follow_symlinks"`
-	ShowHidden      bool   `yaml:"show_hidden"`
-	Ignore          *bool  `yaml:"ignore"`
+	Template              string `yaml:"template"`
+	SectionTemplate       string `yaml:"section_template"`
+	PromptTemplate        string `yaml:"prompt_template"`
+	StatsTemplate         string `yaml:"stats_template"`
+	HeaderTemplate        string `yaml:"header_template"`
+	FooterTemplate        string `yaml:"footer_template"`
+	SectionHeaderTemplate string `yaml:"section_header_template"`
+	SectionFooterTemplate string `yaml:"section_footer_template"`
+	OutputFormat          string `yaml:"output_format"`
+	FollowSymlinks        bool   `yaml:"follow_symlinks"`
+	ShowHidden            bool   `yaml:"show_hidden"`
+	Ignore                *bool  `yaml:"ignore"`
 
 	OutputMode string `yaml:"output_mode"`
 	ShowStats  string `yaml:"show_stats"`
@@ -69,6 +71,12 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		}
 		if loaded.FooterTemplate != "" {
 			lxCfg.FooterTemplate = loaded.FooterTemplate
+		}
+		if loaded.SectionHeaderTemplate != "" {
+			lxCfg.SectionHeaderTemplate = loaded.SectionHeaderTemplate
+		}
+		if loaded.SectionFooterTemplate != "" {
+			lxCfg.SectionFooterTemplate = loaded.SectionFooterTemplate
 		}
 		if loaded.OutputFormat != "" {
 			lxCfg.OutputFormat = loaded.OutputFormat

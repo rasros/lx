@@ -1,14 +1,14 @@
 ## Docs
 ---
 
-[1/5] README.md (2 rows)
+[1/2] README.md (2 rows)
 ---
 ```markdown
 # Hello World
 Readme content.
 ```
 
-[2/5] pkg/util/README.md (1 rows)
+[2/2] pkg/util/README.md (1 rows)
 ---
 ```markdown
 # Util Docs
@@ -17,14 +17,14 @@ Readme content.
 ## Logic
 ---
 
-[3/5] main.go (2 rows)
+[1/2] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[4/5] pkg/util/util.go (1 rows)
+[2/2] pkg/util/util.go (1 rows)
 ---
 ```go
 package util
@@ -33,7 +33,7 @@ package util
 ## Scripts
 ---
 
-[5/5] myscript (2 rows)
+myscript (2 rows)
 ---
 ```bash
 #!/bin/bash

@@ -24,14 +24,27 @@ type defaultTokenizer struct{}
 
 func (defaultTokenizer) Estimate(size int64, _ interface{}) int64 { return size / 4 }
 
+// preparedItem wraps a raw StreamItem with calculated metadata
+type preparedItem struct {
+	raw              StreamItem
+	section          *SectionContext
+	fileIndexGlobal  int
+	fileIndexSection int
+	streamIndex      int // Order in the output
+}
+
 type Stream struct {
-	items      []StreamItem
-	tokenizer  Tokenizer
-	engine     *TemplateEngine
-	renderCfg  RunnerConfig
-	workDir    string
-	format     string // "markdown", "xml", "html"
-	finalStats *GlobalContext
+	items     []StreamItem
+	tokenizer Tokenizer
+	engine    *TemplateEngine
+	renderCfg RunnerConfig
+	workDir   string
+	format    string
+
+	// Calculated state
+	finalStats    *GlobalContext
+	preparedItems []preparedItem
+	sections      []*SectionContext
 }
 
 func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
@@ -70,6 +83,7 @@ func (s *Stream) AddFile(f InputFile) *Stream {
 }
 
 func (s *Stream) AddSection(title string) *Stream {
+	// Add as a placeholder item. Prepare() will refine this.
 	s.items = append(s.items, SectionContext{Body: title})
 	return s
 }
@@ -84,36 +98,108 @@ func (s *Stream) Prepare() GlobalContext {
 		return *s.finalStats
 	}
 
-	ctx := GlobalContext{
+	global := GlobalContext{
 		WorkDir:  s.workDir,
 		Metadata: make(map[string]string),
 	}
 
-	sectionCount := 0
-	for _, item := range s.items {
-		switch v := item.(type) {
-		case InputFile:
-			ctx.TotalFiles++
-			ctx.TotalSize += v.Size
-			ctx.TokenEstimate += s.tokenizer.Estimate(v.Size, nil)
-		case SectionContext:
-			sectionCount++
+	// 1. Initial Pass: Identify Sections and assign items
+	s.sections = make([]*SectionContext, 0)
+	s.preparedItems = make([]preparedItem, 0, len(s.items))
+
+	// Create an implicit root section
+	currentSection := &SectionContext{
+		Index:      0,
+		Body:       "",
+		IsImplicit: true,
+	}
+	// We only add it to s.sections if we actually use it (or if it's the only one)
+	usingImplicit := true
+
+	// Check if the very first item is a Section definition.
+	// If so, we skip the implicit section entirely.
+	if len(s.items) > 0 {
+		if _, ok := s.items[0].(SectionContext); ok {
+			usingImplicit = false
 		}
 	}
-	ctx.TotalSections = sectionCount
-	return ctx
+
+	if usingImplicit {
+		s.sections = append(s.sections, currentSection)
+	}
+
+	sectionCounter := 0
+	if !usingImplicit {
+		sectionCounter = -1 // Will increment to 0 on first item
+	}
+
+	globalFileIdx := 1
+
+	for i, item := range s.items {
+		// Handle explicit Section creation
+		if sec, ok := item.(SectionContext); ok {
+			sectionCounter++
+			newSec := &SectionContext{
+				Index:      sectionCounter,
+				Body:       sec.Body,
+				IsImplicit: false,
+			}
+			s.sections = append(s.sections, newSec)
+			currentSection = newSec
+
+			// The SectionContext item itself is added to the stream
+			// It belongs to the *new* section conceptually
+			s.preparedItems = append(s.preparedItems, preparedItem{
+				raw:         item,
+				section:     currentSection,
+				streamIndex: i,
+			})
+			continue
+		}
+
+		// Handle Files
+		if f, ok := item.(InputFile); ok {
+			currentSection.TotalFiles++
+			currentSection.TotalSize += f.Size
+			global.TotalFiles++
+			global.TotalSize += f.Size
+			global.TokenEstimate += s.tokenizer.Estimate(f.Size, nil)
+
+			s.preparedItems = append(s.preparedItems, preparedItem{
+				raw:              item,
+				section:          currentSection,
+				fileIndexGlobal:  globalFileIdx,
+				fileIndexSection: currentSection.TotalFiles,
+				streamIndex:      i,
+			})
+			globalFileIdx++
+			continue
+		}
+
+		// Handle Prompts
+		s.preparedItems = append(s.preparedItems, preparedItem{
+			raw:         item,
+			section:     currentSection,
+			streamIndex: i,
+		})
+	}
+
+	global.TotalSections = len(s.sections)
+
+	// Backfill global context into sections
+	for _, sec := range s.sections {
+		sec.Global = global
+	}
+
+	return global
 }
 
 func (s *Stream) GetGlobalContext() GlobalContext {
 	return s.Prepare()
 }
 
-// Execute processes the stream using a parallel pipeline to maximize I/O and CPU usage
-// while maintaining strict output order.
 func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	global := s.Prepare()
-
-	// Wrap writer to track actual bytes written for stats
 	counter := &byteCounter{w: w}
 
 	if err := s.engine.Header.Execute(counter, HeaderContext{Global: global}); err != nil {
@@ -128,26 +214,24 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
-	// Update the cached stats with the actual written byte count
 	global.TotalWrittenBytes = counter.count
 	s.finalStats = &global
-
 	return nil
 }
 
 // pipeline types
 type seqJob struct {
-	seqID   int
-	fileIdx int
-	item    StreamItem
+	seqID int
+	item  preparedItem
 }
 
 type result struct {
-	index     int
-	buffer    *bytes.Buffer // Holds pooled buffer to reduce GC pressure
-	stats     int64
-	isCompact bool
-	err       error
+	index        int
+	buffer       *bytes.Buffer
+	stats        int64
+	isCompact    bool
+	err          error
+	sectionIndex int // To track boundaries
 }
 
 // bufferPool reduces memory allocation for Output buffers
@@ -160,7 +244,7 @@ var bufferPool = sync.Pool{
 // readPool reduces memory allocation for Input (Read) buffers
 var readPool = sync.Pool{
 	New: func() interface{} {
-		// 32KB is optimal for EstimateLineCount sampling
+		// 32KB for EstimateLineCount sampling
 		b := make([]byte, 32*1024)
 		return &b
 	},
@@ -176,41 +260,38 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 
 	var wg sync.WaitGroup
 
-	// A. Start Workers
+	// A. Workers
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-
 			for j := range jobsCh {
 				if ctx.Err() != nil {
 					return
 				}
 
-				// Create a FRESH processor for every item to reset internal state.
 				proc := NewProcessor(s.engine, global)
 				proc.tokenCounter = s.tokenizer.Estimate
 
 				readBufPtr := readPool.Get().(*[]byte)
 				readBuf := *readBufPtr
-
 				buf := bufferPool.Get().(*bytes.Buffer)
 				buf.Reset()
-
-				// Use a local counter to track stats for this specific item
 				localCounter := &byteCounter{w: buf}
 
-				err := proc.Render(localCounter, j.item, j.fileIdx, readBuf)
+				// Pass the ENTIRE prepared item to Render
+				err := proc.RenderPrepared(localCounter, j.item, readBuf)
 
 				readPool.Put(readBufPtr)
 
 				select {
 				case resultsCh <- result{
-					index:     j.seqID,
-					buffer:    buf,
-					stats:     localCounter.count,
-					isCompact: proc.lastWasCompact, // Access internal state of processor
-					err:       err,
+					index:        j.seqID,
+					buffer:       buf,
+					stats:        localCounter.count,
+					isCompact:    proc.lastWasCompact,
+					err:          err,
+					sectionIndex: j.item.section.Index,
 				}:
 				case <-ctx.Done():
 					return
@@ -219,15 +300,11 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		}()
 	}
 
-	// B. Start Feeder
+	// B. Feeder
 	go func() {
-		fileIdx := 1
-		for i, item := range s.items {
+		for _, item := range s.preparedItems {
 			select {
-			case jobsCh <- seqJob{seqID: i, fileIdx: fileIdx, item: item}:
-				if _, ok := item.(InputFile); ok {
-					fileIdx++
-				}
+			case jobsCh <- seqJob{seqID: item.streamIndex, item: item}:
 			case <-ctx.Done():
 				break
 			}
@@ -237,32 +314,82 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		close(resultsCh)
 	}()
 
-	// C. Start Assembler
-	// Buffers out-of-order results and writes them strictly in sequence.
+	// C. Assembler
 	nextSeq := 0
 	buffer := make(map[int]result)
 
-	// State for separator logic (replaces Processor's internal state tracking)
 	hasRenderedFirst := false
 	lastWasCompact := false
+	useSeparators := s.format != "html" // HTML layout handles spacing via CSS/Tags usually
 
-	// HTML templates don't use separators, so we skip injection for them
-	useSeparators := s.format != "html"
+	// Section Tracking
+	// Start with -1 to force a header check on the first item
+	currentSectionIndex := -1
+
+	renderSectionBoundary := func(newIndex int) error {
+		// If we are already inside a section (current >= 0), close it
+		if currentSectionIndex >= 0 {
+			// Find context for the closing section
+			var ctx SectionContext
+			for _, s := range s.sections {
+				if s.Index == currentSectionIndex {
+					ctx = *s
+					break
+				}
+			}
+			if err := s.engine.SectionFooter.Execute(dest, ctx); err != nil {
+				return err
+			}
+		}
+
+		// Open the new section
+		currentSectionIndex = newIndex
+		var ctx SectionContext
+		for _, s := range s.sections {
+			if s.Index == newIndex {
+				ctx = *s
+				break
+			}
+		}
+
+		// If explicit section title templates are used, they are items in the stream.
+		// SectionHeaderTemplate wraps the *files* primarily.
+		if err := s.engine.SectionHeader.Execute(dest, ctx); err != nil {
+			return err
+		}
+		return nil
+	}
 
 	for res := range resultsCh {
 		if res.err != nil {
 			return res.err
 		}
-
 		buffer[res.index] = res
 
-		// Drain buffer as much as possible
 		for {
 			next, ok := buffer[nextSeq]
 			if !ok {
 				break
 			}
 
+			// 1. Check Section Boundary
+			if next.sectionIndex != currentSectionIndex {
+				if hasRenderedFirst && useSeparators {
+					if _, err := dest.Write([]byte("\n\n")); err != nil {
+						return err
+					}
+				}
+
+				if err := renderSectionBoundary(next.sectionIndex); err != nil {
+					return err
+				}
+				// When crossing sections, we might want to reset spacing to avoid double separators
+				// after the Header has been printed.
+				hasRenderedFirst = false
+			}
+
+			// 2. Render Separator (if needed)
+			// Don't print separator if we just printed a Section Header (hasRenderedFirst=false reset above)
 			if hasRenderedFirst && useSeparators {
 				sep := "\n\n"
 				if lastWasCompact && next.isCompact {
@@ -273,17 +400,30 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				}
 			}
 
+			// 3. Render Item Content
 			if _, err := dest.Write(next.buffer.Bytes()); err != nil {
 				return err
 			}
 
 			hasRenderedFirst = true
 			lastWasCompact = next.isCompact
-
 			bufferPool.Put(next.buffer)
-
 			delete(buffer, nextSeq)
 			nextSeq++
+		}
+	}
+
+	// Close final section
+	if currentSectionIndex >= 0 {
+		var ctx SectionContext
+		for _, s := range s.sections {
+			if s.Index == currentSectionIndex {
+				ctx = *s
+				break
+			}
+		}
+		if err := s.engine.SectionFooter.Execute(dest, ctx); err != nil {
+			return err
 		}
 	}
 
