@@ -1,15 +1,21 @@
 package lx
 
 import (
-	"path"
+	"path/filepath"
 	"strings"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 func IsKept(p string, includes, excludes []string) bool {
+	// Normalize p to OS separators for consistent matching with doublestar
+	osPath := filepath.FromSlash(p)
+
 	if len(includes) > 0 {
 		matched := false
 		for _, pattern := range includes {
-			if matchPattern(pattern, p) {
+			// Normalize pattern to OS separators
+			if matchPattern(filepath.FromSlash(pattern), osPath) {
 				matched = true
 				break
 			}
@@ -19,7 +25,7 @@ func IsKept(p string, includes, excludes []string) bool {
 		}
 	}
 	for _, pattern := range excludes {
-		if matchPattern(pattern, p) {
+		if matchPattern(filepath.FromSlash(pattern), osPath) {
 			return false
 		}
 	}
@@ -27,14 +33,16 @@ func IsKept(p string, includes, excludes []string) bool {
 }
 
 func matchPattern(pattern, p string) bool {
-	p = path.Clean(p)
-	if !strings.Contains(pattern, "/") {
-		return match(pattern, path.Base(p))
+	p = filepath.Clean(p)
+
+	// If pattern has no separators, match against the filename only
+	if !strings.Contains(pattern, string(filepath.Separator)) {
+		return match(pattern, filepath.Base(p))
 	}
 	return match(pattern, p)
 }
 
 func match(pattern, name string) bool {
-	matched, _ := path.Match(pattern, name)
+	matched, _ := doublestar.Match(pattern, name)
 	return matched
 }
