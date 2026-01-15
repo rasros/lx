@@ -1,0 +1,67 @@
+## Go Files Only
+---
+
+[1/10] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[2/10] main_test.go (2 rows)
+---
+```go
+package main
+import "testing"
+```
+
+[3/10] pkg/util/util.go (1 rows)
+---
+```go
+package util
+```
+
+## All Files
+---
+
+[4/10] README.md (2 rows)
+---
+```markdown
+# Hello World
+Readme content.
+```
+
+[5/10] binary.dat - binary file skipped (7 B)
+[6/10] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[7/10] main_test.go (2 rows)
+---
+```go
+package main
+import "testing"
+```
+
+[8/10] myscript (2 rows)
+---
+```bash
+#!/bin/bash
+echo 'hi'
+```
+
+[9/10] pkg/util/README.md (1 rows)
+---
+```markdown
+# Util Docs
+```
+
+[10/10] pkg/util/util.go (1 rows)
+---
+```go
+package util
+```
+

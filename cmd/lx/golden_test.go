@@ -53,6 +53,48 @@ func TestGolden(t *testing.T) {
 		},
 		{name: "prompt_injection", args: []string{"-p", "Explain this code", "main.go"}},
 
+		// --- ADVANCED FILTERING SCENARIOS ---
+		{
+			// Verify -E correctly clears filters to allow a broader second pass
+			name: "filter_reset_relax",
+			args: []string{
+				"-s", "Go Files Only", "-i", "*.go", ".",
+				"-E",
+				"-s", "All Files", ".",
+			},
+		},
+		{
+			// Verify filters accumulate if -E is NOT used
+			name: "filter_progressive_tightening",
+			args: []string{
+				"-s", "Round 1 (All)", ".",
+				"-e", "*.md", // Add exclude
+				"-s", "Round 2 (No Markdown)", ".",
+				"-e", "*_test.go", // Add another exclude
+				"-s", "Round 3 (No MD, No Tests)", ".",
+			},
+		},
+		{
+			// Verify path-based globs vs filename globs
+			name: "filter_path_globbing",
+			args: []string{
+				"-s", "Pkg Directory Only", "-i", "pkg/*", ".",
+				"-E",
+				"-s", "Root Files Only", "-e", "*/*", ".", // Exclude anything with a separator (subdirectories)
+			},
+		},
+		{
+			// Real-world scenario: Docs -> Logic -> Scripts
+			name: "mixed_sections",
+			args: []string{
+				"-s", "Docs", "-i", "*.md", ".",
+				"-E",
+				"-s", "Logic", "-i", "*.go", "-e", "*_test.go", ".",
+				"-E",
+				"-s", "Scripts", "-i", "myscript", ".",
+			},
+		},
+
 		// --- SPECIAL FILE TYPES ---
 		{name: "binary_file", args: []string{"binary.dat"}},
 		{name: "shebang_detection", args: []string{"myscript"}},

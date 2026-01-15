@@ -14,6 +14,8 @@ type InputFile struct {
 	Size      int64
 	ModTime   time.Time
 	LoadError error
+	// Config defines how this specific file should be sliced and rendered.
+	Config RunnerConfig
 
 	// Open returns a ReadCloser for the file content.
 	Open func() (io.ReadCloser, error)

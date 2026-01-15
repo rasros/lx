@@ -43,7 +43,6 @@ func TestRun_Basic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// We use a pipe to capture the output of the Run command
 			out, err := captureStdout(func() error {
 				return Run(context.Background(), tt.args)
 			})
@@ -66,8 +65,6 @@ func TestRun_StickyFlags(t *testing.T) {
 	f1 := filepath.Join(tmpDir, "long.txt")
 	os.WriteFile(f1, []byte("line1\nline2\nline3\nline4\nline5\n"), 0644)
 
-	// Test if -n2 correctly limits output to 2 lines
-	// Note: Our refined app.go handles Head/Tail logic via Processor
 	out, err := captureStdout(func() error {
 		return Run(context.Background(), []string{"-n", "2", f1})
 	})
@@ -81,7 +78,6 @@ func TestRun_StickyFlags(t *testing.T) {
 	}
 }
 
-// Helper to capture stdout during a function execution
 func captureStdout(f func() error) (string, error) {
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -96,7 +92,6 @@ func captureStdout(f func() error) (string, error) {
 	var buf strings.Builder
 	ioCopyC := make(chan struct{})
 	go func() {
-		// Read from pipe until writer is closed
 		data, _ := io.ReadAll(r)
 		buf.Write(data)
 		close(ioCopyC)

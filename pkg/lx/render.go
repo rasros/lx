@@ -17,15 +17,13 @@ type RenderedItem struct {
 
 type Processor struct {
 	engine       *TemplateEngine
-	cfg          RunnerConfig
 	global       GlobalContext
 	tokenCounter TokenCounter
 }
 
-func NewProcessor(engine *TemplateEngine, cfg RunnerConfig, global GlobalContext) *Processor {
+func NewProcessor(engine *TemplateEngine, global GlobalContext) *Processor {
 	return &Processor{
 		engine:       engine,
-		cfg:          cfg,
 		global:       global,
 		tokenCounter: DefaultTokenCounter,
 	}
@@ -41,10 +39,10 @@ func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
 		_, err = fmt.Fprint(w, rendered.Body)
 		return err
 	case SectionContext:
-		v.Global = p.global // Sync global state
+		v.Global = p.global
 		return p.engine.Section.Execute(w, v)
 	case PromptContext:
-		v.Global = p.global // Sync global state
+		v.Global = p.global
 		return p.engine.Prompt.Execute(w, v)
 	default:
 		return nil
@@ -72,14 +70,15 @@ func (p *Processor) renderFile(file InputFile, index int) (RenderedItem, error) 
 	isBinary := detect.IsBinary(header[:n])
 	lang := detect.DetectLanguage(file.Path, header[:n])
 
-	isCompact := p.cfg.Head == 0 && p.cfg.Tail == 0
+	cfg := file.Config
+	isCompact := cfg.Head == 0 && cfg.Tail == 0
 	totalRows, exact, _ := content.EstimateLineCount(reader, size)
 
 	var contentData interface{}
 	if !isBinary && !isCompact && size > 0 {
-		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact)
+		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, cfg)
 		if err == nil {
-			contentData = p.formatContent(head, tail, gap, totalRows)
+			contentData = p.formatContent(head, tail, gap, totalRows, cfg)
 		}
 	}
 
@@ -103,21 +102,21 @@ func (p *Processor) renderFile(file InputFile, index int) (RenderedItem, error) 
 	return RenderedItem{Body: buf.String(), IsCompactView: isCompact}, err
 }
 
-func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool) (head, tail, gap []byte, err error) {
-	if p.cfg.Head < 0 {
+func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg RunnerConfig) (head, tail, gap []byte, err error) {
+	if cfg.Head < 0 {
 		sr := io.NewSectionReader(reader, 0, size)
 		head, _, err = content.ReadHead(sr, -1)
 		return head, nil, nil, err
 	}
 
-	if p.cfg.Head > 0 {
+	if cfg.Head > 0 {
 		sr := io.NewSectionReader(reader, 0, size)
-		head, _, err = content.ReadHead(sr, p.cfg.Head)
+		head, _, err = content.ReadHead(sr, cfg.Head)
 	}
 
-	if p.cfg.Tail > 0 {
-		skipped := totalRows - p.cfg.Head - p.cfg.Tail
-		if skipped > 0 && p.cfg.Head > 0 {
+	if cfg.Tail > 0 {
+		skipped := totalRows - cfg.Head - cfg.Tail
+		if skipped > 0 && cfg.Head > 0 {
 			tilde := ""
 			if isEstimate {
 				tilde = "~"
@@ -126,16 +125,16 @@ func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, is
 		}
 
 		if f, ok := reader.(*os.File); ok {
-			tail, _ = content.ReadTailSeek(f, p.cfg.Tail)
+			tail, _ = content.ReadTailSeek(f, cfg.Tail)
 		} else if br, ok := reader.(*bytes.Reader); ok {
-			tail = tailFromBuffer(br, p.cfg.Tail)
+			tail = tailFromBuffer(br, cfg.Tail)
 		}
 	}
 	return
 }
 
-func (p *Processor) formatContent(head, tail, gap []byte, totalRows int) interface{} {
-	if p.cfg.LineNumbers {
+func (p *Processor) formatContent(head, tail, gap []byte, totalRows int, cfg RunnerConfig) interface{} {
+	if cfg.LineNumbers {
 		return content.LineNumberFormatter{
 			Head: head, Gap: gap, Tail: tail, TotalRows: totalRows,
 		}

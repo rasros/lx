@@ -45,6 +45,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				cleanRoot = "."
 			}
 
+			// Initialize ignore stack with global ignores at the root "."
 			ignoreStacks := make(map[string][]gitignore.IgnoreMatcher)
 			if w.opts.GlobalIgnore != nil {
 				ignoreStacks["."] = []gitignore.IgnoreMatcher{w.opts.GlobalIgnore}
@@ -62,7 +63,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				default:
 				}
 
-				// 1. Handle Hidden
+				// 1. Hidden Files Check
 				if !w.opts.ShowHidden && isHidden(p) {
 					if d.IsDir() {
 						return fs.SkipDir
@@ -70,14 +71,26 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 					return nil
 				}
 
-				// 2. Handle Ignore Logic
-				parent := path.Dir(p)
-				if p == "." {
-					parent = ""
-				}
-				currentStack := ignoreStacks[parent]
-
+				// 2. Ignore Logic
 				if w.opts.IgnoreEnabled {
+					// Identify parent to inherit ignore stack
+					parent := path.Dir(p)
+					if parent == "." || parent == "/" {
+						parent = "."
+					}
+					if p == "." {
+						parent = "" // Root has no parent stack, it starts fresh or uses global
+					}
+
+					// Inherit from parent
+					var currentStack []gitignore.IgnoreMatcher
+					if p == "." {
+						currentStack = ignoreStacks["."]
+					} else {
+						currentStack = ignoreStacks[parent]
+					}
+
+					// If directory, load local ignores and store for children
 					if d.IsDir() {
 						local := loadLocalIgnores(filesystem, p)
 						newStack := append([]gitignore.IgnoreMatcher{}, currentStack...)
@@ -85,6 +98,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 						ignoreStacks[p] = newStack
 					}
 
+					// Check if current path is ignored
 					if isIgnored(currentStack, p, d.IsDir()) && p != "." {
 						if w.opts.OnIgnore != nil {
 							w.opts.OnIgnore(p, "gitignore")
@@ -96,9 +110,13 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 					}
 				}
 
-				// 3. File Processing (with Filtering)
+				// 3. File Processing (apply user filters)
 				if !d.IsDir() {
-					// Apply Includes/Excludes ONLY to files
+					// Skip the root "." if it somehow appears as a file (unlikely)
+					if p == "." {
+						return nil
+					}
+
 					if !IsKept(p, w.opts.Includes, w.opts.Excludes) {
 						return nil
 					}
@@ -115,6 +133,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				}
 				return nil
 			})
+
 			if err != nil && err != context.Canceled {
 				out <- InputFile{Path: root, LoadError: err}
 			}

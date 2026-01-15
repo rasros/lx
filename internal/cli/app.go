@@ -131,8 +131,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	}
 
 	var includes, excludes []string
-	ops := reorderTrailingOps(parsed.Ops)
 
+	ops := reorderTrailingOps(parsed.Ops)
 	for _, op := range ops {
 		switch op.Action {
 		case "head":
@@ -248,9 +248,11 @@ func handleStatsDisplay(parsed *ParsedArgs, stream *lx.Stream, debugOut io.Write
 	} else if _, ok := parsed.Globals["no-stats"]; ok {
 		showStatsFlag = "never"
 	}
+
 	if showStatsFlag == "never" {
 		return
 	}
+
 	show := (showStatsFlag == "always")
 	if !show {
 		_, hasCopy := parsed.Globals["copy"]
@@ -263,6 +265,7 @@ func handleStatsDisplay(parsed *ParsedArgs, stream *lx.Stream, debugOut io.Write
 			show = true
 		}
 	}
+
 	if show {
 		_ = stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
 			Global: stream.GetGlobalContext(),
@@ -302,9 +305,11 @@ func determineLogLevel(globals map[string]string, configVerbosity string) slog.L
 func determineOutput(globals map[string]string, defaultMode string) (io.Writer, *bytes.Buffer, io.Writer, error) {
 	outputPath, hasOutput := globals["output"]
 	_, hasCopy := globals["copy"]
+
 	var out io.Writer = os.Stdout
 	var clipBuf *bytes.Buffer
 	var debugOut io.Writer = os.Stderr
+
 	if hasOutput {
 		f, err := os.Create(outputPath)
 		if err != nil {
@@ -317,6 +322,7 @@ func determineOutput(globals map[string]string, defaultMode string) (io.Writer, 
 		out = clipBuf
 		debugOut = os.Stdout
 	}
+
 	return out, clipBuf, debugOut, nil
 }
 

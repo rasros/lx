@@ -11,10 +11,13 @@ func TestProcessor_RenderFile(t *testing.T) {
 	engine, _ := CompileTemplates(cfg)
 
 	global := GlobalContext{TotalFiles: 1}
-	proc := NewProcessor(engine, RunnerConfig{Head: 2}, global)
 
-	// Create a 5-line file
+	// Processor is now stateless regarding runner config
+	proc := NewProcessor(engine, global)
+
+	// Create a 5-line file with a specific config attached
 	file := NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
+	file.Config = RunnerConfig{Head: 2}
 
 	var buf bytes.Buffer
 	err := proc.Render(&buf, file, 1)

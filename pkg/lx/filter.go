@@ -27,9 +27,7 @@ func IsKept(p string, includes, excludes []string) bool {
 }
 
 func matchPattern(pattern, p string) bool {
-	// Standardize path for matching
 	p = path.Clean(p)
-
 	if !strings.Contains(pattern, "/") {
 		return match(pattern, path.Base(p))
 	}
