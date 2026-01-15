@@ -2,34 +2,31 @@ package lx
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
+	"testing/fstest"
 )
 
 func TestWalker_WithFilters(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Setup files
-	os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main"), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Docs"), 0644)
-
-	w := NewWalker(WalkerOptions{})
-
-	// Test: Filter only .go files
-	goFilter := func(f InputFile) bool {
-		return filepath.Ext(f.Path) == ".go"
+	mockFS := fstest.MapFS{
+		"main.go":   {Data: []byte("package main")},
+		"README.md": {Data: []byte("# Docs")},
 	}
 
+	w := NewWalker(WalkerOptions{
+		FS:       mockFS,
+		Includes: []string{"*.go"},
+	})
+
 	ctx := context.Background()
-	ch := w.Walk(ctx, []string{tmpDir}, goFilter)
+	// Use empty string to represent the root of the fs
+	ch := w.Walk(ctx, []string{""})
 
 	var found []string
 	for f := range ch {
-		found = append(found, filepath.Base(f.Path))
+		found = append(found, f.Path)
 	}
 
 	if len(found) != 1 || found[0] != "main.go" {
-		t.Errorf("Filter failed, found: %v", found)
+		t.Errorf("Filter failed, found: %v (expected [main.go])", found)
 	}
 }

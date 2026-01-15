@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/atotto/clipboard"
 	"github.com/rasros/lx/pkg/lx"
@@ -88,7 +89,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		return err
 	}
 
-	// Apply CLI-specific overrides to the core library config
 	applyGlobalsToConfig(cfg, parsed.Globals)
 	if _, ok := parsed.Globals["xml"]; ok {
 		cfg.OutputFormat = "xml"
@@ -96,8 +96,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		cfg.OutputFormat = "html"
 	}
 
-	// CLI handles logging/verbosity independently of the library
-	level := determineLogLevel(parsed.Globals, "warn") // default to warn
+	level := determineLogLevel(parsed.Globals, "warn")
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
@@ -108,7 +107,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		},
 	}))
 
-	// CLI handles output destinations (stdout vs file vs clipboard)
 	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, parsed.Globals["output_mode"])
 	if err != nil {
 		return err
@@ -121,31 +119,20 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		}
 	}
 
-	// Initial runner state
 	runCfg := lx.RunnerConfig{
 		Head:        -1,
 		Tail:        0,
 		LineNumbers: false,
 	}
 
-	walkerOpts := lx.WalkerOptions{
-		FollowSymlinks: cfg.FollowSymlinks,
-		ShowHidden:     cfg.ShowHidden,
-		IgnoreEnabled:  cfg.IgnoreEnabled(),
-		GlobalIgnore:   cfg.GlobalIgnore,
-		OnIgnore: func(path string, reason string) {
-			logger.Debug("ignored path", "path", path, "reason", reason)
-		},
-	}
-	walker := lx.NewWalker(walkerOpts)
-
 	stream, err := lx.NewStream(cfg, runCfg)
 	if err != nil {
 		return err
 	}
 
-	// State-machine pattern: flags apply to subsequent files
+	var includes, excludes []string
 	ops := reorderTrailingOps(parsed.Ops)
+
 	for _, op := range ops {
 		switch op.Action {
 		case "head":
@@ -169,15 +156,58 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		case "no-line-numbers":
 			runCfg.LineNumbers = false
 			stream.WithRunnerConfig(runCfg)
+		case "include":
+			includes = append(includes, op.Value)
+		case "exclude":
+			excludes = append(excludes, op.Value)
+		case "reset-filters":
+			includes = nil
+			excludes = nil
+
 		case "FILE", "file":
 			if op.Value == "-" {
 				data, _ := io.ReadAll(os.Stdin)
 				stream.AddFile(lx.NewBufferInputFile("stdin", data))
 				continue
 			}
-			for f := range walker.Walk(ctx, []string{op.Value}) {
-				if outPath != "" && f.AbsPath == outPath {
-					continue
+
+			rootPath := op.Value
+			var fsRoot, walkPath string
+
+			if filepath.IsAbs(rootPath) {
+				fsRoot = filepath.Dir(rootPath)
+				walkPath = filepath.Base(rootPath)
+			} else {
+				clean := filepath.Clean(rootPath)
+				if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
+					abs, _ := filepath.Abs(clean)
+					fsRoot = abs
+					walkPath = "."
+				} else {
+					fsRoot = "."
+					walkPath = clean
+				}
+			}
+
+			walker := lx.NewWalker(lx.WalkerOptions{
+				FS:             os.DirFS(fsRoot),
+				FollowSymlinks: cfg.FollowSymlinks,
+				ShowHidden:     cfg.ShowHidden,
+				IgnoreEnabled:  cfg.IgnoreEnabled(),
+				GlobalIgnore:   cfg.GlobalIgnore,
+				Includes:       includes,
+				Excludes:       excludes,
+				OnIgnore: func(path string, reason string) {
+					logger.Debug("ignored path", "path", path, "reason", reason)
+				},
+			})
+
+			for f := range walker.Walk(ctx, []string{walkPath}) {
+				if outPath != "" {
+					fullAbs, _ := filepath.Abs(filepath.Join(fsRoot, f.Path))
+					if fullAbs == outPath {
+						continue
+					}
 				}
 				if f.LoadError != nil {
 					logger.Error("load error", "path", f.Path, "error", f.LoadError)
@@ -196,11 +226,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		defer f.Close()
 	}
 
-	// EXECUTION PHASE
-	// 1. Prepare (Calculate totals/tokens)
-	stream.Prepare()
-
-	// 2. Execute (Write to output)
 	err = stream.Execute(ctx, out)
 	if err != nil {
 		return err
@@ -212,9 +237,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		}
 	}
 
-	// CLI handles displaying stats to stderr
 	handleStatsDisplay(parsed, stream, debugOut)
-
 	return nil
 }
 
@@ -225,11 +248,9 @@ func handleStatsDisplay(parsed *ParsedArgs, stream *lx.Stream, debugOut io.Write
 	} else if _, ok := parsed.Globals["no-stats"]; ok {
 		showStatsFlag = "never"
 	}
-
 	if showStatsFlag == "never" {
 		return
 	}
-
 	show := (showStatsFlag == "always")
 	if !show {
 		_, hasCopy := parsed.Globals["copy"]
@@ -242,7 +263,6 @@ func handleStatsDisplay(parsed *ParsedArgs, stream *lx.Stream, debugOut io.Write
 			show = true
 		}
 	}
-
 	if show {
 		_ = stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
 			Global: stream.GetGlobalContext(),
@@ -282,11 +302,9 @@ func determineLogLevel(globals map[string]string, configVerbosity string) slog.L
 func determineOutput(globals map[string]string, defaultMode string) (io.Writer, *bytes.Buffer, io.Writer, error) {
 	outputPath, hasOutput := globals["output"]
 	_, hasCopy := globals["copy"]
-
 	var out io.Writer = os.Stdout
 	var clipBuf *bytes.Buffer
 	var debugOut io.Writer = os.Stderr
-
 	if hasOutput {
 		f, err := os.Create(outputPath)
 		if err != nil {
@@ -299,7 +317,6 @@ func determineOutput(globals map[string]string, defaultMode string) (io.Writer, 
 		out = clipBuf
 		debugOut = os.Stdout
 	}
-
 	return out, clipBuf, debugOut, nil
 }
 

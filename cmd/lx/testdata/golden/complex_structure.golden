@@ -1,86 +1,30 @@
 ## Documentation
 ---
 
-[1/14] README.md (2 rows)
+[1/4] README.md (2 rows)
 ---
 ```markdown
 # Hello World
 Readme content.
 ```
 
-[2/14] binary.dat - binary file skipped (7 B)
-[3/14] main.go (2 rows)
----
-```go
-package main
-func main() {}
-```
-
-[4/14] main_test.go (2 rows)
----
-```go
-package main
-import "testing"
-```
-
-[5/14] myscript (2 rows)
----
-```bash
-#!/bin/bash
-echo 'hi'
-```
-
-[6/14] pkg/util/README.md (1 rows)
+[2/4] pkg/util/README.md (1 rows)
 ---
 ```markdown
 # Util Docs
-```
-
-[7/14] pkg/util/util.go (1 rows)
----
-```go
-package util
 ```
 
 ## Source Code
 ---
 
-[8/14] README.md (2 rows)
----
-```markdown
-# Hello World
-Readme content.
-```
-
-[9/14] binary.dat - binary file skipped (7 B)
-[10/14] main.go (2 rows)
+[3/4] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[11/14] main_test.go (2 rows)
----
-```go
-package main
-import "testing"
-```
-
-[12/14] myscript (2 rows)
----
-```bash
-#!/bin/bash
-echo 'hi'
-```
-
-[13/14] pkg/util/README.md (1 rows)
----
-```markdown
-# Util Docs
-```
-
-[14/14] pkg/util/util.go (1 rows)
+[4/4] pkg/util/util.go (1 rows)
 ---
 ```go
 package util

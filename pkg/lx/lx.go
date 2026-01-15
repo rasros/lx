@@ -5,6 +5,7 @@ import (
 	"io"
 )
 
+// StreamItem is the common interface for things that can be rendered into the prompt stream.
 type StreamItem interface {
 	isStreamItem()
 }
@@ -13,116 +14,125 @@ func (InputFile) isStreamItem()      {}
 func (SectionContext) isStreamItem() {}
 func (PromptContext) isStreamItem()  {}
 
-type Stream struct {
-	processor    *Processor
-	items        []StreamItem
-	tokenCounter TokenCounter
+// Tokenizer defines how tokens are calculated for an item.
+type Tokenizer interface {
+	Estimate(size int64, content interface{}) int64
 }
 
+type defaultTokenizer struct{}
+
+func (defaultTokenizer) Estimate(size int64, _ interface{}) int64 { return size / 4 }
+
+// Stream is a builder and executor for constructing LLM context prompts.
+type Stream struct {
+	items     []StreamItem
+	tokenizer Tokenizer
+	engine    *TemplateEngine
+	renderCfg RunnerConfig
+	workDir   string
+}
+
+// NewStream initializes a new prompt stream with the provided configuration.
 func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
 	engine, err := CompileTemplates(cfg)
 	if err != nil {
 		return nil, err
 	}
-	global := GlobalContext{
-		WorkDir:  ".",
-		Metadata: make(map[string]string),
-	}
 	return &Stream{
-		processor:    NewProcessor(engine, runnerCfg, global),
-		tokenCounter: DefaultTokenCounter,
+		engine:    engine,
+		renderCfg: runnerCfg,
+		tokenizer: defaultTokenizer{},
+		workDir:   ".",
 	}, nil
 }
 
-// WithTokenCounter allows overriding the default token estimation logic.
-func (s *Stream) WithTokenCounter(tc TokenCounter) *Stream {
-	s.tokenCounter = tc
+// WithTokenizer allows overriding the default character-based token estimation.
+func (s *Stream) WithTokenizer(t Tokenizer) *Stream {
+	s.tokenizer = t
 	return s
 }
 
+// WithRunnerConfig updates the slicing/formatting state for subsequent files added via programmatic loops.
 func (s *Stream) WithRunnerConfig(cfg RunnerConfig) *Stream {
-	s.processor.cfg = cfg
+	s.renderCfg = cfg
 	return s
 }
 
-func (s *Stream) AddFile(f InputFile) *Stream { s.items = append(s.items, f); return s }
+// AddFile appends a file to the stream.
+func (s *Stream) AddFile(f InputFile) *Stream {
+	s.items = append(s.items, f)
+	return s
+}
 
+// AddSection appends a visual section header to the stream.
 func (s *Stream) AddSection(title string) *Stream {
 	s.items = append(s.items, SectionContext{Body: title})
 	return s
 }
 
+// AddPrompt appends custom instructions or text to the stream.
 func (s *Stream) AddPrompt(text string) *Stream {
 	s.items = append(s.items, PromptContext{Body: text})
 	return s
 }
 
-func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
-	// Preparation: Sync totals and global context into items
-	s.Prepare()
-
-	if err := s.processor.engine.Header.Execute(w, HeaderContext{Global: s.processor.global}); err != nil {
-		return err
-	}
-
-	fileIdx := 1
-	for _, item := range s.items {
-		// Ensure current global state is passed to the renderer
-		if err := s.processor.Render(w, item, fileIdx); err != nil {
-			return err
-		}
-		if _, ok := item.(InputFile); ok {
-			fileIdx++
-		}
-	}
-
-	return s.processor.engine.Footer.Execute(w, FooterContext{Global: s.processor.global})
-}
-
-// Prepare calculates totals and updates the internal global context.
+// Prepare calculates aggregate statistics across all items currently in the stream.
 func (s *Stream) Prepare() GlobalContext {
-	var totalSize int64
-	var totalTokens int64
-	fileCount := 0
-	sectionCount := 0
+	ctx := GlobalContext{
+		WorkDir:  s.workDir,
+		Metadata: make(map[string]string),
+	}
 
+	sectionCount := 0
 	for _, item := range s.items {
 		switch v := item.(type) {
 		case InputFile:
-			totalSize += v.Size
-			totalTokens += s.tokenCounter(v.Size, nil)
-			fileCount++
+			ctx.TotalFiles++
+			ctx.TotalSize += v.Size
+			ctx.TokenEstimate += s.tokenizer.Estimate(v.Size, nil)
 		case SectionContext:
 			sectionCount++
 		}
 	}
+	ctx.TotalSections = sectionCount
+	return ctx
+}
 
-	s.processor.global.TotalFiles = fileCount
-	s.processor.global.TotalSize = totalSize
-	s.processor.global.TotalSections = sectionCount
-	s.processor.global.TokenEstimate = totalTokens
+// GetGlobalContext returns the current statistics of the stream.
+func (s *Stream) GetGlobalContext() GlobalContext {
+	return s.Prepare()
+}
 
-	// Update items with the calculated global context
-	for i, item := range s.items {
-		switch v := item.(type) {
-		case SectionContext:
-			v.Global = s.processor.global
-			v.Section = i + 1
-			s.items[i] = v
-		case PromptContext:
-			v.Global = s.processor.global
-			v.Section = i + 1
-			s.items[i] = v
+// Execute renders the entire stream to the provided writer.
+// It automatically calls Prepare() to ensure templates have access to accurate global totals.
+func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
+	global := s.Prepare()
+	proc := NewProcessor(s.engine, s.renderCfg, global)
+	proc.tokenCounter = s.tokenizer.Estimate
+
+	// 1. Render Header
+	if err := s.engine.Header.Execute(w, HeaderContext{Global: global}); err != nil {
+		return err
+	}
+
+	// 2. Render Items
+	fileIdx := 1
+	for _, item := range s.items {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if err := proc.Render(w, item, fileIdx); err != nil {
+				return err
+			}
+			if _, ok := item.(InputFile); ok {
+				fileIdx++
+			}
 		}
 	}
 
-	return s.processor.global
+	// 3. Render Footer
+	return s.engine.Footer.Execute(w, FooterContext{Global: global})
 }
 
-func (s *Stream) GetEngine() *TemplateEngine {
-	return s.processor.engine
-}
-
-func (s *Stream) GetGlobalContext() GlobalContext {
-	return s.processor.global
-}
+func (s *Stream) GetEngine() *TemplateEngine { return s.engine }
