@@ -205,8 +205,6 @@ func Merge(dst *Config, src *Config) {
 	}
 }
 
-// --- Context Structs for Templates ---
-
 type FileContext struct {
 	Path             string
 	AbsPath          string

@@ -13,8 +13,6 @@ import (
 	"time"
 )
 
-// ... (defaultTemplate, defaultSectionTemplate, defaultPromptTemplate unchanged) ...
-
 const defaultTemplate = `{{ .Separator }}{{ if eq .Size 0 }}` +
 	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - empty file` +
 	`{{ else if .IsBinary }}` +
@@ -48,9 +46,6 @@ const defaultXMLTemplate = `{{ .Separator }}` +
 	`{{- end }}` + "\n" +
 	`  </document>`
 
-// defaultXMLSectionHeaderTemplate handles the outer container.
-// - Implicit mode uses <documents> as the root container.
-// - Explicit mode uses <section> as the root container.
 const defaultXMLSectionHeaderTemplate = `{{ if .IsImplicit }}` +
 	`{{ .Separator }}<content>` +
 	`{{ else }}` +
@@ -61,7 +56,6 @@ const defaultXMLSectionTemplate = `{{ if not .IsImplicit }}` +
 	`  <section_name>{{ .Body }}</section_name>` +
 	`{{ end }}`
 
-// defaultXMLSectionFooterTemplate closes the container opened in the header.
 const defaultXMLSectionFooterTemplate = `{{ if .IsImplicit }}` +
 	"\n" + `</content>` +
 	`{{ else }}` +

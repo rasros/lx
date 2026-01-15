@@ -38,7 +38,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	go func() {
 		defer close(out)
 		for _, root := range roots {
-			// fs.FS always uses forward slashes
 			cleanRoot := path.Clean(root)
 			if cleanRoot == "." || cleanRoot == "/" {
 				cleanRoot = "."
@@ -62,7 +61,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				default:
 				}
 
-				// 1. Hidden Files Check
 				if !w.opts.ShowHidden && isHidden(p) {
 					if d.IsDir() {
 						return fs.SkipDir
@@ -70,15 +68,13 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 					return nil
 				}
 
-				// 2. Ignore Logic
 				if w.opts.IgnoreEnabled {
-					// Identify parent to inherit ignore stack
 					parent := path.Dir(p)
 					if parent == "." || parent == "/" {
 						parent = "."
 					}
 					if p == "." {
-						parent = "" // Root has no parent stack
+						parent = ""
 					}
 
 					var currentStack []gitignore.IgnoreMatcher
@@ -88,7 +84,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 						currentStack = ignoreStacks[parent]
 					}
 
-					// If directory, load local ignores and store for children
 					if d.IsDir() {
 						local := loadLocalIgnores(filesystem, p)
 						newStack := append([]gitignore.IgnoreMatcher{}, currentStack...)
@@ -104,7 +99,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 					}
 				}
 
-				// 3. File Processing (apply user filters)
 				if !d.IsDir() {
 					if p == "." {
 						return nil

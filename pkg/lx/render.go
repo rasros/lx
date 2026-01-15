@@ -42,12 +42,10 @@ func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 	switch v := item.raw.(type) {
 	case InputFile:
 		var fCtx FileContext
-		// We pass the global index here, but section index is injected below
 		fCtx, err = p.prepareFileContext(v, item.fileIndexGlobal, scratchBuf)
 		if err != nil {
 			return err
 		}
-		// Inject Section Metadata
 		fCtx.Section = *item.section
 		fCtx.SectionFileIndex = item.fileIndexSection
 
@@ -72,12 +70,6 @@ func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 		return nil
 	}
 
-	// Separator logic is now largely handled by the Assembler in lx.go
-	// However, templates still accept {{ .Separator }}.
-	// We can leave it empty here or allow templates to handle it.
-	// In the assembler update, we print separators *between* buffers.
-	// So passing "" is usually correct here to avoid double spacing.
-
 	switch c := ctx.(type) {
 	case *FileContext:
 		c.Separator = ""
@@ -96,18 +88,12 @@ func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 	return nil
 }
 
-// ... prepareFileContext (Unchanged except signature if needed, but signature matches) ...
 func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte) (FileContext, error) {
-	// (Implementation identical to previous version, it just fills FileContext)
-	// ...
-	// Note: prepareFileContext fills Global, but not Section. Section is filled in RenderPrepared.
 	rc, err := file.Open()
 	if err != nil {
 		return FileContext{}, err
 	}
 	defer rc.Close()
-
-	// ... (rest of logic: reading, detection, line estimation) ...
 
 	var reader io.ReaderAt
 	var size int64
@@ -155,13 +141,10 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 		IsCompactView: isCompact,
 		FileIndex:     index,
 		Global:        p.global,
-		// Section is filled by caller
 	}, nil
 }
 
-// ... readSlices, formatContent, tailFromBuffer (Unchanged) ...
 func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg RunnerConfig) (head, tail, gap []byte, err error) {
-	// (Same as before)
 	if cfg.Head < 0 {
 		sr := io.NewSectionReader(reader, 0, size)
 		head, _, err = content.ReadHead(sr, -1)

@@ -85,7 +85,6 @@ func EstimateLineCount(r io.ReaderAt, fileSize int64, buf []byte) (int, bool, er
 		return 0, true, nil
 	}
 
-	// Use provided buffer to avoid allocation
 	n, err := r.ReadAt(buf, 0)
 	if err != nil && err != io.EOF {
 		return 0, false, err
