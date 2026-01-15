@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"text/template"
 
 	"github.com/rasros/lx/pkg/lx/internal/content"
 	"github.com/rasros/lx/pkg/lx/internal/detect"
@@ -16,9 +17,11 @@ type RenderedItem struct {
 }
 
 type Processor struct {
-	engine       *TemplateEngine
-	global       GlobalContext
-	tokenCounter TokenCounter
+	engine           *TemplateEngine
+	global           GlobalContext
+	tokenCounter     TokenCounter
+	hasRenderedFirst bool
+	lastWasCompact   bool
 }
 
 func NewProcessor(engine *TemplateEngine, global GlobalContext) *Processor {
@@ -30,29 +33,77 @@ func NewProcessor(engine *TemplateEngine, global GlobalContext) *Processor {
 }
 
 func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
+	var isCompact bool
+	var err error
+
+	// 1. Prepare the context and determine layout properties (IsCompact)
+	var ctx interface{}
+	var templateToUse *template.Template
+
 	switch v := item.(type) {
 	case InputFile:
-		rendered, err := p.renderFile(v, index)
+		var fCtx FileContext
+		fCtx, err = p.prepareFileContext(v, index)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprint(w, rendered.Body)
-		return err
+		isCompact = fCtx.IsCompactView
+		ctx = &fCtx
+		templateToUse = p.engine.Main
+
 	case SectionContext:
 		v.Global = p.global
-		return p.engine.Section.Execute(w, v)
+		isCompact = false
+		ctx = &v
+		templateToUse = p.engine.Section
+
 	case PromptContext:
 		v.Global = p.global
-		return p.engine.Prompt.Execute(w, v)
+		isCompact = false
+		ctx = &v
+		templateToUse = p.engine.Prompt
+
 	default:
 		return nil
 	}
+
+	// 2. Calculate Separator based on state
+	separator := ""
+	if p.hasRenderedFirst {
+		if p.lastWasCompact && isCompact {
+			separator = "\n"
+		} else {
+			separator = "\n\n"
+		}
+	}
+
+	// 3. Inject Separator into the context
+	switch c := ctx.(type) {
+	case *FileContext:
+		c.Separator = separator
+	case *SectionContext:
+		c.Separator = separator
+	case *PromptContext:
+		c.Separator = separator
+	}
+
+	// 4. Execute Template
+	if err := templateToUse.Execute(w, ctx); err != nil {
+		return err
+	}
+
+	// 5. Update State
+	p.hasRenderedFirst = true
+	p.lastWasCompact = isCompact
+
+	return nil
 }
 
-func (p *Processor) renderFile(file InputFile, index int) (RenderedItem, error) {
+// prepareFileContext reads the file and builds the context without rendering it.
+func (p *Processor) prepareFileContext(file InputFile, index int) (FileContext, error) {
 	rc, err := file.Open()
 	if err != nil {
-		return RenderedItem{}, err
+		return FileContext{}, err
 	}
 	defer rc.Close()
 
@@ -69,20 +120,26 @@ func (p *Processor) renderFile(file InputFile, index int) (RenderedItem, error) 
 	n, _ := reader.ReadAt(header, 0)
 	isBinary := detect.IsBinary(header[:n])
 	lang := detect.DetectLanguage(file.Path, header[:n])
+	isImage := detect.IsImage(file.Path)
 
 	cfg := file.Config
-	isCompact := cfg.Head == 0 && cfg.Tail == 0
+
+	// Determine "Compact" status for spacing logic
+	// A file is compact if user requested -n0, OR it's binary, OR it's empty.
+	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
+
 	totalRows, exact, _ := content.EstimateLineCount(reader, size)
 
 	var contentData interface{}
-	if !isBinary && !isCompact && size > 0 {
+	// Only read content slices if we actually plan to show them
+	if !isBinary && !isCompact && size > 0 && !isImage {
 		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, cfg)
 		if err == nil {
 			contentData = p.formatContent(head, tail, gap, totalRows, cfg)
 		}
 	}
 
-	ctx := FileContext{
+	return FileContext{
 		Path:          file.Path,
 		AbsPath:       file.AbsPath,
 		Size:          size,
@@ -92,14 +149,11 @@ func (p *Processor) renderFile(file InputFile, index int) (RenderedItem, error) 
 		Content:       contentData,
 		TokenEstimate: p.tokenCounter(size, contentData),
 		IsBinary:      isBinary,
+		IsImage:       isImage,
 		IsCompactView: isCompact,
 		FileIndex:     index,
 		Global:        p.global,
-	}
-
-	var buf bytes.Buffer
-	err = p.engine.Main.Execute(&buf, ctx)
-	return RenderedItem{Body: buf.String(), IsCompactView: isCompact}, err
+	}, nil
 }
 
 func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg RunnerConfig) (head, tail, gap []byte, err error) {

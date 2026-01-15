@@ -94,6 +94,19 @@ func TestGolden(t *testing.T) {
 				"-s", "Scripts", "-i", "myscript", ".",
 			},
 		},
+		{
+			// Real-world scenario: Docs -> Logic -> Scripts
+			name: "progressive_slicing",
+			args: []string{
+				"-s", "All files compact",
+				"-n0", ".",
+				"-s", "All go files 1 lines except tests",
+				"-n1", "-i", "*.go", "-e", "*_test.go", ".",
+				"-NE",
+				"-s", "Full main.go",
+				"main.go",
+			},
+		},
 
 		// --- SPECIAL FILE TYPES ---
 		{name: "binary_file", args: []string{"binary.dat"}},

@@ -32,6 +32,7 @@ Readme content.
 ```
 
 [5/10] binary.dat - binary file skipped (7 B)
+
 [6/10] main.go (2 rows)
 ---
 ```go

@@ -198,19 +198,22 @@ type FileContext struct {
 	IsCompactView  bool
 	FileIndex      int
 	CurrentSection int
+	Separator      string
 	Global         GlobalContext
 }
 
 type SectionContext struct {
-	Body    string
-	Section int
-	Global  GlobalContext
+	Body      string
+	Section   int
+	Separator string
+	Global    GlobalContext
 }
 
 type PromptContext struct {
-	Body    string
-	Section int
-	Global  GlobalContext
+	Body      string
+	Section   int
+	Separator string
+	Global    GlobalContext
 }
 
 type HeaderContext struct {

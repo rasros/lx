@@ -9,6 +9,7 @@ Readme content.
 ```
 
 [2/16] binary.dat - binary file skipped (7 B)
+
 [3/16] main.go (2 rows)
 ---
 ```go
@@ -46,6 +47,7 @@ package util
 ---
 
 [8/16] binary.dat - binary file skipped (7 B)
+
 [9/16] main.go (2 rows)
 ---
 ```go
@@ -77,6 +79,7 @@ package util
 ---
 
 [13/16] binary.dat - binary file skipped (7 B)
+
 [14/16] main.go (2 rows)
 ---
 ```go
