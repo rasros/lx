@@ -22,11 +22,12 @@ type defaultTokenizer struct{}
 func (defaultTokenizer) Estimate(size int64, _ interface{}) int64 { return size / 4 }
 
 type Stream struct {
-	items     []StreamItem
-	tokenizer Tokenizer
-	engine    *TemplateEngine
-	renderCfg RunnerConfig
-	workDir   string
+	items      []StreamItem
+	tokenizer  Tokenizer
+	engine     *TemplateEngine
+	renderCfg  RunnerConfig
+	workDir    string
+	finalStats *GlobalContext
 }
 
 func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
@@ -69,6 +70,10 @@ func (s *Stream) AddPrompt(text string) *Stream {
 }
 
 func (s *Stream) Prepare() GlobalContext {
+	if s.finalStats != nil {
+		return *s.finalStats
+	}
+
 	ctx := GlobalContext{
 		WorkDir:  s.workDir,
 		Metadata: make(map[string]string),
@@ -95,10 +100,14 @@ func (s *Stream) GetGlobalContext() GlobalContext {
 
 func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	global := s.Prepare()
+
+	// Track actual bytes written
+	counter := &byteCounter{w: w}
+
 	proc := NewProcessor(s.engine, global)
 	proc.tokenCounter = s.tokenizer.Estimate
 
-	if err := s.engine.Header.Execute(w, HeaderContext{Global: global}); err != nil {
+	if err := s.engine.Header.Execute(counter, HeaderContext{Global: global}); err != nil {
 		return err
 	}
 
@@ -108,7 +117,7 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			if err := proc.Render(w, item, fileIdx); err != nil {
+			if err := proc.Render(counter, item, fileIdx); err != nil {
 				return err
 			}
 			if _, ok := item.(InputFile); ok {
@@ -117,7 +126,27 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 		}
 	}
 
-	return s.engine.Footer.Execute(w, FooterContext{Global: global})
+	if err := s.engine.Footer.Execute(counter, FooterContext{Global: global}); err != nil {
+		return err
+	}
+
+	// Update the cached stats with the actual written byte count
+	global.TotalWrittenBytes = counter.count
+	s.finalStats = &global
+
+	return nil
 }
 
 func (s *Stream) GetEngine() *TemplateEngine { return s.engine }
+
+// byteCounter wraps an io.Writer to track total bytes written
+type byteCounter struct {
+	w     io.Writer
+	count int64
+}
+
+func (b *byteCounter) Write(p []byte) (n int, err error) {
+	n, err = b.w.Write(p)
+	b.count += int64(n)
+	return
+}

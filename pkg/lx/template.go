@@ -145,7 +145,7 @@ const defaultHTMLSectionTemplate = `<section id="section-{{ .Section }}">` +
 const defaultHTMLPromptTemplate = `<blockquote>{{ .Body | endNewline }}</blockquote>`
 
 const defaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
-	`Size: {{ .Global.TotalSize | humanize }}` + "\n" +
+	`Size: {{ .Global.TotalWrittenBytes | humanize }}` + "\n" +
 	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"
 
 func templateFuncs() template.FuncMap {

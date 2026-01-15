@@ -12,18 +12,32 @@ import (
 type TokenCounter func(size int64, content interface{}) int64
 
 // DefaultTokenCounter provides a simple 4-char-per-token heuristic.
-func DefaultTokenCounter(size int64, _ interface{}) int64 {
-	return size / 4
+// It prioritizes the actual content length if provided (string or byte slice).
+func DefaultTokenCounter(size int64, content interface{}) int64 {
+	var targetSize int64 = size
+
+	// If we have actual sliced content, use its length instead of file size
+	switch v := content.(type) {
+	case string:
+		targetSize = int64(len(v))
+	case []byte:
+		targetSize = int64(len(v))
+	case fmt.Stringer:
+		targetSize = int64(len(v.String()))
+	}
+
+	return targetSize / 4
 }
 
 // GlobalContext holds metadata about the entire execution.
 type GlobalContext struct {
-	TotalFiles    int
-	TotalSize     int64
-	TokenEstimate int64
-	TotalSections int
-	WorkDir       string
-	Metadata      map[string]string
+	TotalFiles        int
+	TotalSize         int64 // Total size of files on disk
+	TotalWrittenBytes int64 // Total bytes actually written to output
+	TokenEstimate     int64
+	TotalSections     int
+	WorkDir           string
+	Metadata          map[string]string
 }
 
 // RunnerConfig defines slicing and formatting state for the rendering processor.
