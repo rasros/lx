@@ -14,8 +14,6 @@ func readFilenamesFromStdin(useNull bool) ([]string, bool, error) {
 		return nil, false, err
 	}
 
-	// If CharDevice is set, it's a terminal (interactive).
-	// If it is NOT set, it's a pipe or file redirection.
 	if info.Mode()&os.ModeCharDevice != 0 {
 		return nil, false, nil
 	}

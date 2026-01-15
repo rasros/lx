@@ -29,10 +29,13 @@ func TestEstimateLineCount(t *testing.T) {
 		{"large estimate", largeData, 0, false},
 	}
 
+	// Buffer for the reader to use (simulating the pool)
+	buf := make([]byte, 32*1024)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := bytes.NewReader(tt.data)
-			count, exact, err := EstimateLineCount(r, int64(len(tt.data)))
+			count, exact, err := EstimateLineCount(r, int64(len(tt.data)), buf)
 			if err != nil {
 				t.Fatalf("EstimateLineCount error: %v", err)
 			}

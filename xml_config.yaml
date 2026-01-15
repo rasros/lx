@@ -1,7 +1,7 @@
-# lx XML Configuration (Synced with v1.1.0-rc.4)
+# lx XML Configuration
 
 template: |
-  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
+  {{ .Separator }}<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
     <source>{{ .Path }}</source>
     {{- if .IsBinary }}
     <error>Binary file ({{ .Size | humanize }})</error>
@@ -11,14 +11,14 @@ template: |
     <document_content>
   {{ .Content | endNewline }}  </document_content>
     {{- end }}
-  </document>{{ "\n\n" }}
+  </document>
 
 section_template: |
-  <section_header>
+  {{ .Separator }}<section_header>
   {{ .Body | endNewline -}}
-  </section_header>{{ "\n\n" }}
+  </section_header>
 
 prompt_template: |
-  <instruction>
+  {{ .Separator }}<instruction>
   {{ .Body | endNewline -}}
-  </instruction>{{ "\n\n" }}
+  </instruction>

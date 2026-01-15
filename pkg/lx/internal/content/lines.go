@@ -79,14 +79,13 @@ func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
 }
 
 // EstimateLineCount estimates the number of lines in a file by reading a sample.
-func EstimateLineCount(r io.ReaderAt, fileSize int64) (int, bool, error) {
+// buf must be non-nil. A size of 32KB is recommended.
+func EstimateLineCount(r io.ReaderAt, fileSize int64, buf []byte) (int, bool, error) {
 	if fileSize == 0 {
 		return 0, true, nil
 	}
 
-	const sampleSize = 32768
-	buf := make([]byte, sampleSize)
-
+	// Use provided buffer to avoid allocation
 	n, err := r.ReadAt(buf, 0)
 	if err != nil && err != io.EOF {
 		return 0, false, err

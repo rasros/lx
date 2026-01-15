@@ -12,15 +12,18 @@ func TestProcessor_RenderFile(t *testing.T) {
 
 	global := GlobalContext{TotalFiles: 1}
 
-	// Processor is now stateless regarding runner config
+	// Processor is stateless regarding runner config
 	proc := NewProcessor(engine, global)
 
 	// Create a 5-line file with a specific config attached
 	file := NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
 	file.Config = RunnerConfig{Head: 2}
 
+	// Create scratch buffer required by Render
+	scratch := make([]byte, 1024)
+
 	var buf bytes.Buffer
-	err := proc.Render(&buf, file, 1)
+	err := proc.Render(&buf, file, 1, scratch)
 	if err != nil {
 		t.Fatal(err)
 	}

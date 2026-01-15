@@ -15,7 +15,6 @@ func TestReadFilenamesFromStdin_Piped(t *testing.T) {
 	defer func() {
 		os.Stdin = origStdin
 		r.Close()
-		// w is closed explicitly below
 	}()
 
 	os.Stdin = r
@@ -52,7 +51,6 @@ func TestReadFilenamesFromStdin_Null(t *testing.T) {
 
 	os.Stdin = r
 
-	// Simulate 'find . -print0'. Spaces are preserved.
 	input := []byte("file 1.txt\x00file\n2.txt\x00file3\x00")
 
 	go func() {

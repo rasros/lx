@@ -13,7 +13,6 @@ import (
 	"time"
 )
 
-// Markdown Templates: Dynamic spacing via .Separator.
 const defaultTemplate = `{{ .Separator }}{{ if eq .Size 0 }}` +
 	`{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - empty file` +
 	`{{ else if .IsBinary }}` +
@@ -31,11 +30,8 @@ const defaultPromptTemplate = `{{ .Separator }}{{ .Body | endNewline }}`
 
 const defaultHeaderTemplate = ""
 
-// defaultFooterTemplate provides the final double newline for MD/XML streams.
-// HTML overrides this in CompileTemplates.
 const defaultFooterTemplate = "\n\n"
 
-// XML Templates: Now use .Separator for dynamic spacing too.
 const defaultXMLTemplate = `{{ .Separator }}<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
 	`  <source>{{ .Path }}</source>` + "\n" +
 	`  {{- if .IsBinary }}` + "\n" +
@@ -56,7 +52,6 @@ const defaultXMLPromptTemplate = `{{ .Separator }}<instruction>` + "\n" +
 	`{{ .Body | endNewline -}}` +
 	`</instruction>`
 
-// HTML Templates: Do NOT use .Separator. They handle structure internally.
 const defaultHTMLHeaderTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>

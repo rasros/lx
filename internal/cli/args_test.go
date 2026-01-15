@@ -139,11 +139,11 @@ func TestParse(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(got.Ops, tt.wantOps) {
-				t.Errorf("Ops mismatch.\nGot:  %+v\nWant: %+v", got.Ops, tt.wantOps)
+				t.Errorf("Ops mismatch.\nGot:   %+v\nWant: %+v", got.Ops, tt.wantOps)
 			}
 
 			if !reflect.DeepEqual(got.Globals, tt.wantGlo) {
-				t.Errorf("Globals mismatch.\nGot:  %+v\nWant: %+v", got.Globals, tt.wantGlo)
+				t.Errorf("Globals mismatch.\nGot:   %+v\nWant: %+v", got.Globals, tt.wantGlo)
 			}
 		})
 	}

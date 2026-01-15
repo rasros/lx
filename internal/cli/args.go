@@ -117,7 +117,7 @@ func parseLong(arg string, args []string, idx int, defs map[string]CommandDef, r
 		if hasEq {
 			return 0, fmt.Errorf("flag --%s does not take a value", key)
 		}
-		val = "true" // For counter, this triggers the increment logic in addOp
+		val = "true"
 	} else if !hasEq {
 		if idx+1 >= len(args) {
 			return 0, fmt.Errorf("flag --%s requires a value", key)

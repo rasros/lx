@@ -84,7 +84,6 @@ func gatherInputs(parsed *ParsedArgs) error {
 }
 
 func processStream(ctx context.Context, parsed *ParsedArgs) error {
-	// Load Library Config + CLI Config
 	cfg, cliOpts, err := LoadConfigChain(parsed.Globals["config"])
 	if err != nil {
 		return err
@@ -190,7 +189,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				}
 			}
 
-			// Ensure walkPath uses forward slashes for the generic Walker/FS matchers
 			walkPath = filepath.ToSlash(walkPath)
 
 			walker := lx.NewWalker(lx.WalkerOptions{
@@ -290,13 +288,11 @@ func determineLogLevel(globals map[string]string, configVerbosity string) slog.L
 	if _, ok := globals["quiet"]; ok {
 		return slog.LevelError + 1
 	}
-	// Prefer flag, fallback to config
 	vStr := configVerbosity
 	if vFlag, ok := globals["verbosity"]; ok {
 		vStr = vFlag
 	}
 
-	// Logic for flags (-v, -vv) which are counters
 	if count, err := strconv.Atoi(vStr); err == nil {
 		if count >= 2 {
 			return slog.LevelDebug
@@ -307,7 +303,6 @@ func determineLogLevel(globals map[string]string, configVerbosity string) slog.L
 		return slog.LevelWarn
 	}
 
-	// Logic for config string values ("debug", "info", etc)
 	switch strings.ToLower(vStr) {
 	case "trace", "debug":
 		return slog.LevelDebug

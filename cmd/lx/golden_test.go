@@ -30,19 +30,14 @@ func TestGolden(t *testing.T) {
 		name string
 		args []string
 	}{
-		// --- BASIC DISCOVERY (Includes everything EXCEPT the fixtures dir) ---
 		{name: "basic_dir_walk", args: []string{"."}},
 		{name: "exclude_filter", args: []string{"-e", "*.go", "."}},
 		{name: "show_hidden", args: []string{"-H", "."}},
 		{name: "ignore_disabled", args: []string{"--no-ignore", "-n0", "."}},
-
-		// --- FORMATTING MODES ---
 		{name: "compact_view", args: []string{"-n0", "."}},
 		{name: "xml_format", args: []string{"--xml", "."}},
 		{name: "html_format", args: []string{"--html", "."}},
 		{name: "line_numbers", args: []string{"-l", "main.go"}},
-
-		// --- COMPLEX COMPOSITION ---
 		{
 			name: "complex_structure",
 			args: []string{
@@ -52,10 +47,7 @@ func TestGolden(t *testing.T) {
 			},
 		},
 		{name: "prompt_injection", args: []string{"-p", "Explain this code", "main.go"}},
-
-		// --- ADVANCED FILTERING SCENARIOS ---
 		{
-			// Verify -E correctly clears filters to allow a broader second pass
 			name: "filter_reset_relax",
 			args: []string{
 				"-s", "Go Files Only", "-i", "*.go", ".",
@@ -64,27 +56,24 @@ func TestGolden(t *testing.T) {
 			},
 		},
 		{
-			// Verify filters accumulate if -E is NOT used
 			name: "filter_progressive_tightening",
 			args: []string{
 				"-s", "Round 1 (All)", ".",
-				"-e", "*.md", // Add exclude
+				"-e", "*.md",
 				"-s", "Round 2 (No Markdown)", ".",
-				"-e", "*_test.go", // Add another exclude
+				"-e", "*_test.go",
 				"-s", "Round 3 (No MD, No Tests)", ".",
 			},
 		},
 		{
-			// Verify path-based globs vs filename globs
 			name: "filter_path_globbing",
 			args: []string{
 				"-s", "Pkg Directory Only", "-i", "pkg/*", ".",
 				"-E",
-				"-s", "Root Files Only", "-e", "*/*", ".", // Exclude anything with a separator (subdirectories)
+				"-s", "Root Files Only", "-e", "*/*", ".",
 			},
 		},
 		{
-			// Real-world scenario: Docs -> Logic -> Scripts
 			name: "mixed_sections",
 			args: []string{
 				"-s", "Docs", "-i", "*.md", ".",
@@ -95,7 +84,6 @@ func TestGolden(t *testing.T) {
 			},
 		},
 		{
-			// Real-world scenario: Docs -> Logic -> Scripts
 			name: "progressive_slicing",
 			args: []string{
 				"-s", "All files compact",
@@ -107,18 +95,12 @@ func TestGolden(t *testing.T) {
 				"main.go",
 			},
 		},
-
-		// --- SPECIAL FILE TYPES ---
 		{name: "binary_file", args: []string{"binary.dat"}},
 		{name: "shebang_detection", args: []string{"myscript"}},
-
-		// --- LARGE FILES & SLICING (Targeting the specific large file) ---
 		{name: "large_file_estimate", args: []string{"--head", "3", "fixtures/large.txt"}},
 		{name: "large_file_head", args: []string{"--head", "5", "fixtures/large.txt"}},
 		{name: "large_file_gap", args: []string{"--head", "3", "--tail", "3", "fixtures/large.txt"}},
 		{name: "large_file_lines_split", args: []string{"--lines", "10", "fixtures/large.txt"}},
-
-		// --- OUTPUT METHODS ---
 		{name: "output_file_flag", args: []string{"-o", "manual_out.txt", "main.go"}},
 	}
 
@@ -127,7 +109,6 @@ func TestGolden(t *testing.T) {
 			outFile := filepath.Join(workDir, "output.tmp")
 			runArgs := tc.args
 
-			// Detect if a manual output path is already set
 			isManualOut := false
 			for _, arg := range runArgs {
 				if arg == "-o" || arg == "--output" {
@@ -190,7 +171,7 @@ func setupFixture(t *testing.T) string {
 		"pkg/util/util.go":   "package util",
 		"pkg/util/README.md": "# Util Docs",
 		"ignore_me.txt":      "secret",
-		".gitignore":         "ignore_me.txt\nfixtures/", // Ignore the fixtures directory from global walks
+		".gitignore":         "ignore_me.txt\nfixtures/",
 		".hidden":            "hidden content",
 		"myscript":           "#!/bin/bash\necho 'hi'",
 	}
@@ -201,11 +182,9 @@ func setupFixture(t *testing.T) string {
 		os.WriteFile(fullPath, []byte(content), 0644)
 	}
 
-	// Create Binary file
 	binaryContent := []byte{0x00, 0x01, 0x02, 0x03, 'B', 'I', 'N'}
 	os.WriteFile(filepath.Join(dir, "binary.dat"), binaryContent, 0644)
 
-	// Create Large file (800 rows) in a specific directory
 	os.MkdirAll(filepath.Join(dir, "fixtures"), 0755)
 	var largeBuf bytes.Buffer
 	for i := 1; i <= 800; i++ {

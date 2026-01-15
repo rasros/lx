@@ -5,40 +5,35 @@
 #   - Or set LX_CONFIG environment variable to point to this file.
 
 # The main template used for rendering files.
+# Uses {{ .Separator }} to manage dynamic spacing between files.
 template: |
-  {{ if eq .Size 0 }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - empty file
-  {{ else if .IsBinary }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - binary file ({{ .Size | humanize }})
+  {{ .Separator }}{{ if eq .Size 0 }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - empty file
+  {{ else if .IsBinary }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})
   {{ else if .IsCompactView }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
   {{ else }}{{ if gt .Global.TotalFiles 1 }}[{{ .FileIndex }}/{{ .Global.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
   ---
   ```{{ .Language }}
-  {{ .Content | endNewline -}}```
-  
-  {{ end }}
+  {{ .Content | endNewline -}}```{{ end }}
 
 # Template used when the -s/--section flag is provided.
 section_template: |
-  ## {{ .Body | endNewline }}---
-
+  {{ .Separator }}## {{ .Body | endNewline }}---
 
 # Template used when the -p/--prompt flag is provided.
 prompt_template: |
-  {{ .Body | endNewline }}
-
+  {{ .Separator }}{{ .Body | endNewline }}
 
 # Template rendered once at the very beginning of the output.
 header_template: ""
 
 # Template rendered once at the very end of the output.
-footer_template: ""
-
+footer_template: "\n\n"
 
 # Template used for the summary stats (printed to stderr, or stdout if redirected).
 stats_template: |
   Files: {{ .Global.TotalFiles }}
-  Size: {{ .Global.TotalSize | humanize }}
+  Size: {{ .Global.TotalWrittenBytes | humanize }}
   Est. Tokens: {{ .Global.TokenEstimate }}
-
 
 # Output mode.
 # Options:
@@ -62,6 +57,7 @@ verbosity: "warn"
 # Options:
 #   "markdown" (default) - Print markdown.
 #   "xml"                - Claude style XML.
+#   "html"               - HTML for browser.
 output_format: "markdown"
 
 # Discovery Options

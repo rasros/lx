@@ -11,7 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// CliConfig defines the structure for parsing YAML config files.
 type CliConfig struct {
 	Template        string `yaml:"template"`
 	SectionTemplate string `yaml:"section_template"`
@@ -24,7 +23,6 @@ type CliConfig struct {
 	ShowHidden      bool   `yaml:"show_hidden"`
 	Ignore          *bool  `yaml:"ignore"`
 
-	// CLI-specific (not in library config)
 	OutputMode string `yaml:"output_mode"`
 	ShowStats  string `yaml:"show_stats"`
 	Verbosity  string `yaml:"verbosity"`

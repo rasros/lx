@@ -32,18 +32,19 @@ func NewProcessor(engine *TemplateEngine, global GlobalContext) *Processor {
 	}
 }
 
-func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
+// Render processes an item. If item is an InputFile, scratchBuf is used for
+// header reading and line estimation to avoid allocations.
+func (p *Processor) Render(w io.Writer, item StreamItem, index int, scratchBuf []byte) error {
 	var isCompact bool
 	var err error
 
-	// 1. Prepare the context and determine layout properties (IsCompact)
 	var ctx interface{}
 	var templateToUse *template.Template
 
 	switch v := item.(type) {
 	case InputFile:
 		var fCtx FileContext
-		fCtx, err = p.prepareFileContext(v, index)
+		fCtx, err = p.prepareFileContext(v, index, scratchBuf)
 		if err != nil {
 			return err
 		}
@@ -67,7 +68,6 @@ func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
 		return nil
 	}
 
-	// 2. Calculate Separator based on state
 	separator := ""
 	if p.hasRenderedFirst {
 		if p.lastWasCompact && isCompact {
@@ -77,7 +77,6 @@ func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
 		}
 	}
 
-	// 3. Inject Separator into the context
 	switch c := ctx.(type) {
 	case *FileContext:
 		c.Separator = separator
@@ -87,12 +86,10 @@ func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
 		c.Separator = separator
 	}
 
-	// 4. Execute Template
 	if err := templateToUse.Execute(w, ctx); err != nil {
 		return err
 	}
 
-	// 5. Update State
 	p.hasRenderedFirst = true
 	p.lastWasCompact = isCompact
 
@@ -100,7 +97,7 @@ func (p *Processor) Render(w io.Writer, item StreamItem, index int) error {
 }
 
 // prepareFileContext reads the file and builds the context without rendering it.
-func (p *Processor) prepareFileContext(file InputFile, index int) (FileContext, error) {
+func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte) (FileContext, error) {
 	rc, err := file.Open()
 	if err != nil {
 		return FileContext{}, err
@@ -116,10 +113,20 @@ func (p *Processor) prepareFileContext(file InputFile, index int) (FileContext, 
 		reader, size = bytes.NewReader(data), int64(len(data))
 	}
 
-	header := make([]byte, 1024)
-	n, _ := reader.ReadAt(header, 0)
-	isBinary := detect.IsBinary(header[:n])
-	lang := detect.DetectLanguage(file.Path, header[:n])
+	// Use scratch buffer for detection (header read)
+	// Fallback if no scratch provided (though pipeline should always provide it)
+	if scratch == nil {
+		scratch = make([]byte, 1024)
+	}
+
+	headerLen := 1024
+	if len(scratch) < headerLen {
+		headerLen = len(scratch)
+	}
+
+	n, _ := reader.ReadAt(scratch[:headerLen], 0)
+	isBinary := detect.IsBinary(scratch[:n])
+	lang := detect.DetectLanguage(file.Path, scratch[:n])
 	isImage := detect.IsImage(file.Path)
 
 	cfg := file.Config
@@ -128,7 +135,8 @@ func (p *Processor) prepareFileContext(file InputFile, index int) (FileContext, 
 	// A file is compact if user requested -n0, OR it's binary, OR it's empty.
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
 
-	totalRows, exact, _ := content.EstimateLineCount(reader, size)
+	// Use the SAME scratch buffer for line counting (needs up to ~32KB)
+	totalRows, exact, _ := content.EstimateLineCount(reader, size, scratch)
 
 	var contentData interface{}
 	// Only read content slices if we actually plan to show them

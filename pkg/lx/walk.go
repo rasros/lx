@@ -4,7 +4,7 @@ import (
 	"context"
 	"io/fs"
 	"os"
-	"path" // Strict usage of path for fs.FS compatibility
+	"path"
 	"strings"
 
 	"github.com/monochromegane/go-gitignore"
@@ -81,7 +81,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 						parent = "" // Root has no parent stack
 					}
 
-					// Inherit from parent
 					var currentStack []gitignore.IgnoreMatcher
 					if p == "." {
 						currentStack = ignoreStacks["."]
@@ -97,7 +96,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 						ignoreStacks[p] = newStack
 					}
 
-					// Check if current path is ignored
 					if isIgnored(currentStack, p, d.IsDir()) && p != "." {
 						if d.IsDir() {
 							return fs.SkipDir

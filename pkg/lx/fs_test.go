@@ -39,16 +39,13 @@ func TestInputFile_DirFS(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 1. Create the generic FS (how the library sees it)
 	fsys := os.DirFS(dir)
 
-	// 2. Get info relative to the FS root
 	info, err := fs.Stat(fsys, "test.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// 3. Test NewInputFile
 	f := NewInputFile(fsys, "test.txt", info)
 
 	if f.Path != "test.txt" {

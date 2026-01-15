@@ -124,8 +124,6 @@ func printHelp() {
 	}
 }
 
-// wordWrap breaks a string into lines of maximum 'width', prefixing subsequent
-// lines with 'indent'.
 func wordWrap(text string, indent string, width int) string {
 	if text == "" {
 		return ""
@@ -137,7 +135,6 @@ func wordWrap(text string, indent string, width int) string {
 	}
 
 	var sb strings.Builder
-	// Start first line with indent
 	sb.WriteString(indent)
 
 	currentLineLen := len(indent)
