@@ -118,7 +118,6 @@ GLOBBING & FILTERS:
      > -i "cmd/*.go" matches "cmd/main.go" but NOT "other/main.go"
 
 
-
 EXAMPLES:
   # Copy all code in src/, excluding tests
   lx -c -e "*_test.go" src/
