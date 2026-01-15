@@ -60,9 +60,9 @@ var definitions = []CommandDef{
 	// Interleaved flags
 	{Name: "line-numbers", Short: "l", Type: CmdInterleaved, ValueType: ValueNone, Usage: "Enable line numbers for subsequent files. Highly recommended when pasting logs or long source files to an LLM for debugging."},
 	{Name: "no-line-numbers", Short: "L", Type: CmdInterleaved, ValueType: ValueNone, Usage: "Disable line numbers for subsequent files."},
-	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "Print first N lines of subsequent files. Set to 0 for 'compact view' (lists filename/size only, no content)."},
-	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "Print last N lines of subsequent files. Set to 0 for 'compact view'."},
-	{Name: "lines", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "Print N lines total for subsequent files, split evenly between the top and bottom of the file."},
+	{Name: "head", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "Print first N lines of subsequent files."},
+	{Name: "tail", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "Print last N lines of subsequent files."},
+	{Name: "lines", Short: "n", Type: CmdInterleaved, ValueType: ValueNumber, Usage: "Print N lines total for subsequent files, split evenly between the top and bottom of the file. Set to 0 for 'compact view' (lists filename/size only, no content)."},
 	{Name: "reset-lines", Short: "N", Type: CmdInterleaved, ValueType: ValueNone, Usage: "Reset head/tail/lines limits to default (print entire file)."},
 
 	// Filter flags
