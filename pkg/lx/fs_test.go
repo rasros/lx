@@ -2,6 +2,7 @@ package lx
 
 import (
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,13 +31,30 @@ func TestStdinInputFile(t *testing.T) {
 	}
 }
 
-func TestOsInputFile(t *testing.T) {
+func TestInputFile_DirFS(t *testing.T) {
+	// Setup generic OS temp dir for the test environment
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test.txt")
-	os.WriteFile(path, []byte("data"), 0644)
-	info, _ := os.Stat(path)
+	fullPath := filepath.Join(dir, "test.txt")
+	if err := os.WriteFile(fullPath, []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
-	f := NewOsInputFile(path, path, info)
+	// 1. Create the generic FS (how the library sees it)
+	fsys := os.DirFS(dir)
+
+	// 2. Get info relative to the FS root
+	info, err := fs.Stat(fsys, "test.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Test NewInputFile
+	f := NewInputFile(fsys, "test.txt", info)
+
+	if f.Path != "test.txt" {
+		t.Errorf("Path = %q, want test.txt", f.Path)
+	}
+
 	rc, err := f.Open()
 	if err != nil {
 		t.Fatal(err)

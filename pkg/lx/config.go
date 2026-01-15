@@ -44,36 +44,31 @@ type TemplateEngine struct {
 }
 
 // Config represents the core library configuration.
+// It is decoupled from serialization formats like YAML.
 type Config struct {
-	Template        string `yaml:"template"`
-	SectionTemplate string `yaml:"section_template"`
-	PromptTemplate  string `yaml:"prompt_template"`
-	StatsTemplate   string `yaml:"stats_template"`
-	HeaderTemplate  string `yaml:"header_template"`
-	FooterTemplate  string `yaml:"footer_template"`
+	Template        string
+	SectionTemplate string
+	PromptTemplate  string
+	StatsTemplate   string
+	HeaderTemplate  string
+	FooterTemplate  string
 
-	OutputFormat string `yaml:"output_format"`
+	OutputFormat string
 
-	FollowSymlinks bool  `yaml:"follow_symlinks"`
-	ShowHidden     bool  `yaml:"show_hidden"`
-	Ignore         *bool `yaml:"ignore"`
+	FollowSymlinks bool
+	ShowHidden     bool
+	// IgnoreEnabled controls whether .gitignore/.ignore/.lxignore files are respected.
+	IgnoreEnabled bool
 
-	GlobalIgnore gitignore.IgnoreMatcher `yaml:"-"`
+	GlobalIgnore gitignore.IgnoreMatcher
 }
 
+// NewConfig returns a default configuration.
 func NewConfig() *Config {
-	ignore := true
 	return &Config{
-		OutputFormat: "markdown",
-		Ignore:       &ignore,
+		OutputFormat:  "markdown",
+		IgnoreEnabled: true,
 	}
-}
-
-func (c *Config) IgnoreEnabled() bool {
-	if c.Ignore == nil {
-		return true
-	}
-	return *c.Ignore
 }
 
 func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
@@ -150,6 +145,7 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 	}, nil
 }
 
+// Merge applies non-zero fields from src to dst.
 func Merge(dst *Config, src *Config) {
 	if src.Template != "" {
 		dst.Template = src.Template
@@ -172,16 +168,17 @@ func Merge(dst *Config, src *Config) {
 	if src.OutputFormat != "" {
 		dst.OutputFormat = src.OutputFormat
 	}
-	if src.Ignore != nil {
-		dst.Ignore = src.Ignore
-	}
 	if src.FollowSymlinks {
 		dst.FollowSymlinks = true
 	}
 	if src.ShowHidden {
 		dst.ShowHidden = true
 	}
+	// IgnoreEnabled is tricky to merge without a pointer or mask,
+	// but strictly speaking, the CLI handles the logic before calling Merge.
 }
+
+// --- Context Structs for Templates ---
 
 type FileContext struct {
 	Path           string

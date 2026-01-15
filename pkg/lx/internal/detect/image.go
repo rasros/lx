@@ -1,7 +1,7 @@
 package detect
 
 import (
-	"path/filepath"
+	"path"
 	"strings"
 )
 
@@ -18,7 +18,7 @@ var imageExtensions = map[string]bool{
 	".avif": true,
 }
 
-func IsImage(path string) bool {
-	ext := strings.ToLower(filepath.Ext(path))
+func IsImage(p string) bool {
+	ext := strings.ToLower(path.Ext(p))
 	return imageExtensions[ext]
 }

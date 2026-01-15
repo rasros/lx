@@ -3,17 +3,19 @@ package lx
 import (
 	"bytes"
 	"io"
-	"os"
+	"io/fs"
 	"time"
 )
 
 // InputFile represents a file to be processed.
+// It holds metadata in memory (cheap) and a lazy opener for content (heavy).
 type InputFile struct {
 	Path      string
 	AbsPath   string
 	Size      int64
 	ModTime   time.Time
 	LoadError error
+
 	// Config defines how this specific file should be sliced and rendered.
 	Config RunnerConfig
 
@@ -21,15 +23,16 @@ type InputFile struct {
 	Open func() (io.ReadCloser, error)
 }
 
-// NewOsInputFile creates an InputFile from a real OS path.
-func NewOsInputFile(path, absPath string, info os.FileInfo) InputFile {
+// NewInputFile creates an InputFile from a generic fs.FS.
+// path must be a forward-slash separated path relative to the root of fsys.
+func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	return InputFile{
 		Path:    path,
-		AbsPath: absPath,
+		AbsPath: path, // For virtual FS, AbsPath is usually just the path
 		Size:    info.Size(),
 		ModTime: info.ModTime(),
 		Open: func() (io.ReadCloser, error) {
-			return os.Open(path)
+			return fsys.Open(path)
 		},
 	}
 }

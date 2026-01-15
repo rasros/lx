@@ -11,67 +11,110 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// CliConfig adds CLI-specific metadata on top of the library config.
+// CliConfig defines the structure for parsing YAML config files.
 type CliConfig struct {
-	lx.Config  `yaml:",inline"`
+	Template        string `yaml:"template"`
+	SectionTemplate string `yaml:"section_template"`
+	PromptTemplate  string `yaml:"prompt_template"`
+	StatsTemplate   string `yaml:"stats_template"`
+	HeaderTemplate  string `yaml:"header_template"`
+	FooterTemplate  string `yaml:"footer_template"`
+	OutputFormat    string `yaml:"output_format"`
+	FollowSymlinks  bool   `yaml:"follow_symlinks"`
+	ShowHidden      bool   `yaml:"show_hidden"`
+	Ignore          *bool  `yaml:"ignore"`
+
+	// CLI-specific (not in library config)
 	OutputMode string `yaml:"output_mode"`
 	ShowStats  string `yaml:"show_stats"`
 	Verbosity  string `yaml:"verbosity"`
 }
 
-func LoadConfigChain(cliPath string) (*lx.Config, error) {
-	cliCfg := &CliConfig{
-		Config: *lx.NewConfig(),
+func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
+	lxCfg := lx.NewConfig()
+
+	mergedCli := &CliConfig{
+		OutputMode: "stdout",
+		ShowStats:  "auto",
+		Verbosity:  "warn",
 	}
 
-	// 1. User config
+	apply := func(path string, strict bool) error {
+		f, err := os.Open(path)
+		if err != nil {
+			if os.IsNotExist(err) && !strict {
+				return nil
+			}
+			return err
+		}
+		defer f.Close()
+
+		var loaded CliConfig
+		if err := yaml.NewDecoder(f).Decode(&loaded); err != nil {
+			return err
+		}
+
+		if loaded.Template != "" {
+			lxCfg.Template = loaded.Template
+		}
+		if loaded.SectionTemplate != "" {
+			lxCfg.SectionTemplate = loaded.SectionTemplate
+		}
+		if loaded.PromptTemplate != "" {
+			lxCfg.PromptTemplate = loaded.PromptTemplate
+		}
+		if loaded.StatsTemplate != "" {
+			lxCfg.StatsTemplate = loaded.StatsTemplate
+		}
+		if loaded.HeaderTemplate != "" {
+			lxCfg.HeaderTemplate = loaded.HeaderTemplate
+		}
+		if loaded.FooterTemplate != "" {
+			lxCfg.FooterTemplate = loaded.FooterTemplate
+		}
+		if loaded.OutputFormat != "" {
+			lxCfg.OutputFormat = loaded.OutputFormat
+		}
+		if loaded.FollowSymlinks {
+			lxCfg.FollowSymlinks = true
+		}
+		if loaded.ShowHidden {
+			lxCfg.ShowHidden = true
+		}
+		if loaded.Ignore != nil {
+			lxCfg.IgnoreEnabled = *loaded.Ignore
+		}
+
+		if loaded.OutputMode != "" {
+			mergedCli.OutputMode = loaded.OutputMode
+		}
+		if loaded.ShowStats != "" {
+			mergedCli.ShowStats = loaded.ShowStats
+		}
+		if loaded.Verbosity != "" {
+			mergedCli.Verbosity = loaded.Verbosity
+		}
+
+		return nil
+	}
+
 	if configDir, err := os.UserConfigDir(); err == nil {
 		path := filepath.Join(configDir, "lx", "config.yaml")
-		_ = mergeConfigFile(cliCfg, path, false)
+		_ = apply(path, false)
 	}
 
-	// 2. Env
 	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
-		_ = mergeConfigFile(cliCfg, envPath, false)
+		_ = apply(envPath, false)
 	}
 
-	// 3. CLI explicit
 	if cliPath != "" {
-		if err := mergeConfigFile(cliCfg, cliPath, true); err != nil {
-			return nil, err
+		if err := apply(cliPath, true); err != nil {
+			return nil, nil, err
 		}
 	}
 
-	cliCfg.Config.GlobalIgnore = loadGlobalIgnores()
-	return &cliCfg.Config, nil
-}
-
-func mergeConfigFile(dst *CliConfig, path string, strict bool) error {
-	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) && !strict {
-			return nil
-		}
-		return err
-	}
-	defer f.Close()
-
-	var loaded CliConfig
-	if err := yaml.NewDecoder(f).Decode(&loaded); err != nil {
-		return err
-	}
-
-	lx.Merge(&dst.Config, &loaded.Config)
-	if loaded.OutputMode != "" {
-		dst.OutputMode = loaded.OutputMode
-	}
-	if loaded.ShowStats != "" {
-		dst.ShowStats = loaded.ShowStats
-	}
-	if loaded.Verbosity != "" {
-		dst.Verbosity = loaded.Verbosity
-	}
-	return nil
+	lxCfg.GlobalIgnore = loadGlobalIgnores()
+	return lxCfg, mergedCli, nil
 }
 
 func loadGlobalIgnores() gitignore.IgnoreMatcher {

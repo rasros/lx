@@ -181,7 +181,7 @@ func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, is
 		if f, ok := reader.(*os.File); ok {
 			tail, _ = content.ReadTailSeek(f, cfg.Tail)
 		} else if br, ok := reader.(*bytes.Reader); ok {
-			tail = tailFromBuffer(br, cfg.Tail)
+			tail, _ = tailFromBuffer(br, cfg.Tail)
 		}
 	}
 	return
@@ -200,17 +200,17 @@ func (p *Processor) formatContent(head, tail, gap []byte, totalRows int, cfg Run
 	return res.String()
 }
 
-func tailFromBuffer(r *bytes.Reader, lines int) []byte {
+func tailFromBuffer(r *bytes.Reader, lines int) ([]byte, error) {
 	data := make([]byte, r.Size())
-	r.ReadAt(data, 0)
+	_, _ = r.ReadAt(data, 0)
 	count := 0
 	for i := len(data) - 1; i >= 0; i-- {
 		if data[i] == '\n' {
 			count++
 			if count > lines {
-				return data[i+1:]
+				return data[i+1:], nil
 			}
 		}
 	}
-	return data
+	return data, nil
 }

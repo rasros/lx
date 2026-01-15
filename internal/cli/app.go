@@ -84,7 +84,8 @@ func gatherInputs(parsed *ParsedArgs) error {
 }
 
 func processStream(ctx context.Context, parsed *ParsedArgs) error {
-	cfg, err := LoadConfigChain(parsed.Globals["config"])
+	// Load Library Config + CLI Config
+	cfg, cliOpts, err := LoadConfigChain(parsed.Globals["config"])
 	if err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		cfg.OutputFormat = "html"
 	}
 
-	level := determineLogLevel(parsed.Globals, "warn")
+	level := determineLogLevel(parsed.Globals, cliOpts.Verbosity)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
@@ -107,7 +108,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		},
 	}))
 
-	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, parsed.Globals["output_mode"])
+	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, cliOpts.OutputMode)
 	if err != nil {
 		return err
 	}
@@ -189,17 +190,17 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				}
 			}
 
+			// Ensure walkPath uses forward slashes for the generic Walker/FS matchers
+			walkPath = filepath.ToSlash(walkPath)
+
 			walker := lx.NewWalker(lx.WalkerOptions{
 				FS:             os.DirFS(fsRoot),
 				FollowSymlinks: cfg.FollowSymlinks,
 				ShowHidden:     cfg.ShowHidden,
-				IgnoreEnabled:  cfg.IgnoreEnabled(),
+				IgnoreEnabled:  cfg.IgnoreEnabled,
 				GlobalIgnore:   cfg.GlobalIgnore,
 				Includes:       includes,
 				Excludes:       excludes,
-				OnIgnore: func(path string, reason string) {
-					logger.Debug("ignored path", "path", path, "reason", reason)
-				},
 			})
 
 			for f := range walker.Walk(ctx, []string{walkPath}) {
@@ -237,12 +238,12 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		}
 	}
 
-	handleStatsDisplay(parsed, stream, debugOut)
+	handleStatsDisplay(parsed, cliOpts, stream, debugOut)
 	return nil
 }
 
-func handleStatsDisplay(parsed *ParsedArgs, stream *lx.Stream, debugOut io.Writer) {
-	showStatsFlag := "auto"
+func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer) {
+	showStatsFlag := cliOpts.ShowStats
 	if _, ok := parsed.Globals["stats"]; ok {
 		showStatsFlag = "always"
 	} else if _, ok := parsed.Globals["no-stats"]; ok {
@@ -281,8 +282,7 @@ func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
 		c.ShowHidden = true
 	}
 	if _, ok := globals["no-ignore"]; ok {
-		f := false
-		c.Ignore = &f
+		c.IgnoreEnabled = false
 	}
 }
 
@@ -290,16 +290,36 @@ func determineLogLevel(globals map[string]string, configVerbosity string) slog.L
 	if _, ok := globals["quiet"]; ok {
 		return slog.LevelError + 1
 	}
-	if v, ok := globals["verbosity"]; ok {
-		count, _ := strconv.Atoi(v)
+	// Prefer flag, fallback to config
+	vStr := configVerbosity
+	if vFlag, ok := globals["verbosity"]; ok {
+		vStr = vFlag
+	}
+
+	// Logic for flags (-v, -vv) which are counters
+	if count, err := strconv.Atoi(vStr); err == nil {
 		if count >= 2 {
 			return slog.LevelDebug
 		}
 		if count == 1 {
 			return slog.LevelInfo
 		}
+		return slog.LevelWarn
 	}
-	return slog.LevelWarn
+
+	// Logic for config string values ("debug", "info", etc)
+	switch strings.ToLower(vStr) {
+	case "trace", "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "error":
+		return slog.LevelError
+	case "silent":
+		return slog.LevelError + 1
+	default:
+		return slog.LevelWarn
+	}
 }
 
 func determineOutput(globals map[string]string, defaultMode string) (io.Writer, *bytes.Buffer, io.Writer, error) {

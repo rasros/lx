@@ -2,7 +2,7 @@ package detect
 
 import (
 	"bytes"
-	"path/filepath"
+	"path"
 	"strings"
 	"unicode/utf8"
 )
@@ -165,15 +165,16 @@ func IsBinary(data []byte) bool {
 	return !utf8.Valid(data)
 }
 
-func DetectLanguage(path string, data []byte) string {
-	base := strings.ToLower(filepath.Base(path))
+func DetectLanguage(p string, data []byte) string {
+	// Use path.Base/Ext (forward slash) for generic fs.FS compatibility
+	base := strings.ToLower(path.Base(p))
 	if lang, ok := filenameToLang[base]; ok {
 		return lang
 	}
 	if strings.HasPrefix(base, "dockerfile.") {
 		return "dockerfile"
 	}
-	if lang, ok := extToLang[strings.ToLower(filepath.Ext(path))]; ok {
+	if lang, ok := extToLang[strings.ToLower(path.Ext(p))]; ok {
 		return lang
 	}
 	return parseShebang(data)
@@ -189,9 +190,9 @@ func parseShebang(data []byte) string {
 	}
 	line := string(bytes.TrimSpace(data[2:end]))
 	if parts := strings.Fields(line); len(parts) > 0 {
-		interpreter := filepath.Base(parts[0])
+		interpreter := path.Base(parts[0])
 		if interpreter == "env" && len(parts) > 1 {
-			interpreter = filepath.Base(parts[1])
+			interpreter = path.Base(parts[1])
 		}
 		return shebangToLang[interpreter]
 	}

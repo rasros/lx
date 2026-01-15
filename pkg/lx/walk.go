@@ -2,10 +2,9 @@ package lx
 
 import (
 	"context"
-	"io"
 	"io/fs"
 	"os"
-	"path"
+	"path" // Strict usage of path for fs.FS compatibility
 	"strings"
 
 	"github.com/monochromegane/go-gitignore"
@@ -19,7 +18,6 @@ type WalkerOptions struct {
 	GlobalIgnore   gitignore.IgnoreMatcher
 	Includes       []string
 	Excludes       []string
-	OnIgnore       func(path string, reason string)
 }
 
 type Walker struct {
@@ -40,6 +38,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	go func() {
 		defer close(out)
 		for _, root := range roots {
+			// fs.FS always uses forward slashes
 			cleanRoot := path.Clean(root)
 			if cleanRoot == "." || cleanRoot == "/" {
 				cleanRoot = "."
@@ -79,7 +78,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 						parent = "."
 					}
 					if p == "." {
-						parent = "" // Root has no parent stack, it starts fresh or uses global
+						parent = "" // Root has no parent stack
 					}
 
 					// Inherit from parent
@@ -100,9 +99,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 
 					// Check if current path is ignored
 					if isIgnored(currentStack, p, d.IsDir()) && p != "." {
-						if w.opts.OnIgnore != nil {
-							w.opts.OnIgnore(p, "gitignore")
-						}
 						if d.IsDir() {
 							return fs.SkipDir
 						}
@@ -112,7 +108,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 
 				// 3. File Processing (apply user filters)
 				if !d.IsDir() {
-					// Skip the root "." if it somehow appears as a file (unlikely)
 					if p == "." {
 						return nil
 					}
@@ -122,14 +117,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 					}
 
 					info, _ := d.Info()
-					out <- InputFile{
-						Path:    p,
-						Size:    info.Size(),
-						ModTime: info.ModTime(),
-						Open: func() (io.ReadCloser, error) {
-							return filesystem.Open(p)
-						},
-					}
+					out <- NewInputFile(filesystem, p, info)
 				}
 				return nil
 			})
