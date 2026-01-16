@@ -21,6 +21,7 @@ const (
 	ValueAny
 	ValueNumber
 	ValueCounter
+	ValueOptional
 )
 
 type CommandDef struct {
@@ -28,14 +29,17 @@ type CommandDef struct {
 	Short     string
 	Type      CmdType
 	ValueType ValueType
-	Usage     string
+	Usage     string // Short description for -h
+	Long      string // Detailed description for --help
 	Internal  bool
+	Category  string
 }
 
 type Op struct {
-	Action string
-	Value  string
-	Type   CmdType
+	Action  string
+	Value   string
+	Type    CmdType
+	IsShort bool
 }
 
 type ParsedArgs struct {
@@ -107,26 +111,41 @@ func parseLong(arg string, args []string, idx int, defs map[string]CommandDef, r
 	if !ok {
 		if key == "help" {
 			res.Globals["help"] = "true"
+			res.Ops = append(res.Ops, Op{Action: "help", Value: "true", Type: CmdGlobal})
 			return 0, nil
 		}
 		return 0, fmt.Errorf("unknown flag: --%s", key)
 	}
 
 	consumed := 0
-	if def.ValueType == ValueNone || def.ValueType == ValueCounter {
+
+	switch def.ValueType {
+	case ValueNone, ValueCounter:
 		if hasEq {
 			return 0, fmt.Errorf("flag --%s does not take a value", key)
 		}
 		val = "true"
-	} else if !hasEq {
-		if idx+1 >= len(args) {
-			return 0, fmt.Errorf("flag --%s requires a value", key)
+	case ValueOptional:
+		if hasEq {
+			// val is already set
+		} else if idx+1 < len(args) && !strings.HasPrefix(args[idx+1], "-") {
+			// Look ahead: if next arg is NOT a flag, consume it
+			val = args[idx+1]
+			consumed = 1
+		} else {
+			val = "true"
 		}
-		val = args[idx+1]
-		consumed = 1
+	default: // ValueAny, ValueNumber
+		if !hasEq {
+			if idx+1 >= len(args) {
+				return 0, fmt.Errorf("flag --%s requires a value", key)
+			}
+			val = args[idx+1]
+			consumed = 1
+		}
 	}
 
-	return consumed, addOp(res, def, val)
+	return consumed, addOp(res, def, val, false)
 }
 
 func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, res *ParsedArgs) (int, error) {
@@ -139,13 +158,56 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 			return 0, fmt.Errorf("unknown short flag: -%c", char)
 		}
 
+		// Handle flags that don't take arguments
 		if def.ValueType == ValueNone || def.ValueType == ValueCounter {
-			if err := addOp(res, def, "true"); err != nil {
+			if err := addOp(res, def, "true", true); err != nil {
 				return 0, err
 			}
 			continue
 		}
 
+		// Handle Optional Values (-v)
+		if def.ValueType == ValueOptional {
+			// Check if we are "stacking" the same char, e.g. -vv
+			isStacking := false
+			if j+1 < len(chars) && chars[j+1] == char {
+				isStacking = true
+			}
+
+			if isStacking {
+				// Treat current char as bool, continue loop to handle next 'v'
+				if err := addOp(res, def, "true", true); err != nil {
+					return 0, err
+				}
+				continue
+			}
+
+			// If data remains attached (e.g. -vdebug), use it
+			if j+1 < len(chars) {
+				val := string(chars[j+1:])
+				if err := addOp(res, def, val, true); err != nil {
+					return 0, err
+				}
+				break // consumed remainder
+			}
+
+			// If no data remains, check next arg in list
+			if idx+1 < len(args) && !strings.HasPrefix(args[idx+1], "-") {
+				if err := addOp(res, def, args[idx+1], true); err != nil {
+					return 0, err
+				}
+				consumed = 1
+				break
+			}
+
+			// No value found, default to true
+			if err := addOp(res, def, "true", true); err != nil {
+				return 0, err
+			}
+			continue
+		}
+
+		// Handle Mandatory Values
 		val := ""
 		if j+1 < len(chars) {
 			val = string(chars[j+1:])
@@ -157,7 +219,7 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 			consumed = 1
 		}
 
-		if err := addOp(res, def, val); err != nil {
+		if err := addOp(res, def, val, true); err != nil {
 			return 0, err
 		}
 		break
@@ -165,7 +227,7 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 	return consumed, nil
 }
 
-func addOp(res *ParsedArgs, def CommandDef, val string) error {
+func addOp(res *ParsedArgs, def CommandDef, val string, isShort bool) error {
 	if def.ValueType == ValueNumber {
 		if _, err := strconv.Atoi(val); err != nil {
 			prefix := "--"
@@ -177,17 +239,21 @@ func addOp(res *ParsedArgs, def CommandDef, val string) error {
 	}
 
 	if def.Type == CmdGlobal {
+		// For globals, we might want to store the "last won" value in the map,
+		// but also keep the Op in the list for things like counting -v
+		res.Globals[def.Name] = val
+
+		// If it's a counter, we also manually increment the map string for legacy support
 		if def.ValueType == ValueCounter {
 			current := 0
 			if curStr, ok := res.Globals[def.Name]; ok {
 				current, _ = strconv.Atoi(curStr)
 			}
 			res.Globals[def.Name] = strconv.Itoa(current + 1)
-		} else {
-			res.Globals[def.Name] = val
 		}
-	} else {
-		res.Ops = append(res.Ops, Op{Action: def.Name, Value: val, Type: def.Type})
 	}
+
+	// Always append to Ops (even globals) so we can track order and recurrence (e.g. -vv)
+	res.Ops = append(res.Ops, Op{Action: def.Name, Value: val, Type: def.Type, IsShort: isShort})
 	return nil
 }
