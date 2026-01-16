@@ -22,9 +22,12 @@ type CliConfig struct {
 	SectionHeaderTemplate string `yaml:"section_header_template"`
 	SectionFooterTemplate string `yaml:"section_footer_template"`
 	OutputFormat          string `yaml:"output_format"`
-	FollowSymlinks        bool   `yaml:"follow_symlinks"`
-	ShowHidden            bool   `yaml:"show_hidden"`
-	Ignore                *bool  `yaml:"ignore"`
+
+	// Changed to *bool pointers to allow explicit "false" overrides
+	// (e.g. disabling hidden files locally even if enabled globally)
+	ShowSymlinks *bool `yaml:"show_symlinks"`
+	ShowHidden   *bool `yaml:"show_hidden"`
+	Ignore       *bool `yaml:"ignore"`
 
 	OutputMode string `yaml:"output_mode"`
 	ShowStats  string `yaml:"show_stats"`
@@ -86,11 +89,12 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		if loaded.OutputFormat != "" {
 			lxCfg.OutputFormat = loaded.OutputFormat
 		}
-		if loaded.FollowSymlinks {
-			lxCfg.FollowSymlinks = true
+
+		if loaded.ShowSymlinks != nil {
+			lxCfg.IgnoreSymlinks = !(*loaded.ShowSymlinks)
 		}
-		if loaded.ShowHidden {
-			lxCfg.ShowHidden = true
+		if loaded.ShowHidden != nil {
+			lxCfg.IgnoreHidden = !(*loaded.ShowHidden)
 		}
 		if loaded.Ignore != nil {
 			lxCfg.IgnoreEnabled = *loaded.Ignore

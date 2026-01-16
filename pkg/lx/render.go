@@ -93,12 +93,9 @@ func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte) (FileContext, error) {
 	rc, err := file.Open()
 	if err != nil {
-		// Trigger callback for the host application to handle (log, etc.)
 		if p.onFileError != nil {
 			p.onFileError(file, err)
 		}
-		// Return a safe context with the ReadError field set.
-		// We DO NOT return the error to the pipeline, preventing a crash.
 		return FileContext{
 			Path:      file.Path,
 			AbsPath:   file.AbsPath,
@@ -107,9 +104,27 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 			FileIndex: index,
 			Global:    p.global,
 			ReadError: err.Error(),
+			IsError:   true,
 		}, nil
 	}
 	defer rc.Close()
+
+	// 1. Directory Check: Ensure we aren't trying to read a directory as a file.
+	// This happens when following symlinks to directories.
+	if f, ok := rc.(*os.File); ok {
+		if stat, err := f.Stat(); err == nil && stat.IsDir() {
+			return FileContext{
+				Path:      file.Path,
+				AbsPath:   file.AbsPath,
+				Size:      file.Size,
+				ModTime:   file.ModTime,
+				FileIndex: index,
+				Global:    p.global,
+				ReadError: "is a directory",
+				IsError:   true,
+			}, nil
+		}
+	}
 
 	var reader io.ReaderAt
 	var size int64
@@ -127,6 +142,7 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 	if len(scratch) < headerLen {
 		headerLen = len(scratch)
 	}
+
 	n, _ := reader.ReadAt(scratch[:headerLen], 0)
 	isBinary := detect.IsBinary(scratch[:n])
 	lang := detect.DetectLanguage(file.Path, scratch[:n])
@@ -137,10 +153,28 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 
 	var contentData interface{}
 	if !isBinary && !isCompact && size > 0 && !isImage {
-		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, cfg)
-		if err == nil {
-			contentData = p.formatContent(head, tail, gap, totalRows, cfg)
+		effectiveCfg := cfg
+		// Prevent duplication for small files
+		if exact && cfg.Head > 0 && cfg.Tail > 0 && totalRows <= (cfg.Head+cfg.Tail) {
+			effectiveCfg.Head = -1
+			effectiveCfg.Tail = 0
 		}
+
+		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, effectiveCfg)
+		if err != nil {
+			// 2. Read Error Check: If reading fails, flag as error immediately.
+			return FileContext{
+				Path:      file.Path,
+				AbsPath:   file.AbsPath,
+				Size:      file.Size,
+				ModTime:   file.ModTime,
+				FileIndex: index,
+				Global:    p.global,
+				ReadError: err.Error(),
+				IsError:   true,
+			}, nil
+		}
+		contentData = p.formatContent(head, tail, gap, totalRows, effectiveCfg)
 	}
 
 	return FileContext{

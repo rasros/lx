@@ -13,7 +13,9 @@ import (
 	"time"
 )
 
-const defaultTemplate = `{{ .Separator }}{{ if eq .Size 0 }}` +
+const defaultTemplate = `{{ .Separator }}{{ if .IsError }}` +
+	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - error: {{ .ReadError }}` +
+	`{{ else if eq .Size 0 }}` +
 	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - empty file` +
 	`{{ else if .IsBinary }}` +
 	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` +
@@ -35,7 +37,9 @@ const defaultFooterTemplate = "\n\n"
 const defaultXMLTemplate = `{{ .Separator }}` +
 	`  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
 	`    <source>{{ .Path }}</source>` + "\n" +
-	`{{- if .IsBinary }}` + "\n" +
+	`{{- if .IsError }}` + "\n" +
+	`    <error>{{ .ReadError }}</error>` + "\n" +
+	`{{- else if .IsBinary }}` + "\n" +
 	`    <error>Binary file ({{ .Size | humanize }})</error>` + "\n" +
 	`{{- else if .IsCompactView }}` + "\n" +
 	`    <description>Compact view</description>` + "\n" +
@@ -99,6 +103,7 @@ article > header {
   color: var(--pico-primary);
   text-decoration: underline;
 }
+.error-state { color: var(--pico-color-red-500); font-weight: bold; }
 </style>
 </head>
 <body>
@@ -123,7 +128,7 @@ const defaultHTMLFooterTemplate = `</main>
 const defaultHTMLTemplate = `<article id="file-{{ .FileIndex }}">
 <header>
  <a href="#file-{{ .FileIndex }}" aria-label="Link to this file"><strong>{{ .Path }}</strong></a>
-{{- if and (gt .Size 0) (not .IsImage) }}
+{{- if and (gt .Size 0) (not .IsImage) (not .IsError) }}
  <small>
  {{- if .IsCompactView -}}
    ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows - compact)
@@ -133,7 +138,9 @@ const defaultHTMLTemplate = `<article id="file-{{ .FileIndex }}">
  </small>
 {{- end }}
 </header>
-{{- if eq .Size 0 }}
+{{- if .IsError }}
+<p class="error-state">Error: {{ .ReadError }}</p>
+{{- else if eq .Size 0 }}
 <em>Empty file</em>
 {{- else if .IsImage }}
 <img src="{{ .AbsPath | dataURI }}" alt="{{ .Path }}" />

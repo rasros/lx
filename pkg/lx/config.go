@@ -66,17 +66,22 @@ type Config struct {
 	SectionHeaderTemplate string
 	SectionFooterTemplate string
 	OutputFormat          string
-	FollowSymlinks        bool
-	ShowHidden            bool
-	IgnoreEnabled         bool
-	GlobalIgnore          gitignore.IgnoreMatcher
+
+	// Filtering Options (Negative Logic)
+	IgnoreSymlinks bool
+	IgnoreHidden   bool
+	IgnoreEnabled  bool // Refers to gitignore processing
+
+	GlobalIgnore gitignore.IgnoreMatcher
 }
 
 // NewConfig returns a default configuration.
 func NewConfig() *Config {
 	return &Config{
-		OutputFormat:  "markdown",
-		IgnoreEnabled: true,
+		OutputFormat:   "markdown",
+		IgnoreEnabled:  true,
+		IgnoreHidden:   true, // Default: Do not show hidden files
+		IgnoreSymlinks: true, // Default: Do not follow symlinks
 	}
 }
 
@@ -197,11 +202,11 @@ func Merge(dst *Config, src *Config) {
 	if src.OutputFormat != "" {
 		dst.OutputFormat = src.OutputFormat
 	}
-	if src.FollowSymlinks {
-		dst.FollowSymlinks = true
+	if !src.IgnoreSymlinks {
+		dst.IgnoreSymlinks = false
 	}
-	if src.ShowHidden {
-		dst.ShowHidden = true
+	if !src.IgnoreHidden {
+		dst.IgnoreHidden = false
 	}
 }
 
@@ -212,6 +217,7 @@ type FileContext struct {
 	ModTime          time.Time
 	TotalRows        int
 	ReadError        string
+	IsError          bool
 	TokenEstimate    int64
 	IsEstimate       bool
 	Language         string

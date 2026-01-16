@@ -113,15 +113,12 @@ internals or config caches.`,
 	},
 	{
 		Category:  CatDiscovery,
-		Name:      "follow",
+		Name:      "symlinks",
 		Short:     "S",
 		Type:      CmdGlobal,
 		ValueType: ValueNone,
-		Usage:     "Follow symbolic links",
-		Long: `Follow symbolic links during recursive directory walking.
-        
-Be careful with recursive symlinks, as they are not currently detected and
-may cause infinite loops.`,
+		Usage:     "Include symbolic links files",
+		Long:      `Include symbolic links and process them as normal during recursive directory walking.`,
 	},
 	{
 		Category:  CatDiscovery,
@@ -164,11 +161,11 @@ directories, or other usually ignored content.`,
 	},
 	{
 		Category:  CatDiscovery,
-		Name:      "no-follow",
+		Name:      "no-symlinks",
 		Type:      CmdGlobal,
 		ValueType: ValueNone,
-		Usage:     "Do not follow symbolic links (default)",
-		Long:      "Do not follow symbolic links. This is the default behavior.",
+		Usage:     "Do not show symbolic links (default)",
+		Long:      "Do not show symbolic links. This is the default behavior.",
 	},
 	{
 		Category:  CatDiscovery,

@@ -133,8 +133,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	slog.Debug("Configuration loaded",
 		"format", cfg.OutputFormat,
 		"ignore_enabled", cfg.IgnoreEnabled,
-		"show_hidden", cfg.ShowHidden,
-		"follow_symlinks", cfg.FollowSymlinks,
+		"ignore_hidden", cfg.IgnoreHidden,
+		"ignore_symlinks", cfg.IgnoreSymlinks,
 	)
 
 	// 3. Determine Outputs
@@ -247,27 +247,19 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			walkPath = filepath.ToSlash(walkPath)
 
-			walkerShowHidden := cfg.ShowHidden
+			// Map config settings to walker settings
+			walkerIgnoreHidden := cfg.IgnoreHidden
+			walkerIgnoreSymlinks := cfg.IgnoreSymlinks
 			walkerIgnoreEnabled := cfg.IgnoreEnabled
 
 			if op.Action == "file" {
 				slog.Debug("Action 'file' used: Forcing inclusion (bypassing ignore/hidden rules)", "path", rootPath)
-				walkerShowHidden = true
+				// If specific file action, we un-ignore everything to ensure it is processed
+				walkerIgnoreHidden = false
 				walkerIgnoreEnabled = false
+				// Force follow symlinks for direct file arguments
+				walkerIgnoreSymlinks = false
 			}
-
-			/*
-			   --- IGNORE LOGIC DOCUMENTATION ---
-			   The Walker is configured here. The logic follows this precedence:
-
-			   1. Explicit Action: If `-f` (Action: "file") is used, ignore rules are DISABLED for that specific target.
-			   2. CLI Flags: `-I` (no-ignore) sets walkerIgnoreEnabled = false globally.
-			   3. Config File: `ignore: false` in config.yaml sets defaults.
-			   4. Walker Execution:
-			      - It checks Global Ignores first (loaded from ~/.config/lx/ignore or ~/.config/git/ignore).
-			      - It checks Local Ignores in every directory: .lxignore, then .ignore, then .gitignore.
-			      - .lxignore takes highest precedence among local files.
-			*/
 
 			slog.Debug("Initializing Walker",
 				"fs_root", fsRoot,
@@ -275,13 +267,15 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				"includes_count", len(includes),
 				"excludes_count", len(excludes),
 				"ignore_enabled", walkerIgnoreEnabled,
-				"show_hidden", walkerShowHidden,
+				"ignore_hidden", walkerIgnoreHidden,
+				"ignore_symlinks", walkerIgnoreSymlinks,
 			)
 
 			walker := lx.NewWalker(lx.WalkerOptions{
 				FS:             os.DirFS(fsRoot),
-				FollowSymlinks: cfg.FollowSymlinks,
-				ShowHidden:     walkerShowHidden,
+				Root:           fsRoot, // Pass physical root for symlink resolution
+				IgnoreSymlinks: walkerIgnoreSymlinks,
+				IgnoreHidden:   walkerIgnoreHidden,
 				IgnoreEnabled:  walkerIgnoreEnabled,
 				GlobalIgnore:   cfg.GlobalIgnore,
 				Includes:       includes,
@@ -388,13 +382,14 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 }
 
 func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
-	if _, ok := globals["follow"]; ok {
+	// Flags "Show/Follow" INVERT the internal "Ignore" settings.
+	if _, ok := globals["symlinks"]; ok {
 		slog.Debug("Override: Follow symlinks enabled via flag")
-		c.FollowSymlinks = true
+		c.IgnoreSymlinks = false
 	}
 	if _, ok := globals["hidden"]; ok {
 		slog.Debug("Override: Show hidden files enabled via flag")
-		c.ShowHidden = true
+		c.IgnoreHidden = false
 	}
 	if _, ok := globals["no-ignore"]; ok {
 		slog.Debug("Override: Ignore files disabled via flag")
