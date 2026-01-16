@@ -33,7 +33,7 @@ func Run(ctx context.Context, args []string) error {
 
 	if err := gatherInputs(parsed); err != nil {
 		if len(args) == 0 {
-			printHelp()
+			printShortHelp()
 			return nil
 		}
 		return err
@@ -43,10 +43,18 @@ func Run(ctx context.Context, args []string) error {
 }
 
 func handleGlobals(parsed *ParsedArgs) bool {
-	if _, ok := parsed.Globals["help"]; ok {
-		printHelp()
-		return true
+	// Check for help Op specifically to distinguish short/long
+	for _, op := range parsed.Ops {
+		if op.Action == "help" {
+			if op.IsShort {
+				printShortHelp()
+			} else {
+				printLongHelp()
+			}
+			return true
+		}
 	}
+
 	if _, ok := parsed.Globals["version"]; ok {
 		fmt.Printf("lx version %s\n", Version)
 		return true
@@ -96,7 +104,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		cfg.OutputFormat = "html"
 	}
 
-	level := determineLogLevel(parsed.Globals, cliOpts.Verbosity)
+	level := determineLogLevel(parsed, cliOpts.Verbosity)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
@@ -106,6 +114,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			return a
 		},
 	}))
+	// Set default logger (optional, if your pkg/lx uses it, otherwise pass it down)
+	slog.SetDefault(logger)
 
 	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, cliOpts.OutputMode)
 	if err != nil {
@@ -191,11 +201,21 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			walkPath = filepath.ToSlash(walkPath)
 
+			// Determine walker settings
+			// If action is "file" (specifically -f), force inclusion of hidden and ignored files
+			walkerShowHidden := cfg.ShowHidden
+			walkerIgnoreEnabled := cfg.IgnoreEnabled
+
+			if op.Action == "file" {
+				walkerShowHidden = true
+				walkerIgnoreEnabled = false
+			}
+
 			walker := lx.NewWalker(lx.WalkerOptions{
 				FS:             os.DirFS(fsRoot),
 				FollowSymlinks: cfg.FollowSymlinks,
-				ShowHidden:     cfg.ShowHidden,
-				IgnoreEnabled:  cfg.IgnoreEnabled,
+				ShowHidden:     walkerShowHidden,
+				IgnoreEnabled:  walkerIgnoreEnabled,
 				GlobalIgnore:   cfg.GlobalIgnore,
 				Includes:       includes,
 				Excludes:       excludes,
@@ -284,26 +304,55 @@ func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
 	}
 }
 
-func determineLogLevel(globals map[string]string, configVerbosity string) slog.Level {
-	if _, ok := globals["quiet"]; ok {
+func determineLogLevel(parsed *ParsedArgs, configVerbosity string) slog.Level {
+	if _, ok := parsed.Globals["quiet"]; ok {
 		return slog.LevelError + 1
 	}
-	vStr := configVerbosity
-	if vFlag, ok := globals["verbosity"]; ok {
-		vStr = vFlag
+
+	// Calculate level based on Ops to handle mix of -vv and --verbose=debug
+	count := 0
+	explicitLevel := ""
+
+	for _, op := range parsed.Ops {
+		if op.Action == "verbose" {
+			if op.Value == "true" {
+				count++
+			} else if op.Value != "" {
+				explicitLevel = op.Value
+			}
+		}
 	}
 
-	if count, err := strconv.Atoi(vStr); err == nil {
+	// 1. Explicit level wins (--verbose=trace)
+	if explicitLevel != "" {
+		return parseLevelString(explicitLevel)
+	}
+
+	// 2. Flags count wins (-vv)
+	if count > 0 {
 		if count >= 2 {
 			return slog.LevelDebug
 		}
-		if count == 1 {
+		return slog.LevelInfo
+	}
+
+	// 3. Config file fallback
+	return parseLevelString(configVerbosity)
+}
+
+func parseLevelString(s string) slog.Level {
+	// Handle numeric string from config
+	if c, err := strconv.Atoi(s); err == nil {
+		if c >= 2 {
+			return slog.LevelDebug
+		}
+		if c == 1 {
 			return slog.LevelInfo
 		}
 		return slog.LevelWarn
 	}
 
-	switch strings.ToLower(vStr) {
+	switch strings.ToLower(s) {
 	case "trace", "debug":
 		return slog.LevelDebug
 	case "info":
