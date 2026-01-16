@@ -27,7 +27,7 @@ func TestParse(t *testing.T) {
 			name: "double dash delimiter",
 			args: []string{"-h", "5", "--", "-file-with-dash.txt", "normal.txt"},
 			wantOps: []Op{
-				{Action: "head", Value: "5", Type: CmdInterleaved},
+				{Action: "head", Value: "5", Type: CmdInterleaved, IsShort: true},
 				{Action: "FILE", Value: "-file-with-dash.txt", Type: CmdAction},
 				{Action: "FILE", Value: "normal.txt", Type: CmdAction},
 			},
@@ -37,7 +37,7 @@ func TestParse(t *testing.T) {
 			name: "sticky number",
 			args: []string{"-h5", "file.txt"},
 			wantOps: []Op{
-				{Action: "head", Value: "5", Type: CmdInterleaved},
+				{Action: "head", Value: "5", Type: CmdInterleaved, IsShort: true},
 				{Action: "FILE", Value: "file.txt", Type: CmdAction},
 			},
 			wantGlo: map[string]string{},
@@ -46,8 +46,10 @@ func TestParse(t *testing.T) {
 			name: "grouped bools sticky number",
 			args: []string{"-lvh5", "file.txt"},
 			wantOps: []Op{
-				{Action: "head", Value: "5", Type: CmdInterleaved},
-				{Action: "FILE", Value: "file.txt", Type: CmdAction},
+				{Action: "line-numbers", Value: "true", Type: CmdGlobal, IsShort: true},
+				{Action: "verbose", Value: "true", Type: CmdGlobal, IsShort: true},
+				{Action: "head", Value: "5", Type: CmdInterleaved, IsShort: true},
+				{Action: "FILE", Value: "file.txt", Type: CmdAction, IsShort: false},
 			},
 			wantGlo: map[string]string{
 				"line-numbers": "true",
@@ -58,6 +60,9 @@ func TestParse(t *testing.T) {
 			name: "grouped bools sticky string",
 			args: []string{"-lvfconfig.yaml", "main.go"},
 			wantOps: []Op{
+				{Action: "line-numbers", Value: "true", Type: CmdGlobal, IsShort: true},
+				{Action: "verbose", Value: "true", Type: CmdGlobal, IsShort: true},
+				{Action: "config", Value: "config.yaml", Type: CmdGlobal, IsShort: true},
 				{Action: "FILE", Value: "main.go", Type: CmdAction},
 			},
 			wantGlo: map[string]string{
@@ -67,9 +72,11 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name:    "sticky string alone",
-			args:    []string{"-fconfig.yaml"},
-			wantOps: []Op{},
+			name: "sticky string alone",
+			args: []string{"-fconfig.yaml"},
+			wantOps: []Op{
+				{Action: "config", Value: "config.yaml", Type: CmdGlobal, IsShort: true},
+			},
 			wantGlo: map[string]string{
 				"config": "config.yaml",
 			},

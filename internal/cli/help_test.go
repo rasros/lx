@@ -7,7 +7,7 @@ import (
 
 func TestPrintHelp(t *testing.T) {
 	out, err := captureStdout(func() error {
-		printHelp()
+		printLongHelp()
 		return nil
 	})
 	if err != nil {

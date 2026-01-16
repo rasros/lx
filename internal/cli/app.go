@@ -20,12 +20,12 @@ func Run(ctx context.Context, args []string) error {
 	// However, usually we wait until flags are parsed to know the verbosity.
 	parsed, err := Parse(args, definitions)
 	if err != nil {
-		return err
+		return fmt.Errorf("argument parsing failed: %w", err)
 	}
 
 	stopProfiling, err := setupProfiling(parsed)
 	if err != nil {
-		return err
+		return fmt.Errorf("profiling setup failed: %w", err)
 	}
 	defer stopProfiling()
 
@@ -38,14 +38,13 @@ func Run(ctx context.Context, args []string) error {
 			printShortHelp()
 			return nil
 		}
-		return err
+		return fmt.Errorf("input gathering failed: %w", err)
 	}
 
 	return processStream(ctx, parsed)
 }
 
 func handleGlobals(parsed *ParsedArgs) bool {
-	// Check for help Op specifically to distinguish short/long
 	for _, op := range parsed.Ops {
 		if op.Action == "help" {
 			if op.IsShort {
@@ -68,6 +67,7 @@ func gatherInputs(parsed *ParsedArgs) error {
 	hasFilesOrGenerators := false
 	for _, op := range parsed.Ops {
 		if op.Action == "FILE" || op.Action == "file" || op.Action == "section" || op.Action == "prompt" {
+			slog.Debug("Detected input from actions")
 			hasFilesOrGenerators = true
 			break
 		}
@@ -85,6 +85,8 @@ func gatherInputs(parsed *ParsedArgs) error {
 				parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f, Type: CmdAction})
 			}
 			hasFilesOrGenerators = true
+		} else {
+			slog.Debug("No stdin pipe detected")
 		}
 	}
 
@@ -110,10 +112,16 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	}
 
 	// 2. Setup Logger
-	level := determineLogLevel(parsed, cliOpts.Verbosity)
+	// We return the error here instead of logging it, adhering to "Log OR Return"
+	level, err := determineLogLevel(parsed, cliOpts.Verbosity)
+	if err != nil {
+		return err
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			// In non-debug modes, remove the timestamp for cleaner CLI look
 			if a.Key == slog.TimeKey && level > slog.LevelDebug {
 				return slog.Attr{}
 			}
@@ -123,7 +131,12 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	slog.SetDefault(logger)
 
 	slog.Debug("Logger initialized", "level", level.String())
-	slog.Debug("Configuration loaded", "format", cfg.OutputFormat, "ignore_enabled", cfg.IgnoreEnabled)
+	slog.Debug("Configuration loaded",
+		"format", cfg.OutputFormat,
+		"ignore_enabled", cfg.IgnoreEnabled,
+		"show_hidden", cfg.ShowHidden,
+		"follow_symlinks", cfg.FollowSymlinks,
+	)
 
 	// 3. Determine Outputs
 	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, cliOpts.OutputMode)
@@ -154,9 +167,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 	// 4. Process Operations
 	ops := reorderTrailingOps(parsed.Ops)
-	slog.Debug("Processing operations", "count", len(ops))
+	slog.Debug("Processing operations", "total_ops", len(ops))
 
-	for _, op := range ops {
+	for i, op := range ops {
+		slog.Debug("Processing op", "index", i, "action", op.Action, "value", op.Value)
+
 		switch op.Action {
 		case "head":
 			val, _ := strconv.Atoi(op.Value)
@@ -181,8 +196,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			slog.Debug("Enabling line numbers")
 			runCfg.LineNumbers = true
 			stream.WithRunnerConfig(runCfg)
-		case "no-line-numbers":
-			slog.Debug("Disabling line numbers")
+		case "reset-line-numbers":
+			slog.Debug("Resetting line numbers")
 			runCfg.LineNumbers = false
 			stream.WithRunnerConfig(runCfg)
 		case "include":
@@ -199,7 +214,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		case "FILE", "file":
 			if op.Value == "-" {
 				slog.Info("Reading content from stdin")
-				data, _ := io.ReadAll(os.Stdin)
+				data, err := io.ReadAll(os.Stdin)
+				if err != nil {
+					slog.Error("Failed to read from stdin", "error", err)
+					continue
+				}
 				stream.AddFile(lx.NewBufferInputFile("stdin", data))
 				continue
 			}
@@ -228,17 +247,31 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			walkerIgnoreEnabled := cfg.IgnoreEnabled
 
 			if op.Action == "file" {
-				slog.Debug("Forcing single file inclusion (ignoring ignore rules)", "path", rootPath)
+				slog.Debug("Action 'file' used: Forcing inclusion (bypassing ignore/hidden rules)", "path", rootPath)
 				walkerShowHidden = true
 				walkerIgnoreEnabled = false
 			}
 
-			slog.Debug("Starting walker",
+			/*
+				--- IGNORE LOGIC DOCUMENTATION ---
+				The Walker is configured here. The logic follows this precedence:
+
+				1. Explicit Action: If `-f` (Action: "file") is used, ignore rules are DISABLED for that specific target.
+				2. CLI Flags: `-I` (no-ignore) sets walkerIgnoreEnabled = false globally.
+				3. Config File: `ignore: false` in config.yaml sets defaults.
+				4. Walker Execution:
+				   - It checks Global Ignores first (loaded from ~/.config/lx/ignore or ~/.config/git/ignore).
+				   - It checks Local Ignores in every directory: .lxignore, then .ignore, then .gitignore.
+				   - .lxignore takes highest precedence among local files.
+			*/
+
+			slog.Debug("Initializing Walker",
 				"fs_root", fsRoot,
 				"walk_path", walkPath,
-				"includes", includes,
-				"excludes", excludes,
-				"ignore", walkerIgnoreEnabled,
+				"includes_count", len(includes),
+				"excludes_count", len(excludes),
+				"ignore_enabled", walkerIgnoreEnabled,
+				"show_hidden", walkerShowHidden,
 			)
 
 			walker := lx.NewWalker(lx.WalkerOptions{
@@ -252,23 +285,26 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			})
 
 			count := 0
+			// The Walker does the heavy lifting of ignore checking internally.
+			// If a file is emitted here, it has passed all ignore/hidden checks.
 			for f := range walker.Walk(ctx, []string{walkPath}) {
 				if outPath != "" {
 					fullAbs, _ := filepath.Abs(filepath.Join(fsRoot, f.Path))
 					if fullAbs == outPath {
-						slog.Debug("Skipping output file to avoid recursion", "path", f.Path)
+						slog.Warn("Skipping output file to avoid infinite recursion", "path", f.Path)
 						continue
 					}
 				}
 				if f.LoadError != nil {
-					logger.Error("Failed to load file", "path", f.Path, "error", f.LoadError)
+					slog.Error("Failed to access file during walk", "path", f.Path, "error", f.LoadError)
 					continue
 				}
-				slog.Debug("Adding file to stream", "path", f.Path, "size", f.Size)
+
+				slog.Debug("File accepted by walker", "path", f.Path, "size", f.Size)
 				stream.AddFile(f)
 				count++
 			}
-			slog.Debug("Walker finished", "path", rootPath, "files_found", count)
+			slog.Debug("Walker finished", "root", rootPath, "files_found", count)
 
 		case "section":
 			slog.Debug("Adding section", "title", op.Value)
@@ -284,7 +320,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		defer f.Close()
 	}
 
-	slog.Info("Executing pipeline")
+	slog.Info("Executing stream pipeline...")
 	err = stream.Execute(ctx, out)
 	if err != nil {
 		slog.Error("Pipeline execution failed", "error", err)
@@ -294,8 +330,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	if clipBuf != nil {
 		slog.Info("Copying output to clipboard", "bytes", clipBuf.Len())
 		if err := clipboard.WriteAll(clipBuf.String()); err != nil {
-			return fmt.Errorf("clipboard write: %w", err)
+			return fmt.Errorf("clipboard write failed: %w", err)
 		}
+		slog.Info("Clipboard copy successful")
 	}
 
 	handleStatsDisplay(parsed, cliOpts, stream, debugOut)
@@ -314,7 +351,7 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 		return
 	}
 
-	show := (showStatsFlag == "always")
+	show := showStatsFlag == "always"
 	if !show {
 		_, hasCopy := parsed.Globals["copy"]
 		_, hasOutput := parsed.Globals["output"]
@@ -328,86 +365,98 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 	}
 
 	if show {
-		_ = stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
+		err := stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
 			Global: stream.GetGlobalContext(),
 		})
+		if err != nil {
+			slog.Error("Failed to render stats", "error", err)
+		}
 	}
 }
 
 func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
 	if _, ok := globals["follow"]; ok {
-		slog.Debug("Override: Follow symlinks enabled")
+		slog.Debug("Override: Follow symlinks enabled via flag")
 		c.FollowSymlinks = true
 	}
 	if _, ok := globals["hidden"]; ok {
-		slog.Debug("Override: Show hidden files enabled")
+		slog.Debug("Override: Show hidden files enabled via flag")
 		c.ShowHidden = true
 	}
 	if _, ok := globals["no-ignore"]; ok {
-		slog.Debug("Override: Ignore files disabled")
+		slog.Debug("Override: Ignore files disabled via flag")
 		c.IgnoreEnabled = false
 	}
 }
 
-func determineLogLevel(parsed *ParsedArgs, configVerbosity string) slog.Level {
+func determineLogLevel(parsed *ParsedArgs, configVerbosity string) (slog.Level, error) {
 	if _, ok := parsed.Globals["quiet"]; ok {
-		return slog.LevelError + 1
+		return slog.LevelError + 1, nil
 	}
 
-	// Calculate level based on Ops to handle mix of -vv and --verbose=debug
 	count := 0
-	explicitLevel := ""
+	var explicitLevel slog.Level
+	hasExplicit := false
 
 	for _, op := range parsed.Ops {
 		if op.Action == "verbose" {
 			if op.Value == "true" {
 				count++
 			} else if op.Value != "" {
-				explicitLevel = op.Value
+				lvl, err := parseLogLevel(op.Value)
+				if err != nil {
+					return 0, fmt.Errorf("invalid verbosity level %s", op.Value)
+				}
+				explicitLevel = lvl
+				hasExplicit = true
 			}
 		}
 	}
 
-	// 1. Explicit level wins (--verbose=trace)
-	if explicitLevel != "" {
-		return parseLevelString(explicitLevel)
+	if hasExplicit {
+		return explicitLevel, nil
 	}
 
-	// 2. Flags count wins (-vv)
 	if count > 0 {
 		if count >= 2 {
-			return slog.LevelDebug
+			return slog.LevelDebug, nil
 		}
-		return slog.LevelInfo
+		return slog.LevelInfo, nil
 	}
 
-	// 3. Config file fallback
-	return parseLevelString(configVerbosity)
+	if lvl, err := parseLogLevel(configVerbosity); err == nil {
+		return lvl, nil
+	}
+
+	return slog.LevelWarn, nil
 }
 
-func parseLevelString(s string) slog.Level {
-	// Handle numeric string from config
+// parseLogLevel unifies the string-to-level logic for both flags and config
+func parseLogLevel(s string) (slog.Level, error) {
+	// Handle numeric string
 	if c, err := strconv.Atoi(s); err == nil {
 		if c >= 2 {
-			return slog.LevelDebug
+			return slog.LevelDebug, nil
 		}
 		if c == 1 {
-			return slog.LevelInfo
+			return slog.LevelInfo, nil
 		}
-		return slog.LevelWarn
+		return slog.LevelWarn, nil
 	}
 
 	switch strings.ToLower(s) {
-	case "trace", "debug":
-		return slog.LevelDebug
+	case "debug":
+		return slog.LevelDebug, nil
 	case "info":
-		return slog.LevelInfo
+		return slog.LevelInfo, nil
+	case "warn", "warning":
+		return slog.LevelWarn, nil
 	case "error":
-		return slog.LevelError
+		return slog.LevelError, nil
 	case "silent":
-		return slog.LevelError + 1
+		return slog.LevelError + 1, nil
 	default:
-		return slog.LevelWarn
+		return 0, fmt.Errorf("unknown log level: %q", s)
 	}
 }
 

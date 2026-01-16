@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/rasros/lx/internal/cli"
@@ -10,6 +10,7 @@ import (
 
 func main() {
 	if err := cli.Run(context.Background(), os.Args[1:]); err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 }

@@ -35,7 +35,7 @@ var definitions = []CommandDef{
 		Short:     "c",
 		Type:      CmdGlobal,
 		ValueType: ValueNone,
-		Usage:     "Copy the final output directly to the system clipboard",
+		Usage:     "Copy the final output to the system clipboard",
 		Long: `Copy the final formatted output directly to the system clipboard.
 
 This feature depends on system tools:
@@ -83,7 +83,7 @@ between file contents, metadata, and user instructions, especially in large cont
 		ValueType: ValueNone,
 		Usage:     "Format output as a standalone HTML 5 file",
 		Long: `Format output as a standalone HTML 5 file.
-		
+
 The output includes Pico CSS for styling and syntax highlighting. This is useful
 for creating shareable archives or viewing code in a browser.`,
 	},
@@ -93,7 +93,7 @@ for creating shareable archives or viewing code in a browser.`,
 		Short:     "C",
 		Type:      CmdGlobal,
 		ValueType: ValueNone,
-		Usage:     "Force output to stdout, overriding config file defaults",
+		Usage:     "Write output to stdout (default)",
 		Long: `Force output to stdout, overriding any settings in the config file.
 Useful if your config defaults to "copy" mode but you want to pipe the output.`,
 	},
@@ -107,19 +107,19 @@ Useful if your config defaults to "copy" mode but you want to pipe the output.`,
 		ValueType: ValueNone,
 		Usage:     "Include hidden files and directories",
 		Long: `Include hidden files and directories (starting with '.') in the traversal.
-		
+        
 By default, lx skips hidden files to avoid cluttering the context with git
 internals or config caches.`,
 	},
 	{
 		Category:  CatDiscovery,
 		Name:      "follow",
-		Short:     "L",
+		Short:     "S",
 		Type:      CmdGlobal,
 		ValueType: ValueNone,
 		Usage:     "Follow symbolic links",
 		Long: `Follow symbolic links during recursive directory walking.
-		
+        
 Be careful with recursive symlinks, as they are not currently detected and
 may cause infinite loops.`,
 	},
@@ -130,9 +130,14 @@ may cause infinite loops.`,
 		ValueType: ValueNone,
 		Usage:     "Respect ignore files (default)",
 		Long: `Respect .gitignore, .ignore, and .lxignore files.
-		
-This is the default behavior. Use this flag only if you need to override
-a previous --no-ignore flag.`,
+        
+This is the default behavior. The precedence order for ignoring files is:
+1. .lxignore (in directory)
+2. .ignore (in directory)
+3. .gitignore (in directory)
+4. Global ignore files (~/.config/lx/ignore or ~/.config/git/ignore)
+
+Use this flag only if you need to override a previous --no-ignore flag.`,
 	},
 	{
 		Category:  CatDiscovery,
@@ -142,7 +147,10 @@ a previous --no-ignore flag.`,
 		ValueType: ValueNone,
 		Usage:     "Disregard all ignore files (traverse everything)",
 		Long: `Disregard all ignore files and traverse everything.
-		
+        
+When this flag is set, lx will NOT check .gitignore, .ignore, .lxignore, or
+any global ignore files. 
+
 This is useful when you explicitly want to include build artifacts, vendor
 directories, or other usually ignored content.`,
 	},
@@ -170,7 +178,7 @@ directories, or other usually ignored content.`,
 		ValueType: ValueNone,
 		Usage:     "Expect NUL-terminated filenames from stdin",
 		Long: `Expect NUL-terminated filenames from stdin.
-		
+        
 Useful for handling filenames with spaces or newlines when piping from tools
 like 'find -print0' or 'fd -0'.`,
 	},
@@ -184,14 +192,14 @@ like 'find -print0' or 'fd -0'.`,
 		ValueType: ValueNone,
 		Usage:     "Enable line numbers for subsequent files",
 		Long: `Enable line numbers for subsequent files.
-		
+        
 Useful when you want to ask the LLM about specific lines of code. This setting
 persists until reset or disabled.`,
 	},
 	{
 		Category:  CatInterleaved,
-		Name:      "no-line-numbers",
-		Short:     "N", // Changed short from L to N to avoid conflict with follow
+		Name:      "reset-line-numbers",
+		Short:     "L",
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
 		Usage:     "Disable line numbers for subsequent files (default)",
@@ -205,7 +213,7 @@ persists until reset or disabled.`,
 		ValueType: ValueNumber,
 		Usage:     "Limit subsequent files to N lines (0 for compact)",
 		Long: `Limit subsequent files to N lines.
-		
+        
 If the file is larger than N lines, lx will output the first N/2 lines and
 the last N/2 lines, separated by a gap indicator.
 
@@ -214,6 +222,7 @@ Set to 0 for 'compact' mode, which only prints file names and sizes.`,
 	{
 		Category:  CatInterleaved,
 		Name:      "reset-lines",
+		Short:     "N",
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
 		Usage:     "Reset slicing rules; print full content",
@@ -243,7 +252,7 @@ Set to 0 for 'compact' mode, which only prints file names and sizes.`,
 		ValueType: ValueAny,
 		Usage:     "Add a glob whitelist pattern",
 		Long: `Add a glob whitelist pattern.
-		
+        
 Only files matching this pattern will be included. You can specify multiple
 includes. If includes are present, files must match at least one include pattern.
 
@@ -257,7 +266,7 @@ Example: -i "*.go" -i "*.js"`,
 		ValueType: ValueAny,
 		Usage:     "Add a glob blacklist pattern",
 		Long: `Add a glob blacklist pattern.
-		
+        
 Files matching this pattern will be skipped, even if they match an include pattern.
 
 Example: -e "*_test.go"`,
@@ -279,9 +288,9 @@ Example: -e "*_test.go"`,
 		Short:     "f",
 		Type:      CmdAction,
 		ValueType: ValueAny,
-		Usage:     "Process a specific path immediately (bypasses gitignore)",
+		Usage:     "Process a specific path bypassing ignores",
 		Long: `Process a specific path immediately.
-		
+        
 Unlike passing a path as a raw argument, this action bypasses gitignore checks
 and applies current interleaving settings immediately.`,
 	},
@@ -293,7 +302,7 @@ and applies current interleaving settings immediately.`,
 		ValueType: ValueAny,
 		Usage:     "Insert a logical separator with a header",
 		Long: `Insert a logical separator with a header.
-		
+        
 This helps organize the output into distinct sections, which is useful when
 grouping related files for the LLM.`,
 	},
@@ -305,7 +314,7 @@ grouping related files for the LLM.`,
 		ValueType: ValueAny,
 		Usage:     "Inject a custom text prompt into the output",
 		Long: `Inject a custom text prompt or instruction directly into the output stream.
-		
+        
 The value is treated as raw text.`,
 	},
 
@@ -334,11 +343,11 @@ The value is treated as raw text.`,
 		Short:     "v",
 		Type:      CmdGlobal,
 		ValueType: ValueOptional,
-		Usage:     "Set log level [possible values: info, debug, trace, silent]",
+		Usage:     "Set log level [possible values: info, debug, silent]",
 		Long: `Set log level.
-		
+        
 Use -v for info, -vv for debug. Alternatively, provide an explicit level:
---verbose=trace, --verbose=error`,
+--verbose=debug, --verbose=error`,
 	},
 	{
 		Category:  CatConfig,

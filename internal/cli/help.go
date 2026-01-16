@@ -18,15 +18,14 @@ const (
 	cUnderline = "\033[4m"
 )
 
-// -- Short Help Template (fd-style) --
-const shortHelpTmpl = `
-A program to discover and format files for LLM prompting
+// -- Short Help Template
+const shortHelpTmpl = `A program to discover and format files for LLM prompting
 
 {{ "Usage:" | head }} {{ "lx" | bold }} [OPTIONS] [path|action]...
 
 {{ "Arguments:" | head }}
-  [path]...   File or directory to process (defaults to current dir)
-  [action]... State modifiers (flags) or prompt generators (-s, -p, -f)
+  [path]...   the file or directory to process (defaults to current dir)
+  [action]... the state modifiers (flags) or prompt generators (-s, -p, -f)
 
 {{ "Options:" | head }}
 {{- range . }}
@@ -35,17 +34,31 @@ A program to discover and format files for LLM prompting
 `
 
 // -- Long Help Template (fd-style) --
-const longHelpTmpl = `{{ "NAME:" | head }}
-    lx - file discovery, slicing, and formatting tool for LLM prompting
+const longHelpTmpl = `{{"lx" | bold }} - file discovery, slicing, and formatting tool for LLM prompting
 
-{{ "USAGE:" | head }}
-    lx [global options] [state flags] <path|action> [state flags] <path|action>...
-    lx [options] -- <files...>   (Disable flag parsing for subsequent arguments)
+{{ "Usage:" | head }}
+  lx [OPTIONS] [state modifiers] <actions>...
+  lx [OPTIONS] -- <files...>   (Disable flag parsing for subsequent arguments)
 
-{{ "DESCRIPTION:" | head }}
-    lx is designed to package code and text for Large Language Models (LLMs). 
-    It acts as a bridge between your filesystem and your AI chat context.
+{{ "Arguments:" | head }}
+  [OPTIONS]
+          Global options that modify the behavior of the program.
+  [state modifiers]
+          asdf
+  [actions]
+          These are the outputs of the program. It can either be:
+            1. A file, which is output and formatted directly.
+		    2. A directory, which is walked recursively and processed as paths.
+            3. An explicit action (see Actions section below).
+          If actions is omitted the default is to walk the current working directory.
+          If your 
 
+          the search pattern which is either a regular expression (default) or a glob pattern (if
+          --glob is used). If no pattern has been specified, every entry is considered a match. If
+          your pattern starts with a dash (-), make sure to pass '--' first, or it will be
+          considered as a flag (fd -- '-foo').
+
+{{ "Description:" | head }}
     It recursively walks directories, respecting .gitignore rules, detects binary 
     files, and formats everything into a clean Markdown (or XML/HTML) structure 
     with token estimations.
@@ -67,8 +80,8 @@ const longHelpTmpl = `{{ "NAME:" | head }}
 {{ .Long | wrapIndent "          " 80 }}
 {{- end }}
 
-{{ "INTERLEAVED OPTIONS (The Paintbrush):" | head }}
-    lx treats command line arguments as a stream. Interleaved flags change the 
+{{ "State modifiers:" | head }}
+    lx treats command line arguments as a stream. Interleaved state flags change the 
     internal state of the processor for all SUBSEQUENT files until reset.
 
     Think of it like a paintbrush: if you set the "color" to blue (-l), 
@@ -178,7 +191,6 @@ func makeFuncs() template.FuncMap {
 			}
 			flagPart += "--" + d.Name
 
-			// 2. Add value hint
 			switch d.ValueType {
 			case ValueAny:
 				flagPart += " <value>"
@@ -186,22 +198,17 @@ func makeFuncs() template.FuncMap {
 				flagPart += " <n>"
 			case ValueOptional:
 				flagPart += " [value]"
+			case ValueNone:
 			}
 
-			// 3. Pad to align descriptions
-			padding := 26
+			padding := 28
 			if len(flagPart) < padding {
 				flagPart += strings.Repeat(" ", padding-len(flagPart))
 			} else {
 				flagPart += " "
 			}
 
-			// 4. Wrap description if needed
-			desc := wordWrap(d.Usage, strings.Repeat(" ", padding), 80)
-			// Remove the initial indent from wordWrap since we append it to flagPart
-			desc = strings.TrimLeft(desc, " ")
-
-			return flagPart + desc
+			return cBold + flagPart + cResetIntensity + d.Usage
 		},
 	}
 }

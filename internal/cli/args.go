@@ -20,7 +20,6 @@ const (
 	ValueNone ValueType = iota
 	ValueAny
 	ValueNumber
-	ValueCounter
 	ValueOptional
 )
 
@@ -120,7 +119,7 @@ func parseLong(arg string, args []string, idx int, defs map[string]CommandDef, r
 	consumed := 0
 
 	switch def.ValueType {
-	case ValueNone, ValueCounter:
+	case ValueNone:
 		if hasEq {
 			return 0, fmt.Errorf("flag --%s does not take a value", key)
 		}
@@ -159,7 +158,7 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 		}
 
 		// Handle flags that don't take arguments
-		if def.ValueType == ValueNone || def.ValueType == ValueCounter {
+		if def.ValueType == ValueNone {
 			if err := addOp(res, def, "true", true); err != nil {
 				return 0, err
 			}
@@ -191,16 +190,6 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 				break // consumed remainder
 			}
 
-			// If no data remains, check next arg in list
-			if idx+1 < len(args) && !strings.HasPrefix(args[idx+1], "-") {
-				if err := addOp(res, def, args[idx+1], true); err != nil {
-					return 0, err
-				}
-				consumed = 1
-				break
-			}
-
-			// No value found, default to true
 			if err := addOp(res, def, "true", true); err != nil {
 				return 0, err
 			}
@@ -239,21 +228,9 @@ func addOp(res *ParsedArgs, def CommandDef, val string, isShort bool) error {
 	}
 
 	if def.Type == CmdGlobal {
-		// For globals, we might want to store the "last won" value in the map,
-		// but also keep the Op in the list for things like counting -v
 		res.Globals[def.Name] = val
-
-		// If it's a counter, we also manually increment the map string for legacy support
-		if def.ValueType == ValueCounter {
-			current := 0
-			if curStr, ok := res.Globals[def.Name]; ok {
-				current, _ = strconv.Atoi(curStr)
-			}
-			res.Globals[def.Name] = strconv.Itoa(current + 1)
-		}
 	}
 
-	// Always append to Ops (even globals) so we can track order and recurrence (e.g. -vv)
 	res.Ops = append(res.Ops, Op{Action: def.Name, Value: val, Type: def.Type, IsShort: isShort})
 	return nil
 }
