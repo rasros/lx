@@ -1,0 +1,159 @@
+--- STDOUT ---
+[1/9] README.md (2 rows)
+---
+```markdown
+# Project
+Documentation here.
+```
+
+[2/9] doc/notes.txt (1 rows)
+---
+```text
+some notes
+```
+
+[3/9] links/cycle_a/visible.txt (1 rows)
+---
+```text
+a
+```
+
+[4/9] links/cycle_b/visible.txt (1 rows)
+---
+```text
+b
+```
+
+[5/9] links/safe_target/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+[6/9] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[7/9] pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
+
+[8/9] src/large.txt (100 rows)
+---
+```text
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+```
+
+[9/9] src/script.py (1 rows)
+---
+```python
+print('hello')
+```
+
+
+--- STDERR ---
+

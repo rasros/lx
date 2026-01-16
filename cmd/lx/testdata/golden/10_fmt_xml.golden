@@ -1,0 +1,178 @@
+--- STDOUT ---
+<content>
+  <document index="1" language="markdown" rows="2">
+    <source>README.md</source>
+    <document_content>
+# Project
+Documentation here.
+    </document_content>
+  </document>
+
+  <document index="2" language="text" rows="1">
+    <source>doc/notes.txt</source>
+    <document_content>
+some notes
+    </document_content>
+  </document>
+
+  <document index="3" language="text" rows="1">
+    <source>links/cycle_a/visible.txt</source>
+    <document_content>
+a
+    </document_content>
+  </document>
+
+  <document index="4" language="text" rows="1">
+    <source>links/cycle_b/visible.txt</source>
+    <document_content>
+b
+    </document_content>
+  </document>
+
+  <document index="5" language="text" rows="1">
+    <source>links/safe_target/recursion.txt</source>
+    <document_content>
+I am safe
+    </document_content>
+  </document>
+
+  <document index="6" language="go" rows="2">
+    <source>main.go</source>
+    <document_content>
+package main
+func main() {}
+    </document_content>
+  </document>
+
+  <document index="7" language="go" rows="2">
+    <source>main_test.go</source>
+    <document_content>
+package main
+import "testing"
+    </document_content>
+  </document>
+
+  <document index="8" language="go" rows="1">
+    <source>pkg/util.go</source>
+    <document_content>
+package pkg
+    </document_content>
+  </document>
+
+  <document index="9" language="text" rows="100">
+    <source>src/large.txt</source>
+    <document_content>
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+    </document_content>
+  </document>
+
+  <document index="10" language="python" rows="1">
+    <source>src/script.py</source>
+    <document_content>
+print('hello')
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---
+

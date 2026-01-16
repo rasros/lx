@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/10] README.md (2 rows)
+[2/10] doc/notes.txt (1 rows)
+[3/10] links/cycle_a/visible.txt (1 rows)
+[4/10] links/cycle_b/visible.txt (1 rows)
+[5/10] links/safe_target/recursion.txt (1 rows)
+[6/10] main.go (2 rows)
+[7/10] main_test.go (2 rows)
+[8/10] pkg/util.go (1 rows)
+[9/10] src/large.txt (100 rows)
+[10/10] src/script.py (1 rows)
+
+
+--- STDERR ---
+

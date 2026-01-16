@@ -1,7 +1,0 @@
-myscript (2 rows)
----
-```bash
-#!/bin/bash
-echo 'hi'
-```
-

@@ -1,8 +1,0 @@
-[1/7] README.md (2 rows)
-[2/7] binary.dat - binary file skipped (7 B)
-[3/7] main.go (2 rows)
-[4/7] main_test.go (2 rows)
-[5/7] myscript (2 rows)
-[6/7] pkg/util/README.md (1 rows)
-[7/7] pkg/util/util.go (1 rows)
-

@@ -1,0 +1,17 @@
+--- STDOUT ---
+[1/2] pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
+
+[2/2] README.md (2 rows)
+---
+```markdown
+# Project
+Documentation here.
+```
+
+
+--- STDERR ---
+

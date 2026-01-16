@@ -1,8 +1,0 @@
-fixtures/large.txt (~800 rows)
----
-```text
-This is deterministic line number 798 for estimation testing.
-This is deterministic line number 799 for estimation testing.
-This is deterministic line number 800 for estimation testing.
-```
-

@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"flag"
-	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -17,9 +18,11 @@ import (
 var update = flag.Bool("update", false, "update .golden files")
 
 func TestGolden(t *testing.T) {
-	workDir := setupFixture(t)
+	// 1. Setup extensive file system fixture
+	workDir := setupComplexFixture(t)
 	defer os.RemoveAll(workDir)
 
+	// Switch to work dir so "." args work naturally
 	wd, _ := os.Getwd()
 	defer os.Chdir(wd)
 	if err := os.Chdir(workDir); err != nil {
@@ -30,232 +33,271 @@ func TestGolden(t *testing.T) {
 		name string
 		args []string
 	}{
-		{name: "basic_dir_walk", args: []string{"."}},
-		{name: "exclude_filter", args: []string{"-e", "*.go", "."}},
-		{name: "show_hidden", args: []string{"-H", "."}},
-		{name: "ignore_disabled", args: []string{"--no-ignore", "-n0", "."}},
-		{name: "compact_view", args: []string{"-n0", "."}},
+		// --- Basic Discovery ---
+		{name: "01_walk_default", args: []string{"."}},
+		{name: "02_walk_compact", args: []string{"-n0", "."}},
+		{name: "03_specific_file", args: []string{"main.go"}},
+		{name: "04_multiple_roots", args: []string{"pkg", "README.md"}},
 
-		{
-			name: "md_mixed_prompts_files",
-			args: []string{"-p", "Analyze these:", ".", "-p", "End of list"},
-		},
-		{
-			name: "md_explicit_sections",
-			args: []string{
-				"-s", "Docs", "README.md",
-				"-s", "Code", "main.go",
-			},
-		},
+		// --- Output Formats ---
+		{name: "10_fmt_xml", args: []string{"--xml", "."}},
+		{name: "11_fmt_html", args: []string{"--html", "main.go", "README.md"}},
+		{name: "12_fmt_markdown_explicit", args: []string{"--md", "main.go"}},
 
-		// --- XML Format Tests ---
-		// 1. Implicit Only (Default behavior)
-		{
-			name: "xml_implicit_basic",
-			args: []string{"--xml", "main.go", "README.md"},
-		},
-		// 2. Implicit with Prompts
-		{
-			name: "xml_implicit_with_prompts",
-			args: []string{"--xml", "-p", "Start", "main.go", "-p", "End"},
-		},
-		// 3. Explicit Sections Only
-		{
-			name: "xml_explicit_sections",
-			args: []string{"--xml", "-s", "Docs", "README.md", "-s", "Code", "main.go"},
-		},
-		// 4. Explicit Sections with Prompts inside
-		{
-			name: "xml_explicit_with_prompts",
-			args: []string{
-				"--xml",
-				"-s", "Context", "-p", "Here is the readme", "README.md",
-				"-s", "Task", "-p", "Refactor this", "main.go",
-			},
-		},
-		// 5. Prompts Only (No files)
-		{
-			name: "xml_prompts_only",
-			args: []string{"--xml", "-p", "Just instructions", "-p", "More instructions"},
-		},
-		// 6. Mixed Implicit then Explicit (Not typical but possible)
-		// lx treats the first batch as implicit section 0, then switches to explicit.
-		{
-			name: "xml_mixed_implicit_explicit",
-			args: []string{"--xml", "README.md", "-s", "Code", "main.go"},
-		},
+		// --- Structure & Sections ---
+		{name: "20_sections_explicit", args: []string{"-s", "Docs", "doc", "-s", "Source", "src"}},
+		{name: "21_prompts_mixed", args: []string{"-p", "Analyze this:", "main.go", "-p", "Determine bug"}},
+		{name: "22_xml_complex_structure", args: []string{"--xml", "-s", "Context", "-p", "Read carefully", "README.md", "-s", "Code", "main.go"}},
 
-		// --- HTML Format Tests ---
-		{
-			name: "html_basic",
-			args: []string{"--html", "main.go"},
-		},
-		{
-			name: "html_explicit_sections",
-			args: []string{"--html", "-s", "Documentation", "README.md", "-s", "Code", "main.go"},
-		},
-		{
-			name: "html_prompts_mixed",
-			args: []string{"--html", "-p", "Header Prompt", "README.md", "-s", "Code", "-p", "Inner Prompt", "main.go"},
-		},
+		// --- Filtering ---
+		{name: "30_include_only_go", args: []string{"-i", "*.go", "."}},
+		{name: "31_exclude_tests", args: []string{"-e", "*_test.go", "."}},
+		{name: "32_mixed_filters", args: []string{"-i", "*.go", "-e", "*_test.go", "."}},
+		{name: "33_filter_reset", args: []string{"-i", "*.md", ".", "-E", "-s", "All", "."}},
+		{name: "34_hidden_files", args: []string{"-H", "."}},
+		{name: "35_no_ignore_files", args: []string{"--no-ignore", "."}},
 
-		// --- Complex Filter Logic ---
-		{name: "line_numbers", args: []string{"-l", "main.go"}},
-		{
-			name: "complex_structure",
-			args: []string{
-				"-s", "Documentation", "-i", "*.md", ".",
-				"-E",
-				"-s", "Source Code", "-i", "*.go", "-e", "*_test.go", ".",
-			},
-		},
-		{
-			name: "filter_reset_relax",
-			args: []string{
-				"-s", "Go Files Only", "-i", "*.go", ".",
-				"-E",
-				"-s", "All Files", ".",
-			},
-		},
-		{
-			name: "filter_progressive_tightening",
-			args: []string{
-				"-s", "Round 1 (All)", ".",
-				"-e", "*.md",
-				"-s", "Round 2 (No Markdown)", ".",
-				"-e", "*_test.go",
-				"-s", "Round 3 (No MD, No Tests)", ".",
-			},
-		},
-		{
-			name: "filter_path_globbing",
-			args: []string{
-				"-s", "Pkg Directory Only", "-i", "pkg/*", ".",
-				"-E",
-				"-s", "Root Files Only", "-e", "*/*", ".",
-			},
-		},
-		{
-			name: "mixed_sections",
-			args: []string{
-				"-s", "Docs", "-i", "*.md", ".",
-				"-E",
-				"-s", "Logic", "-i", "*.go", "-e", "*_test.go", ".",
-				"-E",
-				"-s", "Scripts", "-i", "myscript", ".",
-			},
-		},
+		// --- Interleaved State (The Paintbrush) ---
+		{name: "40_lines_limit", args: []string{"--lines", "4", "."}},
+		{name: "41_line_numbers", args: []string{"-l", "main.go"}},
+		{name: "42_progressive_state", args: []string{
+			"-s", "Raw", "README.md",
+			"-s", "Numbered", "-l", "main.go",
+			"-s", "Sliced", "-n", "2", "pkg/util.go",
+			"-s", "Reset", "-L", "-N", "src/script.py",
+		}},
+		{name: "43_head_tail", args: []string{"--head", "3", "src/large.txt", "--tail", "2", "src/large.txt"}},
 
-		// --- Slicing & Edge Cases ---
-		{
-			name: "progressive_slicing",
-			args: []string{
-				"-s", "All files compact",
-				"-n0", ".",
-				"-s", "All go files 1 lines except tests",
-				"-n1", "-i", "*.go", "-e", "*_test.go", ".",
-				"-NE",
-				"-s", "Full main.go",
-				"main.go",
-			},
-		},
-		{name: "binary_file", args: []string{"binary.dat"}},
-		{name: "shebang_detection", args: []string{"myscript"}},
-		{name: "large_file_estimate", args: []string{"--head", "3", "fixtures/large.txt"}},
-		{name: "large_file_head", args: []string{"--head", "5", "fixtures/large.txt"}},
-		{name: "large_file_gap", args: []string{"--head", "3", "--tail", "3", "fixtures/large.txt"}},
-		{name: "large_file_lines_split", args: []string{"--lines", "10", "fixtures/large.txt"}},
-		{name: "output_file_flag", args: []string{"-o", "manual_out.txt", "main.go"}},
+		// --- Symlinks & Edge Cases ---
+		// Note: On Windows without Dev Mode, symlink creation might fail in setup.
+		// If they exist, we test them.
+		{name: "50_symlinks_ignore", args: []string{"links"}}, // Default: ignore
+		{name: "51_symlinks_follow", args: []string{"--symlinks", "links"}},
+		{name: "52_symlinks_dag", args: []string{"--symlinks", "links/loop"}}, // Valid DAG (A->B)
+		// NEW: Test true infinite cycle. Should not hang or crash.
+		{name: "53_symlinks_infinite_cycle", args: []string{"--symlinks", "links/cycle_a"}},
+
+		// --- Permissions & Errors ---
+		// Note: We expect stderr output here
+		{name: "60_access_denied_file", args: []string{"secret/locked.txt"}},
+		{name: "61_access_denied_dir", args: []string{"secret/locked_dir"}},
+		{name: "62_missing_file", args: []string{"nonexistent.go"}},
+
+		// --- Stats & Verbosity ---
+		{name: "70_stats_forced", args: []string{"--stats", "main.go"}},
+		{name: "71_quiet_mode", args: []string{"-q", "main.go"}},
+		{name: "72_verbose_debug", args: []string{"-vv", "main.go"}}, // Captures debug logs in stderr
+
+		// --- Binary & Empty ---
+		{name: "80_binary_detection", args: []string{"bin/data.bin"}},
+		{name: "81_empty_file", args: []string{"bin/empty.txt"}},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			outFile := filepath.Join(workDir, "output.tmp")
-			runArgs := tc.args
+			// 1. Capture Stdout and Stderr
+			outR, outW, _ := os.Pipe()
+			errR, errW, _ := os.Pipe()
 
-			isManualOut := false
-			for _, arg := range runArgs {
-				if arg == "-o" || arg == "--output" {
-					isManualOut = true
-					break
+			origOut := os.Stdout
+			origErr := os.Stderr
+			defer func() {
+				os.Stdout = origOut
+				os.Stderr = origErr
+			}()
+
+			os.Stdout = outW
+			os.Stderr = errW
+
+			// 2. Prepare Args
+			// We force --no-stats unless the test explicitly requested stats or quiet
+			// to keep golden files stable against execution time variations.
+			runArgs := append([]string{}, tc.args...)
+			hasStatsControl := false
+			for _, a := range runArgs {
+				if a == "--stats" || a == "--no-stats" || a == "-q" || a == "--quiet" {
+					hasStatsControl = true
 				}
 			}
-
-			if !isManualOut {
-				runArgs = append(runArgs, "-o", outFile)
-			}
-			runArgs = append(runArgs, "--no-stats")
-
-			if err := cli.Run(context.Background(), runArgs); err != nil {
-				t.Fatalf("cli.Run() failed: %v", err)
+			if !hasStatsControl {
+				runArgs = append(runArgs, "--no-stats")
 			}
 
-			targetFile := outFile
-			if isManualOut {
-				for i, arg := range tc.args {
-					if (arg == "-o" || arg == "--output") && i+1 < len(tc.args) {
-						targetFile = filepath.Join(workDir, tc.args[i+1])
-					}
-				}
+			// 3. Run Logic
+			// We run in a goroutine to ensure pipes don't block if buffer fills
+			errChan := make(chan error, 1)
+			go func() {
+				defer outW.Close()
+				defer errW.Close()
+				errChan <- cli.Run(context.Background(), runArgs)
+			}()
+
+			// 4. Read Output
+			var stdoutBuf, stderrBuf bytes.Buffer
+			_, _ = io.Copy(&stdoutBuf, outR)
+			_, _ = io.Copy(&stderrBuf, errR)
+
+			// Wait for run completion
+			if err := <-errChan; err != nil {
+				// We don't fail the test on cli.Run error, because some tests
+				// intentionally provoke errors (like missing files).
+				// We log it to the golden file instead.
+				stderrBuf.WriteString("\nCLI Error: " + err.Error() + "\n")
 			}
 
-			gotBytes, err := os.ReadFile(targetFile)
-			if err != nil {
-				t.Fatalf("failed to read output: %v", err)
-			}
-			got := string(gotBytes)
+			// 5. Normalize Output (Paths, OS-specific errors)
+			fullOutput := normalizeOutput(workDir, stdoutBuf.String(), stderrBuf.String())
 
-			got = strings.ReplaceAll(got, workDir, "/ROOT")
-			if runtime.GOOS == "windows" {
-				got = strings.ReplaceAll(got, "\\", "/")
-			}
-
+			// 6. Compare / Update Golden
 			goldenPath := filepath.Join(wd, "testdata", "golden", tc.name+".golden")
 			if *update {
 				os.MkdirAll(filepath.Dir(goldenPath), 0755)
-				os.WriteFile(goldenPath, []byte(got), 0644)
+				os.WriteFile(goldenPath, []byte(fullOutput), 0644)
 			}
 
-			wantBytes, _ := os.ReadFile(goldenPath)
-			want := string(wantBytes)
+			wantBytes, err := os.ReadFile(goldenPath)
+			if err != nil {
+				// If missing and not updating, allow empty if expected empty? No, usually fail.
+				if *update {
+					return
+				}
+				t.Fatalf("Golden file missing: %v. Run with -update", err)
+			}
 
-			if got != want {
-				t.Errorf("Mismatch for %s. Expected len %d, got %d", tc.name, len(want), len(got))
+			if string(wantBytes) != fullOutput {
+				t.Errorf("Mismatch for %s.\nExpected len: %d\nGot len: %d\nCheck testdata/golden/%s.golden",
+					tc.name, len(wantBytes), len(fullOutput), tc.name)
+				// Create a .actual file for debugging
+				_ = os.WriteFile(goldenPath+".actual", []byte(fullOutput), 0644)
 			}
 		})
 	}
 }
 
-func setupFixture(t *testing.T) string {
+// normalizeOutput combines stdout/stderr and cleans up OS-specific noise
+func normalizeOutput(root, stdout, stderr string) string {
+	var sb strings.Builder
+
+	clean := func(s string) string {
+		// Replace temp dir with constant
+		s = strings.ReplaceAll(s, root, "/ROOT")
+
+		// Normalize Windows paths
+		if runtime.GOOS == "windows" {
+			s = strings.ReplaceAll(s, "\\", "/")
+		}
+
+		// Normalize permission errors
+		s = regexp.MustCompile(`(?i)(permission denied|access is denied)`).ReplaceAllString(s, "PERMISSION_DENIED")
+
+		// Normalize directory read errors (happens when following directory symlinks)
+		// Linux: "read ...: is a directory"
+		// Windows: "The handle is invalid" (sometimes) or "is a directory"
+		s = regexp.MustCompile(`(?i)(read .*: is a directory|The handle is invalid)`).ReplaceAllString(s, "IS_DIRECTORY_ERROR")
+
+		// Remove timestamp noise from logs
+		s = regexp.MustCompile(`time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+[+-]\d{2}:\d{2}`).ReplaceAllString(s, "time=FIXED")
+
+		return s
+	}
+
+	sb.WriteString("--- STDOUT ---\n")
+	sb.WriteString(clean(stdout))
+	if !strings.HasSuffix(stdout, "\n") {
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("\n--- STDERR ---\n")
+	sb.WriteString(clean(stderr))
+	if !strings.HasSuffix(stderr, "\n") {
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
+func setupComplexFixture(t *testing.T) string {
 	dir := t.TempDir()
-	files := map[string]string{
-		"README.md":          "# Hello World\nReadme content.",
-		"main.go":            "package main\nfunc main() {}",
-		"main_test.go":       "package main\nimport \"testing\"",
-		"pkg/util/util.go":   "package util",
-		"pkg/util/README.md": "# Util Docs",
-		"ignore_me.txt":      "secret",
-		".gitignore":         "ignore_me.txt\nfixtures/",
-		".hidden":            "hidden content",
-		"myscript":           "#!/bin/bash\necho 'hi'",
+
+	// Helper to create file
+	create := func(path, content string, perm os.FileMode) {
+		fp := filepath.Join(dir, path)
+		os.MkdirAll(filepath.Dir(fp), 0755)
+		if err := os.WriteFile(fp, []byte(content), perm); err != nil {
+			t.Fatalf("setup create file %s: %v", path, err)
+		}
 	}
 
-	for path, content := range files {
-		fullPath := filepath.Join(dir, path)
-		os.MkdirAll(filepath.Dir(fullPath), 0755)
-		os.WriteFile(fullPath, []byte(content), 0644)
+	// Helper to create symlink (resolves path to absolute)
+	symlink := func(oldname, newname string) {
+		fp := filepath.Join(dir, newname)
+		os.MkdirAll(filepath.Dir(fp), 0755)
+		_ = os.Symlink(filepath.Join(dir, oldname), fp)
 	}
 
-	binaryContent := []byte{0x00, 0x01, 0x02, 0x03, 'B', 'I', 'N'}
-	os.WriteFile(filepath.Join(dir, "binary.dat"), binaryContent, 0644)
-
-	os.MkdirAll(filepath.Join(dir, "fixtures"), 0755)
-	var largeBuf bytes.Buffer
-	for i := 1; i <= 800; i++ {
-		line := fmt.Sprintf("This is deterministic line number %d for estimation testing.\n", i)
-		largeBuf.WriteString(line)
+	// Helper to create RAW symlink (preserves relative paths for cycles)
+	symlinkRaw := func(oldname, newname string) {
+		fp := filepath.Join(dir, newname)
+		os.MkdirAll(filepath.Dir(fp), 0755)
+		_ = os.Symlink(oldname, fp)
 	}
-	os.WriteFile(filepath.Join(dir, "fixtures", "large.txt"), largeBuf.Bytes(), 0644)
+
+	// 1. Root Files
+	create("README.md", "# Project\nDocumentation here.", 0644)
+	create("main.go", "package main\nfunc main() {}", 0644)
+	create("main_test.go", "package main\nimport \"testing\"", 0644)
+	create(".gitignore", "bin/\nsecret/\n", 0644)
+	create(".hidden", "i am hidden", 0644)
+
+	// 2. Subdirectories
+	create("pkg/util.go", "package pkg", 0644)
+	create("src/script.py", "print('hello')", 0755) // executable
+	create("doc/notes.txt", "some notes", 0644)
+
+	// 3. Binary & Empty
+	create("bin/empty.txt", "", 0644)
+	create("bin/data.bin", string([]byte{0x00, 0x01, 0xFF, 0xFE}), 0644)
+
+	// 4. Large file for slicing
+	var large strings.Builder
+	for i := 1; i <= 100; i++ {
+		large.WriteString("Line ")
+		large.WriteString(strings.Repeat("x", 10))
+		large.WriteString("\n")
+	}
+	create("src/large.txt", large.String(), 0644)
+
+	// 5. Symlinks
+	symlink("main.go", "links/link_to_main.go")
+	symlink("pkg", "links/link_to_pkg")
+	symlinkRaw("does_not_exist", filepath.Join(dir, "links/broken_link"))
+
+	create("links/safe_target/recursion.txt", "I am safe", 0644)
+	symlink("links/safe_target", "links/loop")
+
+	// TRUE INFINITE CYCLE
+	// links/cycle_a/to_b -> ../cycle_b
+	// links/cycle_b/to_a -> ../cycle_a
+	// FIX: Use visible.txt instead of .keep to verify cycle detection in output
+	create("links/cycle_a/visible.txt", "a", 0644)
+	create("links/cycle_b/visible.txt", "b", 0644)
+	symlinkRaw("../cycle_b", filepath.Join(dir, "links/cycle_a/to_b"))
+	symlinkRaw("../cycle_a", filepath.Join(dir, "links/cycle_b/to_a"))
+
+	// 6. Permissions (Locked)
+	create("secret/locked.txt", "TOP SECRET", 0600) // Start readable to write
+	secretDir := filepath.Join(dir, "secret", "locked_dir")
+	os.MkdirAll(secretDir, 0755)
+	os.WriteFile(filepath.Join(secretDir, "file.txt"), []byte("nested"), 0644)
+
+	// Lock them now
+	os.Chmod(filepath.Join(dir, "secret/locked.txt"), 0000)
+	os.Chmod(secretDir, 0000)
+
+	t.Cleanup(func() {
+		os.Chmod(filepath.Join(dir, "secret/locked.txt"), 0644)
+		os.Chmod(secretDir, 0755)
+	})
 
 	return dir
 }

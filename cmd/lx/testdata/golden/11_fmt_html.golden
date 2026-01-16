@@ -1,3 +1,4 @@
+--- STDOUT ---
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30,6 +31,7 @@ article > header {
   color: var(--pico-primary);
   text-decoration: underline;
 }
+.error-state { color: var(--pico-color-red-500); font-weight: bold; }
 </style>
 </head>
 <body>
@@ -44,22 +46,9 @@ article > header {
 </hgroup>
 </header>
 <main>
-<blockquote>Header Prompt
-</blockquote><article id="file-1">
+<article id="file-1">
 <header>
- <a href="#file-1" aria-label="Link to this file"><strong>README.md</strong></a>
- <small>(2 rows)</small>
-</header>
-<pre><code class="language-markdown">
-# Hello World
-Readme content.
-</code></pre>
-</article>
-<section id="section-1"><h2><a href="#section-1" style="text-decoration:none; color:inherit;">Code
-</a></h2></section><blockquote>Inner Prompt
-</blockquote><article id="file-2">
-<header>
- <a href="#file-2" aria-label="Link to this file"><strong>main.go</strong></a>
+ <a href="#file-1" aria-label="Link to this file"><strong>main.go</strong></a>
  <small>(2 rows)</small>
 </header>
 <pre><code class="language-go">
@@ -67,8 +56,21 @@ package main
 func main() {}
 </code></pre>
 </article>
+<article id="file-2">
+<header>
+ <a href="#file-2" aria-label="Link to this file"><strong>README.md</strong></a>
+ <small>(2 rows)</small>
+</header>
+<pre><code class="language-markdown">
+# Project
+Documentation here.
+</code></pre>
+</article>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
 </body>
 </html>
+
+--- STDERR ---
+

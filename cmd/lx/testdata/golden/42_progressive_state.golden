@@ -1,0 +1,42 @@
+--- STDOUT ---
+## Raw
+---
+
+README.md (2 rows)
+---
+```markdown
+# Project
+Documentation here.
+```
+
+## Numbered
+---
+
+main.go (2 rows)
+---
+```go
+1: package main
+2: func main() {}
+```
+
+## Sliced
+---
+
+pkg/util.go (1 rows)
+---
+```go
+1: package pkg
+```
+
+## Reset
+---
+
+src/script.py (1 rows)
+---
+```python
+print('hello')
+```
+
+
+--- STDERR ---
+

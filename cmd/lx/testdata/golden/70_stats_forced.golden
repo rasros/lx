@@ -1,0 +1,13 @@
+--- STDOUT ---
+main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---
+Files: 1
+Size: 60 B
+Est. Tokens: 6

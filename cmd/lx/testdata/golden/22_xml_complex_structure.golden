@@ -1,11 +1,16 @@
+--- STDOUT ---
 <section>
-  <section_name>Docs</section_name>
+  <section_name>Context</section_name>
+
+  <instruction>
+Read carefully
+  </instruction>
 
   <document index="1" language="markdown" rows="2">
     <source>README.md</source>
     <document_content>
-# Hello World
-Readme content.
+# Project
+Documentation here.
     </document_content>
   </document>
 </section>
@@ -21,4 +26,7 @@ func main() {}
     </document_content>
   </document>
 </section>
+
+
+--- STDERR ---
 

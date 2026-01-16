@@ -1,0 +1,6 @@
+--- STDOUT ---
+
+
+
+--- STDERR ---
+[1;31mError:[0m Failed to access file during walk: stat nonexistent.go: no such file or directory (path=nonexistent.go)
