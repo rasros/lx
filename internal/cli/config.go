@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,12 +46,16 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			if os.IsNotExist(err) && !strict {
 				return nil
 			}
+			slog.Error("Failed to open config file", "path", path, "error", err)
 			return err
 		}
 		defer f.Close()
 
+		slog.Debug("Loading configuration file", "path", path)
+
 		var loaded CliConfig
 		if err := yaml.NewDecoder(f).Decode(&loaded); err != nil {
+			slog.Error("Failed to parse config file", "path", path, "error", err)
 			return err
 		}
 
@@ -139,6 +144,7 @@ func loadGlobalIgnores() gitignore.IgnoreMatcher {
 
 	for _, c := range candidates {
 		if data, err := os.ReadFile(c); err == nil {
+			slog.Debug("Loaded global ignore file", "path", c)
 			lines = append(lines, strings.Split(string(data), "\n")...)
 		}
 	}
