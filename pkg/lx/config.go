@@ -211,6 +211,7 @@ type FileContext struct {
 	Size             int64
 	ModTime          time.Time
 	TotalRows        int
+	ReadError        string
 	TokenEstimate    int64
 	IsEstimate       bool
 	Language         string

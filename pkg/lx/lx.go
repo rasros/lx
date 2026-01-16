@@ -20,6 +20,9 @@ type Tokenizer interface {
 	Estimate(size int64, content interface{}) int64
 }
 
+// FileErrorHandler is a callback invoked when the processor fails to read a file.
+type FileErrorHandler func(f InputFile, err error)
+
 type defaultTokenizer struct{}
 
 func (defaultTokenizer) Estimate(size int64, _ interface{}) int64 { return size / 4 }
@@ -42,6 +45,7 @@ type Stream struct {
 	finalStats    *GlobalContext
 	preparedItems []preparedItem
 	sections      []*SectionContext
+	onFileError   FileErrorHandler
 }
 
 func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
@@ -70,6 +74,12 @@ func (s *Stream) WithTokenizer(t Tokenizer) *Stream {
 
 func (s *Stream) WithRunnerConfig(cfg RunnerConfig) *Stream {
 	s.renderCfg = cfg
+	return s
+}
+
+// WithOnFileError sets the callback for file reading errors.
+func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
+	s.onFileError = h
 	return s
 }
 
@@ -250,7 +260,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					return
 				}
 
-				proc := NewProcessor(s.engine, global)
+				proc := NewProcessor(s.engine, global, s.onFileError)
 				proc.tokenCounter = s.tokenizer.Estimate
 
 				readBufPtr := readPool.Get().(*[]byte)

@@ -20,14 +20,16 @@ type Processor struct {
 	engine           *TemplateEngine
 	global           GlobalContext
 	tokenCounter     TokenCounter
+	onFileError      FileErrorHandler
 	hasRenderedFirst bool
 	lastWasCompact   bool
 }
 
-func NewProcessor(engine *TemplateEngine, global GlobalContext) *Processor {
+func NewProcessor(engine *TemplateEngine, global GlobalContext, onError FileErrorHandler) *Processor {
 	return &Processor{
 		engine:       engine,
 		global:       global,
+		onFileError:  onError,
 		tokenCounter: DefaultTokenCounter,
 	}
 }
@@ -91,7 +93,21 @@ func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte) (FileContext, error) {
 	rc, err := file.Open()
 	if err != nil {
-		return FileContext{}, err
+		// Trigger callback for the host application to handle (log, etc.)
+		if p.onFileError != nil {
+			p.onFileError(file, err)
+		}
+		// Return a safe context with the ReadError field set.
+		// We DO NOT return the error to the pipeline, preventing a crash.
+		return FileContext{
+			Path:      file.Path,
+			AbsPath:   file.AbsPath,
+			Size:      file.Size,
+			ModTime:   file.ModTime,
+			FileIndex: index,
+			Global:    p.global,
+			ReadError: err.Error(),
+		}, nil
 	}
 	defer rc.Close()
 

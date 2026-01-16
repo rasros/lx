@@ -112,23 +112,22 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	}
 
 	// 2. Setup Logger
-	// We return the error here instead of logging it, adhering to "Log OR Return"
 	level, err := determineLogLevel(parsed, cliOpts.Verbosity)
 	if err != nil {
 		return err
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: level,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			// In non-debug modes, remove the timestamp for cleaner CLI look
-			if a.Key == slog.TimeKey && level > slog.LevelDebug {
-				return slog.Attr{}
-			}
-			return a
-		},
-	}))
-	slog.SetDefault(logger)
+	var handler slog.Handler
+
+	if level > slog.LevelDebug {
+		handler = NewCliHandler(os.Stderr, level)
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: level,
+		})
+	}
+
+	slog.SetDefault(slog.New(handler))
 
 	slog.Debug("Logger initialized", "level", level.String())
 	slog.Debug("Configuration loaded",
@@ -162,6 +161,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	if err != nil {
 		return err
 	}
+
+	// Register callback for read errors so pkg/lx remains silent but CLI logs it
+	stream.WithOnFileError(func(f lx.InputFile, err error) {
+		slog.Error("Failed to read file", "path", f.Path, "error", err)
+	})
 
 	var includes, excludes []string
 
@@ -253,16 +257,16 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			}
 
 			/*
-				--- IGNORE LOGIC DOCUMENTATION ---
-				The Walker is configured here. The logic follows this precedence:
+			   --- IGNORE LOGIC DOCUMENTATION ---
+			   The Walker is configured here. The logic follows this precedence:
 
-				1. Explicit Action: If `-f` (Action: "file") is used, ignore rules are DISABLED for that specific target.
-				2. CLI Flags: `-I` (no-ignore) sets walkerIgnoreEnabled = false globally.
-				3. Config File: `ignore: false` in config.yaml sets defaults.
-				4. Walker Execution:
-				   - It checks Global Ignores first (loaded from ~/.config/lx/ignore or ~/.config/git/ignore).
-				   - It checks Local Ignores in every directory: .lxignore, then .ignore, then .gitignore.
-				   - .lxignore takes highest precedence among local files.
+			   1. Explicit Action: If `-f` (Action: "file") is used, ignore rules are DISABLED for that specific target.
+			   2. CLI Flags: `-I` (no-ignore) sets walkerIgnoreEnabled = false globally.
+			   3. Config File: `ignore: false` in config.yaml sets defaults.
+			   4. Walker Execution:
+			      - It checks Global Ignores first (loaded from ~/.config/lx/ignore or ~/.config/git/ignore).
+			      - It checks Local Ignores in every directory: .lxignore, then .ignore, then .gitignore.
+			      - .lxignore takes highest precedence among local files.
 			*/
 
 			slog.Debug("Initializing Walker",
@@ -282,6 +286,13 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				GlobalIgnore:   cfg.GlobalIgnore,
 				Includes:       includes,
 				Excludes:       excludes,
+				OnIgnore: func(path, reason, source string) {
+					args := []any{"path", path, "reason", reason}
+					if source != "" {
+						args = append(args, "source", source)
+					}
+					slog.Debug("Walker ignored path", args...)
+				},
 			})
 
 			count := 0
@@ -344,6 +355,8 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 	if _, ok := parsed.Globals["stats"]; ok {
 		showStatsFlag = "always"
 	} else if _, ok := parsed.Globals["no-stats"]; ok {
+		showStatsFlag = "never"
+	} else if _, ok := parsed.Globals["quiet"]; ok {
 		showStatsFlag = "never"
 	}
 

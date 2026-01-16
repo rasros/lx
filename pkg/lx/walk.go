@@ -18,10 +18,17 @@ type WalkerOptions struct {
 	GlobalIgnore   gitignore.IgnoreMatcher
 	Includes       []string
 	Excludes       []string
+	OnIgnore       func(path string, reason string, source string)
 }
 
 type Walker struct {
 	opts WalkerOptions
+}
+
+// ignoreSource pairs a matcher with the file it was loaded from.
+type ignoreSource struct {
+	matcher gitignore.IgnoreMatcher
+	source  string
 }
 
 func NewWalker(opts WalkerOptions) *Walker {
@@ -44,9 +51,9 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 			}
 
 			// Initialize ignore stack with global ignores at the root "."
-			ignoreStacks := make(map[string][]gitignore.IgnoreMatcher)
+			ignoreStacks := make(map[string][]ignoreSource)
 			if w.opts.GlobalIgnore != nil {
-				ignoreStacks["."] = []gitignore.IgnoreMatcher{w.opts.GlobalIgnore}
+				ignoreStacks["."] = []ignoreSource{{matcher: w.opts.GlobalIgnore, source: "global"}}
 			}
 
 			err := fs.WalkDir(filesystem, cleanRoot, func(p string, d fs.DirEntry, err error) error {
@@ -62,6 +69,9 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				}
 
 				if !w.opts.ShowHidden && isHidden(p) {
+					if w.opts.OnIgnore != nil {
+						w.opts.OnIgnore(p, "hidden", "")
+					}
 					if d.IsDir() {
 						return fs.SkipDir
 					}
@@ -77,7 +87,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 						parent = ""
 					}
 
-					var currentStack []gitignore.IgnoreMatcher
+					var currentStack []ignoreSource
 					if p == "." {
 						currentStack = ignoreStacks["."]
 					} else {
@@ -86,12 +96,16 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 
 					if d.IsDir() {
 						local := loadLocalIgnores(filesystem, p)
-						newStack := append([]gitignore.IgnoreMatcher{}, currentStack...)
+						newStack := append([]ignoreSource{}, currentStack...)
 						newStack = append(newStack, local...)
 						ignoreStacks[p] = newStack
 					}
 
-					if isIgnored(currentStack, p, d.IsDir()) && p != "." {
+					ignored, source := isIgnored(currentStack, p, d.IsDir())
+					if ignored && p != "." {
+						if w.opts.OnIgnore != nil {
+							w.opts.OnIgnore(p, "ignore-file", source)
+						}
 						if d.IsDir() {
 							return fs.SkipDir
 						}
@@ -105,6 +119,9 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 					}
 
 					if !IsKept(p, w.opts.Includes, w.opts.Excludes) {
+						if w.opts.OnIgnore != nil {
+							w.opts.OnIgnore(p, "filter-pattern", "")
+						}
 						return nil
 					}
 
@@ -122,25 +139,26 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	return out
 }
 
-func loadLocalIgnores(fsys fs.FS, dir string) []gitignore.IgnoreMatcher {
+func loadLocalIgnores(fsys fs.FS, dir string) []ignoreSource {
 	names := []string{".gitignore", ".ignore", ".lxignore"}
-	var matchers []gitignore.IgnoreMatcher
+	var sources []ignoreSource
 	for _, name := range names {
 		target := path.Join(dir, name)
 		if data, err := fs.ReadFile(fsys, target); err == nil {
-			matchers = append(matchers, gitignore.NewGitIgnoreFromReader(dir, strings.NewReader(string(data))))
+			m := gitignore.NewGitIgnoreFromReader(dir, strings.NewReader(string(data)))
+			sources = append(sources, ignoreSource{matcher: m, source: target})
 		}
 	}
-	return matchers
+	return sources
 }
 
-func isIgnored(stack []gitignore.IgnoreMatcher, p string, isDir bool) bool {
-	for _, m := range stack {
-		if m != nil && m.Match(p, isDir) {
-			return true
+func isIgnored(stack []ignoreSource, p string, isDir bool) (bool, string) {
+	for _, s := range stack {
+		if s.matcher != nil && s.matcher.Match(p, isDir) {
+			return true, s.source
 		}
 	}
-	return false
+	return false, ""
 }
 
 func isHidden(p string) bool {
