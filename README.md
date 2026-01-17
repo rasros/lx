@@ -4,12 +4,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rasros/lx)](https://goreportcard.com/report/github.com/rasros/lx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`lx` is a CLI tool that formats file system content for Large Language Models.
-
-It replaces manual copy-pasting with a precise shell command, handling recursive discovery, formatting, and token
-estimation automatically.
-
----
+`lx` is a CLI context bundler for Large Language Models. It recursively discovers files, respects ignore rules, detects
+binaries, and formats content into Markdown, XML, or HTML with built-in token estimation.
 
 ## Installation
 
@@ -25,220 +21,187 @@ Or via curl:
 curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
 ```
 
-### System Dependencies (Clipboard)
+### Dependencies
 
-The copy-to-clipboard feature (`-c` / `--copy`) depends on the following:
+Clipboard support (`-c`) requires system utilities:
 
-* **macOS**: Native support via `pbcopy`.
-* **Windows**: Native support via `clip`.
-* **Linux**: Requires `xclip` for X11 or `wl-clipboard` for Wayland to be installed.
-
-If you're on Linux and not sure, check your session type:
-
-```bash
-echo $XDG_SESSION_TYPE
-```
+* **Linux (X11):** `xclip`
+* **Linux (Wayland):** `wl-clipboard`
+* **macOS/Windows:** Native support (`pbcopy` / `clip`) included.
 
 ---
 
-## Why lx?
+## Stream Processing Model
 
-* **Smart Discovery:** Respects `.gitignore` and `.lxignore` automatically (unlike `find`).
-* **Binary Safety:** Detects and skips binary files to prevent corrupting your clipboard or token context.
-* **Token Aware:** Estimates token usage (stderr) to keep you within LLM context limits.
-* **Format Ready:** Wraps code in correct markdown fences with language tags for syntax highlighting.
-* **Stream Processing:** Allows you to mix files, directories, prompts, and specific formatting rules in a single
-  command.
+Unlike standard CLI tools where flags are global, `lx` treats command-line arguments as a sequential stream.
+
+* **Global Options:** Apply to the entire execution (e.g., `-c`).
+* **State Modifiers:** Apply to all **subsequent** files until reset or changed.
+* **Actions:** The inputs to process (files, directories, or generators like `-p`).
+
+This allows for granular control within a single command:
+
+```bash
+# Usage: lx [OPTIONS] [state modifiers] <actions>...
+lx -n 50 log.txt -N main.go
+```
+
+1. `-n 50` (State Modifier): Sets line limit to 50 for subsequent files.
+2. `log.txt` (Action): Processed with line limit.
+3. `-N` (State Modifier): Resets line limits.
+4. `main.go` (Action): Processed in full.
 
 ---
 
-## Basic Usage
+## Usage Examples
 
-Format a single file:
+### Basic Formatting
 
-```bash
-lx go.mod
-```
-
-**Output:**
-
-````markdown
-go.mod (11 rows)
----
-```gomod
-module github.com/rasros/lx
-
-go 1.25.5
-
-require gopkg.in/yaml.v3 v3.0.1
-
-require (
-        github.com/atotto/clipboard v0.1.4
-        github.com/bmatcuk/doublestar/v4 v4.9.2
-        github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00
-)
-```
-````
-
-Recursively walk a directory (respects `.gitignore`):
+Recursively walk the current directory (default action), respecting `.gitignore`, and print to stdout.
 
 ```bash
-lx src/
+lx
 ```
 
-Copy output directly to clipboard:
+### Clipboard Integration
+
+Bundle the `src` directory and copy directly to the system clipboard.
 
 ```bash
-lx -c . # . is also the default if no arguments are provided
+lx -c src/
 ```
 
-Copy all modified files in your current branch to the clipboard:
+### Git Integration
+
+Pipe a list of modified files from git directly into `lx`.
 
 ```bash
 git diff --name-only | lx -c
 ```
 
----
+### Filtering and Slicing
 
-## How It Works (The Paintbrush Model)
-
-Unlike standard tools where flags apply globally, `lx` processes arguments left-to-right as a **stream**. Think of flags
-as a "paintbrush": if you set a modifier, it applies to all **subsequent** files until it is changed or reset.
-
-* **Apply limit to all:**
-  `lx -n 50 file1.go file2.go` (Both files limited to 50 lines)
-
-* **Apply limit to one, then reset:**
-  `lx -n 50 file1.go -N file2.go` (`file1` is limited, `file2` is full length)
-
-This allows you to construct precise context bundles: "Give me the full config file, but only the headers of the logs."
-
----
-
-## Power Usage
-
-Composing context from multiple sources with specific ordering and formatting:
+Include only Python files, exclude tests, and inject a header.
 
 ```bash
-lx -s "Server Code" -i "*.py" -e "test_*.py" src/server -E -s "Libs" requirements.txt -c
+lx -s "Backend Logic" -i "*.py" -e "test_*" src/
 ```
 
-**Breakdown:**
+### Token Economy (Head/Tail)
 
-1. **`-s "..."`**: Injects a Markdown section header ("Server Code").
-2. **`-i` / `-e`**: Sets filters (include `*.py`, exclude `test_*.py`).
-3. **`src/server`**: Walks the directory using those filters.
-4. **`-E`**: Resets the active filters (so subsequent files aren't filtered).
-5. **`-s`**: Injects a new section header ("Libs").
-6. **`requirements.txt`**: Adds the dependency file.
-7. **`-c`**: Copies the result to the clipboard.
+Read the last 100 lines of a log file and the full content of a config file.
+
+```bash
+lx --tail 100 app.log -N config.yaml
+```
+
+### Prompt Injection
+
+Inject instructions directly into the context stream.
+
+```bash
+lx -p "Analyze the following error logs:" error.log
+```
 
 ---
 
-## Formatting Modes
+## Output Formats
 
 ### Markdown (Default)
 
-Standard fenced code blocks. Best for GitHub Copilot, ChatGPT, and DeepSeek.
+Standard fenced code blocks. Optimized for GitHub Copilot, ChatGPT, and DeepSeek.
 
-### XML (Claude Optimized)
+### XML (`--xml`)
 
-Formats output using XML tags (`<document>`, `<source>`, `<content>`). This is highly recommended for Anthropic's Claude
-to ensure accurate parsing of multiple files.
+Wraps content in `<document>`, `<source>`, and `<content>` tags. This is recommended by Anthropic for Claude.
 
 ```bash
 lx --xml src/
 ```
 
-### HTML (Shareable Reports)
+### HTML (`--html`)
 
-Generates a standalone, syntax-highlighted HTML 5 file. Useful for attaching logs/code to bug tickets or sharing
-snapshots with non-technical stakeholders. Includes responsive design (Pico CSS).
-
-```bash
-lx --html src/logs/ > report.html
-```
-
----
-
-## Piping & Integration
-
-`lx` plays nicely with other tools. You can pipe a list of filenames from `fd`, `find`, or `ripgrep` directly into `lx`.
-
-**Find files containing "TODO":**
+Generates a standalone HTML file with syntax highlighting (Pico CSS). Useful for viewing in a browser.
 
 ```bash
-rg -l "TODO" | lx -c
-```
-
-**Find all Rust files (using `fd`):**
-
-```bash
-fd -e rs | lx
+lx --html src/logs/ > debug_report.html
 ```
 
 ---
 
 ## Configuration
 
-`lx` is fully template-driven. You can override defaults by creating a config file at `~/.config/lx/config.yaml`.
-
-**Sample Config:**
+Defaults can be overridden via `~/.config/lx/config.yaml`.
 
 ```yaml
-# Default output behavior
-output_mode: "copy"      # Options: stdout, copy
-output_format: "xml"     # Options: markdown, xml, html
-verbosity: "info"        # Options: debug, info, warn, error, silent
+# Output settings
+output_mode: "stdout"    # stdout, copy
+output_format: "markdown" # markdown, xml, html
+verbosity: "info"
 
-# Traversal rules
+# Traversal
 show_hidden: false
 follow_symlinks: false
-ignore: true             # Respect .gitignore
+ignore: true             # Respect .gitignore/.lxignore
 
-# Custom Templates (Go text/template syntax)
-template: |
+# Templates (Go text/template)
+# Available variables: .Path, .Content, .Extension
+file_content_template: |
   ### {{ .Path }}
   {{ .Content }}
 
 stats_template: |
-  Total Files: {{ .Global.TotalFiles }}
+  ---
+  Files: {{ .Global.TotalFiles }}
   Tokens: {{ .Global.TokenEstimate }}
 ```
 
 ---
 
-## Core Features
+## Flag Reference
 
-### 1. Slicing Files
+### Global Options
 
-Limit output to specific lines to save tokens.
+*Settings that apply to the whole operation, regardless of position.*
 
-```bash
-# Get first 50 lines from the file
-lx --head 50 error.log
+* `-c`, `--copy`: Copy the final formatted output to the system clipboard.
+* `-o`, `--output <value>`: Write the result to a file path.
+* `--md`: Format output as Markdown (default).
+* `--xml`: Format output using XML tags (Claude optimized).
+* `--html`: Format output as a standalone HTML 5 file.
+* `-C`, `--stdout`: Force output to stdout.
+* `-q`, `--quiet`: Suppress stats summary and logging.
+* `-v`, `--verbose`: Set log level.
 
-# Compact mode: List filenames and sizes only (no content)
-lx -n0 src/
-```
+### Discovery Options
 
-### 2. Line Referencing
+*Settings that control how files are found when walking directories.*
 
-Add line numbers to help the LLM pinpoint specific locations.
+* `-H`, `--hidden`: Include hidden files and directories.
+* `-S`, `--follow`: Follow symbolic links to directories.
+* `--links` / `--no-links`: Include/ignore symbolic links to files.
+* `--ignore` / `-I`, `--no-ignore`: Toggle respect for `.gitignore` and ignore files.
+* `-0`, `--null`: Expect NUL-terminated filenames from stdin.
 
-```bash
-lx -l server.log
-```
+### State Modifiers
 
-### 3. Prompt Injection
+*Flags that alter the processing rules for subsequent files.*
 
-Inject custom instructions directly into the stream without leaving the terminal.
+* `-n`, `--lines <n>`: Limit subsequent files to N lines (0 for compact).
+* `--head <n>`: Read only the first N lines of subsequent files.
+* `--tail <n>`: Read only the last N lines of subsequent files.
+* `-N`, `--reset-lines`: Reset slicing rules; print full content.
+* `-l`, `--line-numbers`: Enable line numbers.
+* `-L`, `--reset-line-numbers`: Disable line numbers.
+* `-i`, `--include <value>`: Add a glob whitelist pattern.
+* `-e`, `--exclude <value>`: Add a glob blacklist pattern.
+* `-E`, `--reset-filters`: Clear all active include/exclude filters.
 
-```bash
-lx -p "Refactor the following code to use Pydantic:" main.py
-```
+### Actions
 
-### 4. Stats Output
+*Explicit content generators that insert data into the stream immediately.*
 
-`lx` prints a summary of file counts, total size, and estimated tokens to stderr. This appears automatically when output
-is redirected from stdout. You can disable it via `--no-stats`.
+* `[path]`: File or directory to process.
+* `-f`, `--file <value>`: Force process a specific path (bypasses ignores/filters).
+* `-s`, `--section <value>`: Insert a logical separator with a header.
+* `-p`, `--prompt <value>`: Inject a custom text prompt.
