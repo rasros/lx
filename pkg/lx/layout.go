@@ -5,9 +5,11 @@ import (
 	"text/template"
 )
 
-// LayoutWriter acts as a middleman between the pipeline assembler and the output writer.
+// layoutWriter acts as a middleman between the pipeline assembler and the output writer.
 // It manages section transitions and dynamic spacing between items.
-type LayoutWriter struct {
+//
+// It is an internal helper for Stream.Execute.
+type layoutWriter struct {
 	w                io.Writer
 	engine           *TemplateEngine
 	sections         []*SectionContext
@@ -17,8 +19,8 @@ type LayoutWriter struct {
 	lastIsCompact    bool
 }
 
-func NewLayoutWriter(w io.Writer, engine *TemplateEngine, sections []*SectionContext, enableSeparators bool) *LayoutWriter {
-	return &LayoutWriter{
+func newLayoutWriter(w io.Writer, engine *TemplateEngine, sections []*SectionContext, enableSeparators bool) *layoutWriter {
+	return &layoutWriter{
 		w:                w,
 		engine:           engine,
 		sections:         sections,
@@ -28,7 +30,7 @@ func NewLayoutWriter(w io.Writer, engine *TemplateEngine, sections []*SectionCon
 }
 
 // WriteItem handles the logic for a single rendered item from the pipeline.
-func (lw *LayoutWriter) WriteItem(res result) error {
+func (lw *layoutWriter) WriteItem(res result) error {
 	if res.sectionIndex != lw.currentSecIdx {
 		if err := lw.handleSectionChange(res.sectionIndex); err != nil {
 			return err
@@ -54,7 +56,7 @@ func (lw *LayoutWriter) WriteItem(res result) error {
 	return nil
 }
 
-func (lw *LayoutWriter) handleSectionChange(newIdx int) error {
+func (lw *layoutWriter) handleSectionChange(newIdx int) error {
 	if lw.currentSecIdx >= 0 {
 		if err := lw.renderTemplate(lw.engine.SectionFooter, lw.currentSecIdx); err != nil {
 			return err
@@ -78,14 +80,14 @@ func (lw *LayoutWriter) handleSectionChange(newIdx int) error {
 }
 
 // Close ensures the final section is properly closed with a footer.
-func (lw *LayoutWriter) Close() error {
+func (lw *layoutWriter) Close() error {
 	if lw.currentSecIdx >= 0 {
 		return lw.renderTemplate(lw.engine.SectionFooter, lw.currentSecIdx)
 	}
 	return nil
 }
 
-func (lw *LayoutWriter) renderTemplate(tmpl *template.Template, secIdx int) error {
+func (lw *layoutWriter) renderTemplate(tmpl *template.Template, secIdx int) error {
 	var ctx SectionContext
 	found := false
 	for _, s := range lw.sections {

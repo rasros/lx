@@ -11,6 +11,37 @@ import (
 	"github.com/monochromegane/go-gitignore"
 )
 
+// IgnoreReason provides a typed explanation for why a file was ignored.
+type IgnoreReason int
+
+const (
+	ReasonHidden IgnoreReason = iota
+	ReasonIgnoreFile
+	ReasonSymlinkDirSkipped
+	ReasonSymlinkFileSkipped
+	ReasonSymlinkCycle
+	ReasonFilterPattern
+)
+
+func (ir IgnoreReason) String() string {
+	switch ir {
+	case ReasonHidden:
+		return "hidden"
+	case ReasonIgnoreFile:
+		return "ignore-file"
+	case ReasonSymlinkDirSkipped:
+		return "symlink-dir-skipped"
+	case ReasonSymlinkFileSkipped:
+		return "symlink-file-skipped"
+	case ReasonSymlinkCycle:
+		return "symlink-cycle"
+	case ReasonFilterPattern:
+		return "filter-pattern"
+	default:
+		return "unknown"
+	}
+}
+
 // WalkerOptions configures the behavior of the file system walker.
 type WalkerOptions struct {
 	FS                 fs.FS
@@ -22,7 +53,7 @@ type WalkerOptions struct {
 	GlobalIgnore       gitignore.IgnoreMatcher
 	Includes           []string
 	Excludes           []string
-	OnIgnore           func(path string, reason string, source string)
+	OnIgnore           func(path string, reason IgnoreReason, source string)
 }
 
 // Walker encapsulates the logic for traversing a file system with filtering and ignore rules.
@@ -72,7 +103,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 
 			if w.opts.IgnoreHidden && isHidden(p) {
 				if w.opts.OnIgnore != nil {
-					w.opts.OnIgnore(p, "hidden", "")
+					w.opts.OnIgnore(p, ReasonHidden, "")
 				}
 				if d.IsDir() {
 					return fs.SkipDir
@@ -90,7 +121,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				if isTargetDir {
 					if w.opts.IgnoreDirSymlinks {
 						if w.opts.OnIgnore != nil {
-							w.opts.OnIgnore(p, "symlink-dir-skipped", "")
+							w.opts.OnIgnore(p, ReasonSymlinkDirSkipped, "")
 						}
 						return nil
 					}
@@ -107,7 +138,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 					if err == nil {
 						if _, exists := visitedDirs[realPath]; exists {
 							if w.opts.OnIgnore != nil {
-								w.opts.OnIgnore(p, "symlink-cycle", "")
+								w.opts.OnIgnore(p, ReasonSymlinkCycle, "")
 							}
 							return nil
 						}
@@ -118,7 +149,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				} else {
 					if w.opts.IgnoreFileSymlinks {
 						if w.opts.OnIgnore != nil {
-							w.opts.OnIgnore(p, "symlink-file-skipped", "")
+							w.opts.OnIgnore(p, ReasonSymlinkFileSkipped, "")
 						}
 						return nil
 					}
@@ -165,7 +196,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				ignored, source := isIgnored(currentStack, p, d.IsDir())
 				if ignored && p != "." {
 					if w.opts.OnIgnore != nil {
-						w.opts.OnIgnore(p, "ignore-file", source)
+						w.opts.OnIgnore(p, ReasonIgnoreFile, source)
 					}
 					if d.IsDir() {
 						return fs.SkipDir
@@ -181,7 +212,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 
 				if !IsKept(p, w.opts.Includes, w.opts.Excludes) {
 					if w.opts.OnIgnore != nil {
-						w.opts.OnIgnore(p, "filter-pattern", "")
+						w.opts.OnIgnore(p, ReasonFilterPattern, "")
 					}
 					return nil
 				}

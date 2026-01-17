@@ -11,14 +11,15 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal/detect"
 )
 
-// RenderedItem represents a fully processed piece of the stream.
-type RenderedItem struct {
+// renderedItem represents a fully processed piece of the stream.
+type renderedItem struct {
 	Body          string
 	IsCompactView bool
 }
 
-// Processor handles the conversion of input items into formatted output.
-type Processor struct {
+// processor handles the conversion of input items into formatted output.
+// It is an internal helper for Stream.Execute.
+type processor struct {
 	engine           *TemplateEngine
 	global           GlobalContext
 	tokenCounter     TokenCounter
@@ -27,8 +28,8 @@ type Processor struct {
 	lastWasCompact   bool
 }
 
-func NewProcessor(engine *TemplateEngine, global GlobalContext, onError FileErrorHandler) *Processor {
-	return &Processor{
+func newProcessor(engine *TemplateEngine, global GlobalContext, onError FileErrorHandler) *processor {
+	return &processor{
 		engine:       engine,
 		global:       global,
 		onFileError:  onError,
@@ -37,7 +38,7 @@ func NewProcessor(engine *TemplateEngine, global GlobalContext, onError FileErro
 }
 
 // RenderPrepared processes a preparedItem which contains pre-calculated context.
-func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []byte) error {
+func (p *processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []byte) error {
 	var isCompact bool
 	var err error
 	var ctx interface{}
@@ -83,7 +84,7 @@ func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 	return nil
 }
 
-func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte) (FileContext, error) {
+func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte) (FileContext, error) {
 	rc, err := file.Open()
 	if err != nil {
 		if p.onFileError != nil {
@@ -183,7 +184,7 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 	}, nil
 }
 
-func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg RunnerConfig) (head, tail, gap []byte, err error) {
+func (p *processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg RunnerConfig) (head, tail, gap []byte, err error) {
 	if cfg.Head < 0 {
 		sr := io.NewSectionReader(reader, 0, size)
 		head, _, err = content.ReadHead(sr, -1)
@@ -211,7 +212,7 @@ func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, is
 	return
 }
 
-func (p *Processor) formatContent(head, tail, gap []byte, totalRows int, cfg RunnerConfig) interface{} {
+func (p *processor) formatContent(head, tail, gap []byte, totalRows int, cfg RunnerConfig) interface{} {
 	if cfg.LineNumbers {
 		return content.LineNumberFormatter{Head: head, Gap: gap, Tail: tail, TotalRows: totalRows}
 	}

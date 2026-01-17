@@ -8,19 +8,14 @@ import (
 	"sync"
 )
 
-// StreamItem is an interface for types that can be added to the output stream.
-type StreamItem interface {
+// streamItem is an internal interface for types that can be added to the output stream.
+type streamItem interface {
 	isStreamItem()
 }
 
 func (InputFile) isStreamItem()      {}
 func (SectionContext) isStreamItem() {}
 func (PromptContext) isStreamItem()  {}
-
-// Tokenizer defines the interface for estimating LLM tokens.
-type Tokenizer interface {
-	Estimate(size int64, content interface{}) int64
-}
 
 // FileErrorHandler is a callback invoked when the processor fails to read a file.
 type FileErrorHandler func(f InputFile, err error)
@@ -30,7 +25,7 @@ type defaultTokenizer struct{}
 func (defaultTokenizer) Estimate(size int64, _ interface{}) int64 { return size / 4 }
 
 type preparedItem struct {
-	raw              StreamItem
+	raw              streamItem
 	section          *SectionContext
 	fileIndexGlobal  int
 	fileIndexSection int
@@ -39,16 +34,17 @@ type preparedItem struct {
 
 // Stream manages a collection of files, sections, and prompts for rendering.
 type Stream struct {
-	items         []StreamItem
-	tokenizer     Tokenizer
-	engine        *TemplateEngine
-	renderCfg     RunnerConfig
-	workDir       string
-	format        string
-	finalStats    *GlobalContext
-	preparedItems []preparedItem
-	sections      []*SectionContext
-	onFileError   FileErrorHandler
+	items       []streamItem
+	tokenizer   Tokenizer
+	engine      *TemplateEngine
+	renderCfg   RunnerConfig
+	workDir     string
+	format      string
+	finalStats  *GlobalContext
+	sections    []*SectionContext
+	onFileError FileErrorHandler
+	concurrency int
+	prepared    []preparedItem
 }
 
 // NewStream initializes a new stream with the given configuration.
@@ -63,12 +59,23 @@ func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
 	}
 
 	return &Stream{
-		engine:    engine,
-		renderCfg: runnerCfg,
-		tokenizer: defaultTokenizer{},
-		workDir:   ".",
-		format:    fmtType,
+		engine:      engine,
+		renderCfg:   runnerCfg,
+		tokenizer:   defaultTokenizer{},
+		workDir:     ".",
+		format:      fmtType,
+		concurrency: runtime.NumCPU(),
 	}, nil
+}
+
+// WithConcurrency sets the number of concurrent workers for file processing.
+// Defaults to runtime.NumCPU(). Set to 1 for sequential processing.
+func (s *Stream) WithConcurrency(n int) *Stream {
+	if n < 1 {
+		n = 1
+	}
+	s.concurrency = n
+	return s
 }
 
 func (s *Stream) WithTokenizer(t Tokenizer) *Stream {
@@ -115,7 +122,7 @@ func (s *Stream) Prepare() GlobalContext {
 	}
 
 	s.sections = make([]*SectionContext, 0)
-	s.preparedItems = make([]preparedItem, 0, len(s.items))
+	s.prepared = make([]preparedItem, 0, len(s.items))
 
 	currentSection := &SectionContext{
 		Index:      0,
@@ -152,7 +159,7 @@ func (s *Stream) Prepare() GlobalContext {
 			s.sections = append(s.sections, newSec)
 			currentSection = newSec
 
-			s.preparedItems = append(s.preparedItems, preparedItem{
+			s.prepared = append(s.prepared, preparedItem{
 				raw:         item,
 				section:     currentSection,
 				streamIndex: i,
@@ -167,7 +174,7 @@ func (s *Stream) Prepare() GlobalContext {
 			global.TotalSize += f.Size
 			global.TokenEstimate += s.tokenizer.Estimate(f.Size, nil)
 
-			s.preparedItems = append(s.preparedItems, preparedItem{
+			s.prepared = append(s.prepared, preparedItem{
 				raw:              item,
 				section:          currentSection,
 				fileIndexGlobal:  globalFileIdx,
@@ -178,7 +185,7 @@ func (s *Stream) Prepare() GlobalContext {
 			continue
 		}
 
-		s.preparedItems = append(s.preparedItems, preparedItem{
+		s.prepared = append(s.prepared, preparedItem{
 			raw:         item,
 			section:     currentSection,
 			streamIndex: i,
@@ -248,7 +255,7 @@ var readPool = sync.Pool{
 }
 
 func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global GlobalContext) error {
-	numWorkers := runtime.NumCPU()
+	numWorkers := s.concurrency
 	jobsCh := make(chan seqJob, numWorkers)
 	resultsCh := make(chan result, numWorkers)
 
@@ -266,7 +273,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					return
 				}
 
-				proc := NewProcessor(s.engine, global, s.onFileError)
+				proc := newProcessor(s.engine, global, s.onFileError)
 				proc.tokenCounter = s.tokenizer.Estimate
 
 				readBufPtr := readPool.Get().(*[]byte)
@@ -296,7 +303,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 	}
 
 	go func() {
-		for _, item := range s.preparedItems {
+		for _, item := range s.prepared {
 			select {
 			case jobsCh <- seqJob{seqID: item.streamIndex, item: item}:
 			case <-ctx.Done():
@@ -309,7 +316,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 	}()
 
 	useSeparators := s.format != "html"
-	layout := NewLayoutWriter(dest, s.engine, s.sections, useSeparators)
+	layout := newLayoutWriter(dest, s.engine, s.sections, useSeparators)
 	defer layout.Close()
 
 	nextSeq := 0

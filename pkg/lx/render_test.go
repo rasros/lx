@@ -12,7 +12,7 @@ func TestProcessor_RenderFile(t *testing.T) {
 
 	global := GlobalContext{TotalFiles: 1}
 
-	proc := NewProcessor(engine, global, nil)
+	proc := newProcessor(engine, global, nil)
 	file := NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
 
 	file.Config = RunnerConfig{Head: 2, Tail: 0}

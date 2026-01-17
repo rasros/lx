@@ -21,7 +21,7 @@ func TestLayoutWriter(t *testing.T) {
 
 	t.Run("Standard Spacing", func(t *testing.T) {
 		var buf bytes.Buffer
-		lw := NewLayoutWriter(&buf, engine, sections, true)
+		lw := newLayoutWriter(&buf, engine, sections, true)
 
 		lw.WriteItem(result{
 			buffer:       bytes.NewBufferString("Item1"),
@@ -46,7 +46,7 @@ func TestLayoutWriter(t *testing.T) {
 
 	t.Run("Compact Spacing", func(t *testing.T) {
 		var buf bytes.Buffer
-		lw := NewLayoutWriter(&buf, engine, sections, true)
+		lw := newLayoutWriter(&buf, engine, sections, true)
 
 		lw.WriteItem(result{
 			buffer:       bytes.NewBufferString("Item1"),
@@ -77,7 +77,7 @@ func TestLayoutWriter(t *testing.T) {
 
 	t.Run("Section Transition", func(t *testing.T) {
 		var buf bytes.Buffer
-		lw := NewLayoutWriter(&buf, engine, sections, true)
+		lw := newLayoutWriter(&buf, engine, sections, true)
 
 		lw.WriteItem(result{
 			buffer:       bytes.NewBufferString("A"),
@@ -100,7 +100,7 @@ func TestLayoutWriter(t *testing.T) {
 
 	t.Run("HTML No Spacing", func(t *testing.T) {
 		var buf bytes.Buffer
-		lw := NewLayoutWriter(&buf, engine, sections, false)
+		lw := newLayoutWriter(&buf, engine, sections, false)
 
 		lw.WriteItem(result{buffer: bytes.NewBufferString("<div1/>\n"), sectionIndex: 0})
 		lw.WriteItem(result{buffer: bytes.NewBufferString("<div2/>\n"), sectionIndex: 0})

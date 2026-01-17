@@ -37,6 +37,15 @@ func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	}
 }
 
+// NewInputFileFromPath is a helper that performs fs.Stat
+func NewInputFileFromPath(fsys fs.FS, path string) (InputFile, error) {
+	info, err := fs.Stat(fsys, path)
+	if err != nil {
+		return InputFile{}, err
+	}
+	return NewInputFile(fsys, path, info), nil
+}
+
 // NewBufferInputFile creates an InputFile from an in-memory byte slice.
 func NewBufferInputFile(name string, data []byte) InputFile {
 	return InputFile{
