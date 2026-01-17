@@ -94,12 +94,20 @@ get_release_tag() {
 
   local api_latest="https://api.github.com/repos/${REPO}/releases/latest"
   local tag
-  tag="$(curl -fsSL "$api_latest" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
+  local raw_output
+
+  # We use grep without -m1 to ensure we consume the whole stream.
+  # This prevents curl from erroring out with code 23 (failed writing body).
+  raw_output="$(curl -fsSL "$api_latest" | grep '"tag_name"')"
+  tag="$(echo "$raw_output" | head -n 1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
 
   if [ -z "$tag" ]; then
     log "No stable release found, checking for pre-releases..."
     local api_tags="https://api.github.com/repos/${REPO}/tags"
-    tag="$(curl -fsSL "$api_tags" | grep -m1 '"name"' | sed -E 's/.*"name": *"([^"]+)".*/\1/')"
+
+    # Same robustness fix for tags endpoint
+    raw_output="$(curl -fsSL "$api_tags" | grep '"name"')"
+    tag="$(echo "$raw_output" | head -n 1 | sed -E 's/.*"name": *"([^"]+)".*/\1/')"
   fi
 
   if [ -z "$tag" ]; then
