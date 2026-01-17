@@ -11,11 +11,12 @@ import (
 	"github.com/monochromegane/go-gitignore"
 )
 
+// WalkerOptions configures the behavior of the file system walker.
 type WalkerOptions struct {
 	FS                 fs.FS
 	Root               string
-	IgnoreFileSymlinks bool // Default false (Show file links)
-	IgnoreDirSymlinks  bool // Default true (Ignore dir links)
+	IgnoreFileSymlinks bool
+	IgnoreDirSymlinks  bool
 	IgnoreHidden       bool
 	IgnoreEnabled      bool
 	GlobalIgnore       gitignore.IgnoreMatcher
@@ -24,11 +25,11 @@ type WalkerOptions struct {
 	OnIgnore           func(path string, reason string, source string)
 }
 
+// Walker encapsulates the logic for traversing a file system with filtering and ignore rules.
 type Walker struct {
 	opts WalkerOptions
 }
 
-// ignoreSource pairs a matcher with the file it was loaded from.
 type ignoreSource struct {
 	matcher gitignore.IgnoreMatcher
 	source  string
@@ -38,6 +39,7 @@ func NewWalker(opts WalkerOptions) *Walker {
 	return &Walker{opts: opts}
 }
 
+// Walk starts a goroutine to traverse the roots and send discovered files to the returned channel.
 func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	out := make(chan InputFile)
 	filesystem := w.opts.FS
@@ -80,16 +82,12 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 
 			isSymlink := (d.Type() & fs.ModeSymlink) != 0
 
-			// Symlink Handling Logic
 			if isSymlink {
-				// We must stat to determine if it is a directory or file target
 				info, err := fs.Stat(filesystem, p)
 
-				// Broken link case: treat as file so we can report the error downstream
 				isTargetDir := (err == nil && info.IsDir())
 
 				if isTargetDir {
-					// --- DIRECTORY SYMLINK ---
 					if w.opts.IgnoreDirSymlinks {
 						if w.opts.OnIgnore != nil {
 							w.opts.OnIgnore(p, "symlink-dir-skipped", "")
@@ -97,7 +95,6 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 						return nil
 					}
 
-					// Cycle Detection & Recursion
 					absPath := p
 					if w.opts.Root != "" {
 						absPath = filepath.Join(w.opts.Root, p)
@@ -116,22 +113,18 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 						}
 						visitedDirs[realPath] = struct{}{}
 					}
-					// Recurse
 					return fs.WalkDir(filesystem, p, walkFn)
 
 				} else {
-					// --- FILE SYMLINK (or broken) ---
 					if w.opts.IgnoreFileSymlinks {
 						if w.opts.OnIgnore != nil {
 							w.opts.OnIgnore(p, "symlink-file-skipped", "")
 						}
 						return nil
 					}
-					// Fall through to normal file processing
 				}
 			}
 
-			// Regular Directory Tracking for Cycles
 			if d.IsDir() && !isSymlink {
 				absPath := p
 				if w.opts.Root != "" {

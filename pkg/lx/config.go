@@ -67,7 +67,6 @@ type Config struct {
 	SectionFooterTemplate string
 	OutputFormat          string
 
-	// Filtering Options (Negative Logic)
 	IgnoreFileSymlinks bool
 	IgnoreDirSymlinks  bool
 	IgnoreHidden       bool
@@ -87,6 +86,7 @@ func NewConfig() *Config {
 	}
 }
 
+// CompileTemplates parses the configuration templates into a TemplateEngine.
 func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 	format := cfg.OutputFormat
 	if format == "" {
@@ -215,6 +215,7 @@ func Merge(dst *Config, src *Config) {
 	}
 }
 
+// FileContext represents the data provided to file-level templates.
 type FileContext struct {
 	Path             string
 	AbsPath          string
@@ -237,6 +238,7 @@ type FileContext struct {
 	Section          SectionContext
 }
 
+// SectionContext represents the data provided to section templates.
 type SectionContext struct {
 	Body       string
 	Index      int
@@ -247,6 +249,7 @@ type SectionContext struct {
 	IsImplicit bool
 }
 
+// PromptContext represents the data provided to custom text prompt templates.
 type PromptContext struct {
 	Body      string
 	Separator string
@@ -254,14 +257,17 @@ type PromptContext struct {
 	Section   SectionContext
 }
 
+// HeaderContext represents the data provided to the overall output header.
 type HeaderContext struct {
 	Global GlobalContext
 }
 
+// FooterContext represents the data provided to the overall output footer.
 type FooterContext struct {
 	Global GlobalContext
 }
 
+// StatsContext represents the data provided to the statistics summary template.
 type StatsContext struct {
 	Global GlobalContext
 }

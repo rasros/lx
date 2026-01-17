@@ -8,78 +8,67 @@ import (
 )
 
 var extToLang = map[string]string{
-	// Systems / Compiled
-	".go":    "go",
-	".rs":    "rust",
-	".c":     "c",
-	".h":     "c",
-	".cc":    "cpp",
-	".cpp":   "cpp",
-	".cxx":   "cpp",
-	".hpp":   "cpp",
-	".hh":    "cpp",
-	".hxx":   "cpp",
-	".cs":    "csharp",
-	".m":     "objectivec",
-	".mm":    "objectivec",
-	".swift": "swift",
-	".val":   "vala",
-	".v":     "v",
-	".zig":   "zig",
-	".nim":   "nim",
-
-	// JVM
-	".java":   "java",
-	".kt":     "kotlin",
-	".kts":    "kotlin",
-	".scala":  "scala",
-	".groovy": "groovy",
-	".gradle": "groovy",
-	".clj":    "clojure",
-	".cljs":   "clojure",
-
-	// Web / Front-end
-	".js":     "javascript",
-	".mjs":    "javascript",
-	".cjs":    "javascript",
-	".jsx":    "jsx",
-	".ts":     "typescript",
-	".tsx":    "tsx",
-	".html":   "html",
-	".htm":    "html",
-	".css":    "css",
-	".scss":   "scss",
-	".sass":   "sass",
-	".less":   "less",
-	".vue":    "vue",
-	".svelte": "svelte",
-	".wasm":   "wasm",
-
-	// Scripting / Dynamic
-	".py":   "python",
-	".pyw":  "python",
-	".rb":   "ruby",
-	".php":  "php",
-	".lua":  "lua",
-	".pl":   "perl",
-	".pm":   "perl",
-	".r":    "r",
-	".dart": "dart",
-	".el":   "lisp",
-	".lisp": "lisp",
-	".erl":  "erlang",
-	".ex":   "elixir",
-	".exs":  "elixir",
-
-	// Shell / Batch
-	".sh":   "bash",
-	".bash": "bash",
-	".zsh":  "zsh",
-	".ps1":  "powershell",
-	".bat":  "batch",
-	".cmd":  "batch",
-
-	// Data / Config / Markup
+	".go":         "go",
+	".rs":         "rust",
+	".c":          "c",
+	".h":          "c",
+	".cc":         "cpp",
+	".cpp":        "cpp",
+	".cxx":        "cpp",
+	".hpp":        "cpp",
+	".hh":         "cpp",
+	".hxx":        "cpp",
+	".cs":         "csharp",
+	".m":          "objectivec",
+	".mm":         "objectivec",
+	".swift":      "swift",
+	".val":        "vala",
+	".v":          "v",
+	".zig":        "zig",
+	".nim":        "nim",
+	".java":       "java",
+	".kt":         "kotlin",
+	".kts":        "kotlin",
+	".scala":      "scala",
+	".groovy":     "groovy",
+	".gradle":     "groovy",
+	".clj":        "clojure",
+	".cljs":       "clojure",
+	".js":         "javascript",
+	".mjs":        "javascript",
+	".cjs":        "javascript",
+	".jsx":        "jsx",
+	".ts":         "typescript",
+	".tsx":        "tsx",
+	".html":       "html",
+	".htm":        "html",
+	".css":        "css",
+	".scss":       "scss",
+	".sass":       "sass",
+	".less":       "less",
+	".vue":        "vue",
+	".svelte":     "svelte",
+	".wasm":       "wasm",
+	".py":         "python",
+	".pyw":        "python",
+	".rb":         "ruby",
+	".php":        "php",
+	".lua":        "lua",
+	".pl":         "perl",
+	".pm":         "perl",
+	".r":          "r",
+	".dart":       "dart",
+	".el":         "lisp",
+	".lisp":       "lisp",
+	".erl":        "erlang",
+	".ex":         "elixir",
+	".exs":        "elixir",
+	".sh":         "bash",
+	".bash":       "bash",
+	".zsh":        "zsh",
+	".ps1":        "powershell",
+	".bat":        "batch",
+	".cmd":        "batch",
 	".json":       "json",
 	".yml":        "yaml",
 	".yaml":       "yaml",
@@ -99,16 +88,13 @@ var extToLang = map[string]string{
 	".tf":         "hcl",
 	".tfvars":     "hcl",
 	".dockerfile": "dockerfile",
-
-	// Utilities
-	".diff":  "diff",
-	".patch": "diff",
-	".txt":   "text",
-	".log":   "text",
+	".diff":       "diff",
+	".patch":      "diff",
+	".txt":        "text",
+	".log":        "text",
 }
 
 var filenameToLang = map[string]string{
-	// Build / Config
 	"dockerfile":    "dockerfile",
 	"makefile":      "makefile",
 	"jenkinsfile":   "groovy",
@@ -122,8 +108,6 @@ var filenameToLang = map[string]string{
 	"tsconfig.json": "json",
 	"composer.json": "json",
 	"cargo.toml":    "toml",
-
-	// Dotfiles
 	".gitignore":    "gitignore",
 	".gitmodules":   "gitconfig",
 	".bashrc":       "bash",
@@ -151,6 +135,7 @@ var shebangToLang = map[string]string{
 	"make":    "makefile",
 }
 
+// IsBinary detects if the given data sample contains null bytes or is invalid UTF-8.
 func IsBinary(data []byte) bool {
 	limit := 1024
 	if len(data) < limit {
@@ -165,8 +150,8 @@ func IsBinary(data []byte) bool {
 	return !utf8.Valid(data)
 }
 
+// DetectLanguage identifies the programming language based on extension, filename, or shebang.
 func DetectLanguage(p string, data []byte) string {
-	// Use path.Base/Ext (forward slash) for generic fs.FS compatibility
 	base := strings.ToLower(path.Base(p))
 	if lang, ok := filenameToLang[base]; ok {
 		return lang

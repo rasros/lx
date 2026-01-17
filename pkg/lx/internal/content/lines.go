@@ -18,6 +18,7 @@ type LineNumberFormatter struct {
 	TotalRows int
 }
 
+// Format implements fmt.Formatter to support width-aligned line numbering.
 func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
 	width := 1
 	if lnf.TotalRows > 9 {
@@ -79,7 +80,7 @@ func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
 }
 
 // EstimateLineCount estimates the number of lines in a file by reading a sample.
-// buf must be non-nil. A size of 32KB is recommended.
+// Returns (estimated count, is exact, error).
 func EstimateLineCount(r io.ReaderAt, fileSize int64, buf []byte) (int, bool, error) {
 	if fileSize == 0 {
 		return 0, true, nil
@@ -108,7 +109,7 @@ func EstimateLineCount(r io.ReaderAt, fileSize int64, buf []byte) (int, bool, er
 	return estimated, false, nil
 }
 
-// ReadHead reads the first n lines from r.
+// ReadHead reads up to n lines from r. If n < 0, reads everything.
 func ReadHead(r io.Reader, n int) ([]byte, int, error) {
 	if n == 0 {
 		return nil, 0, nil
@@ -134,7 +135,7 @@ func ReadHead(r io.Reader, n int) ([]byte, int, error) {
 	return buf.Bytes(), linesRead, sc.Err()
 }
 
-// ReadTailSeek reads the last linesWanted from f using Seek.
+// ReadTailSeek reads the last linesWanted from f using Seek for efficiency.
 func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 	if linesWanted <= 0 {
 		return nil, nil

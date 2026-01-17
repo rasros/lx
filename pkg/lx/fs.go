@@ -8,7 +8,7 @@ import (
 )
 
 // InputFile represents a file to be processed.
-// It holds metadata in memory (cheap) and a lazy opener for content (heavy).
+// It holds metadata in memory and a lazy opener for content.
 type InputFile struct {
 	Path      string
 	AbsPath   string
@@ -28,7 +28,7 @@ type InputFile struct {
 func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	return InputFile{
 		Path:    path,
-		AbsPath: path, // For virtual FS, AbsPath is usually just the path
+		AbsPath: path,
 		Size:    info.Size(),
 		ModTime: info.ModTime(),
 		Open: func() (io.ReadCloser, error) {

@@ -7,14 +7,13 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 )
 
+// IsKept checks if a path matches include patterns and does not match exclude patterns.
 func IsKept(p string, includes, excludes []string) bool {
-	// Normalize p to OS separators for consistent matching with doublestar
 	osPath := filepath.FromSlash(p)
 
 	if len(includes) > 0 {
 		matched := false
 		for _, pattern := range includes {
-			// Normalize pattern to OS separators
 			if matchPattern(filepath.FromSlash(pattern), osPath) {
 				matched = true
 				break
@@ -35,7 +34,6 @@ func IsKept(p string, includes, excludes []string) bool {
 func matchPattern(pattern, p string) bool {
 	p = filepath.Clean(p)
 
-	// If pattern has no separators, match against the filename only
 	if !strings.Contains(pattern, string(filepath.Separator)) {
 		return match(pattern, filepath.Base(p))
 	}

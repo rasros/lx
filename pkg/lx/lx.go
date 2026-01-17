@@ -8,6 +8,7 @@ import (
 	"sync"
 )
 
+// StreamItem is an interface for types that can be added to the output stream.
 type StreamItem interface {
 	isStreamItem()
 }
@@ -16,6 +17,7 @@ func (InputFile) isStreamItem()      {}
 func (SectionContext) isStreamItem() {}
 func (PromptContext) isStreamItem()  {}
 
+// Tokenizer defines the interface for estimating LLM tokens.
 type Tokenizer interface {
 	Estimate(size int64, content interface{}) int64
 }
@@ -35,6 +37,7 @@ type preparedItem struct {
 	streamIndex      int
 }
 
+// Stream manages a collection of files, sections, and prompts for rendering.
 type Stream struct {
 	items         []StreamItem
 	tokenizer     Tokenizer
@@ -48,6 +51,7 @@ type Stream struct {
 	onFileError   FileErrorHandler
 }
 
+// NewStream initializes a new stream with the given configuration.
 func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
 	engine, err := CompileTemplates(cfg)
 	if err != nil {
@@ -99,6 +103,7 @@ func (s *Stream) AddPrompt(text string) *Stream {
 	return s
 }
 
+// Prepare calculates metadata and organizes items into sections before rendering.
 func (s *Stream) Prepare() GlobalContext {
 	if s.finalStats != nil {
 		return *s.finalStats
@@ -193,6 +198,7 @@ func (s *Stream) GetGlobalContext() GlobalContext {
 	return s.Prepare()
 }
 
+// Execute renders the stream content to w.
 func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	global := s.Prepare()
 	counter := &byteCounter{w: w}

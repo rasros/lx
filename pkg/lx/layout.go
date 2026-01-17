@@ -5,7 +5,7 @@ import (
 	"text/template"
 )
 
-// LayoutWriter act as a middleman between the pipeline assembler and the output writer.
+// LayoutWriter acts as a middleman between the pipeline assembler and the output writer.
 // It manages section transitions and dynamic spacing between items.
 type LayoutWriter struct {
 	w                io.Writer

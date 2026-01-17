@@ -11,11 +11,13 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal/detect"
 )
 
+// RenderedItem represents a fully processed piece of the stream.
 type RenderedItem struct {
 	Body          string
 	IsCompactView bool
 }
 
+// Processor handles the conversion of input items into formatted output.
 type Processor struct {
 	engine           *TemplateEngine
 	global           GlobalContext
@@ -34,7 +36,7 @@ func NewProcessor(engine *TemplateEngine, global GlobalContext, onError FileErro
 	}
 }
 
-// RenderPrepared processes a preparedItem which contains pre-calculated context
+// RenderPrepared processes a preparedItem which contains pre-calculated context.
 func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []byte) error {
 	var isCompact bool
 	var err error
@@ -72,15 +74,6 @@ func (p *Processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 		return nil
 	}
 
-	switch c := ctx.(type) {
-	case *FileContext:
-		c.Separator = ""
-	case *SectionContext:
-		c.Separator = ""
-	case *PromptContext:
-		c.Separator = ""
-	}
-
 	if err := templateToUse.Execute(w, ctx); err != nil {
 		return err
 	}
@@ -109,8 +102,6 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 	}
 	defer rc.Close()
 
-	// 1. Directory Check: Ensure we aren't trying to read a directory as a file.
-	// This happens when following symlinks to directories.
 	if f, ok := rc.(*os.File); ok {
 		if stat, err := f.Stat(); err == nil && stat.IsDir() {
 			return FileContext{
@@ -154,7 +145,6 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 	var contentData interface{}
 	if !isBinary && !isCompact && size > 0 && !isImage {
 		effectiveCfg := cfg
-		// Prevent duplication for small files
 		if exact && cfg.Head > 0 && cfg.Tail > 0 && totalRows <= (cfg.Head+cfg.Tail) {
 			effectiveCfg.Head = -1
 			effectiveCfg.Tail = 0
@@ -162,7 +152,6 @@ func (p *Processor) prepareFileContext(file InputFile, index int, scratch []byte
 
 		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, effectiveCfg)
 		if err != nil {
-			// 2. Read Error Check: If reading fails, flag as error immediately.
 			return FileContext{
 				Path:      file.Path,
 				AbsPath:   file.AbsPath,
