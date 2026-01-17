@@ -345,11 +345,18 @@ gitignore rules) until new filters are applied.`,
 		Short:     "f",
 		Type:      CmdAction,
 		ValueType: ValueAny,
-		Usage:     "Process a specific path bypassing ignores",
-		Long: `Process a specific file path immediately.
+		Usage:     "Force process a specific path (bypasses ignores/filters)",
+		Long: `Force process a specific file path immediately.
 
 Unlike passing a path as a standard argument, using -f forces the file to be
-included even if it is listed in .gitignore or hidden.`,
+included even if it is:
+  - Listed in .gitignore
+  - Hidden (starts with .)
+  - Excluded by active -e filters
+  - Not included by active -i filters
+
+If the path is a directory, active filters (-i/-e) are preserved for the
+recursive walk, but hidden/.gitignore checks are still disabled.`,
 	},
 	{
 		Category:  CatActions,

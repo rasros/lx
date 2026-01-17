@@ -246,19 +246,35 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			walkerIgnoreFileSymlinks := cfg.IgnoreFileSymlinks
 			walkerIgnoreEnabled := cfg.IgnoreEnabled
 
+			walkerIncludes := includes
+			walkerExcludes := excludes
+
 			if op.Action == "file" {
 				slog.Debug("Action 'file' used: Forcing inclusion (bypassing ignore/hidden rules)", "path", rootPath)
 				walkerIgnoreHidden = false
 				walkerIgnoreEnabled = false
 				walkerIgnoreDirSymlinks = false
 				walkerIgnoreFileSymlinks = false
+
+				// If it's a directory, we keep the filters
+				// If it's a file, we clear the filters
+				info, err := os.Stat(rootPath)
+				isDir := err == nil && info.IsDir()
+
+				if !isDir {
+					slog.Debug("Force target is a file; clearing filters to ensure inclusion")
+					walkerIncludes = nil
+					walkerExcludes = nil
+				} else {
+					slog.Debug("Force target is a directory; preserving filters for recursive walk")
+				}
 			}
 
 			slog.Debug("Initializing Walker",
 				"fs_root", fsRoot,
 				"walk_path", walkPath,
-				"includes_count", len(includes),
-				"excludes_count", len(excludes),
+				"includes_count", len(walkerIncludes),
+				"excludes_count", len(walkerExcludes),
 				"ignore_enabled", walkerIgnoreEnabled,
 				"ignore_hidden", walkerIgnoreHidden,
 				"ignore_dir_symlinks", walkerIgnoreDirSymlinks,
@@ -273,8 +289,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				IgnoreHidden:       walkerIgnoreHidden,
 				IgnoreEnabled:      walkerIgnoreEnabled,
 				GlobalIgnore:       cfg.GlobalIgnore,
-				Includes:           includes,
-				Excludes:           excludes,
+				Includes:           walkerIncludes,
+				Excludes:           walkerExcludes,
 				OnIgnore: func(path string, reason lx.IgnoreReason, source string) {
 					args := []any{"path", path, "reason", reason.String()}
 					if source != "" {
