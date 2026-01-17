@@ -16,7 +16,7 @@ estimation automatically.
 Via go install:
 
 ```bash
-go install github.com/rasros/lx/cmd/lx@v1.1.0-rc.4
+go install github.com/rasros/lx/cmd/lx
 ```
 
 Or via curl:
@@ -24,6 +24,7 @@ Or via curl:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh | bash
 ```
+
 ### System Dependencies (Clipboard)
 
 The copy-to-clipboard feature (`-c` / `--copy`) depends on the following:
@@ -32,12 +33,22 @@ The copy-to-clipboard feature (`-c` / `--copy`) depends on the following:
 * **Windows**: Native support via `clip`.
 * **Linux**: Requires `xclip` for X11 or `wl-clipboard` for Wayland to be installed.
 
-If you're on Linux and not sure, do this:
+If you're on Linux and not sure, check your session type:
+
 ```bash
 echo $XDG_SESSION_TYPE
 ```
 
-If it outputs wayland, install wl-clipboard. If it outputs x11, install xclip.
+---
+
+## Why lx?
+
+* **Smart Discovery:** Respects `.gitignore` and `.lxignore` automatically (unlike `find`).
+* **Binary Safety:** Detects and skips binary files to prevent corrupting your clipboard or token context.
+* **Token Aware:** Estimates token usage (stderr) to keep you within LLM context limits.
+* **Format Ready:** Wraps code in correct markdown fences with language tags for syntax highlighting.
+* **Stream Processing:** Allows you to mix files, directories, prompts, and specific formatting rules in a single
+  command.
 
 ---
 
@@ -49,10 +60,10 @@ Format a single file:
 lx go.mod
 ```
 
-This produces the following fenced output:
+**Output:**
 
 ````markdown
-go.mod (10 rows)
+go.mod (11 rows)
 ---
 ```gomod
 module github.com/rasros/lx
@@ -63,12 +74,13 @@ require gopkg.in/yaml.v3 v3.0.1
 
 require (
         github.com/atotto/clipboard v0.1.4
+        github.com/bmatcuk/doublestar/v4 v4.9.2
         github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00
 )
 ```
 ````
 
-Recursively walk a directory and output contents (respects `.gitignore`):
+Recursively walk a directory (respects `.gitignore`):
 
 ```bash
 lx src/
@@ -80,34 +92,72 @@ Copy output directly to clipboard:
 lx -c . # . is also the default if no arguments are provided
 ```
 
-Write output to a file:
+Copy all modified files in your current branch to the clipboard:
 
 ```bash
-lx -o prompt.md src/
+git diff --name-only | lx -c
 ```
+
+---
+
+## How It Works (The Paintbrush Model)
+
+Unlike standard tools where flags apply globally, `lx` processes arguments left-to-right as a **stream**. Think of flags
+as a "paintbrush": if you set a modifier, it applies to all **subsequent** files until it is changed or reset.
+
+* **Apply limit to all:**
+  `lx -n 50 file1.go file2.go` (Both files limited to 50 lines)
+
+* **Apply limit to one, then reset:**
+  `lx -n 50 file1.go -N file2.go` (`file1` is limited, `file2` is full length)
+
+This allows you to construct precise context bundles: "Give me the full config file, but only the headers of the logs."
 
 ---
 
 ## Power Usage
 
-`lx` allows you to compose context from multiple sources with specific ordering.
-
-For example, to grab all server code (excluding tests), add the dependency file, organize them with headers, and
-copy the result to your clipboard:
+Composing context from multiple sources with specific ordering and formatting:
 
 ```bash
 lx -s "Server Code" -i "*.py" -e "test_*.py" src/server -E -s "Libs" requirements.txt -c
 ```
 
-**What just happened?**
+**Breakdown:**
 
-1. **`-s "..."`**: Injects a Markdown section header.
-2. **`-i` / `-e`**: Sets up filters to only include Python files and exclude tests.
-3. **`src/server`**: Recursively walks the source directory using those filters.
-4. **`-E`**: Resets the active filters so subsequent files aren't filtered.
-5. **`-s`**: Injects a new section header.
-6. **`requirements.txt`**: Appends the specific dependency file.
-7. **`-c`**: Copies the entire formatted output to your clipboard.
+1. **`-s "..."`**: Injects a Markdown section header ("Server Code").
+2. **`-i` / `-e`**: Sets filters (include `*.py`, exclude `test_*.py`).
+3. **`src/server`**: Walks the directory using those filters.
+4. **`-E`**: Resets the active filters (so subsequent files aren't filtered).
+5. **`-s`**: Injects a new section header ("Libs").
+6. **`requirements.txt`**: Adds the dependency file.
+7. **`-c`**: Copies the result to the clipboard.
+
+---
+
+## Formatting Modes
+
+### Markdown (Default)
+
+Standard fenced code blocks. Best for GitHub Copilot, ChatGPT, and DeepSeek.
+
+### XML (Claude Optimized)
+
+Formats output using XML tags (`<document>`, `<source>`, `<content>`). This is highly recommended for Anthropic's Claude
+to ensure accurate parsing of multiple files.
+
+```bash
+lx --xml src/
+```
+
+### HTML (Shareable Reports)
+
+Generates a standalone, syntax-highlighted HTML 5 file. Useful for attaching logs/code to bug tickets or sharing
+snapshots with non-technical stakeholders. Includes responsive design (Pico CSS).
+
+```bash
+lx --html src/logs/ > report.html
+```
 
 ---
 
@@ -115,13 +165,13 @@ lx -s "Server Code" -i "*.py" -e "test_*.py" src/server -E -s "Libs" requirement
 
 `lx` plays nicely with other tools. You can pipe a list of filenames from `fd`, `find`, or `ripgrep` directly into `lx`.
 
-**Using `ripgrep` to find files containing "TODO":**
+**Find files containing "TODO":**
 
 ```bash
 rg -l "TODO" | lx -c
 ```
 
-**Using `fd` to find all Rust files:**
+**Find all Rust files (using `fd`):**
 
 ```bash
 fd -e rs | lx
@@ -129,89 +179,66 @@ fd -e rs | lx
 
 ---
 
-## XML Support (Recommended for Claude)
+## Configuration
 
-You can switch to XML formatting, which is recommended by Anthropic's documentation for Claude to ensure better parsing
-of long contexts.
+`lx` is fully template-driven. You can override defaults by creating a config file at `~/.config/lx/config.yaml`.
 
-```bash
-lx --xml src/
-```
+**Sample Config:**
 
----
+```yaml
+# Default output behavior
+output_mode: "copy"      # Options: stdout, copy
+output_format: "xml"     # Options: markdown, xml, html
+verbosity: "info"        # Options: debug, info, warn, error, silent
 
-## HTML Support (Recommended for Browser Viewing)
+# Traversal rules
+show_hidden: false
+follow_symlinks: false
+ignore: true             # Respect .gitignore
 
-`lx` can output a complete, minimalistic HTML document styled with Pico CSS. This is useful for creating shareable
-archives or viewing code in a browser. It automatically detects images and renders them too.
+# Custom Templates (Go text/template syntax)
+template: |
+  ### {{ .Path }}
+  {{ .Content }}
 
-```bash
-lx --html src/ > output.html
+stats_template: |
+  Total Files: {{ .Global.TotalFiles }}
+  Tokens: {{ .Global.TokenEstimate }}
 ```
 
 ---
 
 ## Core Features
 
-### 1. Smart Discovery
-
-`lx` works like `ripgrep` or `fd`. It recursively walks directories while automatically respecting `.gitignore`,
-`.ignore`, and `.lxignore` files.
-
-```bash
-lx src/  # Walks src/, skipping ignored files
-lx -H .  # Includes hidden files
-```
-
-### 2. Slicing Files
+### 1. Slicing Files
 
 Limit output to specific lines to save tokens.
 
 ```bash
-# Get 50 lines from the middle of a file
-lx --lines 50 error.log
+# Get first 50 lines from the file
+lx --head 50 error.log
 
 # Compact mode: List filenames and sizes only (no content)
 lx -n0 src/
 ```
 
-### 3. Line Referencing
+### 2. Line Referencing
 
-Add line numbers to help the LLM pinpoint specific locations in code or logs.
+Add line numbers to help the LLM pinpoint specific locations.
 
 ```bash
 lx -l server.log
 ```
 
-### 4. Prompt Injection
+### 3. Prompt Injection
 
-Inject custom instructions directly into the stream without leaving the terminal with `-s` or `-p`.
+Inject custom instructions directly into the stream without leaving the terminal.
 
 ```bash
 lx -p "Refactor the following code to use Pydantic:" main.py
 ```
 
-**Tip:** You can create aliases for common prompts. Add this to your shell profile to quickly inject your test
-prompt:
+### 4. Stats Output
 
-```bash
-alias lxt='lx -p "$(cat ~/prompts/tests.md)"'
-```
-
-### 5. Stats Output
-
-`lx` prints a summary of file counts, total size, and estimated tokens to stderr. This appears automatically when
-output is redirected from stdout. You can disable it by `--no-stats`.
-
-### 6. File Support
-
-Binary files are printed as a single line and do not cause errors.
-
-PDF conversion and compressed archives are planned as future improvements.
-
----
-
-## Configuration
-
-`lx` is fully template-driven. You can customize the Markdown output format by creating a config file at
-`~/.config/lx/config.yaml`.
+`lx` prints a summary of file counts, total size, and estimated tokens to stderr. This appears automatically when output
+is redirected from stdout. You can disable it via `--no-stats`.
