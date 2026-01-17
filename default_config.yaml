@@ -9,27 +9,28 @@
 # -----------------------------------------------------------------------------
 
 # A shared partial template used to render the file header.
-# Included in other templates via {{ template "file_header" . }}
-file_header_template: |
+# Uses |- to strip the trailing newline so it can be used inline.
+file_header_template: |-
   {{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }}
 
 # Renders the content of a standard text file.
-file_content_template: |
+# Uses |- to prevent an extra newline after the closing backticks.
+file_content_template: |-
   {{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
   ---
   ```{{ .Language }}
   {{ .Content | endNewline -}}```
 
 # Renders when a file cannot be read (e.g. permission denied).
-file_error_template: |
+file_error_template: |-
   {{ template "file_header" . }} - error: {{ .ReadError }}
 
 # Renders when a binary file is detected and skipped.
-file_binary_template: |
+file_binary_template: |-
   {{ template "file_header" . }} - binary file skipped ({{ .Size | humanize }})
 
 # Renders when a file is in "compact" mode (size only, no content).
-file_compact_template: |
+file_compact_template: |-
   {{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
 
 # -----------------------------------------------------------------------------
@@ -38,11 +39,11 @@ file_compact_template: |
 
 # Template used when the -s/--section flag is provided.
 # This acts as a separator between groups of files.
-section_template: |
+section_separator_template: |-
   ## {{ .Body | endNewline }}---
 
 # Template used when the -p/--prompt flag is provided.
-prompt_template: |
+prompt_template: |-
   {{ .Body | endNewline }}
 
 # -----------------------------------------------------------------------------
@@ -50,10 +51,10 @@ prompt_template: |
 # -----------------------------------------------------------------------------
 
 # Template rendered once at the very beginning of the output.
-header_template: ""
+output_header_template: ""
 
 # Template rendered once at the very end of the output.
-footer_template: "\n\n"
+output_footer_template: "\n\n"
 
 # Optional: Wrappers for sections (e.g., XML tags). Left empty for Markdown.
 section_header_template: ""
