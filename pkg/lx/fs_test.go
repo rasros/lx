@@ -32,7 +32,6 @@ func TestStdinInputFile(t *testing.T) {
 }
 
 func TestInputFile_DirFS(t *testing.T) {
-	// Setup generic OS temp dir for the test environment
 	dir := t.TempDir()
 	fullPath := filepath.Join(dir, "test.txt")
 	if err := os.WriteFile(fullPath, []byte("data"), 0644); err != nil {

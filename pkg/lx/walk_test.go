@@ -18,7 +18,6 @@ func TestWalker_WithFilters(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	// Use empty string to represent the root of the fs
 	ch := w.Walk(ctx, []string{""})
 
 	var found []string

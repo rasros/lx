@@ -21,10 +21,12 @@ func TestTemplateFuncs_Humanize(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := humanize(tt.in)
-		if got != tt.want {
-			t.Errorf("humanize(%d) = %q, want %q", tt.in, got, tt.want)
-		}
+		t.Run(tt.want, func(t *testing.T) {
+			got := humanize(tt.in)
+			if got != tt.want {
+				t.Errorf("humanize(%d) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
 	}
 }
 
