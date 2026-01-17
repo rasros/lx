@@ -116,11 +116,8 @@ const defaultXMLSectionSeparator = `{{ if not .IsImplicit }}` +
 	`  <section_name>{{ .Body }}</section_name>` +
 	`{{ end }}`
 
-const defaultXMLSectionFooter = `{{ if .IsImplicit }}` +
-	"\n" + `</content>` +
-	`{{ else }}` +
-	"\n" + `</section>` +
-	`{{ end }}`
+const defaultXMLSectionFooter = `
+{{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}`
 
 const defaultXMLPrompt = `  <instruction>` + "\n" +
 	`{{ .Body | endNewline }}` +
@@ -237,7 +234,6 @@ const defaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
 	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"
 
 func templateFuncs() template.FuncMap {
-	// ... [Implementation remains the same as before] ...
 	return template.FuncMap{
 		"date": func(layout string, t time.Time) string {
 			return t.Format(layout)
