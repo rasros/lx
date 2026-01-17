@@ -18,7 +18,7 @@ section_header_template: "*** {{ .Body }} ***\n"
   <document index="2" language="yaml" rows="1">
     <source>configs/custom_template.yaml</source>
     <document_content>
-template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
+file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
     </document_content>
   </document>
 
@@ -89,7 +89,6 @@ import "testing"
     </document_content>
   </document>
 </section>
-
 
 --- STDERR ---
 

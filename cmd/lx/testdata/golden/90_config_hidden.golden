@@ -28,7 +28,7 @@ section_header_template: "*** {{ .Body }} ***\n"
 [5/25] configs/custom_template.yaml (1 rows)
 ---
 ```yaml
-template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
+file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
 [6/25] configs/follow.yaml (1 rows)

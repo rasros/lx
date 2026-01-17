@@ -46,7 +46,7 @@ article > header {
 </hgroup>
 </header>
 <main>
-<article id="file-1">
+<section id="section-0"><article id="file-1">
 <header>
  <a href="#file-1" aria-label="Link to this file"><strong>main.go</strong></a>
  <small>(2 rows)</small>

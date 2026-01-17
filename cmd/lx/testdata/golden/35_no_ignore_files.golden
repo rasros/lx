@@ -7,7 +7,7 @@ Documentation here.
 ```
 
 [2/26] bin/data.bin - binary file skipped (4 B)
-[3/26] bin/empty.txt - empty file
+[3/26] bin/empty.txt (0 rows)
 
 [4/26] configs/custom_sections.yaml (1 rows)
 ---
@@ -18,7 +18,7 @@ section_header_template: "*** {{ .Body }} ***\n"
 [5/26] configs/custom_template.yaml (1 rows)
 ---
 ```yaml
-template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
+file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
 [6/26] configs/follow.yaml (1 rows)

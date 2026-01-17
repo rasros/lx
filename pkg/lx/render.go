@@ -11,14 +11,6 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal/detect"
 )
 
-// renderedItem represents a fully processed piece of the stream.
-type renderedItem struct {
-	Body          string
-	IsCompactView bool
-}
-
-// processor handles the conversion of input items into formatted output.
-// It is an internal helper for Stream.Execute.
 type processor struct {
 	engine           *TemplateEngine
 	global           GlobalContext
@@ -56,13 +48,23 @@ func (p *processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 
 		isCompact = fCtx.IsCompactView
 		ctx = &fCtx
-		templateToUse = p.engine.Main
+
+		// State Routing: Select the granular template based on file state
+		if fCtx.IsError {
+			templateToUse = p.engine.FileError
+		} else if fCtx.IsBinary {
+			templateToUse = p.engine.FileBinary
+		} else if fCtx.IsCompactView {
+			templateToUse = p.engine.FileCompact
+		} else {
+			templateToUse = p.engine.FileContent
+		}
 
 	case SectionContext:
 		v = *item.section
 		isCompact = false
 		ctx = &v
-		templateToUse = p.engine.Section
+		templateToUse = p.engine.SectionSeparator
 
 	case PromptContext:
 		v.Global = p.global

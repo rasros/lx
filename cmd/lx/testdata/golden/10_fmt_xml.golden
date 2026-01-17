@@ -18,7 +18,7 @@ section_header_template: "*** {{ .Body }} ***\n"
   <document index="3" language="yaml" rows="1">
     <source>configs/custom_template.yaml</source>
     <document_content>
-template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
+file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
     </document_content>
   </document>
 
@@ -251,12 +251,11 @@ print('hello')
     </document_content>
   </document>
 
-  <document index="22" rows="0">
+  <document index="22">
     <source>/ROOT/links/broken_link</source>
     <error>open /ROOT/links/broken_link: FILE_NOT_FOUND</error>
   </document>
 </content>
-
 
 --- STDERR ---
 [1;31mError:[0m Failed to read file: open /ROOT/links/broken_link: FILE_NOT_FOUND (path=/ROOT/links/broken_link)

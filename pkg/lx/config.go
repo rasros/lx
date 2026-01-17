@@ -28,27 +28,45 @@ type RunnerConfig struct {
 
 // TemplateEngine holds the parsed text/template instances.
 type TemplateEngine struct {
-	Main          *template.Template
-	Section       *template.Template
-	Prompt        *template.Template
-	Stats         *template.Template
-	Header        *template.Template
-	Footer        *template.Template
+	FileContent *template.Template
+	FileError   *template.Template
+	FileBinary  *template.Template
+	FileCompact *template.Template
+
+	SectionSeparator *template.Template
+	Prompt           *template.Template
+
 	SectionHeader *template.Template
 	SectionFooter *template.Template
+
+	OutputHeader *template.Template
+	OutputFooter *template.Template
+	Stats        *template.Template
 }
 
 // Config represents the core library configuration.
 type Config struct {
-	Template              string
-	SectionTemplate       string
-	PromptTemplate        string
-	StatsTemplate         string
-	HeaderTemplate        string
-	FooterTemplate        string
+	// File-level Templates
+	FileContentTemplate string
+	FileErrorTemplate   string
+	FileBinaryTemplate  string
+	FileCompactTemplate string
+	FileHeaderTemplate  string
+
+	// Item-level Templates
+	SectionSeparatorTemplate string
+	PromptTemplate           string
+
+	// Group/Wrapper Templates
 	SectionHeaderTemplate string
 	SectionFooterTemplate string
-	OutputFormat          string
+
+	// Global Output Templates
+	OutputHeaderTemplate string
+	OutputFooterTemplate string
+	StatsTemplate        string
+
+	OutputFormat string
 
 	IgnoreFileSymlinks bool
 	IgnoreDirSymlinks  bool
@@ -76,30 +94,7 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 		format = "markdown"
 	}
 
-	var defMain, defSection, defPrompt string
-	defHeader := defaultHeaderTemplate
-	defFooter := defaultFooterTemplate
-	defSecHeader := ""
-	defSecFooter := ""
-
-	switch format {
-	case "xml":
-		defMain = defaultXMLTemplate
-		defSection = defaultXMLSectionTemplate
-		defPrompt = defaultXMLPromptTemplate
-		defSecHeader = defaultXMLSectionHeaderTemplate
-		defSecFooter = defaultXMLSectionFooterTemplate
-	case "html":
-		defMain = defaultHTMLTemplate
-		defSection = defaultHTMLSectionTemplate
-		defPrompt = defaultHTMLPromptTemplate
-		defHeader = defaultHTMLHeaderTemplate
-		defFooter = defaultHTMLFooterTemplate
-	default:
-		defMain = defaultTemplate
-		defSection = defaultSectionTemplate
-		defPrompt = defaultPromptTemplate
-	}
+	defaults := getFormatDefaults(format)
 
 	pick := func(user, def string) string {
 		if user != "" {
@@ -109,81 +104,132 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 	}
 
 	funcs := templateFuncs()
+
+	fileHeaderStr := pick(cfg.FileHeaderTemplate, defaults.FileHeader)
+
+	parseWithPartial := func(name, tmpl string) (*template.Template, error) {
+		t := template.New(name).Funcs(funcs)
+		if _, err := t.Parse(tmpl); err != nil {
+			return nil, err
+		}
+		if _, err := t.New("file_header").Parse(fileHeaderStr); err != nil {
+			return nil, err
+		}
+		return t, nil
+	}
+
 	parse := func(name, tmpl string) (*template.Template, error) {
 		return template.New(name).Funcs(funcs).Parse(tmpl)
 	}
 
-	tMain, err := parse("main", pick(cfg.Template, defMain))
+	tContent, err := parseWithPartial("file_content", pick(cfg.FileContentTemplate, defaults.FileContent))
 	if err != nil {
-		return nil, fmt.Errorf("main template: %w", err)
+		return nil, fmt.Errorf("file_content template: %w", err)
 	}
-	tSection, err := parse("section", pick(cfg.SectionTemplate, defSection))
+	tError, err := parseWithPartial("file_error", pick(cfg.FileErrorTemplate, defaults.FileError))
 	if err != nil {
-		return nil, fmt.Errorf("section template: %w", err)
+		return nil, fmt.Errorf("file_error template: %w", err)
 	}
-	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, defPrompt))
+	tBinary, err := parseWithPartial("file_binary", pick(cfg.FileBinaryTemplate, defaults.FileBinary))
+	if err != nil {
+		return nil, fmt.Errorf("file_binary template: %w", err)
+	}
+	tCompact, err := parseWithPartial("file_compact", pick(cfg.FileCompactTemplate, defaults.FileCompact))
+	if err != nil {
+		return nil, fmt.Errorf("file_compact template: %w", err)
+	}
+
+	tSep, err := parse("section_separator", pick(cfg.SectionSeparatorTemplate, defaults.SectionSeparator))
+	if err != nil {
+		return nil, fmt.Errorf("section_separator template: %w", err)
+	}
+	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, defaults.Prompt))
 	if err != nil {
 		return nil, fmt.Errorf("prompt template: %w", err)
+	}
+
+	tSecHeader, err := parse("section_header", pick(cfg.SectionHeaderTemplate, defaults.SectionHeader))
+	if err != nil {
+		return nil, fmt.Errorf("section_header template: %w", err)
+	}
+	tSecFooter, err := parse("section_footer", pick(cfg.SectionFooterTemplate, defaults.SectionFooter))
+	if err != nil {
+		return nil, fmt.Errorf("section_footer template: %w", err)
+	}
+
+	tHeader, err := parse("output_header", pick(cfg.OutputHeaderTemplate, defaults.OutputHeader))
+	if err != nil {
+		return nil, fmt.Errorf("output_header template: %w", err)
+	}
+	tFooter, err := parse("output_footer", pick(cfg.OutputFooterTemplate, defaults.OutputFooter))
+	if err != nil {
+		return nil, fmt.Errorf("output_footer template: %w", err)
 	}
 	tStats, err := parse("stats", pick(cfg.StatsTemplate, defaultStatsTemplate))
 	if err != nil {
 		return nil, fmt.Errorf("stats template: %w", err)
 	}
-	tHeader, err := parse("header", pick(cfg.HeaderTemplate, defHeader))
-	if err != nil {
-		return nil, fmt.Errorf("header template: %w", err)
-	}
-	tFooter, err := parse("footer", pick(cfg.FooterTemplate, defFooter))
-	if err != nil {
-		return nil, fmt.Errorf("footer template: %w", err)
-	}
-	tSecHeader, err := parse("section_header", pick(cfg.SectionHeaderTemplate, defSecHeader))
-	if err != nil {
-		return nil, fmt.Errorf("section_header template: %w", err)
-	}
-	tSecFooter, err := parse("section_footer", pick(cfg.SectionFooterTemplate, defSecFooter))
-	if err != nil {
-		return nil, fmt.Errorf("section_footer template: %w", err)
-	}
 
 	return &TemplateEngine{
-		Main:          tMain,
-		Section:       tSection,
-		Prompt:        tPrompt,
-		Stats:         tStats,
-		Header:        tHeader,
-		Footer:        tFooter,
+		FileContent: tContent,
+		FileError:   tError,
+		FileBinary:  tBinary,
+		FileCompact: tCompact,
+
+		SectionSeparator: tSep,
+		Prompt:           tPrompt,
+
 		SectionHeader: tSecHeader,
 		SectionFooter: tSecFooter,
+
+		OutputHeader: tHeader,
+		OutputFooter: tFooter,
+		Stats:        tStats,
 	}, nil
 }
 
 // Merge applies non-zero fields from src to dst.
 func Merge(dst *Config, src *Config) {
-	if src.Template != "" {
-		dst.Template = src.Template
+	if src.FileContentTemplate != "" {
+		dst.FileContentTemplate = src.FileContentTemplate
 	}
-	if src.SectionTemplate != "" {
-		dst.SectionTemplate = src.SectionTemplate
+	if src.FileErrorTemplate != "" {
+		dst.FileErrorTemplate = src.FileErrorTemplate
+	}
+	if src.FileBinaryTemplate != "" {
+		dst.FileBinaryTemplate = src.FileBinaryTemplate
+	}
+	if src.FileCompactTemplate != "" {
+		dst.FileCompactTemplate = src.FileCompactTemplate
+	}
+	if src.FileHeaderTemplate != "" {
+		dst.FileHeaderTemplate = src.FileHeaderTemplate
+	}
+
+	if src.SectionSeparatorTemplate != "" {
+		dst.SectionSeparatorTemplate = src.SectionSeparatorTemplate
 	}
 	if src.PromptTemplate != "" {
 		dst.PromptTemplate = src.PromptTemplate
 	}
-	if src.StatsTemplate != "" {
-		dst.StatsTemplate = src.StatsTemplate
-	}
-	if src.HeaderTemplate != "" {
-		dst.HeaderTemplate = src.HeaderTemplate
-	}
-	if src.FooterTemplate != "" {
-		dst.FooterTemplate = src.FooterTemplate
-	}
+
 	if src.SectionHeaderTemplate != "" {
 		dst.SectionHeaderTemplate = src.SectionHeaderTemplate
 	}
 	if src.SectionFooterTemplate != "" {
 		dst.SectionFooterTemplate = src.SectionFooterTemplate
 	}
+
+	if src.OutputHeaderTemplate != "" {
+		dst.OutputHeaderTemplate = src.OutputHeaderTemplate
+	}
+	if src.OutputFooterTemplate != "" {
+		dst.OutputFooterTemplate = src.OutputFooterTemplate
+	}
+	if src.StatsTemplate != "" {
+		dst.StatsTemplate = src.StatsTemplate
+	}
+
 	if src.OutputFormat != "" {
 		dst.OutputFormat = src.OutputFormat
 	}
@@ -216,7 +262,6 @@ type FileContext struct {
 	IsCompactView    bool
 	FileIndex        int
 	SectionFileIndex int
-	Separator        string
 	Global           GlobalContext
 	Section          SectionContext
 }
@@ -227,17 +272,15 @@ type SectionContext struct {
 	Index      int
 	TotalFiles int
 	TotalSize  int64
-	Separator  string
 	Global     GlobalContext
 	IsImplicit bool
 }
 
 // PromptContext represents the data provided to custom text prompt templates.
 type PromptContext struct {
-	Body      string
-	Separator string
-	Global    GlobalContext
-	Section   SectionContext
+	Body    string
+	Global  GlobalContext
+	Section SectionContext
 }
 
 // HeaderContext represents the data provided to the overall output header.

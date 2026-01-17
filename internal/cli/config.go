@@ -13,15 +13,27 @@ import (
 )
 
 type CliConfig struct {
-	Template              string `yaml:"template"`
-	SectionTemplate       string `yaml:"section_template"`
-	PromptTemplate        string `yaml:"prompt_template"`
-	StatsTemplate         string `yaml:"stats_template"`
-	HeaderTemplate        string `yaml:"header_template"`
-	FooterTemplate        string `yaml:"footer_template"`
+	// File-level Templates
+	FileContentTemplate string `yaml:"file_content_template"`
+	FileErrorTemplate   string `yaml:"file_error_template"`
+	FileBinaryTemplate  string `yaml:"file_binary_template"`
+	FileCompactTemplate string `yaml:"file_compact_template"`
+	FileHeaderTemplate  string `yaml:"file_header_template"` // Partial
+
+	// Item-level Templates
+	SectionSeparatorTemplate string `yaml:"section_separator_template"`
+	PromptTemplate           string `yaml:"prompt_template"`
+
+	// Group/Wrapper Templates
 	SectionHeaderTemplate string `yaml:"section_header_template"`
 	SectionFooterTemplate string `yaml:"section_footer_template"`
-	OutputFormat          string `yaml:"output_format"`
+
+	// Global Output Templates
+	OutputHeaderTemplate string `yaml:"output_header_template"`
+	OutputFooterTemplate string `yaml:"output_footer_template"`
+	StatsTemplate        string `yaml:"stats_template"`
+
+	OutputFormat string `yaml:"output_format"`
 
 	FollowSymlinks *bool `yaml:"follow_symlinks"`
 	NoFileSymlinks *bool `yaml:"no_file_links"`
@@ -62,34 +74,53 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			return err
 		}
 
-		if loaded.Template != "" {
-			lxCfg.Template = loaded.Template
+		// File Templates
+		if loaded.FileContentTemplate != "" {
+			lxCfg.FileContentTemplate = loaded.FileContentTemplate
 		}
-		if loaded.SectionTemplate != "" {
-			lxCfg.SectionTemplate = loaded.SectionTemplate
+		if loaded.FileErrorTemplate != "" {
+			lxCfg.FileErrorTemplate = loaded.FileErrorTemplate
+		}
+		if loaded.FileBinaryTemplate != "" {
+			lxCfg.FileBinaryTemplate = loaded.FileBinaryTemplate
+		}
+		if loaded.FileCompactTemplate != "" {
+			lxCfg.FileCompactTemplate = loaded.FileCompactTemplate
+		}
+		if loaded.FileHeaderTemplate != "" {
+			lxCfg.FileHeaderTemplate = loaded.FileHeaderTemplate
+		}
+
+		// Item Templates
+		if loaded.SectionSeparatorTemplate != "" {
+			lxCfg.SectionSeparatorTemplate = loaded.SectionSeparatorTemplate
 		}
 		if loaded.PromptTemplate != "" {
 			lxCfg.PromptTemplate = loaded.PromptTemplate
 		}
-		if loaded.StatsTemplate != "" {
-			lxCfg.StatsTemplate = loaded.StatsTemplate
-		}
-		if loaded.HeaderTemplate != "" {
-			lxCfg.HeaderTemplate = loaded.HeaderTemplate
-		}
-		if loaded.FooterTemplate != "" {
-			lxCfg.FooterTemplate = loaded.FooterTemplate
-		}
+
+		// Group/Global Templates
 		if loaded.SectionHeaderTemplate != "" {
 			lxCfg.SectionHeaderTemplate = loaded.SectionHeaderTemplate
 		}
 		if loaded.SectionFooterTemplate != "" {
 			lxCfg.SectionFooterTemplate = loaded.SectionFooterTemplate
 		}
+		if loaded.OutputHeaderTemplate != "" {
+			lxCfg.OutputHeaderTemplate = loaded.OutputHeaderTemplate
+		}
+		if loaded.OutputFooterTemplate != "" {
+			lxCfg.OutputFooterTemplate = loaded.OutputFooterTemplate
+		}
+		if loaded.StatsTemplate != "" {
+			lxCfg.StatsTemplate = loaded.StatsTemplate
+		}
+
 		if loaded.OutputFormat != "" {
 			lxCfg.OutputFormat = loaded.OutputFormat
 		}
 
+		// Logic Flags
 		if loaded.FollowSymlinks != nil {
 			lxCfg.IgnoreDirSymlinks = !(*loaded.FollowSymlinks)
 		}
@@ -103,6 +134,7 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			lxCfg.IgnoreEnabled = *loaded.Ignore
 		}
 
+		// CLI Options
 		if loaded.OutputMode != "" {
 			mergedCli.OutputMode = loaded.OutputMode
 		}

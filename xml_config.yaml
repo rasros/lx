@@ -1,24 +1,57 @@
 # lx XML Configuration
+# Optimized for Claude/LLMs that prefer XML structures.
 
-template: |
-  {{ .Separator }}<document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
+# -----------------------------------------------------------------------------
+# File Templates
+# -----------------------------------------------------------------------------
+
+file_content_template: |
+  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
     <source>{{ .Path }}</source>
-    {{- if .IsBinary }}
-    <error>Binary file ({{ .Size | humanize }})</error>
-    {{- else if .IsCompactView }}
-    <description>Compact view</description>
-    {{- else }}
     <document_content>
-  {{ .Content | endNewline }}  </document_content>
-    {{- end }}
+  {{ .Content | endNewline }}    </document_content>
   </document>
 
+file_error_template: |
+  <document index="{{ .FileIndex }}">
+    <source>{{ .Path }}</source>
+    <error>{{ .ReadError }}</error>
+  </document>
+
+file_binary_template: |
+  <document index="{{ .FileIndex }}">
+    <source>{{ .Path }}</source>
+    <error>Binary file ({{ .Size | humanize }})</error>
+  </document>
+
+file_compact_template: |
+  <document index="{{ .FileIndex }}">
+    <source>{{ .Path }}</source>
+    <description>Compact view</description>
+  </document>
+
+# -----------------------------------------------------------------------------
+# Section Wrappers
+# -----------------------------------------------------------------------------
+
+# Wraps the content of a section.
+section_header_template: |
+  {{ if .IsImplicit }}<content>{{ else }}<section>{{ end }}
+
+section_footer_template: |
+  {{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}
+
+# Renders the name of the section inside the wrapper.
 section_template: |
-  {{ .Separator }}<section_header>
-  {{ .Body | endNewline -}}
-  </section_header>
+  {{ if not .IsImplicit }}  <section_name>{{ .Body }}</section_name>{{ end }}
+
+# -----------------------------------------------------------------------------
+# Other
+# -----------------------------------------------------------------------------
 
 prompt_template: |
-  {{ .Separator }}<instruction>
+  <instruction>
   {{ .Body | endNewline -}}
   </instruction>
+
+output_format: "xml"

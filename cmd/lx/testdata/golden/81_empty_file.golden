@@ -1,5 +1,5 @@
 --- STDOUT ---
-bin/empty.txt - empty file
+bin/empty.txt (0 rows)
 
 
 --- STDERR ---

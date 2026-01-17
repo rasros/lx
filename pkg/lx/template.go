@@ -13,65 +13,121 @@ import (
 	"time"
 )
 
-const defaultTemplate = `{{ .Separator }}{{ if .IsError }}` +
-	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - error: {{ .ReadError }}` +
-	`{{ else if eq .Size 0 }}` +
-	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - empty file` +
-	`{{ else if .IsBinary }}` +
-	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} - binary file skipped ({{ .Size | humanize }})` +
-	`{{ else if .IsCompactView }}` +
-	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)` +
-	`{{ else }}` +
-	`{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
+type formatDefaults struct {
+	FileContent      string
+	FileError        string
+	FileBinary       string
+	FileCompact      string
+	FileHeader       string
+	SectionSeparator string
+	Prompt           string
+	OutputHeader     string
+	OutputFooter     string
+	SectionHeader    string
+	SectionFooter    string
+}
+
+func getFormatDefaults(fmtType string) formatDefaults {
+	switch fmtType {
+	case "xml":
+		return formatDefaults{
+			FileContent: defaultXMLContent,
+			FileError:   defaultXMLError,
+			FileBinary:  defaultXMLBinary,
+			FileCompact: defaultXMLCompact,
+			// FileHeader unused in XML
+			SectionSeparator: defaultXMLSectionSeparator,
+			Prompt:           defaultXMLPrompt,
+			SectionHeader:    defaultXMLSectionHeader,
+			SectionFooter:    defaultXMLSectionFooter,
+		}
+	case "html":
+		return formatDefaults{
+			FileContent:      defaultHTMLContent,
+			FileError:        defaultHTMLError,
+			FileBinary:       defaultHTMLBinary,
+			FileCompact:      defaultHTMLCompact,
+			SectionSeparator: defaultHTMLSectionSeparator,
+			Prompt:           defaultHTMLPrompt,
+			OutputHeader:     defaultHTMLOutputHeader,
+			OutputFooter:     defaultHTMLOutputFooter,
+			SectionHeader:    defaultHTMLSectionHeader,
+			// HTML Section Footer unused in default
+		}
+	default: // markdown
+		return formatDefaults{
+			FileContent:      defaultMarkdownContent,
+			FileError:        defaultMarkdownError,
+			FileBinary:       defaultMarkdownBinary,
+			FileCompact:      defaultMarkdownCompact,
+			FileHeader:       defaultMarkdownFileHeader,
+			SectionSeparator: defaultMarkdownSectionSeparator,
+			Prompt:           defaultPrompt,
+			OutputFooter:     defaultMarkdownOutputFooter,
+		}
+	}
+}
+
+// MARKDOWN DEFAULTS
+const defaultMarkdownFileHeader = `{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }}`
+
+const defaultMarkdownContent = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
 ---
 ` + "```{{ .Language }}" + `
-{{ .Content | endNewline -}}` + "```" + `{{ end }}`
+{{ .Content | endNewline -}}` + "```"
 
-const defaultSectionTemplate = `{{ .Separator }}## {{ .Body | endNewline }}---`
-const defaultPromptTemplate = `{{ .Separator }}{{ .Body | endNewline }}`
+const defaultMarkdownError = `{{ template "file_header" . }} - error: {{ .ReadError }}`
+const defaultMarkdownBinary = `{{ template "file_header" . }} - binary file skipped ({{ .Size | humanize }})`
+const defaultMarkdownCompact = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)`
 
-const defaultHeaderTemplate = ""
-const defaultFooterTemplate = "\n\n"
+const defaultMarkdownSectionSeparator = `## {{ .Body | endNewline }}---`
+const defaultPrompt = `{{ .Body | endNewline }}`
+const defaultMarkdownOutputFooter = "\n\n"
 
-// defaultXMLTemplate handles the file content.
-const defaultXMLTemplate = `{{ .Separator }}` +
-	`  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">` + "\n" +
-	`    <source>{{ .Path }}</source>` + "\n" +
-	`{{- if .IsError }}` + "\n" +
-	`    <error>{{ .ReadError }}</error>` + "\n" +
-	`{{- else if .IsBinary }}` + "\n" +
-	`    <error>Binary file ({{ .Size | humanize }})</error>` + "\n" +
-	`{{- else if .IsCompactView }}` + "\n" +
-	`    <description>Compact view</description>` + "\n" +
-	`{{- else }}` + "\n" +
-	`    <document_content>` + "\n" +
-	`{{ .Content | endNewline }}` +
-	`    </document_content>` + "\n" +
-	`{{- end }}` + "\n" +
-	`  </document>`
+// XML DEFAULTS
+const defaultXMLContent = `  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
+    <source>{{ .Path }}</source>
+    <document_content>
+{{ .Content | endNewline }}    </document_content>
+  </document>`
 
-const defaultXMLSectionHeaderTemplate = `{{ if .IsImplicit }}` +
-	`{{ .Separator }}<content>` +
+const defaultXMLError = `  <document index="{{ .FileIndex }}">
+    <source>{{ .Path }}</source>
+    <error>{{ .ReadError }}</error>
+  </document>`
+
+const defaultXMLBinary = `  <document index="{{ .FileIndex }}">
+    <source>{{ .Path }}</source>
+    <error>Binary file ({{ .Size | humanize }})</error>
+  </document>`
+
+const defaultXMLCompact = `  <document index="{{ .FileIndex }}">
+    <source>{{ .Path }}</source>
+    <description>Compact view</description>
+  </document>`
+
+const defaultXMLSectionHeader = `{{ if .IsImplicit }}` +
+	`<content>` +
 	`{{ else }}` +
-	`{{ .Separator }}<section>` +
+	`<section>` +
 	`{{ end }}` + "\n"
 
-const defaultXMLSectionTemplate = `{{ if not .IsImplicit }}` +
+const defaultXMLSectionSeparator = `{{ if not .IsImplicit }}` +
 	`  <section_name>{{ .Body }}</section_name>` +
 	`{{ end }}`
 
-const defaultXMLSectionFooterTemplate = `{{ if .IsImplicit }}` +
+const defaultXMLSectionFooter = `{{ if .IsImplicit }}` +
 	"\n" + `</content>` +
 	`{{ else }}` +
 	"\n" + `</section>` +
 	`{{ end }}`
 
-const defaultXMLPromptTemplate = `{{ .Separator }}` +
-	`  <instruction>` + "\n" +
+const defaultXMLPrompt = `  <instruction>` + "\n" +
 	`{{ .Body | endNewline }}` +
 	`  </instruction>`
 
-const defaultHTMLHeaderTemplate = `<!DOCTYPE html>
+// HTML DEFAULTS
+const defaultHTMLOutputHeader = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -119,35 +175,27 @@ article > header {
 </header>
 <main>
 `
-const defaultHTMLFooterTemplate = `</main>
+const defaultHTMLOutputFooter = `</main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
 </body>
 </html>
 `
-const defaultHTMLTemplate = `<article id="file-{{ .FileIndex }}">
+const defaultHTMLContent = `<article id="file-{{ .FileIndex }}">
 <header>
  <a href="#file-{{ .FileIndex }}" aria-label="Link to this file"><strong>{{ .Path }}</strong></a>
 {{- if and (gt .Size 0) (not .IsImage) (not .IsError) }}
  <small>
- {{- if .IsCompactView -}}
+{{- if .IsCompactView -}}
    ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows - compact)
- {{- else -}}
+{{- else -}}
    ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
- {{- end -}}
+{{- end -}}
  </small>
 {{- end }}
 </header>
-{{- if .IsError }}
-<p class="error-state">Error: {{ .ReadError }}</p>
-{{- else if eq .Size 0 }}
-<em>Empty file</em>
-{{- else if .IsImage }}
+{{- if .IsImage }}
 <img src="{{ .AbsPath | dataURI }}" alt="{{ .Path }}" />
-{{- else if .IsBinary }}
-<em>Binary file ({{ .Size | humanize }})</em>
-{{- else if .IsCompactView }}
-<em>Compact view detected</em>
 {{- else }}
 <pre><code{{ if .Language }} class="language-{{ .Language }}"{{ end }}>
 {{ .Content | escape | endNewline }}</code></pre>
@@ -155,17 +203,41 @@ const defaultHTMLTemplate = `<article id="file-{{ .FileIndex }}">
 </article>
 `
 
-const defaultHTMLSectionTemplate = `<section id="section-{{ .Index }}">` +
-	`<h2><a href="#section-{{ .Index }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>` +
-	`</section>`
+const defaultHTMLError = `<article id="file-{{ .FileIndex }}">
+<header>
+ <strong class="file-anchor">{{ .Path }}</strong>
+</header>
+<p class="error-state">Error: {{ .ReadError }}</p>
+</article>
+`
+const defaultHTMLBinary = `<article id="file-{{ .FileIndex }}">
+<header>
+ <strong class="file-anchor">{{ .Path }}</strong>
+</header>
+<em>Binary file ({{ .Size | humanize }})</em>
+</article>
+`
+const defaultHTMLCompact = `<article id="file-{{ .FileIndex }}">
+<header>
+ <strong class="file-anchor">{{ .Path }}</strong>
+ <small>({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows - compact)</small>
+</header>
+<em>Compact view detected</em>
+</article>
+`
 
-const defaultHTMLPromptTemplate = `<blockquote>{{ .Body | endNewline }}</blockquote>`
+const defaultHTMLSectionHeader = `<section id="section-{{ .Index }}">`
+
+const defaultHTMLSectionSeparator = `<h2><a href="#section-{{ .Index }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>`
+
+const defaultHTMLPrompt = `<blockquote>{{ .Body | endNewline }}</blockquote>`
 
 const defaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
 	`Size: {{ .Global.TotalWrittenBytes | humanize }}` + "\n" +
 	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"
 
 func templateFuncs() template.FuncMap {
+	// ... [Implementation remains the same as before] ...
 	return template.FuncMap{
 		"date": func(layout string, t time.Time) string {
 			return t.Format(layout)

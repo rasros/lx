@@ -210,7 +210,7 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	global := s.Prepare()
 	counter := &byteCounter{w: w}
 
-	if err := s.engine.Header.Execute(counter, HeaderContext{Global: global}); err != nil {
+	if err := s.engine.OutputHeader.Execute(counter, HeaderContext{Global: global}); err != nil {
 		return err
 	}
 
@@ -218,7 +218,7 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
-	if err := s.engine.Footer.Execute(counter, FooterContext{Global: global}); err != nil {
+	if err := s.engine.OutputFooter.Execute(counter, FooterContext{Global: global}); err != nil {
 		return err
 	}
 

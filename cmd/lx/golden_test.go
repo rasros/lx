@@ -323,7 +323,7 @@ func setupComplexFixture(t *testing.T) string {
 	create("configs/follow.yaml", "follow_symlinks: true\n", 0644)
 	create("configs/hidden.yaml", "show_hidden: true\n", 0644)
 	create("configs/no_links.yaml", "no_file_links: true\n", 0644)
-	create("configs/custom_template.yaml", "template: \"File: {{ .Path }}\\nContent:\\n{{ .Content }}\"\n", 0644)
+	create("configs/custom_template.yaml", "file_content_template: \"File: {{ .Path }}\\nContent:\\n{{ .Content }}\"\n", 0644)
 	create("configs/custom_sections.yaml", "section_header_template: \"*** {{ .Body }} ***\\n\"\n", 0644)
 
 	create("secret/locked.txt", "TOP SECRET", 0600)
