@@ -533,6 +533,19 @@ func reorderTrailingOps(ops []Op) []Op {
 	if len(modifiers) == 0 {
 		return ops
 	}
+
+	movedDetails := make([]string, 0, len(modifiers))
+	for _, m := range modifiers {
+		desc := "--" + m.Action
+		if m.Value != "" && m.Value != "true" {
+			desc += fmt.Sprintf("=%q", m.Value)
+		}
+		movedDetails = append(movedDetails, desc)
+	}
+
+	slog.Warn("Trailing state modifiers detected; reordering them to apply to preceding files",
+		"moved_flags", strings.Join(movedDetails, ", "))
+
 	firstActionIdx := lastActionIdx
 	for i := lastActionIdx - 1; i >= 0; i-- {
 		if ops[i].Type == CmdAction {
