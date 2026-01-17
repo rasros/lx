@@ -33,8 +33,8 @@ type TemplateEngine struct {
 	FileBinary  *template.Template
 	FileCompact *template.Template
 
-	SectionSeparator *template.Template
-	Prompt           *template.Template
+	Section *template.Template
+	Prompt  *template.Template
 
 	SectionHeader *template.Template
 	SectionFooter *template.Template
@@ -54,8 +54,8 @@ type Config struct {
 	FileHeaderTemplate  string
 
 	// Item-level Templates
-	SectionSeparatorTemplate string
-	PromptTemplate           string
+	SectionTemplate string
+	PromptTemplate  string
 
 	// Group/Wrapper Templates
 	SectionHeaderTemplate string
@@ -139,9 +139,9 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 		return nil, fmt.Errorf("file_compact template: %w", err)
 	}
 
-	tSep, err := parse("section_separator", pick(cfg.SectionSeparatorTemplate, defaults.SectionSeparator))
+	tSection, err := parse("section", pick(cfg.SectionTemplate, defaults.Section))
 	if err != nil {
-		return nil, fmt.Errorf("section_separator template: %w", err)
+		return nil, fmt.Errorf("section template: %w", err)
 	}
 	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, defaults.Prompt))
 	if err != nil {
@@ -176,8 +176,8 @@ func CompileTemplates(cfg *Config) (*TemplateEngine, error) {
 		FileBinary:  tBinary,
 		FileCompact: tCompact,
 
-		SectionSeparator: tSep,
-		Prompt:           tPrompt,
+		Section: tSection,
+		Prompt:  tPrompt,
 
 		SectionHeader: tSecHeader,
 		SectionFooter: tSecFooter,
@@ -206,8 +206,8 @@ func Merge(dst *Config, src *Config) {
 		dst.FileHeaderTemplate = src.FileHeaderTemplate
 	}
 
-	if src.SectionSeparatorTemplate != "" {
-		dst.SectionSeparatorTemplate = src.SectionSeparatorTemplate
+	if src.SectionTemplate != "" {
+		dst.SectionTemplate = src.SectionTemplate
 	}
 	if src.PromptTemplate != "" {
 		dst.PromptTemplate = src.PromptTemplate

@@ -49,7 +49,6 @@ func (p *processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 		isCompact = fCtx.IsCompactView
 		ctx = &fCtx
 
-		// State Routing: Select the granular template based on file state
 		if fCtx.IsError {
 			templateToUse = p.engine.FileError
 		} else if fCtx.IsBinary {
@@ -64,7 +63,7 @@ func (p *processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 		v = *item.section
 		isCompact = false
 		ctx = &v
-		templateToUse = p.engine.SectionSeparator
+		templateToUse = p.engine.Section
 
 	case PromptContext:
 		v.Global = p.global

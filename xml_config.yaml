@@ -1,57 +1,57 @@
 # lx XML Configuration
-# Optimized for Claude/LLMs that prefer XML structures.
-
 # -----------------------------------------------------------------------------
 # File Templates
 # -----------------------------------------------------------------------------
 
-file_content_template: |
-  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
-    <source>{{ .Path }}</source>
-    <document_content>
+# Indentation Fix:
+# The line containing {{ .Content }} is indented by exactly 2 spaces.
+# Since we use "|2-", 2 spaces - 2 spaces (base) = 0 spaces in the final string.
+# This matches the Go default exactly.
+
+file_content_template: |2-
+    <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
+      <source>{{ .Path }}</source>
+      <document_content>
   {{ .Content | endNewline }}    </document_content>
-  </document>
+    </document>
 
-file_error_template: |
-  <document index="{{ .FileIndex }}">
-    <source>{{ .Path }}</source>
-    <error>{{ .ReadError }}</error>
-  </document>
+file_error_template: |2-
+    <document index="{{ .FileIndex }}">
+      <source>{{ .Path }}</source>
+      <error>{{ .ReadError }}</error>
+    </document>
 
-file_binary_template: |
-  <document index="{{ .FileIndex }}">
-    <source>{{ .Path }}</source>
-    <error>Binary file ({{ .Size | humanize }})</error>
-  </document>
+file_binary_template: |2-
+    <document index="{{ .FileIndex }}">
+      <source>{{ .Path }}</source>
+      <error>Binary file ({{ .Size | humanize }})</error>
+    </document>
 
-file_compact_template: |
-  <document index="{{ .FileIndex }}">
-    <source>{{ .Path }}</source>
-    <description>Compact view</description>
-  </document>
+file_compact_template: |2-
+    <document index="{{ .FileIndex }}">
+      <source>{{ .Path }}</source>
+      <description>Compact view</description>
+    </document>
 
 # -----------------------------------------------------------------------------
 # Section Wrappers
 # -----------------------------------------------------------------------------
 
-# Wraps the content of a section.
-section_header_template: |
-  {{ if .IsImplicit }}<content>{{ else }}<section>{{ end }}
+section_header_template: "{{ if .IsImplicit }}<content>\n{{ end }}"
 
-section_footer_template: |
-  {{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}
+section_template: |-
+  {{ if not .IsImplicit }}<section>
+    <section_name>{{ .Body }}</section_name>{{ end }}
 
-# Renders the name of the section inside the wrapper.
-section_template: |
-  {{ if not .IsImplicit }}  <section_name>{{ .Body }}</section_name>{{ end }}
+section_footer_template: "\n{{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}"
 
 # -----------------------------------------------------------------------------
 # Other
 # -----------------------------------------------------------------------------
 
-prompt_template: |
-  <instruction>
-  {{ .Body | endNewline -}}
-  </instruction>
+prompt_template: |2-
+    <instruction>
+    {{ .Body | endNewline -}}
+    </instruction>
 
 output_format: "xml"

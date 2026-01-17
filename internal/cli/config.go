@@ -18,11 +18,11 @@ type CliConfig struct {
 	FileErrorTemplate   string `yaml:"file_error_template"`
 	FileBinaryTemplate  string `yaml:"file_binary_template"`
 	FileCompactTemplate string `yaml:"file_compact_template"`
-	FileHeaderTemplate  string `yaml:"file_header_template"` // Partial
+	FileHeaderTemplate  string `yaml:"file_header_template"`
 
 	// Item-level Templates
-	SectionSeparatorTemplate string `yaml:"section_separator_template"`
-	PromptTemplate           string `yaml:"prompt_template"`
+	SectionTemplate string `yaml:"section_template"`
+	PromptTemplate  string `yaml:"prompt_template"`
 
 	// Group/Wrapper Templates
 	SectionHeaderTemplate string `yaml:"section_header_template"`
@@ -92,8 +92,8 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		}
 
 		// Item Templates
-		if loaded.SectionSeparatorTemplate != "" {
-			lxCfg.SectionSeparatorTemplate = loaded.SectionSeparatorTemplate
+		if loaded.SectionTemplate != "" {
+			lxCfg.SectionTemplate = loaded.SectionTemplate
 		}
 		if loaded.PromptTemplate != "" {
 			lxCfg.PromptTemplate = loaded.PromptTemplate

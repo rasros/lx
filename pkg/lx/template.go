@@ -14,56 +14,56 @@ import (
 )
 
 type formatDefaults struct {
-	FileContent      string
-	FileError        string
-	FileBinary       string
-	FileCompact      string
-	FileHeader       string
-	SectionSeparator string
-	Prompt           string
-	OutputHeader     string
-	OutputFooter     string
-	SectionHeader    string
-	SectionFooter    string
+	FileContent   string
+	FileError     string
+	FileBinary    string
+	FileCompact   string
+	FileHeader    string
+	Section       string
+	Prompt        string
+	OutputHeader  string
+	OutputFooter  string
+	SectionHeader string
+	SectionFooter string
 }
 
 func getFormatDefaults(fmtType string) formatDefaults {
 	switch fmtType {
 	case "xml":
 		return formatDefaults{
-			FileContent: defaultXMLContent,
-			FileError:   defaultXMLError,
-			FileBinary:  defaultXMLBinary,
-			FileCompact: defaultXMLCompact,
-			// FileHeader unused in XML
-			SectionSeparator: defaultXMLSectionSeparator,
-			Prompt:           defaultXMLPrompt,
-			SectionHeader:    defaultXMLSectionHeader,
-			SectionFooter:    defaultXMLSectionFooter,
+			FileContent:   defaultXMLContent,
+			FileError:     defaultXMLError,
+			FileBinary:    defaultXMLBinary,
+			FileCompact:   defaultXMLCompact,
+			Section:       defaultXMLSection,
+			SectionHeader: defaultXMLSectionHeader,
+			SectionFooter: defaultXMLSectionFooter,
+			Prompt:        defaultXMLPrompt,
+			OutputFooter:  defaultXMLOutputFooter,
 		}
 	case "html":
 		return formatDefaults{
-			FileContent:      defaultHTMLContent,
-			FileError:        defaultHTMLError,
-			FileBinary:       defaultHTMLBinary,
-			FileCompact:      defaultHTMLCompact,
-			SectionSeparator: defaultHTMLSectionSeparator,
-			Prompt:           defaultHTMLPrompt,
-			OutputHeader:     defaultHTMLOutputHeader,
-			OutputFooter:     defaultHTMLOutputFooter,
-			SectionHeader:    defaultHTMLSectionHeader,
-			// HTML Section Footer unused in default
+			FileContent:   defaultHTMLContent,
+			FileError:     defaultHTMLError,
+			FileBinary:    defaultHTMLBinary,
+			FileCompact:   defaultHTMLCompact,
+			Section:       defaultHTMLSection,
+			SectionHeader: defaultHTMLSectionHeader,
+			SectionFooter: defaultHTMLSectionFooter,
+			Prompt:        defaultHTMLPrompt,
+			OutputHeader:  defaultHTMLOutputHeader,
+			OutputFooter:  defaultHTMLOutputFooter,
 		}
 	default: // markdown
 		return formatDefaults{
-			FileContent:      defaultMarkdownContent,
-			FileError:        defaultMarkdownError,
-			FileBinary:       defaultMarkdownBinary,
-			FileCompact:      defaultMarkdownCompact,
-			FileHeader:       defaultMarkdownFileHeader,
-			SectionSeparator: defaultMarkdownSectionSeparator,
-			Prompt:           defaultPrompt,
-			OutputFooter:     defaultMarkdownOutputFooter,
+			FileContent:  defaultMarkdownContent,
+			FileError:    defaultMarkdownError,
+			FileBinary:   defaultMarkdownBinary,
+			FileCompact:  defaultMarkdownCompact,
+			FileHeader:   defaultMarkdownFileHeader,
+			Section:      defaultMarkdownSection,
+			Prompt:       defaultPrompt,
+			OutputFooter: defaultMarkdownOutputFooter,
 		}
 	}
 }
@@ -80,7 +80,7 @@ const defaultMarkdownError = `{{ template "file_header" . }} - error: {{ .ReadEr
 const defaultMarkdownBinary = `{{ template "file_header" . }} - binary file skipped ({{ .Size | humanize }})`
 const defaultMarkdownCompact = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)`
 
-const defaultMarkdownSectionSeparator = `## {{ .Body | endNewline }}---`
+const defaultMarkdownSection = `## {{ .Body | endNewline }}---`
 const defaultPrompt = `{{ .Body | endNewline }}`
 const defaultMarkdownOutputFooter = "\n\n"
 
@@ -106,22 +106,23 @@ const defaultXMLCompact = `  <document index="{{ .FileIndex }}">
     <description>Compact view</description>
   </document>`
 
-const defaultXMLSectionHeader = `{{ if .IsImplicit }}` +
-	`<content>` +
-	`{{ else }}` +
-	`<section>` +
-	`{{ end }}` + "\n"
+// SectionHeader now only handles the implicit wrapper.
+const defaultXMLSectionHeader = `{{ if .IsImplicit }}<content>
+{{ end }}`
 
-const defaultXMLSectionSeparator = `{{ if not .IsImplicit }}` +
-	`  <section_name>{{ .Body }}</section_name>` +
-	`{{ end }}`
+// Section now handles the opening tag and title for explicit sections.
+const defaultXMLSection = `{{- if not .IsImplicit }}<section>
+  <section_name>{{ .Body }}</section_name>{{ end }}`
 
+// SectionFooter closes what was opened (Implicit->Content, Explicit->Section).
 const defaultXMLSectionFooter = `
 {{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}`
 
 const defaultXMLPrompt = `  <instruction>` + "\n" +
 	`{{ .Body | endNewline }}` +
 	`  </instruction>`
+
+const defaultXMLOutputFooter = "\n\n"
 
 // HTML DEFAULTS
 const defaultHTMLOutputHeader = `<!DOCTYPE html>
@@ -223,9 +224,19 @@ const defaultHTMLCompact = `<article id="file-{{ .FileIndex }}">
 </article>
 `
 
-const defaultHTMLSectionHeader = `<section id="section-{{ .Index }}">`
+// HTML: SectionHeader and Footer handle the implicit wrapper or nothing?
+// Actually, defaultHTMLSectionHeader was `<section id...`.
+// But if we move opening tag to Section item, SectionHeader for explicit sections should be empty?
+// Wait, if I move `<section>` to `Section`, then I can't put `{{ .Index }}` easily in the header for non-implicit?
+// Correction: The `Section` template receives `SectionContext` which HAS `.Index`.
+// So:
+const defaultHTMLSectionHeader = `` // Empty for HTML now? No, Implicit wrapper? HTML doesn't use implicit wrapper usually.
 
-const defaultHTMLSectionSeparator = `<h2><a href="#section-{{ .Index }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>`
+// Moved opening tag to here.
+const defaultHTMLSection = `<section id="section-{{ .Index }}"><h2><a href="#section-{{ .Index }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>`
+
+// Added closing tag to footer.
+const defaultHTMLSectionFooter = `</section>`
 
 const defaultHTMLPrompt = `<blockquote>{{ .Body | endNewline }}</blockquote>`
 

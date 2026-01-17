@@ -1,35 +1,28 @@
-# lx Default Configuration
-# Place this file at:
-#   - Linux/Mac: ~/.config/lx/config.yaml
-#   - Windows: %APPDATA%\lx\config.yaml
-#   - Or set LX_CONFIG environment variable to point to this file.
-
+# lx Default Configuration (Markdown)
 # -----------------------------------------------------------------------------
 # File Templates
 # -----------------------------------------------------------------------------
 
-# A shared partial template used to render the file header.
-# Uses |- to strip the trailing newline so it can be used inline.
+# Shared partial for file headers (e.g. "[1/5] path/to/file")
 file_header_template: |-
   {{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }}
 
-# Renders the content of a standard text file.
-# Uses |- to prevent an extra newline after the closing backticks.
+# Renders standard file content
 file_content_template: |-
   {{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
   ---
   ```{{ .Language }}
   {{ .Content | endNewline -}}```
 
-# Renders when a file cannot be read (e.g. permission denied).
+# Renders when a file cannot be read
 file_error_template: |-
   {{ template "file_header" . }} - error: {{ .ReadError }}
 
-# Renders when a binary file is detected and skipped.
+# Renders when a binary file is detected
 file_binary_template: |-
   {{ template "file_header" . }} - binary file skipped ({{ .Size | humanize }})
 
-# Renders when a file is in "compact" mode (size only, no content).
+# Renders when in compact mode (-n 0)
 file_compact_template: |-
   {{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
 
@@ -37,12 +30,11 @@ file_compact_template: |-
 # Item Templates
 # -----------------------------------------------------------------------------
 
-# Template used when the -s/--section flag is provided.
-# This acts as a separator between groups of files.
-section_separator_template: |-
+# Separator between files/groups (Markdown style)
+section_template: |-
   ## {{ .Body | endNewline }}---
 
-# Template used when the -p/--prompt flag is provided.
+# Custom prompts (-p)
 prompt_template: |-
   {{ .Body | endNewline }}
 
@@ -50,17 +42,13 @@ prompt_template: |-
 # Global & Wrapper Templates
 # -----------------------------------------------------------------------------
 
-# Template rendered once at the very beginning of the output.
 output_header_template: ""
-
-# Template rendered once at the very end of the output.
 output_footer_template: "\n\n"
 
-# Optional: Wrappers for sections (e.g., XML tags). Left empty for Markdown.
+# Markdown doesn't use section wrappers
 section_header_template: ""
 section_footer_template: ""
 
-# Template used for the summary stats (printed to stderr, or stdout if redirected).
 stats_template: |
   Files: {{ .Global.TotalFiles }}
   Size: {{ .Global.TotalWrittenBytes | humanize }}
@@ -69,24 +57,11 @@ stats_template: |
 # -----------------------------------------------------------------------------
 # Options
 # -----------------------------------------------------------------------------
-
-# Output mode.
-# Options: "stdout" (default), "copy" (clipboard).
 output_mode: "stdout"
-
-# Stats display mode.
-# Options: "auto" (default), "always", "never".
 show_stats: "auto"
-
-# Logging verbosity.
-# Options: "debug", "info", "warn" (default), "error", "silent".
 verbosity: "warn"
-
-# Output format.
-# Options: "markdown" (default), "xml", "html".
 output_format: "markdown"
 
-# Discovery Options
 follow_symlinks: false
 no_file_links: false
 show_hidden: false
