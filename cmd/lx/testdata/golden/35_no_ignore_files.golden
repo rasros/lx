@@ -191,10 +191,10 @@ Line xxxxxxxxxx
 print('hello')
 ```
 
-[18/18] tmp/TestGolden1014832614/001/links/broken_link - error: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory
+[18/18] /ROOT/links/broken_link - error: open /ROOT/links/broken_link: no such file or directory
 
 
 --- STDERR ---
 [1;31mError:[0m Failed to access file during walk: open secret/locked_dir: PERMISSION_DENIED (path=secret/locked_dir)
-[1;31mError:[0m Failed to read file: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory (path=tmp/TestGolden1014832614/001/links/broken_link)
 [1;31mError:[0m Failed to read file: open secret/locked.txt: PERMISSION_DENIED (path=secret/locked.txt)
+[1;31mError:[0m Failed to read file: open /ROOT/links/broken_link: no such file or directory (path=/ROOT/links/broken_link)

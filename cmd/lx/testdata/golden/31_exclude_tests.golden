@@ -179,8 +179,8 @@ Line xxxxxxxxxx
 print('hello')
 ```
 
-[14/14] tmp/TestGolden1014832614/001/links/broken_link - error: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory
+[14/14] /ROOT/links/broken_link - error: open /ROOT/links/broken_link: no such file or directory
 
 
 --- STDERR ---
-[1;31mError:[0m Failed to read file: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory (path=tmp/TestGolden1014832614/001/links/broken_link)
+[1;31mError:[0m Failed to read file: open /ROOT/links/broken_link: no such file or directory (path=/ROOT/links/broken_link)

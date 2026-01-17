@@ -12,9 +12,11 @@ func TestProcessor_RenderFile(t *testing.T) {
 
 	global := GlobalContext{TotalFiles: 1}
 
-	proc := NewProcessor(engine, global)
+	proc := NewProcessor(engine, global, nil) // Fixed: nil for onError callback
 	file := NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
-	file.Config = RunnerConfig{Head: 2}
+
+	// Set the config on the file itself, which RenderPrepared uses
+	file.Config = RunnerConfig{Head: 2, Tail: 0}
 
 	scratch := make([]byte, 1024)
 
@@ -32,7 +34,13 @@ func TestProcessor_RenderFile(t *testing.T) {
 	}
 
 	got := buf.String()
-	if !strings.Contains(got, "1\n2\n") || strings.Contains(got, "3\n") {
-		t.Errorf("Slicing failed, got:\n%s", got)
+
+	// Expect lines 1 and 2
+	if !strings.Contains(got, "1\n2\n") {
+		t.Errorf("Output missing expected head (1, 2). Got:\n%s", got)
+	}
+	// Expect NO line 3
+	if strings.Contains(got, "3\n") {
+		t.Errorf("Output contains excluded line (3). Got:\n%s", got)
 	}
 }

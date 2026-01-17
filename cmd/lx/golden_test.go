@@ -22,6 +22,9 @@ func TestGolden(t *testing.T) {
 	workDir := setupComplexFixture(t)
 	defer os.RemoveAll(workDir)
 
+	// Resolve canonical path for robust replacing (handles /tmp vs /private/tmp)
+	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
+
 	// Switch to work dir so "." args work naturally
 	wd, _ := os.Getwd()
 	defer os.Chdir(wd)
@@ -124,8 +127,6 @@ func TestGolden(t *testing.T) {
 			os.Stderr = errW
 
 			// 2. Prepare Args
-			// We force --no-stats unless the test explicitly requested stats or quiet
-			// to keep golden files stable against execution time variations.
 			runArgs := append([]string{}, tc.args...)
 			hasStatsControl := false
 			for _, a := range runArgs {
@@ -138,7 +139,6 @@ func TestGolden(t *testing.T) {
 			}
 
 			// 3. Run Logic
-			// We run in a goroutine to ensure pipes don't block if buffer fills
 			errChan := make(chan error, 1)
 			go func() {
 				defer outW.Close()
@@ -153,14 +153,12 @@ func TestGolden(t *testing.T) {
 
 			// Wait for run completion
 			if err := <-errChan; err != nil {
-				// We don't fail the test on cli.Run error, because some tests
-				// intentionally provoke errors (like missing files).
-				// We log it to the golden file instead.
 				stderrBuf.WriteString("\nCLI Error: " + err.Error() + "\n")
 			}
 
-			// 5. Normalize Output (Paths, OS-specific errors)
-			fullOutput := normalizeOutput(workDir, stdoutBuf.String(), stderrBuf.String())
+			// 5. Normalize Output
+			// We pass both raw workDir and resolved canonical path
+			fullOutput := normalizeOutput(workDir, canonicalWorkDir, stdoutBuf.String(), stderrBuf.String())
 
 			// 6. Compare / Update Golden
 			goldenPath := filepath.Join(wd, "testdata", "golden", tc.name+".golden")
@@ -180,7 +178,6 @@ func TestGolden(t *testing.T) {
 			if string(wantBytes) != fullOutput {
 				t.Errorf("Mismatch for %s.\nExpected len: %d\nGot len: %d\nCheck testdata/golden/%s.golden",
 					tc.name, len(wantBytes), len(fullOutput), tc.name)
-				// Create a .actual file for debugging
 				_ = os.WriteFile(goldenPath+".actual", []byte(fullOutput), 0644)
 			}
 		})
@@ -188,12 +185,21 @@ func TestGolden(t *testing.T) {
 }
 
 // normalizeOutput combines stdout/stderr and cleans up OS-specific noise
-func normalizeOutput(root, stdout, stderr string) string {
+func normalizeOutput(root, canonicalRoot, stdout, stderr string) string {
 	var sb strings.Builder
 
 	clean := func(s string) string {
-		// Replace temp dir with constant
+		// 1. Replace the raw temp directory path
 		s = strings.ReplaceAll(s, root, "/ROOT")
+
+		// 2. Replace the canonical temp directory path (handles macOS /var/folders vs /tmp)
+		if canonicalRoot != "" && canonicalRoot != root {
+			s = strings.ReplaceAll(s, canonicalRoot, "/ROOT")
+		}
+
+		// 3. Regex fallback for any persistent "tmp/TestGolden..." leaks
+		// Matches patterns like "tmp/TestGolden12345/001" or similar
+		s = regexp.MustCompile(`(/?\w+)+/TestGolden\d+/\d+`).ReplaceAllString(s, "/ROOT")
 
 		// Normalize Windows paths
 		if runtime.GOOS == "windows" {
@@ -203,12 +209,10 @@ func normalizeOutput(root, stdout, stderr string) string {
 		// Normalize permission errors
 		s = regexp.MustCompile(`(?i)(permission denied|access is denied)`).ReplaceAllString(s, "PERMISSION_DENIED")
 
-		// Normalize directory read errors (happens when following directory symlinks)
-		// Linux: "read ...: is a directory"
-		// Windows: "The handle is invalid" (sometimes) or "is a directory"
+		// Normalize directory read errors
 		s = regexp.MustCompile(`(?i)(read .*: is a directory|The handle is invalid)`).ReplaceAllString(s, "IS_DIRECTORY_ERROR")
 
-		// Remove timestamp noise from logs
+		// Remove timestamp noise
 		s = regexp.MustCompile(`time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+[+-]\d{2}:\d{2}`).ReplaceAllString(s, "time=FIXED")
 
 		return s
@@ -289,9 +293,6 @@ func setupComplexFixture(t *testing.T) string {
 	symlink("links/safe_target", "links/loop")
 
 	// TRUE INFINITE CYCLE
-	// links/cycle_a/to_b -> ../cycle_b
-	// links/cycle_b/to_a -> ../cycle_a
-	// FIX: Use visible.txt instead of .keep to verify cycle detection in output
 	create("links/cycle_a/visible.txt", "a", 0644)
 	create("links/cycle_b/visible.txt", "b", 0644)
 	symlinkRaw("../cycle_b", filepath.Join(dir, "links/cycle_a/to_b"))

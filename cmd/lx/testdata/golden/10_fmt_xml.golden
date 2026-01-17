@@ -202,11 +202,11 @@ print('hello')
   </document>
 
   <document index="15" rows="0">
-    <source>tmp/TestGolden1014832614/001/links/broken_link</source>
-    <error>open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory</error>
+    <source>/ROOT/links/broken_link</source>
+    <error>open /ROOT/links/broken_link: no such file or directory</error>
   </document>
 </content>
 
 
 --- STDERR ---
-[1;31mError:[0m Failed to read file: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory (path=tmp/TestGolden1014832614/001/links/broken_link)
+[1;31mError:[0m Failed to read file: open /ROOT/links/broken_link: no such file or directory (path=/ROOT/links/broken_link)

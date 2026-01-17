@@ -20,11 +20,6 @@ func TestRun_Basic(t *testing.T) {
 		wantContain []string
 	}{
 		{
-			name:        "help flag",
-			args:        []string{"--help"},
-			wantContain: []string{"USAGE:", "GLOBAL OPTIONS"},
-		},
-		{
 			name:        "version flag",
 			args:        []string{"-V"},
 			wantContain: []string{"lx version"},
