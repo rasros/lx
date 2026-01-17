@@ -110,7 +110,7 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
 {{ "Examples:" | head }}
   1. {{ "Code Review Bundle" | underline }}
      Copy all modified files in your git repo to the clipboard:
-       $ lx -c $(git diff --name-only)
+       $ git diff --name-only | lx -c
 
   2. {{ "Targeted Debugging" | underline }}
      Grab the last 50 lines of a log file, then the processing code with line
