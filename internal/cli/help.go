@@ -7,18 +7,14 @@ import (
 	"text/template"
 )
 
-// ANSI Color Codes
 const (
-	// Reset codes specific to modes
 	cResetIntensity = "\033[22m"
 	cResetUnderline = "\033[24m"
-	// Styles
-	cBold      = "\033[1m"
-	cDim       = "\033[2m"
-	cUnderline = "\033[4m"
+	cBold           = "\033[1m"
+	cDim            = "\033[2m"
+	cUnderline      = "\033[4m"
 )
 
-// -- Short Help Template
 const shortHelpTmpl = `A program to discover and format files for LLM prompting
 
 {{ "Usage:" | head }} {{ "lx" | bold }} [OPTIONS] [path|action]...
@@ -33,7 +29,6 @@ const shortHelpTmpl = `A program to discover and format files for LLM prompting
 {{- end }}
 `
 
-// -- Long Help Template (fd-style) --
 const longHelpTmpl = `{{"lx" | bold }} - file discovery, slicing, and formatting tool for LLM prompting
 
 {{ "Usage:" | head }}
@@ -123,38 +118,32 @@ const longHelpTmpl = `{{"lx" | bold }} - file discovery, slicing, and formatting
        $ grep -Rl TODO | lx -c
 `
 
-// Helper to safely wrap string manipulation
 func makeFuncs() template.FuncMap {
 	return template.FuncMap{
 		"bold":      func(s string) string { return cBold + s + cResetIntensity },
 		"underline": func(s string) string { return cUnderline + s + cResetUnderline },
 		"head":      func(s string) string { return cBold + cUnderline + s + cResetUnderline + cResetIntensity },
 
-		// For Long Help Description Wrapping
 		"wrapIndent": func(indent string, width int, s string) string {
 			if s == "" {
 				return ""
 			}
-			// Split by double newline to preserve paragraphs
 			paragraphs := strings.Split(s, "\n\n")
 			var out strings.Builder
 
 			for i, para := range paragraphs {
 				if i > 0 {
 					out.WriteString("\n")
-					out.WriteString(indent) // empty line between paragraphs needs indent if preserving structure, or just \n
+					out.WriteString(indent)
 					out.WriteString("\n")
 				}
-				// Normalize newlines within a paragraph to spaces
 				cleanPara := strings.Join(strings.Fields(para), " ")
 				out.WriteString(wordWrap(cleanPara, indent, width))
 			}
 			return out.String()
 		},
 
-		// For Long Help Flag Line (e.g., " -c, --copy")
 		"flagLine": func(d CommandDef) string {
-			// Format: " -s, --long <val>"
 			var sb strings.Builder
 			sb.WriteString("  ")
 			if d.Short != "" {
@@ -178,11 +167,7 @@ func makeFuncs() template.FuncMap {
 			return sb.String()
 		},
 
-		// For Short Help (fd style)
 		"compactFlag": func(d CommandDef) string {
-			// Format: " -s, --long <val>      Description"
-
-			// 1. Build the flag part
 			flagPart := "  "
 			if d.Short != "" {
 				flagPart += "-" + d.Short + ", "

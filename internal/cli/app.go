@@ -16,8 +16,6 @@ import (
 )
 
 func Run(ctx context.Context, args []string) error {
-	// We can't use the configured logger yet, but we can log to default if needed.
-	// However, usually we wait until flags are parsed to know the verbosity.
 	parsed, err := Parse(args, definitions)
 	if err != nil {
 		return fmt.Errorf("argument parsing failed: %w", err)
@@ -98,7 +96,6 @@ func gatherInputs(parsed *ParsedArgs) error {
 }
 
 func processStream(ctx context.Context, parsed *ParsedArgs) error {
-	// 1. Load Config (First pass to get settings)
 	cfg, cliOpts, err := LoadConfigChain(parsed.Globals["config"])
 	if err != nil {
 		return err
@@ -111,7 +108,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		cfg.OutputFormat = "html"
 	}
 
-	// 2. Setup Logger
 	level, err := determineLogLevel(parsed, cliOpts.Verbosity)
 	if err != nil {
 		return err
@@ -138,7 +134,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		"ignore_file_symlinks", cfg.IgnoreFileSymlinks,
 	)
 
-	// 3. Determine Outputs
 	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, cliOpts.OutputMode)
 	if err != nil {
 		return err
@@ -163,14 +158,12 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		return err
 	}
 
-	// Register callback for read errors so pkg/lx remains silent but CLI logs it
 	stream.WithOnFileError(func(f lx.InputFile, err error) {
 		slog.Error("Failed to read file", "path", f.Path, "error", err)
 	})
 
 	var includes, excludes []string
 
-	// 4. Process Operations
 	ops := reorderTrailingOps(parsed.Ops)
 	slog.Debug("Processing operations", "total_ops", len(ops))
 
@@ -248,7 +241,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			walkPath = filepath.ToSlash(walkPath)
 
-			// Map config settings to walker settings
 			walkerIgnoreHidden := cfg.IgnoreHidden
 			walkerIgnoreDirSymlinks := cfg.IgnoreDirSymlinks
 			walkerIgnoreFileSymlinks := cfg.IgnoreFileSymlinks
@@ -256,10 +248,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			if op.Action == "file" {
 				slog.Debug("Action 'file' used: Forcing inclusion (bypassing ignore/hidden rules)", "path", rootPath)
-				// If specific file action, we un-ignore everything to ensure it is processed
 				walkerIgnoreHidden = false
 				walkerIgnoreEnabled = false
-				// Force follow symlinks for direct file arguments (both types)
 				walkerIgnoreDirSymlinks = false
 				walkerIgnoreFileSymlinks = false
 			}
@@ -295,8 +285,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			})
 
 			count := 0
-			// The Walker does the heavy lifting of ignore checking internally.
-			// If a file is emitted here, it has passed all ignore/hidden checks.
 			for f := range walker.Walk(ctx, []string{walkPath}) {
 				if outPath != "" {
 					fullAbs, _ := filepath.Abs(filepath.Join(fsRoot, f.Path))
@@ -467,9 +455,7 @@ func determineLogLevel(parsed *ParsedArgs, configVerbosity string) (slog.Level, 
 	return slog.LevelWarn, nil
 }
 
-// parseLogLevel unifies the string-to-level logic for both flags and config
 func parseLogLevel(s string) (slog.Level, error) {
-	// Handle numeric string
 	if c, err := strconv.Atoi(s); err == nil {
 		if c >= 2 {
 			return slog.LevelDebug, nil

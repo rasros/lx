@@ -28,8 +28,8 @@ type CommandDef struct {
 	Short     string
 	Type      CmdType
 	ValueType ValueType
-	Usage     string // Short description for -h
-	Long      string // Detailed description for --help
+	Usage     string
+	Long      string
 	Internal  bool
 	Category  string
 }
@@ -126,15 +126,13 @@ func parseLong(arg string, args []string, idx int, defs map[string]CommandDef, r
 		val = "true"
 	case ValueOptional:
 		if hasEq {
-			// val is already set
 		} else if idx+1 < len(args) && !strings.HasPrefix(args[idx+1], "-") {
-			// Look ahead: if next arg is NOT a flag, consume it
 			val = args[idx+1]
 			consumed = 1
 		} else {
 			val = "true"
 		}
-	default: // ValueAny, ValueNumber
+	default:
 		if !hasEq {
 			if idx+1 >= len(args) {
 				return 0, fmt.Errorf("flag --%s requires a value", key)
@@ -157,7 +155,6 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 			return 0, fmt.Errorf("unknown short flag: -%c", char)
 		}
 
-		// Handle flags that don't take arguments
 		if def.ValueType == ValueNone {
 			if err := addOp(res, def, "true", true); err != nil {
 				return 0, err
@@ -165,29 +162,25 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 			continue
 		}
 
-		// Handle Optional Values (-v)
 		if def.ValueType == ValueOptional {
-			// Check if we are "stacking" the same char, e.g. -vv
 			isStacking := false
 			if j+1 < len(chars) && chars[j+1] == char {
 				isStacking = true
 			}
 
 			if isStacking {
-				// Treat current char as bool, continue loop to handle next 'v'
 				if err := addOp(res, def, "true", true); err != nil {
 					return 0, err
 				}
 				continue
 			}
 
-			// If data remains attached (e.g. -vdebug), use it
 			if j+1 < len(chars) {
 				val := string(chars[j+1:])
 				if err := addOp(res, def, val, true); err != nil {
 					return 0, err
 				}
-				break // consumed remainder
+				break
 			}
 
 			if err := addOp(res, def, "true", true); err != nil {
@@ -196,7 +189,6 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 			continue
 		}
 
-		// Handle Mandatory Values
 		val := ""
 		if j+1 < len(chars) {
 			val = string(chars[j+1:])

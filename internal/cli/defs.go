@@ -18,7 +18,6 @@ func init() {
 	}
 }
 
-// Categories
 const (
 	CatFormatting  = "Formatting"
 	CatDiscovery   = "Discovery"
@@ -28,7 +27,6 @@ const (
 )
 
 var definitions = []CommandDef{
-	// --- Output Formatting ---
 	{
 		Category:  CatFormatting,
 		Name:      "copy",
@@ -98,7 +96,6 @@ for creating shareable archives or viewing code in a browser.`,
 Useful if your config defaults to "copy" mode but you want to pipe the output.`,
 	},
 
-	// --- Discovery / Filtering ---
 	{
 		Category:  CatDiscovery,
 		Name:      "hidden",
@@ -152,7 +149,7 @@ internals or config caches.`,
 		Usage:     "Respect ignore files (default)",
 		Long: `Respect .gitignore, .ignore, and .lxignore files.
         
-This is the default behavior. The precedence order for ignoring files is:
+The precedence order for ignoring files is:
 1. .lxignore (in directory)
 2. .ignore (in directory)
 3. .gitignore (in directory)
@@ -196,7 +193,6 @@ Useful for handling filenames with spaces or newlines when piping from tools
 like 'find -print0' or 'fd -0'.`,
 	},
 
-	// --- Interleaved (The Paintbrush) ---
 	{
 		Category:  CatInterleaved,
 		Name:      "line-numbers",
@@ -294,7 +290,6 @@ Example: -e "*_test.go"`,
 		Long:      "Clear all active include/exclude filters. Subsequent files will not be filtered.",
 	},
 
-	// --- Actions ---
 	{
 		Category:  CatActions,
 		Name:      "file",
@@ -331,7 +326,6 @@ grouping related files for the LLM.`,
 The value is treated as raw text.`,
 	},
 
-	// --- Config / Meta ---
 	{
 		Category:  CatConfig,
 		Name:      "config",
@@ -397,7 +391,6 @@ Use -v for info, -vv for debug. Alternatively, provide an explicit level:
 		Long:      "Show help. Use --help for detailed usage information.",
 	},
 
-	// --- Internal ---
 	{Name: "cpuprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "Write CPU profile to file.", Internal: true},
 	{Name: "memprofile", Type: CmdGlobal, ValueType: ValueAny, Usage: "Write memory profile to file.", Internal: true},
 }

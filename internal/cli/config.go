@@ -23,9 +23,8 @@ type CliConfig struct {
 	SectionFooterTemplate string `yaml:"section_footer_template"`
 	OutputFormat          string `yaml:"output_format"`
 
-	// Split symlink logic
-	FollowSymlinks *bool `yaml:"follow_symlinks"` // Dirs
-	NoFileSymlinks *bool `yaml:"no_file_links"`   // Files (Default show)
+	FollowSymlinks *bool `yaml:"follow_symlinks"`
+	NoFileSymlinks *bool `yaml:"no_file_links"`
 
 	ShowHidden *bool `yaml:"show_hidden"`
 	Ignore     *bool `yaml:"ignore"`
