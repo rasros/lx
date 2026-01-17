@@ -29,36 +29,50 @@ const shortHelpTmpl = `A program to discover and format files for LLM prompting
 {{- end }}
 `
 
-const longHelpTmpl = `{{"lx" | bold }} - file discovery, slicing, and formatting tool for LLM prompting
+const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting tool for LLM prompting.
 
 {{ "Usage:" | head }}
-  lx [OPTIONS] [state modifiers] <actions>...
-  lx [OPTIONS] -- <files...>   (Disable flag parsing for subsequent arguments)
-
-{{ "Arguments:" | head }}
-  [OPTIONS]
-          Global options that modify the behavior of the program.
-  [state modifiers]
-          asdf
-  [actions]
-          These are the outputs of the program. It can either be:
-            1. A file, which is output and formatted directly.
-		    2. A directory, which is walked recursively and processed as paths.
-            3. An explicit action (see Actions section below).
-          If actions is omitted the default is to walk the current working directory.
-          If your 
-
-          the search pattern which is either a regular expression (default) or a glob pattern (if
-          --glob is used). If no pattern has been specified, every entry is considered a match. If
-          your pattern starts with a dash (-), make sure to pass '--' first, or it will be
-          considered as a flag (fd -- '-foo').
+  {{ "lx" | bold }} [OPTIONS] [state modifiers] <actions>...
+  {{ "lx" | bold }} [OPTIONS] -- <files...>
 
 {{ "Description:" | head }}
-    It recursively walks directories, respecting .gitignore rules, detects binary 
-    files, and formats everything into a clean Markdown (or XML/HTML) structure 
-    with token estimations.
+  lx is a specialized context bundler for Large Language Models (LLMs) like
+  Claude, ChatGPT, and GitHub Copilot.
 
-{{ "GLOBAL OPTIONS:" | head }}
+  It recursively walks directories, respecting .gitignore rules, detects binary
+  files, and streams content into a clean Markdown (or XML/HTML) structure with
+  token estimations.
+
+  {{ "Stream Processing Model:" | bold }}
+  lx treats command-line arguments as a sequential stream. State modifiers (like
+  --lines or --include) act like a paintbrush: if you set a modifier, it applies
+  to all {{ "subsequent" | underline }} files until it is changed or reset.
+
+{{ "Arguments:" | head }}
+  {{ "[OPTIONS]" | bold }}
+          Global flags that affect the entire execution (e.g., --copy, --xml).
+          These can be placed anywhere in the command.
+
+  {{ "[state modifiers]" | bold }}
+          Flags that alter the processing rules for subsequent files.
+          Example: "-n 50" limits the next files to 50 lines.
+
+  {{ "[actions]" | bold }}
+          The inputs to process. These can be:
+            1. A file path (added directly).
+            2. A directory path (walked recursively).
+            3. An explicit action flag (-f, -p, -s).
+            4. "-" to read file paths from stdin.
+
+          If no actions are provided, lx walks the current directory ".".
+
+  {{ "--" | bold }}
+          Separator that disables flag parsing for subsequent arguments.
+          Useful for filenames that start with a dash.
+
+{{ "Global options:" | head }}
+  Settings that apply to the whole operation, regardless of position.
+
 {{- range .Formatting }}
 {{ . | flagLine }}
 {{ .Long | wrapIndent "          " 80 }}
@@ -69,53 +83,54 @@ const longHelpTmpl = `{{"lx" | bold }} - file discovery, slicing, and formatting
 {{ .Long | wrapIndent "          " 80 }}
 {{- end }}
 
-{{ "DISCOVERY OPTIONS:" | head }}
+{{ "Discovery options:" | head }}
+  Settings that control how files are found when walking directories.
+
 {{- range .Discovery }}
 {{ . | flagLine }}
 {{ .Long | wrapIndent "          " 80 }}
 {{- end }}
 
 {{ "State modifiers:" | head }}
-    lx treats command line arguments as a stream. Interleaved state flags change the 
-    internal state of the processor for all SUBSEQUENT files until reset.
+  Flags that change the configuration for files appearing {{ "after" | underline }} them.
 
-    Think of it like a paintbrush: if you set the "color" to blue (-l), 
-    everything you touch afterwards is blue until you change it.
 {{- range .Interleaved }}
 {{ . | flagLine }}
 {{ .Long | wrapIndent "          " 80 }}
 {{- end }}
 
-{{ "ACTIONS:" | head }}
+{{ "Actions:" | head }}
+  Explicit content generators that insert data into the stream immediately.
+
 {{- range .Actions }}
 {{ . | flagLine }}
 {{ .Long | wrapIndent "          " 80 }}
 {{- end }}
 
-{{ "EXAMPLES:" | head }}
-    1. Code review
-       Copy all modified files in your git repo using 'git diff' to clipboard 
-       along with your agents file and docs:
-       $ git diff --name-only | lx AGENTS.md docs/ -c
+{{ "Examples:" | head }}
+  1. {{ "Code Review Bundle" | underline }}
+     Copy all modified files in your git repo to the clipboard:
+       $ lx -c $(git diff --name-only)
 
-    2. Debug with logs
-       Grab the last 50 lines of the error log, then the processing code with 
-       line numbers to help the LLM pinpoint the crash:
-       $ lx -ls "Crash Log" --tail 50 /var/log/app.log \
-             -LNs "Source Code" src/processor/
+  2. {{ "Targeted Debugging" | underline }}
+     Grab the last 50 lines of a log file, then the processing code with line
+     numbers enabled for reference:
+       $ lx --tail 50 /var/log/app.log \
+            -l src/processor/
 
-    3. Using filters
-       Find all JavaScript files, exclude tests and node_modules, and use XML 
-       format for Claude:
-       $ lx --xml -i "*.js" -e "*test*" -e "node_modules" .
+  3. {{ "Complex Filtering" | underline }}
+     Find JavaScript files except tests, output in XML (optimized for Claude):
+       $ lx --xml -i "*.js" -e "*test*" .
 
-    4. External prompt injection
-       Load a prompt from a file, add specific context, and copy:
-       $ lx -p "$(cat prompt.txt)" src/main.go -c
+  4. {{ "Prompt Injection" | underline }}
+     Load a prompt from a file, add a separator, then the source code:
+       $ lx -p "$(cat prompt.txt)" -s "Context" src/ -c
 
-    5. Search integration
-       Use 'grep' to find files with TODOs and pipe them to lx:
+  5. {{ "Search Integration" | underline }}
+     Use 'grep' to find files with TODOs and pipe them to lx:
        $ grep -Rl TODO | lx -c
+
+Bugs can be reported on GitHub: https://github.com/rasros/lx/issues
 `
 
 func makeFuncs() template.FuncMap {
@@ -146,6 +161,7 @@ func makeFuncs() template.FuncMap {
 		"flagLine": func(d CommandDef) string {
 			var sb strings.Builder
 			sb.WriteString("  ")
+			sb.WriteString(cBold)
 			if d.Short != "" {
 				sb.WriteString("-")
 				sb.WriteString(d.Short)
@@ -155,6 +171,7 @@ func makeFuncs() template.FuncMap {
 			}
 			sb.WriteString("--")
 			sb.WriteString(d.Name)
+			sb.WriteString(cResetIntensity)
 
 			switch d.ValueType {
 			case ValueAny:
