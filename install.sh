@@ -7,9 +7,6 @@ REPO="rasros/lx"
 target_version="${VERSION:-latest}"
 
 # Determine install directory
-# 1. Explicit override via LX_INSTALL_DIR
-# 2. System-wide (/usr/local/bin) if running as root
-# 3. User-local ($HOME/.local/bin) otherwise
 if [ -n "${LX_INSTALL_DIR:-}" ]; then
   INSTALL_DIR="$LX_INSTALL_DIR"
 elif [ "$(id -u)" -eq 0 ]; then
@@ -58,6 +55,16 @@ ensure_deps() {
     log "grep is required but not found"
     exit 1
   fi
+
+  # Detect hashing tool
+  if command -v sha256sum >/dev/null 2>&1; then
+    HASHER="sha256sum"
+  elif command -v shasum >/dev/null 2>&1; then
+    HASHER="shasum -a 256"
+  else
+    log "sha256sum or shasum is required for verification"
+    exit 1
+  fi
 }
 
 ensure_unpack_tool() {
@@ -66,7 +73,7 @@ ensure_unpack_tool() {
     if ! command -v unzip >/dev/null 2>&1; then
       log "unzip is required to extract release archives"
       exit 1
-    fi
+        fi
   else
     if ! command -v tar >/dev/null 2>&1; then
       log "tar is required to extract release archives"
@@ -77,7 +84,6 @@ ensure_unpack_tool() {
 
 get_release_tag() {
   if [ "$target_version" != "latest" ]; then
-    # Return explicit version if requested (ensure it starts with v)
     if [[ "$target_version" != v* ]]; then
       echo "v$target_version"
     else
@@ -86,12 +92,10 @@ get_release_tag() {
     return
   fi
 
-  # 1. Try "latest" (Stable only)
   local api_latest="https://api.github.com/repos/${REPO}/releases/latest"
   local tag
   tag="$(curl -fsSL "$api_latest" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
 
-  # 2. If no stable release (or curl failed), try "tags" to get the absolute newest (including Pre-release/RC)
   if [ -z "$tag" ]; then
     log "No stable release found, checking for pre-releases..."
     local api_tags="https://api.github.com/repos/${REPO}/tags"
@@ -123,6 +127,38 @@ check_path() {
   esac
 }
 
+verify_checksum() {
+  local file="$1"
+  local checksums_path="$2"
+  local filename
+  filename="$(basename "$file")"
+
+  log "Verifying checksum for $filename..."
+
+  # Extract expected hash from checksums.txt
+  # Matches lines like: "hash  filename"
+  local expected
+  expected="$(grep "$filename" "$checksums_path" | awk '{print $1}')"
+
+  if [ -z "$expected" ]; then
+    log "Error: No checksum found for $filename in checksums.txt"
+    exit 1
+  fi
+
+  # Calculate actual hash
+  local actual
+  actual="$($HASHER "$file" | awk '{print $1}')"
+
+  if [ "$actual" != "$expected" ]; then
+    log "Checksum verification failed!"
+    log "Expected: $expected"
+    log "Actual:   $actual"
+    exit 1
+  fi
+
+  log "Checksum verified successfully."
+}
+
 main() {
   ensure_deps
 
@@ -130,8 +166,8 @@ main() {
   arch="$(detect_arch)"
   ensure_unpack_tool "$os"
 
-  tag="$(get_release_tag)" # e.g. "v2.0.0-rc.1"
-  version="${tag#v}"       # "2.0.0-rc.1"
+  tag="$(get_release_tag)"
+  version="${tag#v}"
 
   log "Resolving version: $tag ($os/$arch)"
 
@@ -142,26 +178,41 @@ main() {
   fi
   archive_file="${archive_base}${ext}"
 
-  url="https://github.com/${REPO}/releases/download/${tag}/${archive_file}"
+  # Base download URL
+  download_base="https://github.com/${REPO}/releases/download/${tag}"
+  url="${download_base}/${archive_file}"
+  checksum_url="${download_base}/checksums.txt"
 
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' EXIT
 
   archive_path="${tmpdir}/${archive_file}"
+  checksum_path="${tmpdir}/checksums.txt"
+
+  # 1. Download Archive
   log "Downloading $url"
   if ! curl -fL "$url" -o "$archive_path"; then
     log "Download failed. Check if version '$tag' exists for $os/$arch."
     exit 1
   fi
 
-  # Extract archive
+  # 2. Download Checksums
+  log "Downloading checksums..."
+  if ! curl -fL "$checksum_url" -o "$checksum_path"; then
+    log "Failed to download checksums.txt. Cannot verify integrity."
+    exit 1
+  fi
+
+  # 3. Verify
+  verify_checksum "$archive_path" "$checksum_path"
+
+  # 4. Extract
   if [ "$os" = "windows" ]; then
     (cd "$tmpdir" && unzip -q "$archive_path")
   else
     (cd "$tmpdir" && tar -xzf "$archive_path")
   fi
 
-  # Determine binary name based on release build script logic
   bin_name="lx-${version}-${os}-${arch}"
   if [ "$os" = "windows" ]; then
     bin_name="${bin_name}.exe"
