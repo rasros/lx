@@ -275,7 +275,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				GlobalIgnore:       cfg.GlobalIgnore,
 				Includes:           includes,
 				Excludes:           excludes,
-				// UPDATED: Now accepts lx.IgnoreReason (enum) instead of string
 				OnIgnore: func(path string, reason lx.IgnoreReason, source string) {
 					args := []any{"path", path, "reason", reason.String()}
 					if source != "" {
