@@ -39,6 +39,11 @@ func TestRun_Basic(t *testing.T) {
 			args:        []string{"-s", "MyHeader", "-p", "Instructions", f1},
 			wantContain: []string{"## MyHeader", "Instructions", "Hello World"},
 		},
+		{
+			name:        "new flags check",
+			args:        []string{"--no-links", "--no-follow", f1},
+			wantContain: []string{"hello.txt"},
+		},
 	}
 
 	for _, tt := range tests {
