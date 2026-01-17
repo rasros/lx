@@ -68,9 +68,10 @@ type Config struct {
 	OutputFormat          string
 
 	// Filtering Options (Negative Logic)
-	IgnoreSymlinks bool
-	IgnoreHidden   bool
-	IgnoreEnabled  bool // Refers to gitignore processing
+	IgnoreFileSymlinks bool
+	IgnoreDirSymlinks  bool
+	IgnoreHidden       bool
+	IgnoreEnabled      bool
 
 	GlobalIgnore gitignore.IgnoreMatcher
 }
@@ -78,10 +79,11 @@ type Config struct {
 // NewConfig returns a default configuration.
 func NewConfig() *Config {
 	return &Config{
-		OutputFormat:   "markdown",
-		IgnoreEnabled:  true,
-		IgnoreHidden:   true, // Default: Do not show hidden files
-		IgnoreSymlinks: true, // Default: Do not follow symlinks
+		OutputFormat:       "markdown",
+		IgnoreEnabled:      true,
+		IgnoreHidden:       true,
+		IgnoreFileSymlinks: false,
+		IgnoreDirSymlinks:  true,
 	}
 }
 
@@ -202,8 +204,11 @@ func Merge(dst *Config, src *Config) {
 	if src.OutputFormat != "" {
 		dst.OutputFormat = src.OutputFormat
 	}
-	if !src.IgnoreSymlinks {
-		dst.IgnoreSymlinks = false
+	if !src.IgnoreDirSymlinks {
+		dst.IgnoreDirSymlinks = false
+	}
+	if src.IgnoreFileSymlinks {
+		dst.IgnoreFileSymlinks = true
 	}
 	if !src.IgnoreHidden {
 		dst.IgnoreHidden = false

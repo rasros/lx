@@ -1,0 +1,10 @@
+--- STDOUT ---
+links/loop/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+
+--- STDERR ---
+

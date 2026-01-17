@@ -1,49 +1,74 @@
 --- STDOUT ---
-[1/9] README.md (2 rows)
+[1/14] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[2/9] doc/notes.txt (1 rows)
+[2/14] configs/follow.yaml (1 rows)
+---
+```yaml
+follow_symlinks: true
+```
+
+[3/14] configs/hidden.yaml (1 rows)
+---
+```yaml
+show_hidden: true
+```
+
+[4/14] configs/no_links.yaml (1 rows)
+---
+```yaml
+no_file_links: true
+```
+
+[5/14] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[3/9] links/cycle_a/visible.txt (1 rows)
+[6/14] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[4/9] links/cycle_b/visible.txt (1 rows)
+[7/14] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[5/9] links/safe_target/recursion.txt (1 rows)
----
-```text
-I am safe
-```
-
-[6/9] main.go (2 rows)
+[8/14] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[7/9] pkg/util.go (1 rows)
+[9/14] links/safe_target/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+[10/14] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[11/14] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[8/9] src/large.txt (100 rows)
+[12/14] src/large.txt (100 rows)
 ---
 ```text
 Line xxxxxxxxxx
@@ -148,12 +173,14 @@ Line xxxxxxxxxx
 Line xxxxxxxxxx
 ```
 
-[9/9] src/script.py (1 rows)
+[13/14] src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
+[14/14] tmp/TestGolden1014832614/001/links/broken_link - error: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory
+
 
 --- STDERR ---
-
+[1;31mError:[0m Failed to read file: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory (path=tmp/TestGolden1014832614/001/links/broken_link)

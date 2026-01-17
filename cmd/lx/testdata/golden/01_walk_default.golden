@@ -1,56 +1,81 @@
 --- STDOUT ---
-[1/10] README.md (2 rows)
+[1/15] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[2/10] doc/notes.txt (1 rows)
+[2/15] configs/follow.yaml (1 rows)
+---
+```yaml
+follow_symlinks: true
+```
+
+[3/15] configs/hidden.yaml (1 rows)
+---
+```yaml
+show_hidden: true
+```
+
+[4/15] configs/no_links.yaml (1 rows)
+---
+```yaml
+no_file_links: true
+```
+
+[5/15] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[3/10] links/cycle_a/visible.txt (1 rows)
+[6/15] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[4/10] links/cycle_b/visible.txt (1 rows)
+[7/15] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[5/10] links/safe_target/recursion.txt (1 rows)
----
-```text
-I am safe
-```
-
-[6/10] main.go (2 rows)
+[8/15] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[7/10] main_test.go (2 rows)
+[9/15] links/safe_target/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+[10/15] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[11/15] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[8/10] pkg/util.go (1 rows)
+[12/15] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[9/10] src/large.txt (100 rows)
+[13/15] src/large.txt (100 rows)
 ---
 ```text
 Line xxxxxxxxxx
@@ -155,12 +180,14 @@ Line xxxxxxxxxx
 Line xxxxxxxxxx
 ```
 
-[10/10] src/script.py (1 rows)
+[14/15] src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
+[15/15] tmp/TestGolden1014832614/001/links/broken_link - error: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory
+
 
 --- STDERR ---
-
+[1;31mError:[0m Failed to read file: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory (path=tmp/TestGolden1014832614/001/links/broken_link)

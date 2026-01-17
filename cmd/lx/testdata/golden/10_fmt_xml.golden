@@ -8,35 +8,64 @@ Documentation here.
     </document_content>
   </document>
 
-  <document index="2" language="text" rows="1">
+  <document index="2" language="yaml" rows="1">
+    <source>configs/follow.yaml</source>
+    <document_content>
+follow_symlinks: true
+    </document_content>
+  </document>
+
+  <document index="3" language="yaml" rows="1">
+    <source>configs/hidden.yaml</source>
+    <document_content>
+show_hidden: true
+    </document_content>
+  </document>
+
+  <document index="4" language="yaml" rows="1">
+    <source>configs/no_links.yaml</source>
+    <document_content>
+no_file_links: true
+    </document_content>
+  </document>
+
+  <document index="5" language="text" rows="1">
     <source>doc/notes.txt</source>
     <document_content>
 some notes
     </document_content>
   </document>
 
-  <document index="3" language="text" rows="1">
+  <document index="6" language="text" rows="1">
     <source>links/cycle_a/visible.txt</source>
     <document_content>
 a
     </document_content>
   </document>
 
-  <document index="4" language="text" rows="1">
+  <document index="7" language="text" rows="1">
     <source>links/cycle_b/visible.txt</source>
     <document_content>
 b
     </document_content>
   </document>
 
-  <document index="5" language="text" rows="1">
+  <document index="8" language="go" rows="1">
+    <source>links/link_to_main.go</source>
+    <document_content>
+package main
+func main() {}
+    </document_content>
+  </document>
+
+  <document index="9" language="text" rows="1">
     <source>links/safe_target/recursion.txt</source>
     <document_content>
 I am safe
     </document_content>
   </document>
 
-  <document index="6" language="go" rows="2">
+  <document index="10" language="go" rows="2">
     <source>main.go</source>
     <document_content>
 package main
@@ -44,7 +73,7 @@ func main() {}
     </document_content>
   </document>
 
-  <document index="7" language="go" rows="2">
+  <document index="11" language="go" rows="2">
     <source>main_test.go</source>
     <document_content>
 package main
@@ -52,14 +81,14 @@ import "testing"
     </document_content>
   </document>
 
-  <document index="8" language="go" rows="1">
+  <document index="12" language="go" rows="1">
     <source>pkg/util.go</source>
     <document_content>
 package pkg
     </document_content>
   </document>
 
-  <document index="9" language="text" rows="100">
+  <document index="13" language="text" rows="100">
     <source>src/large.txt</source>
     <document_content>
 Line xxxxxxxxxx
@@ -165,14 +194,19 @@ Line xxxxxxxxxx
     </document_content>
   </document>
 
-  <document index="10" language="python" rows="1">
+  <document index="14" language="python" rows="1">
     <source>src/script.py</source>
     <document_content>
 print('hello')
     </document_content>
   </document>
+
+  <document index="15" rows="0">
+    <source>tmp/TestGolden1014832614/001/links/broken_link</source>
+    <error>open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory</error>
+  </document>
 </content>
 
 
 --- STDERR ---
-
+[1;31mError:[0m Failed to read file: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory (path=tmp/TestGolden1014832614/001/links/broken_link)

@@ -62,9 +62,13 @@ output_format: "markdown"
 
 # Discovery Options
 
-# Show symbolic links during directory traversal.
-# Equivalent to -L / --follow flag.
-show_symlinks: false
+# Follow symbolic links to directories.
+# Equivalent to -S / --follow flag.
+follow_symlinks: false
+
+# Hide symbolic links to files.
+# Equivalent to --no-links flag.
+no_file_links: false
 
 # Include hidden files and directories (starting with ".").
 # Equivalent to -H / --hidden flag.

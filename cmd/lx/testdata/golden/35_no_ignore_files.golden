@@ -1,61 +1,86 @@
 --- STDOUT ---
-[1/13] README.md (2 rows)
+[1/18] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[2/13] bin/data.bin - binary file skipped (4 B)
-[3/13] bin/empty.txt - empty file
+[2/18] bin/data.bin - binary file skipped (4 B)
+[3/18] bin/empty.txt - empty file
 
-[4/13] doc/notes.txt (1 rows)
+[4/18] configs/follow.yaml (1 rows)
+---
+```yaml
+follow_symlinks: true
+```
+
+[5/18] configs/hidden.yaml (1 rows)
+---
+```yaml
+show_hidden: true
+```
+
+[6/18] configs/no_links.yaml (1 rows)
+---
+```yaml
+no_file_links: true
+```
+
+[7/18] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[5/13] links/cycle_a/visible.txt (1 rows)
+[8/18] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[6/13] links/cycle_b/visible.txt (1 rows)
+[9/18] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[7/13] links/safe_target/recursion.txt (1 rows)
----
-```text
-I am safe
-```
-
-[8/13] main.go (2 rows)
+[10/18] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[9/13] main_test.go (2 rows)
+[11/18] links/safe_target/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+[12/18] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[13/18] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[10/13] pkg/util.go (1 rows)
+[14/18] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[11/13] secret/locked.txt - error: open secret/locked.txt: PERMISSION_DENIED
+[15/18] secret/locked.txt - error: open secret/locked.txt: PERMISSION_DENIED
 
-[12/13] src/large.txt (100 rows)
+[16/18] src/large.txt (100 rows)
 ---
 ```text
 Line xxxxxxxxxx
@@ -160,13 +185,16 @@ Line xxxxxxxxxx
 Line xxxxxxxxxx
 ```
 
-[13/13] src/script.py (1 rows)
+[17/18] src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
+[18/18] tmp/TestGolden1014832614/001/links/broken_link - error: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory
+
 
 --- STDERR ---
 [1;31mError:[0m Failed to access file during walk: open secret/locked_dir: PERMISSION_DENIED (path=secret/locked_dir)
+[1;31mError:[0m Failed to read file: open tmp/TestGolden1014832614/001/links/broken_link: no such file or directory (path=tmp/TestGolden1014832614/001/links/broken_link)
 [1;31mError:[0m Failed to read file: open secret/locked.txt: PERMISSION_DENIED (path=secret/locked.txt)

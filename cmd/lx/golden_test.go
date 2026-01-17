@@ -69,16 +69,22 @@ func TestGolden(t *testing.T) {
 		{name: "43_head_tail", args: []string{"--head", "3", "src/large.txt", "--tail", "2", "src/large.txt"}},
 
 		// --- Symlinks & Edge Cases ---
-		// Note: On Windows without Dev Mode, symlink creation might fail in setup.
-		// If they exist, we test them.
-		{name: "50_symlinks_ignore", args: []string{"links"}}, // Default: ignore
-		{name: "51_symlinks_follow", args: []string{"--symlinks", "links"}},
-		{name: "52_symlinks_dag", args: []string{"--symlinks", "links/loop"}}, // Valid DAG (A->B)
-		// NEW: Test true infinite cycle. Should not hang or crash.
-		{name: "53_symlinks_infinite_cycle", args: []string{"--symlinks", "links/cycle_a"}},
+		// 50: Default = Show File Links, Ignore Dir Links
+		{name: "50_symlinks_default", args: []string{"links"}},
+		// 51: Follow = Show File Links, Recurse Dir Links
+		{name: "51_symlinks_follow", args: []string{"--follow", "links"}},
+		// 52: DAG Check (A -> B, no cycle)
+		{name: "52_symlinks_dag", args: []string{"--follow", "links/loop"}},
+		// 53: Cycle Check (A -> B -> A). Should detect and stop.
+		{name: "53_symlinks_infinite_cycle", args: []string{"--follow", "links/cycle_a"}},
+		// 54: Explicit --links (same as default)
+		{name: "54_file_links_explicit", args: []string{"--links", "links"}},
+		// 55: --no-links (Hide File Links). Should NOT show link_to_main.go
+		{name: "55_no_file_links", args: []string{"--no-links", "links"}},
+		// 56: --follow --no-links. Should recurse dirs but hide file links.
+		{name: "56_follow_dirs_no_file_links", args: []string{"--follow", "--no-links", "links"}},
 
 		// --- Permissions & Errors ---
-		// Note: We expect stderr output here
 		{name: "60_access_denied_file", args: []string{"secret/locked.txt"}},
 		{name: "61_access_denied_dir", args: []string{"secret/locked_dir"}},
 		{name: "62_missing_file", args: []string{"nonexistent.go"}},
@@ -86,11 +92,19 @@ func TestGolden(t *testing.T) {
 		// --- Stats & Verbosity ---
 		{name: "70_stats_forced", args: []string{"--stats", "main.go"}},
 		{name: "71_quiet_mode", args: []string{"-q", "main.go"}},
-		{name: "72_verbose_debug", args: []string{"-vv", "main.go"}}, // Captures debug logs in stderr
+		{name: "72_verbose_debug", args: []string{"-vv", "main.go"}},
 
 		// --- Binary & Empty ---
 		{name: "80_binary_detection", args: []string{"bin/data.bin"}},
 		{name: "81_empty_file", args: []string{"bin/empty.txt"}},
+
+		// --- Config File Loading ---
+		// 90: Config enables hidden files
+		{name: "90_config_hidden", args: []string{"-y", "configs/hidden.yaml", "."}},
+		// 91: Config enables following symlinks
+		{name: "91_config_follow", args: []string{"-y", "configs/follow.yaml", "links"}},
+		// 92: CLI overrides Config (Config: follow=true, CLI: --no-follow)
+		{name: "92_config_override", args: []string{"-y", "configs/follow.yaml", "--no-follow", "links"}},
 	}
 
 	for _, tc := range cases {
@@ -157,7 +171,6 @@ func TestGolden(t *testing.T) {
 
 			wantBytes, err := os.ReadFile(goldenPath)
 			if err != nil {
-				// If missing and not updating, allow empty if expected empty? No, usually fail.
 				if *update {
 					return
 				}
@@ -284,7 +297,12 @@ func setupComplexFixture(t *testing.T) string {
 	symlinkRaw("../cycle_b", filepath.Join(dir, "links/cycle_a/to_b"))
 	symlinkRaw("../cycle_a", filepath.Join(dir, "links/cycle_b/to_a"))
 
-	// 6. Permissions (Locked)
+	// 6. Config Files
+	create("configs/follow.yaml", "follow_symlinks: true\n", 0644)
+	create("configs/hidden.yaml", "show_hidden: true\n", 0644)
+	create("configs/no_links.yaml", "no_file_links: true\n", 0644)
+
+	// 7. Permissions (Locked)
 	create("secret/locked.txt", "TOP SECRET", 0600) // Start readable to write
 	secretDir := filepath.Join(dir, "secret", "locked_dir")
 	os.MkdirAll(secretDir, 0755)

@@ -134,7 +134,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		"format", cfg.OutputFormat,
 		"ignore_enabled", cfg.IgnoreEnabled,
 		"ignore_hidden", cfg.IgnoreHidden,
-		"ignore_symlinks", cfg.IgnoreSymlinks,
+		"ignore_dir_symlinks", cfg.IgnoreDirSymlinks,
+		"ignore_file_symlinks", cfg.IgnoreFileSymlinks,
 	)
 
 	// 3. Determine Outputs
@@ -249,7 +250,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			// Map config settings to walker settings
 			walkerIgnoreHidden := cfg.IgnoreHidden
-			walkerIgnoreSymlinks := cfg.IgnoreSymlinks
+			walkerIgnoreDirSymlinks := cfg.IgnoreDirSymlinks
+			walkerIgnoreFileSymlinks := cfg.IgnoreFileSymlinks
 			walkerIgnoreEnabled := cfg.IgnoreEnabled
 
 			if op.Action == "file" {
@@ -257,8 +259,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				// If specific file action, we un-ignore everything to ensure it is processed
 				walkerIgnoreHidden = false
 				walkerIgnoreEnabled = false
-				// Force follow symlinks for direct file arguments
-				walkerIgnoreSymlinks = false
+				// Force follow symlinks for direct file arguments (both types)
+				walkerIgnoreDirSymlinks = false
+				walkerIgnoreFileSymlinks = false
 			}
 
 			slog.Debug("Initializing Walker",
@@ -268,18 +271,20 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				"excludes_count", len(excludes),
 				"ignore_enabled", walkerIgnoreEnabled,
 				"ignore_hidden", walkerIgnoreHidden,
-				"ignore_symlinks", walkerIgnoreSymlinks,
+				"ignore_dir_symlinks", walkerIgnoreDirSymlinks,
+				"ignore_file_symlinks", walkerIgnoreFileSymlinks,
 			)
 
 			walker := lx.NewWalker(lx.WalkerOptions{
-				FS:             os.DirFS(fsRoot),
-				Root:           fsRoot, // Pass physical root for symlink resolution
-				IgnoreSymlinks: walkerIgnoreSymlinks,
-				IgnoreHidden:   walkerIgnoreHidden,
-				IgnoreEnabled:  walkerIgnoreEnabled,
-				GlobalIgnore:   cfg.GlobalIgnore,
-				Includes:       includes,
-				Excludes:       excludes,
+				FS:                 os.DirFS(fsRoot),
+				Root:               fsRoot,
+				IgnoreDirSymlinks:  walkerIgnoreDirSymlinks,
+				IgnoreFileSymlinks: walkerIgnoreFileSymlinks,
+				IgnoreHidden:       walkerIgnoreHidden,
+				IgnoreEnabled:      walkerIgnoreEnabled,
+				GlobalIgnore:       cfg.GlobalIgnore,
+				Includes:           includes,
+				Excludes:           excludes,
 				OnIgnore: func(path, reason, source string) {
 					args := []any{"path", path, "reason", reason}
 					if source != "" {
@@ -383,17 +388,40 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 
 func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
 	// Flags "Show/Follow" INVERT the internal "Ignore" settings.
-	if _, ok := globals["symlinks"]; ok {
-		slog.Debug("Override: Follow symlinks enabled via flag")
-		c.IgnoreSymlinks = false
+	if _, ok := globals["follow"]; ok {
+		slog.Debug("Override: Follow directory symlinks enabled via flag")
+		c.IgnoreDirSymlinks = false
 	}
+	if _, ok := globals["no-follow"]; ok {
+		slog.Debug("Override: Follow directory symlinks disabled via flag")
+		c.IgnoreDirSymlinks = true
+	}
+
+	if _, ok := globals["no-links"]; ok {
+		slog.Debug("Override: Hide file symlinks enabled via flag")
+		c.IgnoreFileSymlinks = true
+	}
+	if _, ok := globals["links"]; ok {
+		slog.Debug("Override: Show file symlinks enabled via flag")
+		c.IgnoreFileSymlinks = false
+	}
+
 	if _, ok := globals["hidden"]; ok {
 		slog.Debug("Override: Show hidden files enabled via flag")
 		c.IgnoreHidden = false
 	}
+	if _, ok := globals["no-hidden"]; ok {
+		slog.Debug("Override: Show hidden files disabled via flag")
+		c.IgnoreHidden = true
+	}
+
 	if _, ok := globals["no-ignore"]; ok {
 		slog.Debug("Override: Ignore files disabled via flag")
 		c.IgnoreEnabled = false
+	}
+	if _, ok := globals["ignore"]; ok {
+		slog.Debug("Override: Ignore files enabled via flag")
+		c.IgnoreEnabled = true
 	}
 }
 

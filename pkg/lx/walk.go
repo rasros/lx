@@ -12,15 +12,16 @@ import (
 )
 
 type WalkerOptions struct {
-	FS             fs.FS
-	Root           string // The physical root path on OS (needed for resolving symlink cycles)
-	IgnoreSymlinks bool   // Replaced FollowSymlinks
-	IgnoreHidden   bool   // Replaced ShowHidden
-	IgnoreEnabled  bool
-	GlobalIgnore   gitignore.IgnoreMatcher
-	Includes       []string
-	Excludes       []string
-	OnIgnore       func(path string, reason string, source string)
+	FS                 fs.FS
+	Root               string
+	IgnoreFileSymlinks bool // Default false (Show file links)
+	IgnoreDirSymlinks  bool // Default true (Ignore dir links)
+	IgnoreHidden       bool
+	IgnoreEnabled      bool
+	GlobalIgnore       gitignore.IgnoreMatcher
+	Includes           []string
+	Excludes           []string
+	OnIgnore           func(path string, reason string, source string)
 }
 
 type Walker struct {
@@ -47,13 +48,9 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	go func() {
 		defer close(out)
 
-		// Visited map tracks canonical paths of DIRECTORIES we have entered
-		// to prevent infinite recursion loops via symlinks.
 		visitedDirs := make(map[string]struct{})
-
 		var walkFn fs.WalkDirFunc
 
-		// Maintain ignore stacks
 		ignoreStacks := make(map[string][]ignoreSource)
 		if w.opts.GlobalIgnore != nil {
 			ignoreStacks["."] = []ignoreSource{{matcher: w.opts.GlobalIgnore, source: "global"}}
@@ -81,64 +78,61 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				return nil
 			}
 
-			// SYMLINK HANDLING
 			isSymlink := (d.Type() & fs.ModeSymlink) != 0
 
-			// 1. If we ignore symlinks, skip them.
-			if w.opts.IgnoreSymlinks && isSymlink {
-				if w.opts.OnIgnore != nil {
-					w.opts.OnIgnore(p, "symlink-skipped", "")
-				}
-				return nil
-			}
-
-			// 2. If we DO follow symlinks, check if it's a directory.
-			if !w.opts.IgnoreSymlinks && isSymlink {
+			// Symlink Handling Logic
+			if isSymlink {
+				// We must stat to determine if it is a directory or file target
 				info, err := fs.Stat(filesystem, p)
-				if err == nil && info.IsDir() {
-					// CYCLE DETECTION:
-					// To safely recurse into a symlink directory, we must know its canonical path.
-					// Since our FS might be virtual, we rely on the user providing opts.Root for OS resolution.
-					// If opts.Root is empty, we fall back to assuming relative to CWD.
 
+				// Broken link case: treat as file so we can report the error downstream
+				isTargetDir := (err == nil && info.IsDir())
+
+				if isTargetDir {
+					// --- DIRECTORY SYMLINK ---
+					if w.opts.IgnoreDirSymlinks {
+						if w.opts.OnIgnore != nil {
+							w.opts.OnIgnore(p, "symlink-dir-skipped", "")
+						}
+						return nil
+					}
+
+					// Cycle Detection & Recursion
 					absPath := p
 					if w.opts.Root != "" {
 						absPath = filepath.Join(w.opts.Root, p)
 					} else {
-						// Fallback: Resolve against CWD if possible
 						if abs, err := filepath.Abs(p); err == nil {
 							absPath = abs
 						}
 					}
-
-					// Resolve the real path on disk
 					realPath, err := filepath.EvalSymlinks(absPath)
-					if err != nil {
-						// If we can't resolve it (broken link?), treat as file to report error later
+					if err == nil {
+						if _, exists := visitedDirs[realPath]; exists {
+							if w.opts.OnIgnore != nil {
+								w.opts.OnIgnore(p, "symlink-cycle", "")
+							}
+							return nil
+						}
+						visitedDirs[realPath] = struct{}{}
+					}
+					// Recurse
+					return fs.WalkDir(filesystem, p, walkFn)
+
+				} else {
+					// --- FILE SYMLINK (or broken) ---
+					if w.opts.IgnoreFileSymlinks {
+						if w.opts.OnIgnore != nil {
+							w.opts.OnIgnore(p, "symlink-file-skipped", "")
+						}
 						return nil
 					}
-
-					// Check if we've been here
-					if _, exists := visitedDirs[realPath]; exists {
-						if w.opts.OnIgnore != nil {
-							w.opts.OnIgnore(p, "symlink-cycle", "")
-						}
-						return nil // Skip cycle
-					}
-
-					// Mark as visited
-					visitedDirs[realPath] = struct{}{}
-
-					// Recurse manually
-					return fs.WalkDir(filesystem, p, walkFn)
+					// Fall through to normal file processing
 				}
-				// File symlinks fall through
 			}
 
-			// Regular Directory Tracking for Cycles (if roots contain symlinks)
+			// Regular Directory Tracking for Cycles
 			if d.IsDir() && !isSymlink {
-				// We also track regular directories to ensure if we enter them via a symlink later
-				// we catch the cycle.
 				absPath := p
 				if w.opts.Root != "" {
 					absPath = filepath.Join(w.opts.Root, p)
@@ -147,14 +141,11 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 						absPath = abs
 					}
 				}
-
-				// For regular dirs, EvalSymlinks usually just cleans the path unless parent is symlink
 				if realPath, err := filepath.EvalSymlinks(absPath); err == nil {
 					visitedDirs[realPath] = struct{}{}
 				}
 			}
 
-			// IGNORE FILES HANDLING
 			if w.opts.IgnoreEnabled {
 				parent := path.Dir(p)
 				if parent == "." || parent == "/" {
@@ -213,9 +204,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 			if cleanRoot == "." || cleanRoot == "/" {
 				cleanRoot = "."
 			}
-
 			err := fs.WalkDir(filesystem, cleanRoot, walkFn)
-
 			if err != nil && err != context.Canceled {
 				out <- InputFile{Path: root, LoadError: err}
 			}
