@@ -1,0 +1,11 @@
+--- STDOUT ---
+.gitignore (2 rows)
+---
+```gitignore
+bin/
+secret/
+```
+
+
+--- STDERR ---
+

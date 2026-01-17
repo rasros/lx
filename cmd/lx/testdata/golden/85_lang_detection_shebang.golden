@@ -1,0 +1,11 @@
+--- STDOUT ---
+langs/script_no_ext (2 rows)
+---
+```bash
+#!/bin/bash
+echo hi
+```
+
+
+--- STDERR ---
+

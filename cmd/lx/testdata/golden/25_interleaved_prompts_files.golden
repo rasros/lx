@@ -1,0 +1,23 @@
+--- STDOUT ---
+[1/2] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+Explain above
+
+
+[2/2] pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
+
+Explain below
+
+
+
+--- STDERR ---
+

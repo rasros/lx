@@ -1,0 +1,10 @@
+--- STDOUT ---
+src/script.py (1 rows)
+---
+```python
+print('hello')
+```
+
+
+--- STDERR ---
+

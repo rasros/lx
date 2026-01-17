@@ -1,94 +1,143 @@
 --- STDOUT ---
-[1/17] .gitignore (2 rows)
+[1/25] .gitignore (2 rows)
 ---
 ```gitignore
 bin/
 secret/
 ```
 
-[2/17] .hidden (1 rows)
+[2/25] .hidden (1 rows)
 ---
 ```
 i am hidden
 ```
 
-[3/17] README.md (2 rows)
+[3/25] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[4/17] configs/follow.yaml (1 rows)
+[4/25] configs/custom_sections.yaml (1 rows)
+---
+```yaml
+section_header_template: "*** {{ .Body }} ***\n"
+```
+
+[5/25] configs/custom_template.yaml (1 rows)
+---
+```yaml
+template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
+```
+
+[6/25] configs/follow.yaml (1 rows)
 ---
 ```yaml
 follow_symlinks: true
 ```
 
-[5/17] configs/hidden.yaml (1 rows)
+[7/25] configs/hidden.yaml (1 rows)
 ---
 ```yaml
 show_hidden: true
 ```
 
-[6/17] configs/no_links.yaml (1 rows)
+[8/25] configs/no_links.yaml (1 rows)
 ---
 ```yaml
 no_file_links: true
 ```
 
-[7/17] doc/notes.txt (1 rows)
+[9/25] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[8/17] links/cycle_a/visible.txt (1 rows)
+[10/25] ignore_test/.gitignore (1 rows)
+---
+```gitignore
+bar.go
+```
+
+[11/25] ignore_test/foo.go (1 rows)
+---
+```go
+package foo
+```
+
+[12/25] langs/Dockerfile (1 rows)
+---
+```dockerfile
+FROM scratch
+```
+
+[13/25] langs/main.rs (1 rows)
+---
+```rust
+fn main() {}
+```
+
+[14/25] langs/script_no_ext (2 rows)
+---
+```bash
+#!/bin/bash
+echo hi
+```
+
+[15/25] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[9/17] links/cycle_b/visible.txt (1 rows)
+[16/25] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[10/17] links/link_to_main.go (~1 rows)
+[17/25] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[11/17] links/safe_target/recursion.txt (1 rows)
+[18/25] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
 ```
 
-[12/17] main.go (2 rows)
+[19/25] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[13/17] main_test.go (2 rows)
+[20/25] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[14/17] pkg/util.go (1 rows)
+[21/25] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[15/17] src/large.txt (100 rows)
+[22/25] spaces/file with spaces.txt (1 rows)
+---
+```text
+content with spaces
+```
+
+[23/25] src/large.txt (100 rows)
 ---
 ```text
 Line xxxxxxxxxx
@@ -193,14 +242,14 @@ Line xxxxxxxxxx
 Line xxxxxxxxxx
 ```
 
-[16/17] src/script.py (1 rows)
+[24/25] src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
-[17/17] /ROOT/links/broken_link - error: open /ROOT/links/broken_link: no such file or directory
+[25/25] /ROOT/links/broken_link - error: open /ROOT/links/broken_link: FILE_NOT_FOUND
 
 
 --- STDERR ---
-[1;31mError:[0m Failed to read file: open /ROOT/links/broken_link: no such file or directory (path=/ROOT/links/broken_link)
+[1;31mError:[0m Failed to read file: open /ROOT/links/broken_link: FILE_NOT_FOUND (path=/ROOT/links/broken_link)

@@ -1,0 +1,10 @@
+--- STDOUT ---
+File: main.go
+Content:
+package main
+func main() {}
+
+
+
+--- STDERR ---
+

@@ -1,0 +1,67 @@
+--- STDOUT ---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>lx Output</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+.hljs { background: transparent !important; }
+img { max-width: 100%; height: auto; }
+pre { background-color: transparent; border: none; }
+article > header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--pico-card-background-color); 
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.file-anchor {
+  text-decoration: none;
+  color: var(--pico-muted-color);
+  margin-right: 0.5rem;
+  font-weight: bold;
+  border: none;
+}
+.file-anchor:hover {
+  color: var(--pico-primary);
+  text-decoration: underline;
+}
+.error-state { color: var(--pico-color-red-500); font-weight: bold; }
+</style>
+</head>
+<body>
+<header>
+<hgroup>
+<h1>lx output</h1>
+<p>
+  Files: 1 &bull; 
+  Size: 27 B &bull; 
+  Path: .
+</p>
+</hgroup>
+</header>
+<main>
+<section id="section-0"><h2><a href="#section-0" style="text-decoration:none; color:inherit;">Core
+</a></h2></section><article id="file-1">
+<header>
+ <a href="#file-1" aria-label="Link to this file"><strong>main.go</strong></a>
+ <small>(2 rows)</small>
+</header>
+<pre><code class="language-go">
+package main
+func main() {}
+</code></pre>
+</article>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>
+
+--- STDERR ---
+

@@ -1,0 +1,11 @@
+--- STDOUT ---
+stdin (2 rows)
+---
+```
+Some content from pipe
+Line 2
+```
+
+
+--- STDERR ---
+

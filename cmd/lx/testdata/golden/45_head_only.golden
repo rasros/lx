@@ -1,0 +1,14 @@
+--- STDOUT ---
+src/large.txt (100 rows)
+---
+```text
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+```
+
+
+--- STDERR ---
+

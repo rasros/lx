@@ -12,17 +12,16 @@ package main
 func main() {}
 ```
 
-[3/4] main.go (2 rows)
----
-```go
-package main
-func main() {}
-```
-
-[4/4] pkg/util.go (1 rows)
+[3/4] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
+```
+
+[4/4] src/script.py (1 rows)
+---
+```python
+print('hello')
 ```
 
 
