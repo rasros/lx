@@ -87,6 +87,53 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 		ignoreStacks := make(map[string][]ignoreSource)
 		if w.opts.GlobalIgnore != nil {
 			ignoreStacks["."] = []ignoreSource{{matcher: w.opts.GlobalIgnore, source: "global"}}
+		} else {
+			ignoreStacks["."] = []ignoreSource{}
+		}
+
+		for _, root := range roots {
+			cleanRoot := path.Clean(root)
+			if cleanRoot == "." || cleanRoot == "/" {
+				continue
+			}
+
+			// We need to ensure the stack exists for the *parent* of the root.
+			dir := path.Dir(cleanRoot)
+			if dir == "." || dir == "/" {
+				continue
+			}
+
+			parts := strings.Split(dir, "/")
+			currentPath := ""
+
+			for _, part := range parts {
+				parent := currentPath
+				if parent == "" {
+					parent = "."
+				}
+
+				if currentPath == "" {
+					currentPath = part
+				} else {
+					currentPath = path.Join(currentPath, part)
+				}
+
+				if _, exists := ignoreStacks[currentPath]; !exists {
+					// Inherit from parent
+					parentStack, ok := ignoreStacks[parent]
+					if !ok {
+						// Fallback if parent not found (shouldn't happen due to order)
+						if w.opts.GlobalIgnore != nil {
+							parentStack = []ignoreSource{{matcher: w.opts.GlobalIgnore, source: "global"}}
+						}
+					}
+
+					local := loadLocalIgnores(filesystem, currentPath)
+					newStack := append([]ignoreSource{}, parentStack...)
+					newStack = append(newStack, local...)
+					ignoreStacks[currentPath] = newStack
+				}
+			}
 		}
 
 		walkFn = func(p string, d fs.DirEntry, err error) error {
