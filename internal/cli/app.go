@@ -96,36 +96,30 @@ func gatherInputs(parsed *ParsedArgs) error {
 }
 
 func processStream(ctx context.Context, parsed *ParsedArgs) error {
+	initialLevel, err := determineLogLevel(parsed, "warn")
+	if err != nil {
+		return err
+	}
+	setupLogger(initialLevel)
+	slog.Debug("Logger initialized (early)", "level", initialLevel.String())
+
 	cfg, cliOpts, err := LoadConfigChain(parsed.Globals["config"])
 	if err != nil {
 		return err
 	}
 
-	applyGlobalsToConfig(cfg, parsed.Globals)
-	if _, ok := parsed.Globals["xml"]; ok {
-		cfg.OutputFormat = "xml"
-	} else if _, ok := parsed.Globals["html"]; ok {
-		cfg.OutputFormat = "html"
-	}
-
-	level, err := determineLogLevel(parsed, cliOpts.Verbosity)
+	// Re-evaluate Log Level
+	finalLevel, err := determineLogLevel(parsed, cliOpts.Verbosity)
 	if err != nil {
 		return err
 	}
 
-	var handler slog.Handler
-
-	if level > slog.LevelDebug {
-		handler = NewCliHandler(os.Stderr, level)
-	} else {
-		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: level,
-		})
+	// Update logger if the level has changed
+	if finalLevel != initialLevel {
+		setupLogger(finalLevel)
+		slog.Debug("Logger level updated from config", "new_level", finalLevel.String())
 	}
 
-	slog.SetDefault(slog.New(handler))
-
-	slog.Debug("Logger initialized", "level", level.String())
 	slog.Debug("Configuration loaded",
 		"format", cfg.OutputFormat,
 		"ignore_enabled", cfg.IgnoreEnabled,
@@ -133,6 +127,13 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		"ignore_dir_symlinks", cfg.IgnoreDirSymlinks,
 		"ignore_file_symlinks", cfg.IgnoreFileSymlinks,
 	)
+
+	applyGlobalsToConfig(cfg, parsed.Globals)
+	if _, ok := parsed.Globals["xml"]; ok {
+		cfg.OutputFormat = "xml"
+	} else if _, ok := parsed.Globals["html"]; ok {
+		cfg.OutputFormat = "html"
+	}
 
 	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, cliOpts.OutputMode)
 	if err != nil {
@@ -358,6 +359,18 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 	handleStatsDisplay(parsed, cliOpts, stream, debugOut)
 	return nil
+}
+
+func setupLogger(level slog.Level) {
+	var handler slog.Handler
+	if level > slog.LevelDebug {
+		handler = NewCliHandler(os.Stderr, level)
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: level,
+		})
+	}
+	slog.SetDefault(slog.New(handler))
 }
 
 func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer) {
