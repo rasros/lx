@@ -298,6 +298,13 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 					}
 					slog.Debug("Walker ignored path", args...)
 				},
+				OnIgnoreFileLoaded: func(path string, isAncestor bool) {
+					if isAncestor {
+						slog.Debug("Loaded ancestor ignore file", "path", path)
+					} else {
+						slog.Debug("Loaded ignore file", "path", path)
+					}
+				},
 			})
 
 			count := 0

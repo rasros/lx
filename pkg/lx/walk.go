@@ -54,6 +54,7 @@ type WalkerOptions struct {
 	Includes           []string
 	Excludes           []string
 	OnIgnore           func(path string, reason IgnoreReason, source string)
+	OnIgnoreFileLoaded func(path string, isAncestor bool)
 }
 
 // Walker encapsulates the logic for traversing a file system with filtering and ignore rules.
@@ -85,12 +86,23 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 		var walkFn fs.WalkDirFunc
 
 		ignoreStacks := make(map[string][]ignoreSource)
+
+		// 1. Initialize Global Ignores
 		if w.opts.GlobalIgnore != nil {
 			ignoreStacks["."] = []ignoreSource{{matcher: w.opts.GlobalIgnore, source: "global"}}
 		} else {
 			ignoreStacks["."] = []ignoreSource{}
 		}
 
+		// 2. Load Ancestor Ignores (e.g. project root .gitignore when running in /src)
+		// We can only do this reliably if we are running against the OS filesystem (cwd).
+		if cwd, err := os.Getwd(); err == nil && w.opts.IgnoreEnabled {
+			ancestors := loadAncestorIgnores(cwd, w.opts.OnIgnoreFileLoaded)
+			// Append ancestors to the base stack.
+			ignoreStacks["."] = append(ignoreStacks["."], ancestors...)
+		}
+
+		// 3. Pre-load ignore stacks for parents of the requested roots.
 		for _, root := range roots {
 			cleanRoot := path.Clean(root)
 			if cleanRoot == "." || cleanRoot == "/" {
@@ -122,13 +134,12 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 					// Inherit from parent
 					parentStack, ok := ignoreStacks[parent]
 					if !ok {
-						// Fallback if parent not found (shouldn't happen due to order)
 						if w.opts.GlobalIgnore != nil {
 							parentStack = []ignoreSource{{matcher: w.opts.GlobalIgnore, source: "global"}}
 						}
 					}
 
-					local := loadLocalIgnores(filesystem, currentPath)
+					local := loadLocalIgnores(filesystem, currentPath, w.opts.OnIgnoreFileLoaded)
 					newStack := append([]ignoreSource{}, parentStack...)
 					newStack = append(newStack, local...)
 					ignoreStacks[currentPath] = newStack
@@ -234,7 +245,7 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 				}
 
 				if d.IsDir() {
-					local := loadLocalIgnores(filesystem, p)
+					local := loadLocalIgnores(filesystem, p, w.opts.OnIgnoreFileLoaded)
 					newStack := append([]ignoreSource{}, currentStack...)
 					newStack = append(newStack, local...)
 					ignoreStacks[p] = newStack
@@ -284,14 +295,52 @@ func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
 	return out
 }
 
-func loadLocalIgnores(fsys fs.FS, dir string) []ignoreSource {
+func loadLocalIgnores(fsys fs.FS, dir string, onLoad func(path string, isAncestor bool)) []ignoreSource {
 	names := []string{".gitignore", ".ignore", ".lxignore"}
 	var sources []ignoreSource
 	for _, name := range names {
 		target := path.Join(dir, name)
 		if data, err := fs.ReadFile(fsys, target); err == nil {
+			if onLoad != nil {
+				onLoad(target, false)
+			}
 			m := gitignore.NewGitIgnoreFromReader(dir, strings.NewReader(string(data)))
 			sources = append(sources, ignoreSource{matcher: m, source: target})
+		}
+	}
+	return sources
+}
+
+// loadAncestorIgnores climbs the directory tree from cwd to root/home
+// and loads any ignore files found.
+func loadAncestorIgnores(cwd string, onLoad func(path string, isAncestor bool)) []ignoreSource {
+	var sources []ignoreSource
+
+	var pathStack []string
+	curr := filepath.Dir(cwd) // Start from parent
+
+	for {
+		if curr == "" || curr == "." || curr == "/" || curr == filepath.Dir(curr) {
+			break
+		}
+		pathStack = append(pathStack, curr)
+		curr = filepath.Dir(curr)
+	}
+
+	// Iterate from Root down to Parent
+	for i := len(pathStack) - 1; i >= 0; i-- {
+		dir := pathStack[i]
+
+		names := []string{".gitignore", ".ignore", ".lxignore"}
+		for _, name := range names {
+			target := filepath.Join(dir, name)
+			if data, err := os.ReadFile(target); err == nil {
+				if onLoad != nil {
+					onLoad(target, true)
+				}
+				m := gitignore.NewGitIgnoreFromReader(".", strings.NewReader(string(data)))
+				sources = append(sources, ignoreSource{matcher: m, source: target})
+			}
 		}
 	}
 	return sources
