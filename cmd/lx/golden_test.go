@@ -140,6 +140,14 @@ func TestGolden(t *testing.T) {
 			"-s", "Tests", "-E", "-i", "*_test.go", ".",
 		}},
 		{name: "101_stdin_null_terminated", args: []string{"-0"}, stdin: "main.go\x00README.md\x00spaces/file with spaces.txt\x00"},
+
+		// This test ensures that when we walk a subdirectory, we still respect
+		// the .gitignore files located in the parent directories.
+		// Structure:
+		//   .gitignore (ignores *.tmp)
+		//   parent_ignore_test/level1/level2/ignore_me.tmp
+		//   parent_ignore_test/level1/level2/keep_me.go
+		{name: "102_walk_nested_respects_root_ignore", args: []string{"parent_ignore_test/level1/level2"}},
 	}
 
 	for _, tc := range cases {
@@ -290,7 +298,8 @@ func setupComplexFixture(t *testing.T) string {
 	create("README.md", "# Project\nDocumentation here.", 0644)
 	create("main.go", "package main\nfunc main() {}", 0644)
 	create("main_test.go", "package main\nimport \"testing\"", 0644)
-	create(".gitignore", "bin/\nsecret/\n", 0644)
+	// Added *.tmp to gitignore to test parent ignore traversal
+	create(".gitignore", "bin/\nsecret/\n*.tmp\n", 0644)
 	create(".hidden", "i am hidden", 0644)
 
 	create("pkg/util.go", "package pkg", 0644)
@@ -342,6 +351,10 @@ func setupComplexFixture(t *testing.T) string {
 	create("ignore_test/foo.go", "package foo", 0644)
 	create("ignore_test/bar.go", "package bar", 0644)
 	create("ignore_test/.gitignore", "bar.go", 0644)
+
+	// Files for testing parent ignore rules deep in the tree
+	create("parent_ignore_test/level1/level2/ignore_me.tmp", "ignore", 0644)
+	create("parent_ignore_test/level1/level2/keep_me.go", "package level2", 0644)
 
 	t.Cleanup(func() {
 		os.Chmod(filepath.Join(dir, "secret/locked.txt"), 0644)

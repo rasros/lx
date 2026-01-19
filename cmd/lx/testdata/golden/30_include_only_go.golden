@@ -1,32 +1,38 @@
 --- STDOUT ---
-[1/5] ignore_test/foo.go (1 rows)
+[1/6] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[2/5] links/link_to_main.go (~1 rows)
+[2/6] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[3/5] main.go (2 rows)
+[3/6] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[4/5] main_test.go (2 rows)
+[4/6] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[5/5] pkg/util.go (1 rows)
+[5/6] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+---
+```go
+package level2
+```
+
+[6/6] pkg/util.go (1 rows)
 ---
 ```go
 package pkg

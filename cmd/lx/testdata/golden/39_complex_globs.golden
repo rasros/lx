@@ -1,24 +1,30 @@
 --- STDOUT ---
-[1/4] ignore_test/foo.go (1 rows)
+[1/5] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[2/4] links/link_to_main.go (~1 rows)
+[2/5] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[3/4] pkg/util.go (1 rows)
+[3/5] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+---
+```go
+package level2
+```
+
+[4/5] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[4/4] src/script.py (1 rows)
+[5/5] src/script.py (1 rows)
 ---
 ```python
 print('hello')

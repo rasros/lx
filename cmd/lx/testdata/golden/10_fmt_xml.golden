@@ -125,20 +125,27 @@ import "testing"
   </document>
 
   <document index="18" language="go" rows="1">
+    <source>parent_ignore_test/level1/level2/keep_me.go</source>
+    <document_content>
+package level2
+    </document_content>
+  </document>
+
+  <document index="19" language="go" rows="1">
     <source>pkg/util.go</source>
     <document_content>
 package pkg
     </document_content>
   </document>
 
-  <document index="19" language="text" rows="1">
+  <document index="20" language="text" rows="1">
     <source>spaces/file with spaces.txt</source>
     <document_content>
 content with spaces
     </document_content>
   </document>
 
-  <document index="20" language="text" rows="100">
+  <document index="21" language="text" rows="100">
     <source>src/large.txt</source>
     <document_content>
 Line xxxxxxxxxx
@@ -244,14 +251,14 @@ Line xxxxxxxxxx
     </document_content>
   </document>
 
-  <document index="21" language="python" rows="1">
+  <document index="22" language="python" rows="1">
     <source>src/script.py</source>
     <document_content>
 print('hello')
     </document_content>
   </document>
 
-  <document index="22">
+  <document index="23">
     <source>/ROOT/links/broken_link</source>
     <error>open /ROOT/links/broken_link: FILE_NOT_FOUND</error>
   </document>
