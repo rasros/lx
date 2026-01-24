@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -19,6 +20,7 @@ var update = flag.Bool("update", false, "update .golden files")
 
 func TestGolden(t *testing.T) {
 	workDir := setupComplexFixture(t)
+	// workDir is now a subdirectory of t.TempDir(), so explicit cleanup is good practice
 	defer os.RemoveAll(workDir)
 
 	// Resolve canonical path to handle OS-specific temp directory behaviors
@@ -26,6 +28,7 @@ func TestGolden(t *testing.T) {
 
 	wd, _ := os.Getwd()
 	defer os.Chdir(wd)
+	// We chdir into the 'content' subdirectory
 	if err := os.Chdir(workDir); err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +250,7 @@ func normalizeOutput(root, canonicalRoot, stdout, stderr string) string {
 		// Normalize timestamps in debug logs
 		s = regexp.MustCompile(`time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(?:[+-]\d{2}:\d{2}|Z)`).ReplaceAllString(s, "time=FIXED")
 
-		// Normalize global ignore path
+		// Sanitize the global ignore path
 		s = regexp.MustCompile(`msg="Loaded global ignore file" path=.*`).ReplaceAllString(s, `msg="Loaded global ignore file" path=GLOBAL_IGNORE`)
 
 		return s
@@ -259,9 +262,13 @@ func normalizeOutput(root, canonicalRoot, stdout, stderr string) string {
 		sb.WriteString("\n")
 	}
 
+	// SORT STDERR LINES to handle non-deterministic order of concurrent errors
 	sb.WriteString("\n--- STDERR ---\n")
-	sb.WriteString(clean(stderr))
-	if !strings.HasSuffix(stderr, "\n") {
+	stderrClean := clean(stderr)
+	lines := strings.Split(strings.TrimSpace(stderrClean), "\n")
+	sort.Strings(lines)
+	if len(lines) > 0 && lines[0] != "" {
+		sb.WriteString(strings.Join(lines, "\n"))
 		sb.WriteString("\n")
 	}
 
@@ -269,7 +276,17 @@ func normalizeOutput(root, canonicalRoot, stdout, stderr string) string {
 }
 
 func setupComplexFixture(t *testing.T) string {
-	dir := t.TempDir()
+	root := t.TempDir()
+
+	// 1. Setup Mock Global Config (Outside the walked 'content' directory)
+	configDir := filepath.Join(root, "mock_config")
+	os.MkdirAll(filepath.Join(configDir, "lx"), 0755)
+	os.WriteFile(filepath.Join(configDir, "lx", "ignore"), []byte(""), 0644)
+	t.Setenv("XDG_CONFIG_HOME", configDir)
+
+	// 2. Setup Content (The directory we will Chdir into and walk)
+	dir := filepath.Join(root, "content")
+	os.MkdirAll(dir, 0755)
 
 	create := func(path, content string, perm os.FileMode) {
 		fp := filepath.Join(dir, path)
@@ -290,14 +307,6 @@ func setupComplexFixture(t *testing.T) string {
 		os.MkdirAll(filepath.Dir(fp), 0755)
 		_ = os.Symlink(oldname, fp)
 	}
-
-	// Create a fake global configuration for the test environment
-	// This ensures consistency between local dev and CI runners.
-	fakeGlobalConfig := filepath.Join(dir, "global_config")
-	os.MkdirAll(filepath.Join(fakeGlobalConfig, "lx"), 0755)
-	// Create an empty ignore file so the debug log always fires
-	os.WriteFile(filepath.Join(fakeGlobalConfig, "lx", "ignore"), []byte(""), 0644)
-	t.Setenv("XDG_CONFIG_HOME", fakeGlobalConfig)
 
 	create("README.md", "# Project\nDocumentation here.", 0644)
 	create("main.go", "package main\nfunc main() {}", 0644)

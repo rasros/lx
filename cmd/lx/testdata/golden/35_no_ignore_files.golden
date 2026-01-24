@@ -1,149 +1,147 @@
 --- STDOUT ---
-[1/29] README.md (2 rows)
+[1/28] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[2/29] bin/data.bin - binary file skipped (4 B)
-[3/29] bin/empty.txt (0 rows)
+[2/28] bin/data.bin - binary file skipped (4 B)
+[3/28] bin/empty.txt (0 rows)
 
-[4/29] configs/custom_sections.yaml (1 rows)
+[4/28] configs/custom_sections.yaml (1 rows)
 ---
 ```yaml
 section_header_template: "*** {{ .Body }} ***\n"
 ```
 
-[5/29] configs/custom_template.yaml (1 rows)
+[5/28] configs/custom_template.yaml (1 rows)
 ---
 ```yaml
 file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
-[6/29] configs/follow.yaml (1 rows)
+[6/28] configs/follow.yaml (1 rows)
 ---
 ```yaml
 follow_symlinks: true
 ```
 
-[7/29] configs/hidden.yaml (1 rows)
+[7/28] configs/hidden.yaml (1 rows)
 ---
 ```yaml
 show_hidden: true
 ```
 
-[8/29] configs/no_links.yaml (1 rows)
+[8/28] configs/no_links.yaml (1 rows)
 ---
 ```yaml
 no_file_links: true
 ```
 
-[9/29] doc/notes.txt (1 rows)
+[9/28] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[10/29] global_config/lx/ignore (0 rows)
-
-[11/29] ignore_test/bar.go (1 rows)
+[10/28] ignore_test/bar.go (1 rows)
 ---
 ```go
 package bar
 ```
 
-[12/29] ignore_test/foo.go (1 rows)
+[11/28] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[13/29] langs/Dockerfile (1 rows)
+[12/28] langs/Dockerfile (1 rows)
 ---
 ```dockerfile
 FROM scratch
 ```
 
-[14/29] langs/main.rs (1 rows)
+[13/28] langs/main.rs (1 rows)
 ---
 ```rust
 fn main() {}
 ```
 
-[15/29] langs/script_no_ext (2 rows)
+[14/28] langs/script_no_ext (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo hi
 ```
 
-[16/29] links/cycle_a/visible.txt (1 rows)
+[15/28] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[17/29] links/cycle_b/visible.txt (1 rows)
+[16/28] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[18/29] links/link_to_main.go (~1 rows)
+[17/28] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[19/29] links/safe_target/recursion.txt (1 rows)
+[18/28] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
 ```
 
-[20/29] main.go (2 rows)
+[19/28] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[21/29] main_test.go (2 rows)
+[20/28] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[22/29] parent_ignore_test/level1/level2/ignore_me.tmp (1 rows)
+[21/28] parent_ignore_test/level1/level2/ignore_me.tmp (1 rows)
 ---
 ```
 ignore
 ```
 
-[23/29] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+[22/28] parent_ignore_test/level1/level2/keep_me.go (1 rows)
 ---
 ```go
 package level2
 ```
 
-[24/29] pkg/util.go (1 rows)
+[23/28] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[25/29] secret/locked.txt - error: open secret/locked.txt: PERMISSION_DENIED
+[24/28] secret/locked.txt - error: open secret/locked.txt: PERMISSION_DENIED
 
-[26/29] spaces/file with spaces.txt (1 rows)
+[25/28] spaces/file with spaces.txt (1 rows)
 ---
 ```text
 content with spaces
 ```
 
-[27/29] src/large.txt (100 rows)
+[26/28] src/large.txt (100 rows)
 ---
 ```text
 Line xxxxxxxxxx
@@ -248,16 +246,16 @@ Line xxxxxxxxxx
 Line xxxxxxxxxx
 ```
 
-[28/29] src/script.py (1 rows)
+[27/28] src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
-[29/29] /ROOT/links/broken_link - error: open /ROOT/links/broken_link: FILE_NOT_FOUND
+[28/28] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
 
 
 --- STDERR ---
 [1;31mError:[0m Failed to access file during walk: open secret/locked_dir: PERMISSION_DENIED (path=secret/locked_dir)
+[1;31mError:[0m Failed to read file: open /ROOT/content/links/broken_link: FILE_NOT_FOUND (path=/ROOT/content/links/broken_link)
 [1;31mError:[0m Failed to read file: open secret/locked.txt: PERMISSION_DENIED (path=secret/locked.txt)
-[1;31mError:[0m Failed to read file: open /ROOT/links/broken_link: FILE_NOT_FOUND (path=/ROOT/links/broken_link)
