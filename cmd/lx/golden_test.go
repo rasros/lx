@@ -291,7 +291,6 @@ func setupComplexFixture(t *testing.T) string {
 	create("README.md", "# Project\nDocumentation here.", 0644)
 	create("main.go", "package main\nfunc main() {}", 0644)
 	create("main_test.go", "package main\nimport \"testing\"", 0644)
-	// Added *.tmp to gitignore to test parent ignore traversal
 	create(".gitignore", "bin/\nsecret/\n*.tmp\n", 0644)
 	create(".hidden", "i am hidden", 0644)
 
