@@ -140,13 +140,6 @@ func TestGolden(t *testing.T) {
 			"-s", "Tests", "-E", "-i", "*_test.go", ".",
 		}},
 		{name: "101_stdin_null_terminated", args: []string{"-0"}, stdin: "main.go\x00README.md\x00spaces/file with spaces.txt\x00"},
-
-		// This test ensures that when we walk a subdirectory, we still respect
-		// the .gitignore files located in the parent directories.
-		// Structure:
-		//   .gitignore (ignores *.tmp)
-		//   parent_ignore_test/level1/level2/ignore_me.tmp
-		//   parent_ignore_test/level1/level2/keep_me.go
 		{name: "102_walk_nested_respects_root_ignore", args: []string{"parent_ignore_test/level1/level2"}},
 	}
 
