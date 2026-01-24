@@ -244,8 +244,11 @@ func normalizeOutput(root, canonicalRoot, stdout, stderr string) string {
 		s = regexp.MustCompile(`(?i)(read .*: is a directory|The handle is invalid)`).ReplaceAllString(s, "IS_DIRECTORY_ERROR")
 		s = regexp.MustCompile(`(?i)(The system cannot find the file specified|no such file or directory)`).ReplaceAllString(s, "FILE_NOT_FOUND")
 
-		// Normalize timestamps in debug logs or file metadata
+		// Normalize timestamps in debug logs
 		s = regexp.MustCompile(`time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(?:[+-]\d{2}:\d{2}|Z)`).ReplaceAllString(s, "time=FIXED")
+
+		// Normalize global ignore path
+		s = regexp.MustCompile(`msg="Loaded global ignore file" path=.*`).ReplaceAllString(s, `msg="Loaded global ignore file" path=GLOBAL_IGNORE`)
 
 		return s
 	}
@@ -287,6 +290,14 @@ func setupComplexFixture(t *testing.T) string {
 		os.MkdirAll(filepath.Dir(fp), 0755)
 		_ = os.Symlink(oldname, fp)
 	}
+
+	// Create a fake global configuration for the test environment
+	// This ensures consistency between local dev and CI runners.
+	fakeGlobalConfig := filepath.Join(dir, "global_config")
+	os.MkdirAll(filepath.Join(fakeGlobalConfig, "lx"), 0755)
+	// Create an empty ignore file so the debug log always fires
+	os.WriteFile(filepath.Join(fakeGlobalConfig, "lx", "ignore"), []byte(""), 0644)
+	t.Setenv("XDG_CONFIG_HOME", fakeGlobalConfig)
 
 	create("README.md", "# Project\nDocumentation here.", 0644)
 	create("main.go", "package main\nfunc main() {}", 0644)
