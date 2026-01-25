@@ -18,6 +18,12 @@ import (
 
 var update = flag.Bool("update", false, "update .golden files")
 
+type goldenTestCase struct {
+	name  string
+	args  []string
+	stdin string
+}
+
 func TestGolden(t *testing.T) {
 	workDir := setupComplexFixture(t)
 	// workDir is now a subdirectory of t.TempDir(), so explicit cleanup is good practice
@@ -26,18 +32,15 @@ func TestGolden(t *testing.T) {
 	// Resolve canonical path to handle OS-specific temp directory behaviors
 	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
 
-	wd, _ := os.Getwd()
-	defer os.Chdir(wd)
+	pkgDir, _ := os.Getwd()
+	defer os.Chdir(pkgDir)
+
 	// We chdir into the 'content' subdirectory
 	if err := os.Chdir(workDir); err != nil {
 		t.Fatal(err)
 	}
 
-	cases := []struct {
-		name  string
-		args  []string
-		stdin string
-	}{
+	cases := []goldenTestCase{
 		// --- 001-009: Basic Walk & Discovery ---
 		{name: "001_walk_default", args: []string{"."}},
 		{name: "002_walk_compact", args: []string{"-n0", "."}},
@@ -146,84 +149,7 @@ func TestGolden(t *testing.T) {
 		{name: "102_walk_nested_respects_root_ignore", args: []string{"parent_ignore_test/level1/level2"}},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			outR, outW, _ := os.Pipe()
-			errR, errW, _ := os.Pipe()
-			inR, inW, _ := os.Pipe()
-
-			origOut := os.Stdout
-			origErr := os.Stderr
-			origIn := os.Stdin
-
-			defer func() {
-				os.Stdout = origOut
-				os.Stderr = origErr
-				os.Stdin = origIn
-			}()
-
-			os.Stdout = outW
-			os.Stderr = errW
-			os.Stdin = inR
-
-			go func() {
-				defer inW.Close()
-				if tc.stdin != "" {
-					io.WriteString(inW, tc.stdin)
-				}
-			}()
-
-			runArgs := append([]string{}, tc.args...)
-			hasStatsControl := false
-			for _, a := range runArgs {
-				if a == "--stats" || a == "--no-stats" || a == "-q" || a == "--quiet" {
-					hasStatsControl = true
-				}
-			}
-			// Default to no stats for stability in golden files unless explicitly testing them
-			if !hasStatsControl {
-				runArgs = append(runArgs, "--no-stats")
-			}
-
-			errChan := make(chan error, 1)
-			go func() {
-				defer outW.Close()
-				defer errW.Close()
-				errChan <- cli.Run(context.Background(), runArgs)
-			}()
-
-			var stdoutBuf, stderrBuf bytes.Buffer
-			_, _ = io.Copy(&stdoutBuf, outR)
-			_, _ = io.Copy(&stderrBuf, errR)
-
-			if err := <-errChan; err != nil {
-				// Errors are printed to stderr to allow testing expected failure modes
-				stderrBuf.WriteString("\nCLI Error: " + err.Error() + "\n")
-			}
-
-			fullOutput := normalizeOutput(workDir, canonicalWorkDir, stdoutBuf.String(), stderrBuf.String())
-
-			goldenPath := filepath.Join(wd, "testdata", "golden", tc.name+".golden")
-			if *update {
-				os.MkdirAll(filepath.Dir(goldenPath), 0755)
-				os.WriteFile(goldenPath, []byte(fullOutput), 0644)
-			}
-
-			wantBytes, err := os.ReadFile(goldenPath)
-			if err != nil {
-				if *update {
-					return
-				}
-				t.Fatalf("Golden file missing: %v. Run with -update", err)
-			}
-
-			if string(wantBytes) != fullOutput {
-				t.Errorf("Mismatch for %s.\nExpected len: %d\nGot len: %d\nCheck testdata/golden/%s.golden",
-					tc.name, len(wantBytes), len(fullOutput), tc.name)
-				_ = os.WriteFile(goldenPath+".actual", []byte(fullOutput), 0644)
-			}
-		})
-	}
+	runGoldenTests(t, cases, pkgDir, workDir, canonicalWorkDir)
 }
 
 func TestGoldenRelativePaths(t *testing.T) {
@@ -233,8 +159,8 @@ func TestGoldenRelativePaths(t *testing.T) {
 	// Resolve canonical path for normalization
 	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
 
-	wd, _ := os.Getwd()
-	defer os.Chdir(wd)
+	pkgDir, _ := os.Getwd()
+	defer os.Chdir(pkgDir)
 
 	// CHDIR into 'src' so we can test accessing files in the parent directory via "../"
 	targetDir := filepath.Join(workDir, "src")
@@ -242,11 +168,12 @@ func TestGoldenRelativePaths(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cases := []struct {
-		name  string
-		args  []string
-		stdin string
-	}{
+	// Capture the exact path string the CLI will discover via filepath.Abs("..")
+	// This ensures we scrub the path present in debug logs even if it differs from t.TempDir()
+	// due to symlinks (e.g. /var vs /private/var on macOS).
+	perceivedRoot, _ := filepath.Abs("..")
+
+	cases := []goldenTestCase{
 		// --- 200-219: Basic Navigation ---
 		{name: "200_relative_parent_file", args: []string{"../README.md"}},
 		{name: "201_relative_sibling_file", args: []string{"../pkg/util.go"}},
@@ -290,6 +217,10 @@ func TestGoldenRelativePaths(t *testing.T) {
 		{name: "262_symlink_follow_relative", args: []string{"--follow", "../links/loop"}},
 	}
 
+	runGoldenTests(t, cases, pkgDir, workDir, canonicalWorkDir, perceivedRoot)
+}
+
+func runGoldenTests(t *testing.T, cases []goldenTestCase, pkgDir string, scrubPaths ...string) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			outR, outW, _ := os.Pipe()
@@ -318,7 +249,16 @@ func TestGoldenRelativePaths(t *testing.T) {
 			}()
 
 			// Ensure stable output for golden files
-			runArgs := append(tc.args, "--no-stats")
+			runArgs := append([]string{}, tc.args...)
+			hasStatsControl := false
+			for _, a := range runArgs {
+				if a == "--stats" || a == "--no-stats" || a == "-q" || a == "--quiet" {
+					hasStatsControl = true
+				}
+			}
+			if !hasStatsControl {
+				runArgs = append(runArgs, "--no-stats")
+			}
 
 			errChan := make(chan error, 1)
 			go func() {
@@ -335,11 +275,9 @@ func TestGoldenRelativePaths(t *testing.T) {
 				stderrBuf.WriteString("\nCLI Error: " + err.Error() + "\n")
 			}
 
-			// We pass 'workDir' (the fixture root) to normalizeOutput.
-			fullOutput := normalizeOutput(workDir, canonicalWorkDir, stdoutBuf.String(), stderrBuf.String())
+			fullOutput := normalizeOutput(stdoutBuf.String(), stderrBuf.String(), scrubPaths...)
 
-			// Golden files are stored in the same place as the main test
-			goldenPath := filepath.Join(wd, "testdata", "golden", tc.name+".golden")
+			goldenPath := filepath.Join(pkgDir, "testdata", "golden", tc.name+".golden")
 			if *update {
 				os.MkdirAll(filepath.Dir(goldenPath), 0755)
 				os.WriteFile(goldenPath, []byte(fullOutput), 0644)
@@ -362,17 +300,19 @@ func TestGoldenRelativePaths(t *testing.T) {
 	}
 }
 
-func normalizeOutput(root, canonicalRoot, stdout, stderr string) string {
+func normalizeOutput(stdout, stderr string, roots ...string) string {
 	var sb strings.Builder
 
 	clean := func(s string) string {
-		s = strings.ReplaceAll(s, root, "/ROOT")
-		if canonicalRoot != "" && canonicalRoot != root {
-			s = strings.ReplaceAll(s, canonicalRoot, "/ROOT")
+		// Clean all possible roots (standard, canonical, perceived)
+		for _, r := range roots {
+			if r != "" {
+				s = strings.ReplaceAll(s, r, "/ROOT")
+			}
 		}
 
 		// Normalize stack traces or test path variations
-		s = regexp.MustCompile(`(/?\w+)+/TestGolden\d+/\d+`).ReplaceAllString(s, "/ROOT")
+		s = regexp.MustCompile(`(/?\w+)+/TestGolden\w+/\d+`).ReplaceAllString(s, "/ROOT")
 
 		if runtime.GOOS == "windows" {
 			s = strings.ReplaceAll(s, "\\", "/")
