@@ -1,9 +1,0 @@
---- STDOUT ---
-links/cycle_a/visible.txt (1 rows)
----
-```text
-a
-```
-
-
---- STDERR ---
