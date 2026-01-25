@@ -38,101 +38,101 @@ func TestGolden(t *testing.T) {
 		args  []string
 		stdin string
 	}{
-		// --- 01-09: Basic Walk & Discovery ---
-		{name: "01_walk_default", args: []string{"."}},
-		{name: "02_walk_compact", args: []string{"-n0", "."}},
-		{name: "03_specific_file", args: []string{"main.go"}},
-		{name: "04_multiple_roots", args: []string{"pkg", "README.md"}},
-		{name: "05_walk_subdir", args: []string{"src"}},
-		{name: "06_walk_parent_ref", args: []string{"src/../pkg"}},
-		{name: "07_walk_dot_slash", args: []string{"./src"}},
+		// --- 001-009: Basic Walk & Discovery ---
+		{name: "001_walk_default", args: []string{"."}},
+		{name: "002_walk_compact", args: []string{"-n0", "."}},
+		{name: "003_specific_file", args: []string{"main.go"}},
+		{name: "004_multiple_roots", args: []string{"pkg", "README.md"}},
+		{name: "005_walk_subdir", args: []string{"src"}},
+		{name: "006_walk_parent_ref", args: []string{"src/../pkg"}},
+		{name: "007_walk_dot_slash", args: []string{"./src"}},
 
-		// --- 10-19: Formatting Outputs ---
-		{name: "10_fmt_xml", args: []string{"--xml", "."}},
-		{name: "11_fmt_html", args: []string{"--html", "main.go", "README.md"}},
-		{name: "12_fmt_markdown_explicit", args: []string{"--md", "main.go"}},
-		{name: "13_fmt_xml_sections", args: []string{"--xml", "-s", "Core", "main.go", "-s", "Docs", "README.md"}},
-		{name: "14_fmt_html_sections", args: []string{"--html", "-s", "Core", "main.go"}},
-		{name: "15_fmt_markdown_no_fences", args: []string{"-y", "configs/custom_template.yaml", "main.go"}},
+		// --- 010-019: Formatting Outputs ---
+		{name: "010_fmt_xml", args: []string{"--xml", "."}},
+		{name: "011_fmt_html", args: []string{"--html", "main.go", "README.md"}},
+		{name: "012_fmt_markdown_explicit", args: []string{"--md", "main.go"}},
+		{name: "013_fmt_xml_sections", args: []string{"--xml", "-s", "Core", "main.go", "-s", "Docs", "README.md"}},
+		{name: "014_fmt_html_sections", args: []string{"--html", "-s", "Core", "main.go"}},
+		{name: "015_fmt_markdown_no_fences", args: []string{"-y", "configs/custom_template.yaml", "main.go"}},
 
-		// --- 20-29: Sections & Prompts ---
-		{name: "20_sections_explicit", args: []string{"-s", "Docs", "doc", "-s", "Source", "src"}},
-		{name: "21_prompts_mixed", args: []string{"-p", "Analyze this:", "main.go", "-p", "Determine bug"}},
-		{name: "22_xml_complex_structure", args: []string{"--xml", "-s", "Context", "-p", "Read carefully", "README.md", "-s", "Code", "main.go"}},
-		{name: "23_prompt_only", args: []string{"-p", "Just a question", "-p", "Another question"}},
-		{name: "24_section_empty", args: []string{"-s", "Empty Section"}},
-		{name: "25_interleaved_prompts_files", args: []string{"main.go", "-p", "Explain above", "pkg/util.go", "-p", "Explain below"}},
+		// --- 020-029: Sections & Prompts ---
+		{name: "020_sections_explicit", args: []string{"-s", "Docs", "doc", "-s", "Source", "src"}},
+		{name: "021_prompts_mixed", args: []string{"-p", "Analyze this:", "main.go", "-p", "Determine bug"}},
+		{name: "022_xml_complex_structure", args: []string{"--xml", "-s", "Context", "-p", "Read carefully", "README.md", "-s", "Code", "main.go"}},
+		{name: "023_prompt_only", args: []string{"-p", "Just a question", "-p", "Another question"}},
+		{name: "024_section_empty", args: []string{"-s", "Empty Section"}},
+		{name: "025_interleaved_prompts_files", args: []string{"main.go", "-p", "Explain above", "pkg/util.go", "-p", "Explain below"}},
 
-		// --- 30-39: Filtering (Include/Exclude) ---
-		{name: "30_include_only_go", args: []string{"-i", "*.go", "."}},
-		{name: "31_exclude_tests", args: []string{"-e", "*_test.go", "."}},
-		{name: "32_mixed_filters", args: []string{"-i", "*.go", "-e", "*_test.go", "."}},
-		{name: "33_filter_reset", args: []string{"-i", "*.md", ".", "-E", "-s", "All", "."}},
-		{name: "34_hidden_files", args: []string{"-H", "."}},
-		{name: "35_no_ignore_files", args: []string{"--no-ignore", "."}},
-		{name: "36_exclude_dir", args: []string{"-e", "src", "."}},
-		{name: "37_include_path_match", args: []string{"-i", "src/script.py", "."}},
-		{name: "38_nested_ignore_file", args: []string{"ignore_test"}},
-		{name: "39_complex_globs", args: []string{"-i", "**/*.{go,py}", "-e", "**/main*", "."}},
+		// --- 030-039: Filtering (Include/Exclude) ---
+		{name: "030_include_only_go", args: []string{"-i", "*.go", "."}},
+		{name: "031_exclude_tests", args: []string{"-e", "*_test.go", "."}},
+		{name: "032_mixed_filters", args: []string{"-i", "*.go", "-e", "*_test.go", "."}},
+		{name: "033_filter_reset", args: []string{"-i", "*.md", ".", "-E", "-s", "All", "."}},
+		{name: "034_hidden_files", args: []string{"-H", "."}},
+		{name: "035_no_ignore_files", args: []string{"--no-ignore", "."}},
+		{name: "036_exclude_dir", args: []string{"-e", "src", "."}},
+		{name: "037_include_path_match", args: []string{"-i", "src/script.py", "."}},
+		{name: "038_nested_ignore_file", args: []string{"ignore_test"}},
+		{name: "039_complex_globs", args: []string{"-i", "**/*.{go,py}", "-e", "**/main*", "."}},
 
-		// --- 40-49: Slicing & Line Numbers ---
-		{name: "40_lines_limit", args: []string{"--lines", "4", "."}},
-		{name: "41_line_numbers", args: []string{"-l", "main.go"}},
-		{name: "42_progressive_state", args: []string{
+		// --- 040-049: Slicing & Line Numbers ---
+		{name: "040_lines_limit", args: []string{"--lines", "4", "."}},
+		{name: "041_line_numbers", args: []string{"-l", "main.go"}},
+		{name: "042_progressive_state", args: []string{
 			"-s", "Raw", "README.md",
 			"-s", "Numbered", "-l", "main.go",
 			"-s", "Sliced", "-n", "2", "pkg/util.go",
 			"-s", "Reset", "-L", "-N", "src/script.py",
 		}},
-		{name: "43_head_tail", args: []string{"--head", "3", "src/large.txt", "--tail", "2", "src/large.txt"}},
-		{name: "44_tail_only", args: []string{"--tail", "5", "src/large.txt"}},
-		{name: "45_head_only", args: []string{"--head", "5", "src/large.txt"}},
-		{name: "46_head_tail_overlap", args: []string{"--head", "100", "--tail", "100", "src/large.txt"}},
-		{name: "47_lines_0_compact", args: []string{"-n", "0", "main.go"}},
-		{name: "48_slice_binary", args: []string{"--head", "5", "bin/data.bin"}},
+		{name: "043_head_tail", args: []string{"--head", "3", "src/large.txt", "--tail", "2", "src/large.txt"}},
+		{name: "044_tail_only", args: []string{"--tail", "5", "src/large.txt"}},
+		{name: "045_head_only", args: []string{"--head", "5", "src/large.txt"}},
+		{name: "046_head_tail_overlap", args: []string{"--head", "100", "--tail", "100", "src/large.txt"}},
+		{name: "047_lines_0_compact", args: []string{"-n", "0", "main.go"}},
+		{name: "048_slice_binary", args: []string{"--head", "5", "bin/data.bin"}},
 
-		// --- 50-59: Symlinks ---
-		{name: "50_symlinks_default", args: []string{"links"}},
-		{name: "51_symlinks_follow", args: []string{"--follow", "links"}},
-		{name: "52_symlinks_dag", args: []string{"--follow", "links/loop"}},
-		{name: "53_symlinks_infinite_cycle", args: []string{"--follow", "links/cycle_a"}},
-		{name: "54_file_links_explicit", args: []string{"--links", "links"}},
-		{name: "55_no_file_links", args: []string{"--no-links", "links"}},
-		{name: "56_follow_dirs_no_file_links", args: []string{"--follow", "--no-links", "links"}},
-		{name: "57_broken_symlink", args: []string{"links/broken_link"}},
+		// --- 050-059: Symlinks ---
+		{name: "050_symlinks_default", args: []string{"links"}},
+		{name: "051_symlinks_follow", args: []string{"--follow", "links"}},
+		{name: "052_symlinks_dag", args: []string{"--follow", "links/loop"}},
+		{name: "053_symlinks_infinite_cycle", args: []string{"--follow", "links/cycle_a"}},
+		{name: "054_file_links_explicit", args: []string{"--links", "links"}},
+		{name: "055_no_file_links", args: []string{"--no-links", "links"}},
+		{name: "056_follow_dirs_no_file_links", args: []string{"--follow", "--no-links", "links"}},
+		{name: "057_broken_symlink", args: []string{"links/broken_link"}},
 
-		// --- 60-69: Errors & Edge Cases ---
-		{name: "60_access_denied_file", args: []string{"secret/locked.txt"}},
-		{name: "61_access_denied_dir", args: []string{"secret/locked_dir"}},
-		{name: "62_missing_file", args: []string{"nonexistent.go"}},
-		{name: "63_spaces_in_filename", args: []string{"spaces/file with spaces.txt"}},
-		{name: "64_spaces_in_dirname", args: []string{"spaces"}},
-		{name: "65_stdin_content", args: []string{"-"}, stdin: "Some content from pipe\nLine 2"},
-		{name: "66_stdin_and_files", args: []string{"main.go", "-"}, stdin: "Piped content"},
-		{name: "67_stdin_file_list", args: []string{}, stdin: "main.go\nREADME.md"},
+		// --- 060-069: Errors & Edge Cases ---
+		{name: "060_access_denied_file", args: []string{"secret/locked.txt"}},
+		{name: "061_access_denied_dir", args: []string{"secret/locked_dir"}},
+		{name: "062_missing_file", args: []string{"nonexistent.go"}},
+		{name: "063_spaces_in_filename", args: []string{"spaces/file with spaces.txt"}},
+		{name: "064_spaces_in_dirname", args: []string{"spaces"}},
+		{name: "065_stdin_content", args: []string{"-"}, stdin: "Some content from pipe\nLine 2"},
+		{name: "066_stdin_and_files", args: []string{"main.go", "-"}, stdin: "Piped content"},
+		{name: "067_stdin_file_list", args: []string{}, stdin: "main.go\nREADME.md"},
 
-		// --- 70-79: Stats & Verbosity ---
-		{name: "70_stats_forced", args: []string{"--stats", "main.go"}},
-		{name: "71_quiet_mode", args: []string{"-q", "main.go"}},
-		{name: "72_verbose_debug", args: []string{"-vv", "main.go"}},
-		{name: "73_verbose_flag", args: []string{"--verbose=debug", "main.go"}},
-		{name: "74_no_stats", args: []string{"--no-stats", "main.go"}},
+		// --- 070-079: Stats & Verbosity ---
+		{name: "070_stats_forced", args: []string{"--stats", "main.go"}},
+		{name: "071_quiet_mode", args: []string{"-q", "main.go"}},
+		{name: "072_verbose_debug", args: []string{"-vv", "main.go"}},
+		{name: "073_verbose_flag", args: []string{"--verbose=debug", "main.go"}},
+		{name: "074_no_stats", args: []string{"--no-stats", "main.go"}},
 
-		// --- 80-89: Detection (Binary, Lang, Empty) ---
-		{name: "80_binary_detection", args: []string{"bin/data.bin"}},
-		{name: "81_empty_file", args: []string{"bin/empty.txt"}},
-		{name: "82_lang_detection_rs", args: []string{"langs/main.rs"}},
-		{name: "83_lang_detection_py", args: []string{"src/script.py"}},
-		{name: "84_lang_detection_dockerfile", args: []string{"langs/Dockerfile"}},
-		{name: "85_lang_detection_shebang", args: []string{"langs/script_no_ext"}},
+		// --- 080-089: Detection (Binary, Lang, Empty) ---
+		{name: "080_binary_detection", args: []string{"bin/data.bin"}},
+		{name: "081_empty_file", args: []string{"bin/empty.txt"}},
+		{name: "082_lang_detection_rs", args: []string{"langs/main.rs"}},
+		{name: "083_lang_detection_py", args: []string{"src/script.py"}},
+		{name: "084_lang_detection_dockerfile", args: []string{"langs/Dockerfile"}},
+		{name: "085_lang_detection_shebang", args: []string{"langs/script_no_ext"}},
 
-		// --- 90-99: Config & Forced Flags ---
-		{name: "90_config_hidden", args: []string{"-y", "configs/hidden.yaml", "."}},
-		{name: "91_config_follow", args: []string{"-y", "configs/follow.yaml", "links"}},
-		{name: "92_config_override", args: []string{"-y", "configs/follow.yaml", "--no-follow", "links"}},
-		{name: "93_force_file_flag", args: []string{"-f", ".gitignore"}},
-		{name: "94_force_file_flag_excludes", args: []string{"-e", "*.go", "-f", "main.go"}},
-		{name: "95_config_custom_sections", args: []string{"-y", "configs/custom_sections.yaml", "-s", "Head", "main.go"}},
+		// --- 090-099: Config & Forced Flags ---
+		{name: "090_config_hidden", args: []string{"-y", "configs/hidden.yaml", "."}},
+		{name: "091_config_follow", args: []string{"-y", "configs/follow.yaml", "links"}},
+		{name: "092_config_override", args: []string{"-y", "configs/follow.yaml", "--no-follow", "links"}},
+		{name: "093_force_file_flag", args: []string{"-f", ".gitignore"}},
+		{name: "094_force_file_flag_excludes", args: []string{"-e", "*.go", "-f", "main.go"}},
+		{name: "095_config_custom_sections", args: []string{"-y", "configs/custom_sections.yaml", "-s", "Head", "main.go"}},
 
 		// --- 100+: Complex Combinations ---
 		{name: "100_complex_review_bundle", args: []string{
@@ -203,6 +203,91 @@ func TestGolden(t *testing.T) {
 
 			fullOutput := normalizeOutput(workDir, canonicalWorkDir, stdoutBuf.String(), stderrBuf.String())
 
+			goldenPath := filepath.Join(wd, "testdata", "golden", tc.name+".golden")
+			if *update {
+				os.MkdirAll(filepath.Dir(goldenPath), 0755)
+				os.WriteFile(goldenPath, []byte(fullOutput), 0644)
+			}
+
+			wantBytes, err := os.ReadFile(goldenPath)
+			if err != nil {
+				if *update {
+					return
+				}
+				t.Fatalf("Golden file missing: %v. Run with -update", err)
+			}
+
+			if string(wantBytes) != fullOutput {
+				t.Errorf("Mismatch for %s.\nExpected len: %d\nGot len: %d\nCheck testdata/golden/%s.golden",
+					tc.name, len(wantBytes), len(fullOutput), tc.name)
+				_ = os.WriteFile(goldenPath+".actual", []byte(fullOutput), 0644)
+			}
+		})
+	}
+}
+
+func TestGoldenRelativePaths(t *testing.T) {
+	workDir := setupComplexFixture(t)
+	defer os.RemoveAll(workDir)
+
+	// Resolve canonical path for normalization
+	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
+
+	wd, _ := os.Getwd()
+	defer os.Chdir(wd)
+
+	// CHDIR into 'src' so we can test accessing files in the parent directory via "../"
+	targetDir := filepath.Join(workDir, "src")
+	if err := os.Chdir(targetDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{name: "200_relative_parent_file", args: []string{"../README.md"}},
+		{name: "201_relative_sibling_file", args: []string{"../pkg/util.go"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			outR, outW, _ := os.Pipe()
+			errR, errW, _ := os.Pipe()
+
+			origOut := os.Stdout
+			origErr := os.Stderr
+
+			defer func() {
+				os.Stdout = origOut
+				os.Stderr = origErr
+			}()
+
+			os.Stdout = outW
+			os.Stderr = errW
+
+			// Ensure stable output for golden files
+			runArgs := append(tc.args, "--no-stats")
+
+			errChan := make(chan error, 1)
+			go func() {
+				defer outW.Close()
+				defer errW.Close()
+				errChan <- cli.Run(context.Background(), runArgs)
+			}()
+
+			var stdoutBuf, stderrBuf bytes.Buffer
+			_, _ = io.Copy(&stdoutBuf, outR)
+			_, _ = io.Copy(&stderrBuf, errR)
+
+			if err := <-errChan; err != nil {
+				stderrBuf.WriteString("\nCLI Error: " + err.Error() + "\n")
+			}
+
+			// We pass 'workDir' (the fixture root) to normalizeOutput.
+			fullOutput := normalizeOutput(workDir, canonicalWorkDir, stdoutBuf.String(), stderrBuf.String())
+
+			// Golden files are stored in the same place as the main test
 			goldenPath := filepath.Join(wd, "testdata", "golden", tc.name+".golden")
 			if *update {
 				os.MkdirAll(filepath.Dir(goldenPath), 0755)
