@@ -1,9 +1,0 @@
---- STDOUT ---
-langs/Dockerfile (1 rows)
----
-```dockerfile
-FROM scratch
-```
-
-
---- STDERR ---
