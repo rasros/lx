@@ -1,0 +1,21 @@
+--- STDOUT ---
+[1/3] links/cycle_a/visible.txt (1 rows)
+---
+```text
+a
+```
+
+[2/3] links/cycle_b/visible.txt (1 rows)
+---
+```text
+b
+```
+
+[3/3] links/safe_target/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+
+--- STDERR ---

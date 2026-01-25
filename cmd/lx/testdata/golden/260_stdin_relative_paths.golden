@@ -1,0 +1,10 @@
+--- STDOUT ---
+stdin (2 rows)
+---
+```
+../README.md
+../pkg/util.go
+```
+
+
+--- STDERR ---

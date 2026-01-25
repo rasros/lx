@@ -1,0 +1,19 @@
+--- STDOUT ---
+[1/2] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+Check this
+
+
+[2/2] util.go (1 rows)
+---
+```go
+package pkg
+```
+
+
+--- STDERR ---

@@ -1,0 +1,14 @@
+--- STDOUT ---
+*** Parent ***
+## Parent
+---
+
+README.md (2 rows)
+---
+```markdown
+# Project
+Documentation here.
+```
+
+
+--- STDERR ---

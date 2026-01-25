@@ -1,0 +1,9 @@
+--- STDOUT ---
+langs/main.rs (1 rows)
+---
+```rust
+fn main() {}
+```
+
+
+--- STDERR ---

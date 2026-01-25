@@ -1,0 +1,9 @@
+--- STDOUT ---
+spaces/file with spaces.txt (1 rows)
+---
+```text
+content with spaces
+```
+
+
+--- STDERR ---

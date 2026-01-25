@@ -1,0 +1,6 @@
+--- STDOUT ---
+
+
+
+--- STDERR ---
+[1;31mError:[0m Failed to access file during walk: open secret/locked_dir: PERMISSION_DENIED (path=secret/locked_dir)

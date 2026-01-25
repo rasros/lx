@@ -1,0 +1,126 @@
+--- STDOUT ---
+## Docs
+---
+
+doc/notes.txt (1 rows)
+---
+```text
+some notes
+```
+
+## Source
+---
+
+[1/2] src/large.txt (100 rows)
+---
+```text
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+```
+
+[2/2] src/script.py (1 rows)
+---
+```python
+print('hello')
+```
+
+
+--- STDERR ---
