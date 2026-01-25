@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] parent_ignore_test/level1/level2/ignore_me.tmp (1 rows)
+---
+```
+ignore
+```
+
+[2/2] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+---
+```go
+package level2
+```
+
+
+--- STDERR ---

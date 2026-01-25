@@ -1,0 +1,222 @@
+--- STDOUT ---
+[1/20] README.md (2 rows)
+---
+```markdown
+# Project
+Documentation here.
+```
+
+[2/20] configs/custom_sections.yaml (1 rows)
+---
+```yaml
+section_header_template: "*** {{ .Body }} ***\n"
+```
+
+[3/20] configs/custom_template.yaml (1 rows)
+---
+```yaml
+file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
+```
+
+[4/20] configs/follow.yaml (1 rows)
+---
+```yaml
+follow_symlinks: true
+```
+
+[5/20] configs/hidden.yaml (1 rows)
+---
+```yaml
+show_hidden: true
+```
+
+[6/20] configs/no_links.yaml (1 rows)
+---
+```yaml
+no_file_links: true
+```
+
+[7/20] doc/notes.txt (1 rows)
+---
+```text
+some notes
+```
+
+[8/20] ignore_test/foo.go (1 rows)
+---
+```go
+package foo
+```
+
+[9/20] langs/Dockerfile (1 rows)
+---
+```dockerfile
+FROM scratch
+```
+
+[10/20] langs/script_no_ext (2 rows)
+---
+```bash
+#!/bin/bash
+echo hi
+```
+
+[11/20] links/cycle_a/visible.txt (1 rows)
+---
+```text
+a
+```
+
+[12/20] links/cycle_b/visible.txt (1 rows)
+---
+```text
+b
+```
+
+[13/20] links/link_to_main.go (~2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[14/20] links/safe_target/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+[15/20] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+---
+```go
+package level2
+```
+
+[16/20] pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
+
+[17/20] spaces/file with spaces.txt (1 rows)
+---
+```text
+content with spaces
+```
+
+[18/20] src/large.txt (100 rows)
+---
+```text
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+```
+
+[19/20] src/script.py (1 rows)
+---
+```python
+print('hello')
+```
+
+[20/20] tmp/TestGoldenRelativePaths3991034831/001/content/links/broken_link - error: open tmp/TestGoldenRelativePaths3991034831/001/content/links/broken_link: FILE_NOT_FOUND
+
+
+--- STDERR ---
+[1;31mError:[0m Failed to read file: open tmp/TestGoldenRelativePaths3991034831/001/content/links/broken_link: FILE_NOT_FOUND (path=tmp/TestGoldenRelativePaths3991034831/001/content/links/broken_link)

@@ -1,0 +1,31 @@
+--- STDOUT ---
+<section>
+  <section_name>Context</section_name>
+
+  <instruction>
+Read carefully
+  </instruction>
+
+  <document index="1" language="markdown" rows="2">
+    <source>README.md</source>
+    <document_content>
+# Project
+Documentation here.
+    </document_content>
+  </document>
+</section>
+
+<section>
+  <section_name>Code</section_name>
+
+  <document index="2" language="go" rows="2">
+    <source>main.go</source>
+    <document_content>
+package main
+func main() {}
+    </document_content>
+  </document>
+</section>
+
+
+--- STDERR ---

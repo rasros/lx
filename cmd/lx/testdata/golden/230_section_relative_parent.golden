@@ -1,0 +1,22 @@
+--- STDOUT ---
+## Root
+---
+
+README.md (2 rows)
+---
+```markdown
+# Project
+Documentation here.
+```
+
+## Lib
+---
+
+util.go (1 rows)
+---
+```go
+package pkg
+```
+
+
+--- STDERR ---

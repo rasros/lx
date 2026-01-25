@@ -1,0 +1,9 @@
+--- STDOUT ---
+util.go (1 rows)
+---
+```go
+1: package pkg
+```
+
+
+--- STDERR ---

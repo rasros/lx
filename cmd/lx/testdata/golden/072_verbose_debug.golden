@@ -1,0 +1,23 @@
+--- STDOUT ---
+main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---
+time=FIXED level=DEBUG msg="Configuration loaded" format=markdown ignore_enabled=true ignore_hidden=true ignore_dir_symlinks=true ignore_file_symlinks=false
+time=FIXED level=DEBUG msg="File accepted by walker" path=main.go size=27
+time=FIXED level=DEBUG msg="Initializing Walker" fs_root=. walk_path=main.go includes_count=0 excludes_count=0 ignore_enabled=true ignore_hidden=true ignore_dir_symlinks=true ignore_file_symlinks=false
+time=FIXED level=DEBUG msg="Loaded global ignore file" path=GLOBAL_IGNORE
+time=FIXED level=DEBUG msg="Logger initialized (early)" level=DEBUG
+time=FIXED level=DEBUG msg="Output set to stdout"
+time=FIXED level=DEBUG msg="Processing op" index=0 action=verbose value=true
+time=FIXED level=DEBUG msg="Processing op" index=1 action=verbose value=true
+time=FIXED level=DEBUG msg="Processing op" index=2 action=FILE value=main.go
+time=FIXED level=DEBUG msg="Processing op" index=3 action=no-stats value=true
+time=FIXED level=DEBUG msg="Processing operations" total_ops=4
+time=FIXED level=DEBUG msg="Walker finished" root=main.go files_found=1
+time=FIXED level=INFO msg="Executing stream pipeline..."

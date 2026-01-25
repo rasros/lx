@@ -1,0 +1,13 @@
+--- STDOUT ---
+<content>
+  <document index="1" language="markdown" rows="2">
+    <source>README.md</source>
+    <document_content>
+# Project
+Documentation here.
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---

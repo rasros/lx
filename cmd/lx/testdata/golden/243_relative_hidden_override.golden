@@ -1,0 +1,9 @@
+--- STDOUT ---
+.hidden (1 rows)
+---
+```
+i am hidden
+```
+
+
+--- STDERR ---
