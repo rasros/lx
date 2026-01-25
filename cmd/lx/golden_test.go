@@ -26,7 +26,6 @@ type goldenTestCase struct {
 
 func TestGolden(t *testing.T) {
 	workDir := setupComplexFixture(t)
-	// workDir is now a subdirectory of t.TempDir(), so explicit cleanup is good practice
 	defer os.RemoveAll(workDir)
 
 	// Resolve canonical path to handle OS-specific temp directory behaviors
