@@ -215,8 +215,8 @@ Line xxxxxxxxxx
 print('hello')
 ```
 
-[20/20] tmp/TestGoldenRelativePaths3991034831/001/content/links/broken_link - error: open tmp/TestGoldenRelativePaths3991034831/001/content/links/broken_link: FILE_NOT_FOUND
+[20/20] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
 
 
 --- STDERR ---
-[1;31mError:[0m Failed to read file: open tmp/TestGoldenRelativePaths3991034831/001/content/links/broken_link: FILE_NOT_FOUND (path=tmp/TestGoldenRelativePaths3991034831/001/content/links/broken_link)
+[1;31mError:[0m Failed to read file: open /ROOT/content/links/broken_link: FILE_NOT_FOUND (path=/ROOT/content/links/broken_link)
