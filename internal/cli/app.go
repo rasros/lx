@@ -232,8 +232,15 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				clean := filepath.Clean(rootPath)
 				if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
 					abs, _ := filepath.Abs(clean)
-					fsRoot = abs
-					walkPath = "."
+
+					// Fix: os.DirFS fails if rooted at a file. Check and split if necessary.
+					if info, err := os.Stat(abs); err == nil && !info.IsDir() {
+						fsRoot = filepath.Dir(abs)
+						walkPath = filepath.Base(abs)
+					} else {
+						fsRoot = abs
+						walkPath = "."
+					}
 				} else {
 					fsRoot = "."
 					walkPath = clean
