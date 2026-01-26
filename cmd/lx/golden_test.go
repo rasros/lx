@@ -127,6 +127,9 @@ func TestGolden(t *testing.T) {
 		{name: "083_lang_detection_py", args: []string{"src/script.py"}},
 		{name: "084_lang_detection_dockerfile", args: []string{"langs/Dockerfile"}},
 		{name: "085_lang_detection_shebang", args: []string{"langs/script_no_ext"}},
+		{name: "086_render_image_md", args: []string{"assets/logo.png"}},
+		{name: "087_render_image_html", args: []string{"--html", "assets/logo.png"}},
+		{name: "088_render_image_compact", args: []string{"-n0", "assets/logo.png"}},
 
 		// --- 090-099: Config & Forced Flags ---
 		{name: "090_config_hidden", args: []string{"-y", "configs/hidden.yaml", "."}},
@@ -442,6 +445,9 @@ func setupComplexFixture(t *testing.T) string {
 	// Files for testing parent ignore rules deep in the tree
 	create("parent_ignore_test/level1/level2/ignore_me.tmp", "ignore", 0644)
 	create("parent_ignore_test/level1/level2/keep_me.go", "package level2", 0644)
+
+	// Image test asset
+	create("assets/logo.png", "\x89PNG\r\n\x1a\n\x00\x00\x00\x0D", 0644)
 
 	t.Cleanup(func() {
 		os.Chmod(filepath.Join(dir, "secret/locked.txt"), 0644)
