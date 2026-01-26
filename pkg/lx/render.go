@@ -51,6 +51,8 @@ func (p *processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 
 		if fCtx.IsError {
 			templateToUse = p.engine.FileError
+		} else if fCtx.IsImage {
+			templateToUse = p.engine.FileContent
 		} else if fCtx.IsBinary {
 			templateToUse = p.engine.FileBinary
 		} else if fCtx.IsCompactView {
