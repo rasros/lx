@@ -1,5 +1,5 @@
 --- STDOUT ---
-data.bin - binary file skipped (4 B)
+../bin/data.bin - binary file skipped (4 B)
 
 
 --- STDERR ---

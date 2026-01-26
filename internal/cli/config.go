@@ -1,13 +1,11 @@
 package cli
 
 import (
-	"bytes"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/monochromegane/go-gitignore"
 	"github.com/rasros/lx/pkg/lx"
 	"gopkg.in/yaml.v3"
 )
@@ -74,7 +72,6 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			return err
 		}
 
-		// File Templates
 		if loaded.FileContentTemplate != "" {
 			lxCfg.FileContentTemplate = loaded.FileContentTemplate
 		}
@@ -91,7 +88,6 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			lxCfg.FileHeaderTemplate = loaded.FileHeaderTemplate
 		}
 
-		// Item Templates
 		if loaded.SectionTemplate != "" {
 			lxCfg.SectionTemplate = loaded.SectionTemplate
 		}
@@ -99,13 +95,13 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			lxCfg.PromptTemplate = loaded.PromptTemplate
 		}
 
-		// Group/Global Templates
 		if loaded.SectionHeaderTemplate != "" {
 			lxCfg.SectionHeaderTemplate = loaded.SectionHeaderTemplate
 		}
 		if loaded.SectionFooterTemplate != "" {
 			lxCfg.SectionFooterTemplate = loaded.SectionFooterTemplate
 		}
+
 		if loaded.OutputHeaderTemplate != "" {
 			lxCfg.OutputHeaderTemplate = loaded.OutputHeaderTemplate
 		}
@@ -120,7 +116,6 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			lxCfg.OutputFormat = loaded.OutputFormat
 		}
 
-		// Logic Flags
 		if loaded.FollowSymlinks != nil {
 			lxCfg.IgnoreDirSymlinks = !(*loaded.FollowSymlinks)
 		}
@@ -134,7 +129,6 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			lxCfg.IgnoreEnabled = *loaded.Ignore
 		}
 
-		// CLI Options
 		if loaded.OutputMode != "" {
 			mergedCli.OutputMode = loaded.OutputMode
 		}
@@ -163,11 +157,11 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		}
 	}
 
-	lxCfg.GlobalIgnore = loadGlobalIgnores()
 	return lxCfg, mergedCli, nil
 }
 
-func loadGlobalIgnores() gitignore.IgnoreMatcher {
+// LoadGlobalIgnorePatterns returns a slice of strings representing global ignore rules.
+func LoadGlobalIgnorePatterns() []string {
 	var lines []string
 	home, _ := os.UserHomeDir()
 	configDir, _ := os.UserConfigDir()
@@ -184,13 +178,15 @@ func loadGlobalIgnores() gitignore.IgnoreMatcher {
 	for _, c := range candidates {
 		if data, err := os.ReadFile(c); err == nil {
 			slog.Debug("Loaded global ignore file", "path", c)
-			lines = append(lines, strings.Split(string(data), "\n")...)
+			raw := strings.Split(string(data), "\n")
+			for _, line := range raw {
+				trimmed := strings.TrimSpace(line)
+				if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+					lines = append(lines, trimmed)
+				}
+			}
 		}
 	}
 
-	if len(lines) == 0 {
-		return nil
-	}
-	buf := bytes.NewBufferString(strings.Join(lines, "\n"))
-	return gitignore.NewGitIgnoreFromReader(".", buf)
+	return lines
 }

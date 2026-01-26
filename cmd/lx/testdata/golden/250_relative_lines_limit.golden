@@ -1,5 +1,5 @@
 --- STDOUT ---
-main.go (2 rows)
+../main.go (2 rows)
 ---
 ```go
 package main

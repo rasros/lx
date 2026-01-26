@@ -48,7 +48,7 @@ article > header {
 <main>
 <article id="file-1">
 <header>
- <a href="#file-1" aria-label="Link to this file"><strong>util.go</strong></a>
+ <a href="#file-1" aria-label="Link to this file"><strong>../pkg/util.go</strong></a>
  <small>(1 rows)</small>
 </header>
 <pre><code class="language-go">

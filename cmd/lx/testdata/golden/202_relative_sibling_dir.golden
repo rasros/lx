@@ -1,5 +1,5 @@
 --- STDOUT ---
-util.go (1 rows)
+../pkg/util.go (1 rows)
 ---
 ```go
 package pkg

@@ -1,359 +1,281 @@
 package lx
 
 import (
-	"context"
+	"bufio"
+	"bytes"
 	"io/fs"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
-	"sync"
 
-	"github.com/monochromegane/go-gitignore"
+	"github.com/bmatcuk/doublestar/v4"
 )
 
-// IgnoreReason provides a typed explanation for why a file was ignored.
-type IgnoreReason int
-
-const (
-	ReasonHidden IgnoreReason = iota
-	ReasonIgnoreFile
-	ReasonSymlinkDirSkipped
-	ReasonSymlinkFileSkipped
-	ReasonSymlinkCycle
-	ReasonFilterPattern
-)
-
-func (ir IgnoreReason) String() string {
-	switch ir {
-	case ReasonHidden:
-		return "hidden"
-	case ReasonIgnoreFile:
-		return "ignore-file"
-	case ReasonSymlinkDirSkipped:
-		return "symlink-dir-skipped"
-	case ReasonSymlinkFileSkipped:
-		return "symlink-file-skipped"
-	case ReasonSymlinkCycle:
-		return "symlink-cycle"
-	case ReasonFilterPattern:
-		return "filter-pattern"
-	default:
-		return "unknown"
-	}
+// Rule represents a single parsed line from the ignore file.
+type Rule struct {
+	Pattern  string
+	Negate   bool
+	BasePath string
 }
 
-// WalkerOptions configures the behavior of the file system walker.
-type WalkerOptions struct {
-	FS                 fs.FS
-	Root               string
-	IgnoreFileSymlinks bool
-	IgnoreDirSymlinks  bool
-	IgnoreHidden       bool
-	IgnoreEnabled      bool
-	GlobalIgnore       gitignore.IgnoreMatcher
-	Includes           []string
-	Excludes           []string
-	OnIgnore           func(path string, reason IgnoreReason, source string)
-	OnIgnoreFileLoaded func(path string, isAncestor bool)
-}
-
-// Walker encapsulates the logic for traversing a file system with filtering and ignore rules.
+// Walker configures the file traversal.
 type Walker struct {
-	opts WalkerOptions
+	BaseRules     []Rule
+	OverrideRules []Rule
 }
 
-type ignoreSource struct {
-	matcher gitignore.IgnoreMatcher
-	source  string
+// NewWalker initializes the walker.
+func NewWalker(basePatterns, overridePatterns []string) *Walker {
+	return &Walker{
+		BaseRules:     parseRules(basePatterns, ""),
+		OverrideRules: parseRules(overridePatterns, ""),
+	}
 }
 
-func NewWalker(opts WalkerOptions) *Walker {
-	return &Walker{opts: opts}
-}
+// IsMatch checks if a path matches a pattern. Exposed for CLI filtering.
+func IsMatch(pattern, relPath string) bool {
+	relPath = path.Clean(strings.ReplaceAll(relPath, "\\", "/"))
+	pattern = path.Clean(strings.ReplaceAll(pattern, "\\", "/"))
 
-// Walk starts a goroutine to traverse the roots and send discovered files to the returned channel.
-func (w *Walker) Walk(ctx context.Context, roots []string) <-chan InputFile {
-	out := make(chan InputFile)
-	filesystem := w.opts.FS
-	if filesystem == nil {
-		filesystem = os.DirFS(".")
+	name := path.Base(relPath)
+
+	// Floating pattern (e.g. "*.go")
+	if !strings.Contains(pattern, "/") {
+		matched, _ := doublestar.Match(pattern, name)
+		if matched {
+			return true
+		}
 	}
 
-	go func() {
-		defer close(out)
+	// Anchored pattern (e.g. "src/*.go")
+	matchPattern := strings.TrimPrefix(pattern, "/")
+	matched, _ := doublestar.Match(matchPattern, relPath)
+	return matched
+}
 
-		// Visited map for cycle detection (symlinks)
-		visitedDirs := make(map[string]struct{})
-		var visitedMu sync.RWMutex
+func parseRules(lines []string, basePath string) []Rule {
+	var rules []Rule
+	for _, p := range lines {
+		p = strings.TrimSpace(p)
+		if p == "" || strings.HasPrefix(p, "#") {
+			continue
+		}
 
-		markVisited := func(path string) bool {
-			visitedMu.Lock()
-			defer visitedMu.Unlock()
-			if _, exists := visitedDirs[path]; exists {
-				return true
-			}
-			visitedDirs[path] = struct{}{}
+		negate := false
+		if strings.HasPrefix(p, "!") {
+			negate = true
+			p = strings.TrimPrefix(p, "!")
+		}
+
+		p = path.Clean(strings.ReplaceAll(p, "\\", "/"))
+		p = strings.TrimRight(p, "/")
+
+		rules = append(rules, Rule{
+			Pattern:  p,
+			Negate:   negate,
+			BasePath: basePath,
+		})
+	}
+	return rules
+}
+
+func match(rule Rule, name, relPath string) bool {
+	targetPath := relPath
+	pattern := rule.Pattern
+
+	if rule.BasePath != "" && rule.BasePath != "." {
+		if !strings.HasPrefix(relPath, rule.BasePath+"/") {
 			return false
 		}
+		targetPath = strings.TrimPrefix(relPath, rule.BasePath+"/")
+	}
 
-		// 1. Initialize Base Stack (Global Ignores + Ancestors)
-		var baseStack []ignoreSource
-		if w.opts.GlobalIgnore != nil {
-			baseStack = append(baseStack, ignoreSource{matcher: w.opts.GlobalIgnore, source: "global"})
+	if !strings.Contains(pattern, "/") {
+		matched, _ := doublestar.Match(pattern, name)
+		if matched {
+			return true
+		}
+	}
+
+	matchPattern := strings.TrimPrefix(pattern, "/")
+	matched, _ := doublestar.Match(matchPattern, targetPath)
+	return matched
+}
+
+func shouldIgnore(relPath string, rules []Rule, parentIgnored bool) bool {
+	ignored := parentIgnored
+	name := path.Base(relPath)
+
+	for _, rule := range rules {
+		if match(rule, name, relPath) {
+			if rule.Negate {
+				ignored = false
+			} else {
+				ignored = true
+			}
+		}
+	}
+	return ignored
+}
+
+func hasNestedException(dirPath string, rules []Rule) bool {
+	dirParts := strings.Split(dirPath, "/")
+
+	for _, rule := range rules {
+		if !rule.Negate {
+			continue
 		}
 
-		// Load Ancestor Ignores only if we are likely on the OS filesystem
-		if cwd, err := os.Getwd(); err == nil && w.opts.IgnoreEnabled {
-			ancestors := loadAncestorIgnores(cwd, w.opts.OnIgnoreFileLoaded)
-			baseStack = append(baseStack, ancestors...)
+		// Check Scope (BasePath)
+		if rule.BasePath != "" && rule.BasePath != "." {
+			if !strings.HasPrefix(dirPath, rule.BasePath) && !strings.HasPrefix(rule.BasePath, dirPath) {
+				continue
+			}
 		}
 
-		// Optimization 1: Recursive function to avoid map lookups and slice copying
-		var recursiveWalk func(dir string, currentStack []ignoreSource)
-		recursiveWalk = func(dir string, currentStack []ignoreSource) {
-			select {
-			case <-ctx.Done():
-				return
-			default:
+		// Floating patterns (e.g. "*.go") match files in any subdirectory
+		if !strings.Contains(rule.Pattern, "/") {
+			return true
+		}
+
+		// Anchored Patterns
+		fullPattern := rule.Pattern
+		if rule.BasePath != "" && rule.BasePath != "." {
+			fullPattern = rule.BasePath + "/" + rule.Pattern
+		}
+		fullPattern = strings.TrimPrefix(fullPattern, "/")
+
+		if strings.Contains(fullPattern, "**") {
+			return true
+		}
+
+		ruleParts := strings.Split(fullPattern, "/")
+
+		if len(dirParts) >= len(ruleParts) {
+			continue
+		}
+
+		isParent := true
+		for i, part := range dirParts {
+			rulePart := ruleParts[i]
+			matched, _ := doublestar.Match(rulePart, part)
+			if !matched {
+				isParent = false
+				break
 			}
+		}
 
-			// Load local .gitignore for this directory
-			if w.opts.IgnoreEnabled {
-				local := loadLocalIgnores(filesystem, dir, w.opts.OnIgnoreFileLoaded)
-				if len(local) > 0 {
-					// Create a new slice sharing the backing array capacity where possible,
-					// but distinct for this stack frame.
-					newStack := make([]ignoreSource, len(currentStack)+len(local))
-					copy(newStack, currentStack)
-					copy(newStack[len(currentStack):], local)
-					currentStack = newStack
-				}
-			}
+		if isParent {
+			return true
+		}
+	}
+	return false
+}
 
-			// Optimization 4: Efficient handling of explicit file roots vs directories
-			// If 'dir' is a file (e.g. user passed specific file), ReadDir fails or returns nothing useful usually.
-			// However, this function is primarily called for Directories.
-			// Roots are handled separately below to kickstart this.
+func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
+	info, err := fs.Stat(fsys, root)
+	if err != nil {
+		return walkFn(root, nil, err)
+	}
 
-			entries, err := fs.ReadDir(filesystem, dir)
-			if err != nil {
-				out <- InputFile{Path: dir, LoadError: err}
-				return
-			}
+	if !info.IsDir() {
+		localRules := w.loadIgnoreFiles(fsys, ".")
+		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(localRules)+len(w.OverrideRules))
+		effectiveRules = append(effectiveRules, w.BaseRules...)
+		effectiveRules = append(effectiveRules, localRules...)
+		effectiveRules = append(effectiveRules, w.OverrideRules...)
 
-			for _, d := range entries {
-				name := d.Name()
-				fullPath := name
-				if dir != "." {
-					fullPath = path.Join(dir, name)
-				}
+		if shouldIgnore(root, effectiveRules, false) {
+			return nil
+		}
+		return walkFn(root, dirEntryAdapter{info}, nil)
+	}
 
-				// 1. Check Hidden (Fastest check)
-				if w.opts.IgnoreHidden && isHidden(name) {
-					if w.opts.OnIgnore != nil {
-						w.opts.OnIgnore(fullPath, ReasonHidden, "")
+	return w.recursiveWalk(fsys, root, w.BaseRules, walkFn, false)
+}
+
+func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkFn fs.WalkDirFunc, parentIgnored bool) error {
+	localRules := w.loadIgnoreFiles(fsys, dir)
+
+	effectiveRules := make([]Rule, 0, len(parentRules)+len(localRules)+len(w.OverrideRules))
+	effectiveRules = append(effectiveRules, parentRules...)
+	effectiveRules = append(effectiveRules, localRules...)
+	effectiveRules = append(effectiveRules, w.OverrideRules...)
+
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return walkFn(dir, nil, err)
+	}
+
+	for _, d := range entries {
+		childPath := d.Name()
+		if dir != "." {
+			childPath = path.Join(dir, d.Name())
+		}
+
+		isIgnored := shouldIgnore(childPath, effectiveRules, parentIgnored)
+
+		if d.IsDir() {
+			if isIgnored {
+				if hasNestedException(childPath, effectiveRules) {
+					if err := w.recursiveWalk(fsys, childPath, effectiveRules, walkFn, true); err != nil {
+						return err
 					}
 					continue
 				}
-
-				isSymlink := (d.Type() & fs.ModeSymlink) != 0
-				isDir := d.IsDir()
-
-				// Handle Symlinks to Directories
-				if isSymlink {
-					info, err := fs.Stat(filesystem, fullPath)
-					if err == nil && info.IsDir() {
-						isDir = true
-						if w.opts.IgnoreDirSymlinks {
-							if w.opts.OnIgnore != nil {
-								w.opts.OnIgnore(fullPath, ReasonSymlinkDirSkipped, "")
-							}
-							continue
-						}
-						// Cycle detection
-						if abs, err := filepath.Abs(fullPath); err == nil {
-							if realPath, err := filepath.EvalSymlinks(abs); err == nil {
-								if markVisited(realPath) {
-									if w.opts.OnIgnore != nil {
-										w.opts.OnIgnore(fullPath, ReasonSymlinkCycle, "")
-									}
-									continue
-								}
-							}
-						}
-					} else if w.opts.IgnoreFileSymlinks {
-						if w.opts.OnIgnore != nil {
-							w.opts.OnIgnore(fullPath, ReasonSymlinkFileSkipped, "")
-						}
-						continue
-					}
-				} else if isDir {
-					// Normal Directory Cycle check (for hardlinks or bind mounts context)
-					if abs, err := filepath.Abs(fullPath); err == nil {
-						if realPath, err := filepath.EvalSymlinks(abs); err == nil {
-							markVisited(realPath)
-						}
-					}
-				}
-
-				if isDir {
-					// Check Ignore (Gitignore) for Directory
-					if w.opts.IgnoreEnabled {
-						if ignored, source := isIgnored(currentStack, fullPath, true); ignored {
-							if w.opts.OnIgnore != nil {
-								w.opts.OnIgnore(fullPath, ReasonIgnoreFile, source)
-							}
-							continue
-						}
-					}
-					// Recurse
-					recursiveWalk(fullPath, currentStack)
-				} else {
-					// Optimization 2: Check Includes/Excludes (Fast Globs) BEFORE Gitignore (Slow Regex)
-					if !IsKept(fullPath, w.opts.Includes, w.opts.Excludes) {
-						if w.opts.OnIgnore != nil {
-							w.opts.OnIgnore(fullPath, ReasonFilterPattern, "")
-						}
-						continue
-					}
-
-					// Check Ignore (Gitignore) for File
-					if w.opts.IgnoreEnabled {
-						if ignored, source := isIgnored(currentStack, fullPath, false); ignored {
-							if w.opts.OnIgnore != nil {
-								w.opts.OnIgnore(fullPath, ReasonIgnoreFile, source)
-							}
-							continue
-						}
-					}
-
-					// Found valid file
-					info, _ := d.Info()
-					out <- NewInputFile(filesystem, fullPath, info)
-				}
-			}
-		}
-
-		// Process Roots
-		for _, root := range roots {
-			cleanRoot := path.Clean(root)
-			if cleanRoot == "/" {
-				cleanRoot = "."
-			}
-
-			// Optimization 4: Direct Stat to handle explicit file roots efficiently
-			info, err := fs.Stat(filesystem, cleanRoot)
-			if err != nil {
-				out <- InputFile{Path: root, LoadError: err}
 				continue
 			}
 
-			// Calculate stack for the parent of the root
-			parent := path.Dir(cleanRoot)
-			stack := baseStack
-			if parent != "." && parent != "/" && w.opts.IgnoreEnabled {
-				// We need to build the stack from the filesystem root down to 'parent'
-				// This is complex for arbitrary paths, so we rely on the baseStack
-				// + loading ignores for the parent if reachable.
-				// For simplicity and performance in common "lx ." cases, baseStack is sufficient.
-			}
-
-			if info.IsDir() {
-				// Check root itself against ignores? Usually roots are explicit.
-				// We proceed to recursive walk.
-				recursiveWalk(cleanRoot, stack)
-			} else {
-				// Root is a file.
-				// Even if it's an explicit root, we check filters if they exist,
-				// but usually explicit files (-f) bypass this in app.go.
-				// If passed as standard arg, we apply standard logic:
-
-				// 1. IsKept
-				if !IsKept(cleanRoot, w.opts.Includes, w.opts.Excludes) {
-					if w.opts.OnIgnore != nil {
-						w.opts.OnIgnore(cleanRoot, ReasonFilterPattern, "")
-					}
+			if err := walkFn(childPath, d, nil); err != nil {
+				if err == fs.SkipDir {
 					continue
 				}
-
-				// 2. Gitignore
-				if w.opts.IgnoreEnabled {
-					if ignored, source := isIgnored(stack, cleanRoot, false); ignored {
-						if w.opts.OnIgnore != nil {
-							w.opts.OnIgnore(cleanRoot, ReasonIgnoreFile, source)
-						}
-						continue
-					}
-				}
-
-				out <- NewInputFile(filesystem, cleanRoot, info)
+				return err
 			}
-		}
-	}()
 
-	return out
-}
-
-func loadLocalIgnores(fsys fs.FS, dir string, onLoad func(path string, isAncestor bool)) []ignoreSource {
-	names := []string{".gitignore", ".ignore", ".lxignore"}
-	var sources []ignoreSource
-	for _, name := range names {
-		target := path.Join(dir, name)
-		if data, err := fs.ReadFile(fsys, target); err == nil {
-			if onLoad != nil {
-				onLoad(target, false)
+			if err := w.recursiveWalk(fsys, childPath, effectiveRules, walkFn, false); err != nil {
+				return err
 			}
-			m := gitignore.NewGitIgnoreFromReader(dir, strings.NewReader(string(data)))
-			sources = append(sources, ignoreSource{matcher: m, source: target})
-		}
-	}
-	return sources
-}
 
-// loadAncestorIgnores climbs the directory tree from cwd to root/home
-func loadAncestorIgnores(cwd string, onLoad func(path string, isAncestor bool)) []ignoreSource {
-	var sources []ignoreSource
-	var pathStack []string
-	curr := filepath.Dir(cwd)
-
-	for {
-		if curr == "" || curr == "." || curr == "/" || curr == filepath.Dir(curr) {
-			break
-		}
-		pathStack = append(pathStack, curr)
-		curr = filepath.Dir(curr)
-	}
-
-	for i := len(pathStack) - 1; i >= 0; i-- {
-		dir := pathStack[i]
-		names := []string{".gitignore", ".ignore", ".lxignore"}
-		for _, name := range names {
-			target := filepath.Join(dir, name)
-			if data, err := os.ReadFile(target); err == nil {
-				if onLoad != nil {
-					onLoad(target, true)
-				}
-				m := gitignore.NewGitIgnoreFromReader(".", strings.NewReader(string(data)))
-				sources = append(sources, ignoreSource{matcher: m, source: target})
+		} else {
+			if isIgnored {
+				continue
+			}
+			if err := walkFn(childPath, d, nil); err != nil {
+				return err
 			}
 		}
 	}
-	return sources
+	return nil
 }
 
-func isIgnored(stack []ignoreSource, p string, isDir bool) (bool, string) {
-	for _, s := range stack {
-		if s.matcher != nil && s.matcher.Match(p, isDir) {
-			return true, s.source
+func (w *Walker) loadIgnoreFiles(fsys fs.FS, dir string) []Rule {
+	var rules []Rule
+	files := []string{".gitignore", ".ignore", ".lxignore"}
+
+	for _, name := range files {
+		fp := name
+		if dir != "." {
+			fp = path.Join(dir, name)
+		}
+
+		data, err := fs.ReadFile(fsys, fp)
+		if err == nil {
+			sc := bufio.NewScanner(bytes.NewReader(data))
+			var lines []string
+			for sc.Scan() {
+				lines = append(lines, sc.Text())
+			}
+			rules = append(rules, parseRules(lines, dir)...)
 		}
 	}
-	return false, ""
+	return rules
 }
 
-func isHidden(name string) bool {
-	if name == "." || name == ".." {
-		return false
-	}
-	return len(name) > 1 && name[0] == '.'
+type dirEntryAdapter struct {
+	info fs.FileInfo
 }
+
+func (d dirEntryAdapter) Name() string               { return d.info.Name() }
+func (d dirEntryAdapter) IsDir() bool                { return d.info.IsDir() }
+func (d dirEntryAdapter) Type() fs.FileMode          { return d.info.Mode().Type() }
+func (d dirEntryAdapter) Info() (fs.FileInfo, error) { return d.info, nil }

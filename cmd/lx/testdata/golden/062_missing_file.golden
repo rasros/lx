@@ -3,4 +3,4 @@
 
 
 --- STDERR ---
-[1;31mError:[0m Failed to access file during walk: stat nonexistent.go: FILE_NOT_FOUND (path=nonexistent.go)
+[1;31mError:[0m Failed to stat path: stat /ROOT/nonexistent.go: FILE_NOT_FOUND (path=/ROOT/nonexistent.go)

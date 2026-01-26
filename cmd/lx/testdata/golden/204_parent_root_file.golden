@@ -1,11 +1,5 @@
 --- STDOUT ---
-.gitignore (3 rows)
----
-```gitignore
-bin/
-secret/
-*.tmp
-```
+
 
 
 --- STDERR ---
