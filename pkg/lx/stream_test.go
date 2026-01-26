@@ -6,30 +6,13 @@ import (
 	"testing"
 )
 
-func TestStream_FluentAPI(t *testing.T) {
-	cfg := NewConfig()
-	runCfg := RunnerConfig{Head: -1, Tail: -1}
-
-	stream, err := NewStream(cfg, runCfg)
-	if err != nil {
-		t.Fatalf("Failed to create stream: %v", err)
-	}
-
-	content := []byte("Hello Library")
-	file := NewBufferInputFile("test.txt", content)
-
-	stream.AddSection("Intro").AddFile(file).AddPrompt("Final Step")
-
-	if len(stream.items) != 3 {
-		t.Errorf("Expected 3 items, got %d", len(stream.items))
-	}
-}
-
-func TestStream_Execute(t *testing.T) {
+func TestStream_Integration(t *testing.T) {
 	cfg := NewConfig()
 	stream, _ := NewStream(cfg, RunnerConfig{Head: -1, Tail: -1})
 
 	stream.AddSection("Header Test")
+	stream.AddFile(NewBufferInputFile("A.txt", []byte("Content A")))
+	stream.AddPrompt("Analyze this")
 
 	var buf strings.Builder
 	err := stream.Execute(context.Background(), &buf)
@@ -38,7 +21,55 @@ func TestStream_Execute(t *testing.T) {
 	}
 
 	got := buf.String()
-	if !strings.Contains(got, "## Header Test") {
-		t.Errorf("Output missing section header, got: %s", got)
+
+	expected := []string{
+		"## Header Test",
+		"Content A",
+		"Analyze this",
+	}
+
+	for _, exp := range expected {
+		if !strings.Contains(got, exp) {
+			t.Errorf("Output missing %q", exp)
+		}
+	}
+}
+
+func TestStream_ContextCancellation(t *testing.T) {
+	cfg := NewConfig()
+	stream, _ := NewStream(cfg, RunnerConfig{Head: -1})
+	stream.WithConcurrency(2)
+
+	for i := 0; i < 50; i++ {
+		stream.AddFile(NewBufferInputFile("file.txt", []byte("data")))
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	cancel()
+
+	var buf strings.Builder
+	err := stream.Execute(ctx, &buf)
+
+	if err != nil && err != context.Canceled {
+		t.Errorf("Expected nil or Canceled, got: %v", err)
+	}
+}
+
+type MockTokenizer struct{}
+
+func (m MockTokenizer) Estimate(size int64, _ interface{}) int64 { return 999 }
+
+func TestStream_TokenizerIntegration(t *testing.T) {
+	cfg := NewConfig()
+	stream, _ := NewStream(cfg, RunnerConfig{Head: -1})
+	stream.WithTokenizer(MockTokenizer{})
+
+	stream.AddFile(NewBufferInputFile("test.txt", []byte("abc")))
+
+	stats := stream.GetGlobalContext()
+
+	if stats.TokenEstimate != 999 {
+		t.Errorf("Expected custom token estimate 999, got %d", stats.TokenEstimate)
 	}
 }
