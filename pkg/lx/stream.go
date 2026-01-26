@@ -273,7 +273,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					return
 				}
 
-				proc := newProcessor(s.engine, global, s.onFileError)
+				proc := newProcessor(s.engine, global, s.onFileError, s.format)
 				proc.tokenCounter = s.tokenizer.Estimate
 
 				readBufPtr := readPool.Get().(*[]byte)
