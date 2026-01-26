@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"text/template"
 	"time"
-
-	"github.com/monochromegane/go-gitignore"
 )
 
 // GlobalContext holds metadata about the entire execution.
@@ -72,8 +70,6 @@ type Config struct {
 	IgnoreDirSymlinks  bool
 	IgnoreHidden       bool
 	IgnoreEnabled      bool
-
-	GlobalIgnore gitignore.IgnoreMatcher
 }
 
 // NewConfig returns a default configuration.
