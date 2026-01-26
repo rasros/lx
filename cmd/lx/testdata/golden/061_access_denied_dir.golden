@@ -3,4 +3,4 @@
 
 
 --- STDERR ---
-[1;31mError:[0m Failed to access file during walk: open secret/locked_dir: PERMISSION_DENIED (path=secret/locked_dir)
+[1;33mWarning:[0m Error accessing path during walk: stat .: PERMISSION_DENIED (path=.)

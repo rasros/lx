@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -108,13 +109,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		return err
 	}
 
-	// Re-evaluate Log Level
 	finalLevel, err := determineLogLevel(parsed, cliOpts.Verbosity)
 	if err != nil {
 		return err
 	}
 
-	// Update logger if the level has changed
 	if finalLevel != initialLevel {
 		setupLogger(finalLevel)
 		slog.Debug("Logger level updated from config", "new_level", finalLevel.String())
@@ -222,118 +221,139 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				continue
 			}
 
-			rootPath := op.Value
-			var fsRoot, walkPath string
+			rawPath := op.Value
+			var fsys fs.FS
+			var walkRoot string
+			var displayPrefix string
 
-			if filepath.IsAbs(rootPath) {
-				fsRoot = filepath.Dir(rootPath)
-				walkPath = filepath.Base(rootPath)
-			} else {
-				clean := filepath.Clean(rootPath)
-				if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
-					abs, _ := filepath.Abs(clean)
-
-					// Fix: os.DirFS fails if rooted at a file. Check and split if necessary.
-					if info, err := os.Stat(abs); err == nil && !info.IsDir() {
-						fsRoot = filepath.Dir(abs)
-						walkPath = filepath.Base(abs)
-					} else {
-						fsRoot = abs
-						walkPath = "."
-					}
-				} else {
-					fsRoot = "."
-					walkPath = clean
-				}
+			absPath, err := filepath.Abs(rawPath)
+			if err != nil {
+				slog.Error("Failed to resolve absolute path", "path", rawPath, "error", err)
+				continue
 			}
 
-			walkPath = filepath.ToSlash(walkPath)
+			stat, err := os.Stat(absPath)
+			if err != nil {
+				slog.Error("Failed to stat path", "path", absPath, "error", err)
+				continue
+			}
 
-			walkerIgnoreHidden := cfg.IgnoreHidden
-			walkerIgnoreDirSymlinks := cfg.IgnoreDirSymlinks
-			walkerIgnoreFileSymlinks := cfg.IgnoreFileSymlinks
-			walkerIgnoreEnabled := cfg.IgnoreEnabled
+			if !stat.IsDir() {
+				fsys = os.DirFS(filepath.Dir(absPath))
+				walkRoot = filepath.Base(absPath)
+			} else {
+				fsys = os.DirFS(absPath)
+				walkRoot = "."
+				displayPrefix = filepath.Clean(rawPath)
+			}
 
-			walkerIncludes := includes
-			walkerExcludes := excludes
+			var baseRules []string
+			var overrideRules []string
 
-			if op.Action == "file" {
-				slog.Debug("Action 'file' used: Forcing inclusion (bypassing ignore/hidden rules)", "path", rootPath)
-				walkerIgnoreHidden = false
-				walkerIgnoreEnabled = false
-				walkerIgnoreDirSymlinks = false
-				walkerIgnoreFileSymlinks = false
+			if cfg.IgnoreEnabled {
+				baseRules = append(baseRules, LoadGlobalIgnorePatterns()...)
+			}
 
-				// If it's a directory, we keep the filters
-				// If it's a file, we clear the filters
-				info, err := os.Stat(rootPath)
-				isDir := err == nil && info.IsDir()
+			isForced := op.Action == "file"
 
-				if !isDir {
-					slog.Debug("Force target is a file; clearing filters to ensure inclusion")
-					walkerIncludes = nil
-					walkerExcludes = nil
-				} else {
-					slog.Debug("Force target is a directory; preserving filters for recursive walk")
-				}
+			if cfg.IgnoreHidden && !isForced {
+				overrideRules = append(overrideRules, ".*")
+			}
+
+			if !isForced {
+				overrideRules = append(overrideRules, excludes...)
 			}
 
 			slog.Debug("Initializing Walker",
-				"fs_root", fsRoot,
-				"walk_path", walkPath,
-				"includes_count", len(walkerIncludes),
-				"excludes_count", len(walkerExcludes),
-				"ignore_enabled", walkerIgnoreEnabled,
-				"ignore_hidden", walkerIgnoreHidden,
-				"ignore_dir_symlinks", walkerIgnoreDirSymlinks,
-				"ignore_file_symlinks", walkerIgnoreFileSymlinks,
+				"walk_root", walkRoot,
+				"base_rules_count", len(baseRules),
+				"override_rules_count", len(overrideRules),
+				"is_forced", isForced,
 			)
 
-			walker := lx.NewWalker(lx.WalkerOptions{
-				FS:                 os.DirFS(fsRoot),
-				Root:               fsRoot,
-				IgnoreDirSymlinks:  walkerIgnoreDirSymlinks,
-				IgnoreFileSymlinks: walkerIgnoreFileSymlinks,
-				IgnoreHidden:       walkerIgnoreHidden,
-				IgnoreEnabled:      walkerIgnoreEnabled,
-				GlobalIgnore:       cfg.GlobalIgnore,
-				Includes:           walkerIncludes,
-				Excludes:           walkerExcludes,
-				OnIgnore: func(path string, reason lx.IgnoreReason, source string) {
-					args := []any{"path", path, "reason", reason.String()}
-					if source != "" {
-						args = append(args, "source", source)
-					}
-					slog.Debug("Walker ignored path", args...)
-				},
-				OnIgnoreFileLoaded: func(path string, isAncestor bool) {
-					if isAncestor {
-						slog.Debug("Loaded ancestor ignore file", "path", path)
-					} else {
-						slog.Debug("Loaded ignore file", "path", path)
-					}
-				},
-			})
+			walker := lx.NewWalker(baseRules, overrideRules)
 
 			count := 0
-			for f := range walker.Walk(ctx, []string{walkPath}) {
-				if outPath != "" {
-					fullAbs, _ := filepath.Abs(filepath.Join(fsRoot, f.Path))
-					if fullAbs == outPath {
-						slog.Warn("Skipping output file to avoid infinite recursion", "path", f.Path)
-						continue
+
+			err = walker.Walk(fsys, walkRoot, func(path string, d fs.DirEntry, err error) error {
+				if err != nil {
+					slog.Warn("Error accessing path during walk", "path", path, "error", err)
+					return nil
+				}
+				if d.IsDir() {
+					return nil
+				}
+
+				// Reconstruct display path relative to user input
+				var effectivePath string
+				if !stat.IsDir() {
+					effectivePath = rawPath
+				} else {
+					if path == "." {
+						effectivePath = displayPrefix
+					} else {
+						effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
 					}
 				}
-				if f.LoadError != nil {
-					slog.Error("Failed to access file during walk", "path", f.Path, "error", f.LoadError)
-					continue
+
+				// Skip directory symlinks to avoid recursion issues and IO errors
+				if (d.Type() & fs.ModeSymlink) != 0 {
+					if cfg.IgnoreFileSymlinks {
+						return nil
+					}
+					targetInfo, err := fs.Stat(fsys, path)
+					if err == nil && targetInfo.IsDir() {
+						slog.Debug("Skipping directory symlink", "path", effectivePath)
+						return nil
+					}
+				}
+
+				// Post-walk filtering for includes (weak filter, respects .gitignore)
+				if !isForced && len(includes) > 0 {
+					matched := false
+					for _, inc := range includes {
+						if lx.IsMatch(inc, path) {
+							matched = true
+							break
+						}
+					}
+					if !matched {
+						return nil
+					}
+				}
+
+				if outPath != "" {
+					if abs, _ := filepath.Abs(effectivePath); abs == outPath {
+						slog.Warn("Skipping output file to avoid infinite recursion", "path", effectivePath)
+						return nil
+					}
+				}
+
+				info, err := d.Info()
+				if err != nil {
+					slog.Error("Failed to stat file in walk", "path", path, "error", err)
+					return nil
+				}
+
+				f := lx.NewInputFile(fsys, path, info)
+				f.Path = effectivePath
+
+				if !stat.IsDir() {
+					f.AbsPath = absPath
+				} else {
+					f.AbsPath = filepath.Join(absPath, path)
 				}
 
 				slog.Debug("File accepted by walker", "path", f.Path, "size", f.Size)
 				stream.AddFile(f)
 				count++
+				return nil
+			})
+
+			if err != nil {
+				slog.Error("Walker traversal failed", "error", err)
 			}
-			slog.Debug("Walker finished", "root", rootPath, "files_found", count)
+			slog.Debug("Walker finished", "root", rawPath, "files_found", count)
 
 		case "section":
 			slog.Debug("Adding section", "title", op.Value)
@@ -418,7 +438,6 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 }
 
 func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
-	// Flags "Show/Follow" INVERT the internal "Ignore" settings.
 	if _, ok := globals["follow"]; ok {
 		slog.Debug("Override: Follow directory symlinks enabled via flag")
 		c.IgnoreDirSymlinks = false
