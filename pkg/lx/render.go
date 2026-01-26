@@ -18,14 +18,16 @@ type processor struct {
 	onFileError      FileErrorHandler
 	hasRenderedFirst bool
 	lastWasCompact   bool
+	format           string
 }
 
-func newProcessor(engine *TemplateEngine, global GlobalContext, onError FileErrorHandler) *processor {
+func newProcessor(engine *TemplateEngine, global GlobalContext, onError FileErrorHandler, format string) *processor {
 	return &processor{
 		engine:       engine,
 		global:       global,
 		onFileError:  onError,
 		tokenCounter: DefaultTokenCounter,
+		format:       format,
 	}
 }
 
@@ -52,7 +54,11 @@ func (p *processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 		if fCtx.IsError {
 			templateToUse = p.engine.FileError
 		} else if fCtx.IsImage {
-			templateToUse = p.engine.FileContent
+			if p.format == "html" {
+				templateToUse = p.engine.FileContent
+			} else {
+				templateToUse = p.engine.FileBinary
+			}
 		} else if fCtx.IsBinary {
 			templateToUse = p.engine.FileBinary
 		} else if fCtx.IsCompactView {

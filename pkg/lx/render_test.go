@@ -13,7 +13,8 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 	cfg := NewConfig()
 	engine, _ := CompileTemplates(cfg)
 	global := GlobalContext{TotalFiles: 1}
-	proc := newProcessor(engine, global, nil)
+	
+	proc := newProcessor(engine, global, nil, "markdown")
 
 	file := NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
 	file.Config = RunnerConfig{Head: 1, Tail: 1} // Head 1, Tail 1, Gap should exist
@@ -55,7 +56,7 @@ func TestRender_DataURI(t *testing.T) {
 	cfg.OutputFormat = "html"
 	engine, _ := CompileTemplates(cfg)
 
-	proc := newProcessor(engine, GlobalContext{}, nil)
+	proc := newProcessor(engine, GlobalContext{}, nil, "html")
 
 	// 3. Create InputFile pointing to real FS
 	file, err := NewInputFileFromPath(os.DirFS(tmp), imgName)
@@ -85,7 +86,8 @@ func TestRender_DataURI(t *testing.T) {
 func TestRender_ErrorHandling(t *testing.T) {
 	cfg := NewConfig()
 	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{}, nil)
+	
+	proc := newProcessor(engine, GlobalContext{}, nil, "markdown")
 
 	file := InputFile{
 		Path: "ghost.txt",
