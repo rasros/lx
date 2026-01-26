@@ -1,130 +1,132 @@
 --- STDOUT ---
-[1/21] README.md (2 rows)
+[1/22] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[2/21] configs/custom_sections.yaml (1 rows)
+[2/22] assets/logo.png - binary file skipped (12 B)
+
+[3/22] configs/custom_sections.yaml (1 rows)
 ---
 ```yaml
 section_header_template: "*** {{ .Body }} ***\n"
 ```
 
-[3/21] configs/custom_template.yaml (1 rows)
+[4/22] configs/custom_template.yaml (1 rows)
 ---
 ```yaml
 file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
-[4/21] configs/follow.yaml (1 rows)
+[5/22] configs/follow.yaml (1 rows)
 ---
 ```yaml
 follow_symlinks: true
 ```
 
-[5/21] configs/hidden.yaml (1 rows)
+[6/22] configs/hidden.yaml (1 rows)
 ---
 ```yaml
 show_hidden: true
 ```
 
-[6/21] configs/no_links.yaml (1 rows)
+[7/22] configs/no_links.yaml (1 rows)
 ---
 ```yaml
 no_file_links: true
 ```
 
-[7/21] doc/notes.txt (1 rows)
+[8/22] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[8/21] ignore_test/foo.go (1 rows)
+[9/22] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[9/21] langs/Dockerfile (1 rows)
+[10/22] langs/Dockerfile (1 rows)
 ---
 ```dockerfile
 FROM scratch
 ```
 
-[10/21] langs/main.rs (1 rows)
+[11/22] langs/main.rs (1 rows)
 ---
 ```rust
 fn main() {}
 ```
 
-[11/21] langs/script_no_ext (2 rows)
+[12/22] langs/script_no_ext (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo hi
 ```
 
-[12/21] links/cycle_a/visible.txt (1 rows)
+[13/22] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[13/21] links/cycle_b/visible.txt (1 rows)
+[14/22] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[14/21] links/link_to_main.go (~1 rows)
+[15/22] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[15/21] links/safe_target/recursion.txt (1 rows)
+[16/22] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
 ```
 
-[16/21] main.go (2 rows)
+[17/22] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[17/21] main_test.go (2 rows)
+[18/22] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[18/21] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+[19/22] parent_ignore_test/level1/level2/keep_me.go (1 rows)
 ---
 ```go
 package level2
 ```
 
-[19/21] pkg/util.go (1 rows)
+[20/22] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[20/21] spaces/file with spaces.txt (1 rows)
+[21/22] spaces/file with spaces.txt (1 rows)
 ---
 ```text
 content with spaces
 ```
 
-[21/21] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
+[22/22] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
 
 
 --- STDERR ---
