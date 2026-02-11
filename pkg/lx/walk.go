@@ -24,7 +24,7 @@ type Walker struct {
 	BaseRules     []Rule
 	OverrideRules []Rule
 	IgnoreEnabled bool
-	OnIgnore func(path string, reason string)
+	OnIgnore      func(path string, reason string)
 }
 
 // NewWalker initializes the walker.

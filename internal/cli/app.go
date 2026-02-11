@@ -273,8 +273,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			walker := lx.NewWalker(baseRules, overrideRules)
 			walker.IgnoreEnabled = cfg.IgnoreEnabled
-			walker.OnIgnore = func(p string) {
-				slog.Debug("Ignored by rules (.gitignore/hidden)", "path", p)
+			walker.OnIgnore = func(p, reason string) {
+				slog.Debug("Ignored", "path", p, "reason", reason)
 			}
 
 			count := 0
@@ -628,4 +628,3 @@ func reorderTrailingOps(ops []Op) []Op {
 	newOps = append(newOps, others...)
 	return newOps
 }
-
