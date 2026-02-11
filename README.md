@@ -36,7 +36,7 @@ go install github.com/rasros/lx/cmd/lx@latest
 ### Via Curl (Pre-built binaries)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rasros/lx/main/install.sh
+curl -fsSL https://raw.github.com/rasros/lx/main/install.sh
 ```
 
 ### Dependencies
