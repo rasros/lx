@@ -272,6 +272,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			)
 
 			walker := lx.NewWalker(baseRules, overrideRules)
+			walker.IgnoreEnabled = cfg.IgnoreEnabled
 
 			count := 0
 

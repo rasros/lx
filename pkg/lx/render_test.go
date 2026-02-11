@@ -13,7 +13,7 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 	cfg := NewConfig()
 	engine, _ := CompileTemplates(cfg)
 	global := GlobalContext{TotalFiles: 1}
-	
+
 	proc := newProcessor(engine, global, nil, "markdown")
 
 	file := NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
@@ -86,7 +86,7 @@ func TestRender_DataURI(t *testing.T) {
 func TestRender_ErrorHandling(t *testing.T) {
 	cfg := NewConfig()
 	engine, _ := CompileTemplates(cfg)
-	
+
 	proc := newProcessor(engine, GlobalContext{}, nil, "markdown")
 
 	file := InputFile{

@@ -21,6 +21,7 @@ type Rule struct {
 type Walker struct {
 	BaseRules     []Rule
 	OverrideRules []Rule
+	IgnoreEnabled bool
 }
 
 // NewWalker initializes the walker.
@@ -28,6 +29,7 @@ func NewWalker(basePatterns, overridePatterns []string) *Walker {
 	return &Walker{
 		BaseRules:     parseRules(basePatterns, ""),
 		OverrideRules: parseRules(overridePatterns, ""),
+		IgnoreEnabled: true,
 	}
 }
 
@@ -178,7 +180,10 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	}
 
 	if !info.IsDir() {
-		localRules := w.loadIgnoreFiles(fsys, ".")
+		var localRules []Rule
+		if w.IgnoreEnabled {
+			localRules = w.loadIgnoreFiles(fsys, ".")
+		}
 		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(localRules)+len(w.OverrideRules))
 		effectiveRules = append(effectiveRules, w.BaseRules...)
 		effectiveRules = append(effectiveRules, localRules...)
@@ -194,7 +199,10 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 }
 
 func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkFn fs.WalkDirFunc, parentIgnored bool) error {
-	localRules := w.loadIgnoreFiles(fsys, dir)
+	var localRules []Rule
+	if w.IgnoreEnabled {
+		localRules = w.loadIgnoreFiles(fsys, dir)
+	}
 
 	effectiveRules := make([]Rule, 0, len(parentRules)+len(localRules)+len(w.OverrideRules))
 	effectiveRules = append(effectiveRules, parentRules...)
