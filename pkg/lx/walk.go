@@ -35,23 +35,40 @@ func NewWalker(basePatterns, overridePatterns []string) *Walker {
 
 // IsMatch checks if a path matches a pattern. Exposed for CLI filtering.
 func IsMatch(pattern, relPath string) bool {
-	relPath = path.Clean(strings.ReplaceAll(relPath, "\\", "/"))
-	pattern = path.Clean(strings.ReplaceAll(pattern, "\\", "/"))
+	relPath = strings.ReplaceAll(relPath, "\\", "/")
+	pattern = strings.ReplaceAll(pattern, "\\", "/")
 
+	isDirOnly := strings.HasSuffix(pattern, "/")
+
+	relPath = path.Clean(relPath)
+	pattern = path.Clean(pattern)
+
+	isAnchored := strings.HasPrefix(pattern, "/")
+	pattern = strings.TrimPrefix(pattern, "/")
+
+	// 1. Anchored or contains slash (matches from root)
+	if strings.Contains(pattern, "/") || isAnchored {
+		matched, _ := doublestar.Match(pattern, relPath)
+		return matched
+	}
+
+	// 2. Basename match
 	name := path.Base(relPath)
+	if matched, _ := doublestar.Match(pattern, name); matched {
+		return true
+	}
 
-	// Floating pattern (e.g. "*.go")
-	if !strings.Contains(pattern, "/") {
-		matched, _ := doublestar.Match(pattern, name)
-		if matched {
+	// 3. Ubiquitous match (matches any directory segment in the path)
+	parts := strings.Split(relPath, "/")
+	for i, part := range parts {
+		if isDirOnly && i == len(parts)-1 {
+			continue // Skip matching the final segment if pattern explicitly targets directories
+		}
+		if matched, _ := doublestar.Match(pattern, part); matched {
 			return true
 		}
 	}
-
-	// Anchored pattern (e.g. "src/*.go")
-	matchPattern := strings.TrimPrefix(pattern, "/")
-	matched, _ := doublestar.Match(matchPattern, relPath)
-	return matched
+	return false
 }
 
 func parseRules(lines []string, basePath string) []Rule {
@@ -68,8 +85,12 @@ func parseRules(lines []string, basePath string) []Rule {
 			p = strings.TrimPrefix(p, "!")
 		}
 
-		p = path.Clean(strings.ReplaceAll(p, "\\", "/"))
-		p = strings.TrimRight(p, "/")
+		p = strings.ReplaceAll(p, "\\", "/")
+		hasTrailingSlash := strings.HasSuffix(p, "/")
+		p = path.Clean(p)
+		if hasTrailingSlash && p != "/" {
+			p += "/"
+		}
 
 		rules = append(rules, Rule{
 			Pattern:  p,
@@ -80,40 +101,59 @@ func parseRules(lines []string, basePath string) []Rule {
 	return rules
 }
 
-func match(rule Rule, name, relPath string) bool {
+func match(rule Rule, relPath string, isDir bool) bool {
 	targetPath := relPath
 	pattern := rule.Pattern
 
-	if rule.BasePath != "" && rule.BasePath != "." {
-		if !strings.HasPrefix(relPath, rule.BasePath+"/") {
-			return false
-		}
-		targetPath = strings.TrimPrefix(relPath, rule.BasePath+"/")
+	isDirOnly := strings.HasSuffix(pattern, "/")
+	pattern = strings.TrimSuffix(pattern, "/")
+
+	if isDirOnly && !isDir {
+		return false
 	}
 
-	if !strings.Contains(pattern, "/") {
-		matched, _ := doublestar.Match(pattern, name)
-		if matched {
+	if rule.BasePath != "" && rule.BasePath != "." {
+		if !strings.HasPrefix(relPath, rule.BasePath+"/") && relPath != rule.BasePath {
+			return false
+		}
+		if relPath == rule.BasePath {
+			targetPath = "."
+		} else {
+			targetPath = strings.TrimPrefix(relPath, rule.BasePath+"/")
+		}
+	}
+
+	isAnchored := strings.HasPrefix(pattern, "/")
+	pattern = strings.TrimPrefix(pattern, "/")
+
+	// 1. Anchored or contains slash
+	if strings.Contains(pattern, "/") || isAnchored {
+		matched, _ := doublestar.Match(pattern, targetPath)
+		return matched
+	}
+
+	// 2. Basename match
+	name := path.Base(targetPath)
+	if matched, _ := doublestar.Match(pattern, name); matched {
+		return true
+	}
+
+	// 3. Ubiquitous match
+	parts := strings.Split(targetPath, "/")
+	for _, part := range parts {
+		if matched, _ := doublestar.Match(pattern, part); matched {
 			return true
 		}
 	}
 
-	matchPattern := strings.TrimPrefix(pattern, "/")
-	matched, _ := doublestar.Match(matchPattern, targetPath)
-	return matched
+	return false
 }
 
-func shouldIgnore(relPath string, rules []Rule, parentIgnored bool) bool {
+func shouldIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool) bool {
 	ignored := parentIgnored
-	name := path.Base(relPath)
-
 	for _, rule := range rules {
-		if match(rule, name, relPath) {
-			if rule.Negate {
-				ignored = false
-			} else {
-				ignored = true
-			}
+		if match(rule, relPath, isDir) {
+			ignored = !rule.Negate
 		}
 	}
 	return ignored
@@ -134,17 +174,20 @@ func hasNestedException(dirPath string, rules []Rule) bool {
 			}
 		}
 
+		pattern := strings.TrimSuffix(rule.Pattern, "/")
+		isAnchored := strings.HasPrefix(pattern, "/")
+		pattern = strings.TrimPrefix(pattern, "/")
+
 		// Floating patterns (e.g. "*.go") match files in any subdirectory
-		if !strings.Contains(rule.Pattern, "/") {
+		if !strings.Contains(pattern, "/") && !isAnchored {
 			return true
 		}
 
 		// Anchored Patterns
-		fullPattern := rule.Pattern
+		fullPattern := pattern
 		if rule.BasePath != "" && rule.BasePath != "." {
-			fullPattern = rule.BasePath + "/" + rule.Pattern
+			fullPattern = rule.BasePath + "/" + pattern
 		}
-		fullPattern = strings.TrimPrefix(fullPattern, "/")
 
 		if strings.Contains(fullPattern, "**") {
 			return true
@@ -189,7 +232,7 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 		effectiveRules = append(effectiveRules, localRules...)
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 
-		if shouldIgnore(root, effectiveRules, false) {
+		if shouldIgnore(root, info.IsDir(), effectiveRules, false) {
 			return nil
 		}
 		return walkFn(root, dirEntryAdapter{info}, nil)
@@ -220,7 +263,7 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 			childPath = path.Join(dir, d.Name())
 		}
 
-		isIgnored := shouldIgnore(childPath, effectiveRules, parentIgnored)
+		isIgnored := shouldIgnore(childPath, d.IsDir(), effectiveRules, parentIgnored)
 
 		if d.IsDir() {
 			if isIgnored {

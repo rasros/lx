@@ -239,19 +239,15 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			}
 
 			if !stat.IsDir() {
-				rawPathClean := filepath.Clean(op.Value)
-
-				// If it's a simple relative path (no ../), anchor at "."
+				rawPathClean := filepath.Clean(rawPath)
+				
 				if !filepath.IsAbs(rawPathClean) && !strings.HasPrefix(rawPathClean, "..") {
 					fsys = os.DirFS(".")
 					walkRoot = filepath.ToSlash(rawPathClean)
-					// No displayPrefix needed as the path remains relative to "."
 				} else {
-					// For absolute paths or parent-relative paths (../),
-					// we must anchor at the directory to allow access.
 					fsys = os.DirFS(filepath.Dir(absPath))
 					walkRoot = filepath.Base(absPath)
-					displayPrefix = filepath.Dir(op.Value)
+					displayPrefix = filepath.Dir(rawPathClean)
 				}
 			} else {
 				fsys = os.DirFS(absPath)
@@ -300,7 +296,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				// Reconstruct display path relative to user input
 				var effectivePath string
 				if !stat.IsDir() {
-					effectivePath = rawPath
+					if displayPrefix != "" {
+						effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
+					} else {
+						effectivePath = filepath.FromSlash(path)
+					}
 				} else {
 					if path == "." {
 						effectivePath = displayPrefix
@@ -352,7 +352,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				f.Path = effectivePath
 
 				if !stat.IsDir() {
-					f.AbsPath = absPath
+					if displayPrefix != "" {
+						f.AbsPath = filepath.Join(filepath.Dir(absPath), path)
+					} else {
+						f.AbsPath = absPath
+					}
 				} else {
 					f.AbsPath = filepath.Join(absPath, path)
 				}
@@ -636,3 +640,4 @@ func reorderTrailingOps(ops []Op) []Op {
 	newOps = append(newOps, others...)
 	return newOps
 }
+
