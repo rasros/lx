@@ -239,8 +239,16 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			}
 
 			if !stat.IsDir() {
-				fsys = os.DirFS(filepath.Dir(absPath))
-				walkRoot = filepath.Base(absPath)
+				if filepath.IsAbs(rawPath) {
+					// Fallback for absolute paths
+					fsys = os.DirFS(filepath.Dir(absPath))
+					walkRoot = filepath.Base(absPath)
+				} else {
+					// Anchor relative files to the current directory
+					// so the walker evaluates the full path against filters
+					fsys = os.DirFS(".")
+					walkRoot = filepath.ToSlash(filepath.Clean(rawPath))
+				}
 			} else {
 				fsys = os.DirFS(absPath)
 				walkRoot = "."
