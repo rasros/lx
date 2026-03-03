@@ -222,6 +222,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			}
 
 			rawPath := op.Value
+			isForced := op.Action == "file"
+
 			var fsys fs.FS
 			var walkRoot string
 			var displayPrefix string
@@ -234,13 +236,24 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			stat, err := os.Stat(absPath)
 			if err != nil {
+				// Prevent stat errors if the missing file (e.g., from git diff) is filtered out anyway
+				if !isForced && !lx.IsKept(rawPath, includes, excludes) {
+					slog.Debug("Skipping missing path due to filters", "path", rawPath)
+					continue
+				}
 				slog.Error("Failed to stat path", "path", absPath, "error", err)
 				continue
 			}
 
 			if !stat.IsDir() {
+				// Prevent processing an explicit file argument if it matches an exclude filter
+				if !isForced && !lx.IsKept(rawPath, includes, excludes) {
+					slog.Debug("Skipping file due to filters", "path", rawPath)
+					continue
+				}
+
 				rawPathClean := filepath.Clean(rawPath)
-				
+
 				if !filepath.IsAbs(rawPathClean) && !strings.HasPrefix(rawPathClean, "..") {
 					fsys = os.DirFS(".")
 					walkRoot = filepath.ToSlash(rawPathClean)
@@ -261,8 +274,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			if cfg.IgnoreEnabled {
 				baseRules = append(baseRules, LoadGlobalIgnorePatterns()...)
 			}
-
-			isForced := op.Action == "file"
 
 			if cfg.IgnoreHidden && !isForced {
 				overrideRules = append(overrideRules, ".*")
@@ -640,4 +651,3 @@ func reorderTrailingOps(ops []Op) []Op {
 	newOps = append(newOps, others...)
 	return newOps
 }
-
