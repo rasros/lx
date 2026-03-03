@@ -239,15 +239,19 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			}
 
 			if !stat.IsDir() {
-				if filepath.IsAbs(rawPath) {
-					// Fallback for absolute paths
+				rawPathClean := filepath.Clean(op.Value)
+
+				// If it's a simple relative path (no ../), anchor at "."
+				if !filepath.IsAbs(rawPathClean) && !strings.HasPrefix(rawPathClean, "..") {
+					fsys = os.DirFS(".")
+					walkRoot = filepath.ToSlash(rawPathClean)
+					// No displayPrefix needed as the path remains relative to "."
+				} else {
+					// For absolute paths or parent-relative paths (../),
+					// we must anchor at the directory to allow access.
 					fsys = os.DirFS(filepath.Dir(absPath))
 					walkRoot = filepath.Base(absPath)
-				} else {
-					// Anchor relative files to the current directory
-					// so the walker evaluates the full path against filters
-					fsys = os.DirFS(".")
-					walkRoot = filepath.ToSlash(filepath.Clean(rawPath))
+					displayPrefix = filepath.Dir(op.Value)
 				}
 			} else {
 				fsys = os.DirFS(absPath)
