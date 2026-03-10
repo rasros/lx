@@ -18,12 +18,12 @@ limits or filters) to specific subsets of files within a single command.
 
 ## Features
 
-* **Token Economy:** Automatically calculates token estimates for every file and the total bundle.
-* **Smart Traversal:** Respects `.gitignore`, `.ignore`, and `.lxignore`. Skips binary files by default.
-* **Stream Processing:** Apply different rules (e.g., `--tail 50`) to different files in one pass.
-* **LLM Optimized:** Outputs Markdown (GitHub/OpenAI), XML (Claude), or HTML (visual debugging).
-* **Clipboard Ready:** Pipes output directly to the system clipboard on Linux (`xclip`/`wl-copy`), macOS, and Windows.
-* **Pipeline Friendly:** Accepts file lists via stdin from tools like `find`, `fd`, or `git`.
+* Token Aware: Automatically calculates token estimates for every file and the total bundle.
+* Smart Traversal: Respects `.gitignore`, `.ignore`, and `.lxignore`. Skips binary files by default.
+* Stream Processing: Apply different rules (e.g., `--tail 50`) to different files in one pass.
+* LLM Optimized: Outputs Markdown (GitHub/OpenAI), XML (Claude), or HTML (visual debugging).
+* Clipboard Ready: Pipes output directly to the system clipboard on Linux (`xclip`/`wl-copy`), macOS, and Windows.
+* Pipeline Friendly: Accepts file lists via stdin from tools like `find`, `fd`, or `git`.
 
 ## Installation
 
@@ -57,7 +57,56 @@ Walk the current directory, ignoring hidden/gitignored files, and copy to clipbo
 lx -c
 ```
 
-### Git Integration
+### Filter by Type
+
+Find Python files, exclude tests:
+
+```bash
+lx -i "*.py" -e "*test*" src/
+```
+
+### Output XML (Recommended for Claude)
+
+Output entire directory as structured xml:
+
+```bash
+lx --xml .
+```
+
+### Prompt Injection
+
+Inject a custom text before the file context:
+
+```bash
+lx -p "Refactor the following code to use contexts:" main.go
+```
+
+### Manually Sectioned Parts
+
+Injects a custom header (also adjusts XML output):
+
+```bash
+lx -s "Code under test" src/database/users -s "Test fixtures" src/tests/fixtures
+```
+
+### Using with `fzf`
+
+Use `fd` to find files, `lx` to preview them, and `lx` again to bundle the selection:
+
+```bash
+# Requires: fd, fzf
+fd -t f | fzf -m --preview 'lx -n 20 {}' | lx -c
+```
+
+### Using with `llm`:
+
+Pipe context directly into [llm](https://github.com/simonw/llm) tool:
+
+```bash
+lx -p "Explain this project structure" src/ | llm
+```
+
+### Using with `git`:
 
 Bundle only the files changed in the current branch:
 
@@ -65,25 +114,9 @@ Bundle only the files changed in the current branch:
 git diff --name-only main | lx -c
 ```
 
-### Filter by Type
-
-Find Python files, exclude tests, and output as XML (Recommended for **Anthropic/Claude**):
-
-```bash
-lx --xml -i "*.py" -e "*test*" src/
-```
-
-### Prompt Injection
-
-Inject a custom instruction header before the file context:
-
-```bash
-lx -p "Refactor the following code to use contexts:" main.go
-```
-
 ## Stream Processing Model
 
-Arguments are processed sequentially. Flags are not global; they are **state modifiers** that apply to all subsequent
+Arguments are processed sequentially. Flags are not global; they are *modifiers* that apply to all subsequent
 actions until reset.
 
 1. **Modifiers:** (`-n`, `--tail`, `-i`) Apply to subsequent files.
@@ -104,24 +137,6 @@ lx --tail 50 app.log -N src/main.go
 | `-N`          | **Reset**    | Resets strategy to full content.       |
 | `src/main.go` | **Action**   | Processed in full.                     |
 
-## Integration
-
-### Using with `fzf`
-
-Use `fd` to find files, `lx` to preview them, and `lx` again to bundle the selection.
-
-```bash
-# Requires: fd, fzf
-fd -t f | fzf -m --preview 'lx -n 20 {}' | lx -c
-```
-
-### Using with `llm`
-
-Pipe context directly into [llm](https://github.com/simonw/llm) tool:
-
-```bash
-lx -p "Explain this project structure" src/ | llm
-```
 
 ## Output Formats
 
