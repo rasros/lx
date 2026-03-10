@@ -1,0 +1,33 @@
+--- STDOUT ---
+[1/5] ignore_exception_test/data/index.json (1 rows)
+---
+```json
+{}
+```
+
+[2/5] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
+---
+```
+excel_data
+```
+
+[3/5] ignore_exception_test/langgraph.json (1 rows)
+---
+```json
+{}
+```
+
+[4/5] ignore_exception_test/pyproject.toml (1 rows)
+---
+```toml
+[tool]
+```
+
+[5/5] ignore_exception_test/uv.lock (1 rows)
+---
+```
+lock_data
+```
+
+
+--- STDERR ---

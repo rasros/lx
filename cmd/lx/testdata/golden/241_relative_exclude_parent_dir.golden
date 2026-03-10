@@ -1,112 +1,142 @@
 --- STDOUT ---
-[1/21] ../README.md (2 rows)
+[1/26] ../README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[2/21] ../assets/logo.png - binary file skipped (12 B)
+[2/26] ../assets/logo.png - binary file skipped (12 B)
 
-[3/21] ../configs/custom_sections.yaml (1 rows)
+[3/26] ../configs/custom_sections.yaml (1 rows)
 ---
 ```yaml
 section_header_template: "*** {{ .Body }} ***\n"
 ```
 
-[4/21] ../configs/custom_template.yaml (1 rows)
+[4/26] ../configs/custom_template.yaml (1 rows)
 ---
 ```yaml
 file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
-[5/21] ../configs/follow.yaml (1 rows)
+[5/26] ../configs/follow.yaml (1 rows)
 ---
 ```yaml
 follow_symlinks: true
 ```
 
-[6/21] ../configs/hidden.yaml (1 rows)
+[6/26] ../configs/hidden.yaml (1 rows)
 ---
 ```yaml
 show_hidden: true
 ```
 
-[7/21] ../configs/no_links.yaml (1 rows)
+[7/26] ../configs/no_links.yaml (1 rows)
 ---
 ```yaml
 no_file_links: true
 ```
 
-[8/21] ../doc/notes.txt (1 rows)
+[8/26] ../doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[9/21] ../ignore_test/foo.go (1 rows)
+[9/26] ../ignore_exception_test/data/index.json (1 rows)
+---
+```json
+{}
+```
+
+[10/26] ../ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
+---
+```
+excel_data
+```
+
+[11/26] ../ignore_exception_test/langgraph.json (1 rows)
+---
+```json
+{}
+```
+
+[12/26] ../ignore_exception_test/pyproject.toml (1 rows)
+---
+```toml
+[tool]
+```
+
+[13/26] ../ignore_exception_test/uv.lock (1 rows)
+---
+```
+lock_data
+```
+
+[14/26] ../ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[10/21] ../langs/Dockerfile (1 rows)
+[15/26] ../langs/Dockerfile (1 rows)
 ---
 ```dockerfile
 FROM scratch
 ```
 
-[11/21] ../langs/script_no_ext (2 rows)
+[16/26] ../langs/script_no_ext (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo hi
 ```
 
-[12/21] ../links/cycle_a/visible.txt (1 rows)
+[17/26] ../links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[13/21] ../links/cycle_b/visible.txt (1 rows)
+[18/26] ../links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[14/21] ../links/link_to_main.go (~2 rows)
+[19/26] ../links/link_to_main.go (~2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[15/21] ../links/safe_target/recursion.txt (1 rows)
+[20/26] ../links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
 ```
 
-[16/21] ../parent_ignore_test/level1/level2/keep_me.go (1 rows)
+[21/26] ../parent_ignore_test/level1/level2/keep_me.go (1 rows)
 ---
 ```go
 package level2
 ```
 
-[17/21] ../pkg/util.go (1 rows)
+[22/26] ../pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[18/21] ../spaces/file with spaces.txt (1 rows)
+[23/26] ../spaces/file with spaces.txt (1 rows)
 ---
 ```text
 content with spaces
 ```
 
-[19/21] ../src/large.txt (100 rows)
+[24/26] ../src/large.txt (100 rows)
 ---
 ```text
 Line xxxxxxxxxx
@@ -211,13 +241,13 @@ Line xxxxxxxxxx
 Line xxxxxxxxxx
 ```
 
-[20/21] ../src/script.py (1 rows)
+[25/26] ../src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
-[21/21] ../ROOT/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
+[26/26] ../ROOT/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
 
 
 --- STDERR ---

@@ -149,6 +149,7 @@ func TestGolden(t *testing.T) {
 		}},
 		{name: "101_stdin_null_terminated", args: []string{"-0"}, stdin: "main.go\x00README.md\x00spaces/file with spaces.txt\x00"},
 		{name: "102_walk_nested_respects_root_ignore", args: []string{"parent_ignore_test/level1/level2"}},
+        {name: "103_complex_ignore_exceptions", args: []string{"ignore_exception_test"}},
 	}
 
 	runGoldenTests(t, cases, pkgDir, workDir, canonicalWorkDir)
@@ -445,6 +446,26 @@ func setupComplexFixture(t *testing.T) string {
 	// Files for testing parent ignore rules deep in the tree
 	create("parent_ignore_test/level1/level2/ignore_me.tmp", "ignore", 0644)
 	create("parent_ignore_test/level1/level2/keep_me.go", "package level2", 0644)
+
+    // --- Complex Ignore Exceptions Test ---
+    ignoreContent := "*\n!/src\n!/migrations\n!/assets\n!/data/**/*.data.xlsx\n!/data/**/index.json\n!langgraph.json\n!pyproject.toml\n!uv.lock\n"
+    create("ignore_exception_test/.gitignore", ignoreContent, 0644)
+    
+    // Files that SHOULD BE KEPT (un-ignored)
+    create("ignore_exception_test/src/main.go", "package main", 0644)
+    create("ignore_exception_test/migrations/001_init.sql", "SELECT 1;", 0644)
+    create("ignore_exception_test/assets/logo.png", "image_data", 0644)
+    create("ignore_exception_test/data/nested/deep/my.data.xlsx", "excel_data", 0644)
+    create("ignore_exception_test/data/index.json", "{}", 0644)
+    create("ignore_exception_test/langgraph.json", "{}", 0644)
+    create("ignore_exception_test/pyproject.toml", "[tool]", 0644)
+    create("ignore_exception_test/uv.lock", "lock_data", 0644)
+    
+    // Files that SHOULD BE IGNORED
+    create("ignore_exception_test/should_ignore.txt", "ignore me", 0644)
+    create("ignore_exception_test/data/secret.csv", "1,2,3", 0644)
+    create("ignore_exception_test/data/nested/deep/ignore.xlsx", "ignore", 0644)
+    create("ignore_exception_test/other_dir/file.go", "package other", 0644)
 
 	// Image test asset
 	create("assets/logo.png", "\x89PNG\r\n\x1a\n\x00\x00\x00\x0D", 0644)
