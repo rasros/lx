@@ -1,0 +1,47 @@
+--- STDOUT ---
+[1/8] ignore_exception_test/assets/logo.png - binary file skipped (10 B)
+
+[2/8] ignore_exception_test/data/index.json (1 rows)
+---
+```json
+{}
+```
+
+[3/8] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
+---
+```
+excel_data
+```
+
+[4/8] ignore_exception_test/langgraph.json (1 rows)
+---
+```json
+{}
+```
+
+[5/8] ignore_exception_test/migrations/001_init.sql (1 rows)
+---
+```sql
+SELECT 1;
+```
+
+[6/8] ignore_exception_test/pyproject.toml (1 rows)
+---
+```toml
+[tool]
+```
+
+[7/8] ignore_exception_test/src/main.go (1 rows)
+---
+```go
+package main
+```
+
+[8/8] ignore_exception_test/uv.lock (1 rows)
+---
+```
+lock_data
+```
+
+
+--- STDERR ---
