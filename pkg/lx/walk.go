@@ -112,6 +112,10 @@ func match(rule Rule, relPath string, isDir bool) bool {
     isDirOnly := strings.HasSuffix(pattern, "/")
     pattern = strings.TrimSuffix(pattern, "/")
 
+    if isDirOnly && !isDir {
+        return false
+    }
+
     if rule.BasePath != "" && rule.BasePath != "." {
         if !strings.HasPrefix(relPath, rule.BasePath+"/") && relPath != rule.BasePath {
             return false
@@ -128,41 +132,20 @@ func match(rule Rule, relPath string, isDir bool) bool {
 
     // 1. Anchored or contains slash
     if strings.Contains(pattern, "/") || isAnchored {
-        // Check full path match
-        if matched, _ := doublestar.Match(pattern, targetPath); matched {
-            if !isDirOnly || isDir {
-                return true
-            }
-        }
-
-        // Check if pattern matches any parent directory.
-        // If an exception un-ignores a parent dir, it cascades to the file.
-        parts := strings.Split(targetPath, "/")
-        for i := 1; i < len(parts); i++ {
-            parentPath := strings.Join(parts[:i], "/")
-            if matched, _ := doublestar.Match(pattern, parentPath); matched {
-                return true // Parents are implicitly directories, satisfying isDirOnly
-            }
-        }
-        return false
+        matched, _ := doublestar.Match(pattern, targetPath)
+        return matched
     }
 
     // 2. Basename match
     name := path.Base(targetPath)
     if matched, _ := doublestar.Match(pattern, name); matched {
-        if !isDirOnly || isDir {
-            return true
-        }
+        return true
     }
 
     // 3. Ubiquitous match
     parts := strings.Split(targetPath, "/")
-    for i, part := range parts {
+    for _, part := range parts {
         if matched, _ := doublestar.Match(pattern, part); matched {
-            // Enforce isDirOnly only on the exact segment that matched
-            if i == len(parts)-1 && isDirOnly && !isDir {
-                continue
-            }
             return true
         }
     }

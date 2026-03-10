@@ -1,5 +1,6 @@
 --- STDOUT ---
-
+secret/locked.txt - error: open secret/locked.txt: PERMISSION_DENIED
 
 
 --- STDERR ---
+[1;31mError:[0m Failed to read file: open secret/locked.txt: PERMISSION_DENIED (path=secret/locked.txt)
