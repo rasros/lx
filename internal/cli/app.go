@@ -292,6 +292,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			walker := lx.NewWalker(baseRules, overrideRules)
 			walker.IgnoreEnabled = cfg.IgnoreEnabled
+			walker.OnIgnore = func(p, reason string) {
+				slog.Debug("Ignored", "path", p, "reason", reason)
+			}
 
 			count := 0
 
@@ -342,6 +345,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						}
 					}
 					if !matched {
+						slog.Debug("Ignored by include filter (-i)", "path", effectivePath)
 						return nil
 					}
 				}

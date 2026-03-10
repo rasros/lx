@@ -3,6 +3,7 @@ package lx
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io/fs"
 	"path"
 	"strings"
@@ -15,6 +16,7 @@ type Rule struct {
 	Pattern  string
 	Negate   bool
 	BasePath string
+	Source   string
 }
 
 // Walker configures the file traversal.
@@ -22,13 +24,14 @@ type Walker struct {
 	BaseRules     []Rule
 	OverrideRules []Rule
 	IgnoreEnabled bool
+	OnIgnore      func(path string, reason string)
 }
 
 // NewWalker initializes the walker.
 func NewWalker(basePatterns, overridePatterns []string) *Walker {
 	return &Walker{
-		BaseRules:     parseRules(basePatterns, ""),
-		OverrideRules: parseRules(overridePatterns, ""),
+		BaseRules:     parseRules(basePatterns, "", "global/base"),
+		OverrideRules: parseRules(overridePatterns, "", "override flags"),
 		IgnoreEnabled: true,
 	}
 }
@@ -71,7 +74,7 @@ func IsMatch(pattern, relPath string) bool {
 	return false
 }
 
-func parseRules(lines []string, basePath string) []Rule {
+func parseRules(lines []string, basePath, source string) []Rule {
 	var rules []Rule
 	for _, p := range lines {
 		p = strings.TrimSpace(p)
@@ -96,6 +99,7 @@ func parseRules(lines []string, basePath string) []Rule {
 			Pattern:  p,
 			Negate:   negate,
 			BasePath: basePath,
+			Source:   source,
 		})
 	}
 	return rules
@@ -149,14 +153,23 @@ func match(rule Rule, relPath string, isDir bool) bool {
 	return false
 }
 
-func shouldIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool) bool {
+// checkIgnore determines if a path should be ignored and returns the reason.
+func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool) (bool, string) {
 	ignored := parentIgnored
+	reason := "parent directory"
+
 	for _, rule := range rules {
 		if match(rule, relPath, isDir) {
-			ignored = !rule.Negate
+			if rule.Negate {
+				ignored = false
+				reason = "" // explicitly included
+			} else {
+				ignored = true
+				reason = fmt.Sprintf("rule %q in %s", rule.Pattern, rule.Source)
+			}
 		}
 	}
-	return ignored
+	return ignored, reason
 }
 
 func hasNestedException(dirPath string, rules []Rule) bool {
@@ -232,7 +245,11 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 		effectiveRules = append(effectiveRules, localRules...)
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 
-		if shouldIgnore(root, info.IsDir(), effectiveRules, false) {
+		isIgnored, reason := checkIgnore(root, info.IsDir(), effectiveRules, false)
+		if isIgnored {
+			if w.OnIgnore != nil {
+				w.OnIgnore(root, reason)
+			}
 			return nil
 		}
 		return walkFn(root, dirEntryAdapter{info}, nil)
@@ -263,7 +280,7 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 			childPath = path.Join(dir, d.Name())
 		}
 
-		isIgnored := shouldIgnore(childPath, d.IsDir(), effectiveRules, parentIgnored)
+		isIgnored, reason := checkIgnore(childPath, d.IsDir(), effectiveRules, parentIgnored)
 
 		if d.IsDir() {
 			if isIgnored {
@@ -272,6 +289,9 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 						return err
 					}
 					continue
+				}
+				if w.OnIgnore != nil {
+					w.OnIgnore(childPath, reason)
 				}
 				continue
 			}
@@ -289,6 +309,9 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 
 		} else {
 			if isIgnored {
+				if w.OnIgnore != nil {
+					w.OnIgnore(childPath, reason)
+				}
 				continue
 			}
 			if err := walkFn(childPath, d, nil); err != nil {
@@ -316,7 +339,7 @@ func (w *Walker) loadIgnoreFiles(fsys fs.FS, dir string) []Rule {
 			for sc.Scan() {
 				lines = append(lines, sc.Text())
 			}
-			rules = append(rules, parseRules(lines, dir)...)
+			rules = append(rules, parseRules(lines, dir, name)...)
 		}
 	}
 	return rules
