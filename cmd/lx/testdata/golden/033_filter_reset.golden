@@ -9,164 +9,178 @@ Documentation here.
 ## All
 ---
 
-[1/29] README.md (2 rows)
+[1/32] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[2/29] assets/logo.png - binary file skipped (12 B)
+[2/32] assets/logo.png - binary file skipped (12 B)
 
-[3/29] configs/custom_sections.yaml (1 rows)
+[3/32] configs/custom_sections.yaml (1 rows)
 ---
 ```yaml
 section_header_template: "*** {{ .Body }} ***\n"
 ```
 
-[4/29] configs/custom_template.yaml (1 rows)
+[4/32] configs/custom_template.yaml (1 rows)
 ---
 ```yaml
 file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
-[5/29] configs/follow.yaml (1 rows)
+[5/32] configs/follow.yaml (1 rows)
 ---
 ```yaml
 follow_symlinks: true
 ```
 
-[6/29] configs/hidden.yaml (1 rows)
+[6/32] configs/hidden.yaml (1 rows)
 ---
 ```yaml
 show_hidden: true
 ```
 
-[7/29] configs/no_links.yaml (1 rows)
+[7/32] configs/no_links.yaml (1 rows)
 ---
 ```yaml
 no_file_links: true
 ```
 
-[8/29] doc/notes.txt (1 rows)
+[8/32] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[9/29] ignore_exception_test/data/index.json (1 rows)
+[9/32] ignore_exception_test/assets/logo.png - binary file skipped (10 B)
+
+[10/32] ignore_exception_test/data/index.json (1 rows)
 ---
 ```json
 {}
 ```
 
-[10/29] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
+[11/32] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
 ---
 ```
 excel_data
 ```
 
-[11/29] ignore_exception_test/langgraph.json (1 rows)
+[12/32] ignore_exception_test/langgraph.json (1 rows)
 ---
 ```json
 {}
 ```
 
-[12/29] ignore_exception_test/pyproject.toml (1 rows)
+[13/32] ignore_exception_test/migrations/001_init.sql (1 rows)
+---
+```sql
+SELECT 1;
+```
+
+[14/32] ignore_exception_test/pyproject.toml (1 rows)
 ---
 ```toml
 [tool]
 ```
 
-[13/29] ignore_exception_test/uv.lock (1 rows)
+[15/32] ignore_exception_test/src/main.go (1 rows)
+---
+```go
+package main
+```
+
+[16/32] ignore_exception_test/uv.lock (1 rows)
 ---
 ```
 lock_data
 ```
 
-[14/29] ignore_test/foo.go (1 rows)
+[17/32] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[15/29] langs/Dockerfile (1 rows)
+[18/32] langs/Dockerfile (1 rows)
 ---
 ```dockerfile
 FROM scratch
 ```
 
-[16/29] langs/main.rs (1 rows)
+[19/32] langs/main.rs (1 rows)
 ---
 ```rust
 fn main() {}
 ```
 
-[17/29] langs/script_no_ext (2 rows)
+[20/32] langs/script_no_ext (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo hi
 ```
 
-[18/29] links/cycle_a/visible.txt (1 rows)
+[21/32] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[19/29] links/cycle_b/visible.txt (1 rows)
+[22/32] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[20/29] links/link_to_main.go (~1 rows)
+[23/32] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[21/29] links/safe_target/recursion.txt (1 rows)
+[24/32] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
 ```
 
-[22/29] main.go (2 rows)
+[25/32] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[23/29] main_test.go (2 rows)
+[26/32] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[24/29] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+[27/32] parent_ignore_test/level1/level2/keep_me.go (1 rows)
 ---
 ```go
 package level2
 ```
 
-[25/29] pkg/util.go (1 rows)
+[28/32] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[26/29] spaces/file with spaces.txt (1 rows)
+[29/32] spaces/file with spaces.txt (1 rows)
 ---
 ```text
 content with spaces
 ```
 
-[27/29] src/large.txt (100 rows)
+[30/32] src/large.txt (100 rows)
 ---
 ```text
 Line xxxxxxxxxx
@@ -271,13 +285,13 @@ Line xxxxxxxxxx
 Line xxxxxxxxxx
 ```
 
-[28/29] src/script.py (1 rows)
+[31/32] src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
-[29/29] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
+[32/32] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
 
 
 --- STDERR ---
