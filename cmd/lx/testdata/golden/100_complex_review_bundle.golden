@@ -48,13 +48,20 @@ no_file_links: true
   <section_name>Source</section_name>
 
   <document index="6" language="go" rows="1">
+    <source>ignore_exception_test/src/main.go</source>
+    <document_content>
+package main
+    </document_content>
+  </document>
+
+  <document index="7" language="go" rows="1">
     <source>ignore_test/foo.go</source>
     <document_content>
 package foo
     </document_content>
   </document>
 
-  <document index="7" language="go" rows="1">
+  <document index="8" language="go" rows="1">
     <source>links/link_to_main.go</source>
     <document_content>
 package main
@@ -62,7 +69,7 @@ func main() {}
     </document_content>
   </document>
 
-  <document index="8" language="go" rows="2">
+  <document index="9" language="go" rows="2">
     <source>main.go</source>
     <document_content>
 package main
@@ -70,14 +77,14 @@ func main() {}
     </document_content>
   </document>
 
-  <document index="9" language="go" rows="1">
+  <document index="10" language="go" rows="1">
     <source>parent_ignore_test/level1/level2/keep_me.go</source>
     <document_content>
 package level2
     </document_content>
   </document>
 
-  <document index="10" language="go" rows="1">
+  <document index="11" language="go" rows="1">
     <source>pkg/util.go</source>
     <document_content>
 package pkg
@@ -88,7 +95,7 @@ package pkg
 <section>
   <section_name>Tests</section_name>
 
-  <document index="11" language="go" rows="2">
+  <document index="12" language="go" rows="2">
     <source>main_test.go</source>
     <document_content>
 package main

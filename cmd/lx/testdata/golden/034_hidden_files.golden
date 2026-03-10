@@ -1,5 +1,5 @@
 --- STDOUT ---
-[1/32] .gitignore (3 rows)
+[1/35] .gitignore (3 rows)
 ---
 ```gitignore
 bin/
@@ -7,176 +7,190 @@ secret/
 *.tmp
 ```
 
-[2/32] .hidden (1 rows)
+[2/35] .hidden (1 rows)
 ---
 ```
 i am hidden
 ```
 
-[3/32] README.md (2 rows)
+[3/35] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[4/32] assets/logo.png - binary file skipped (12 B)
+[4/35] assets/logo.png - binary file skipped (12 B)
 
-[5/32] configs/custom_sections.yaml (1 rows)
+[5/35] configs/custom_sections.yaml (1 rows)
 ---
 ```yaml
 section_header_template: "*** {{ .Body }} ***\n"
 ```
 
-[6/32] configs/custom_template.yaml (1 rows)
+[6/35] configs/custom_template.yaml (1 rows)
 ---
 ```yaml
 file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
-[7/32] configs/follow.yaml (1 rows)
+[7/35] configs/follow.yaml (1 rows)
 ---
 ```yaml
 follow_symlinks: true
 ```
 
-[8/32] configs/hidden.yaml (1 rows)
+[8/35] configs/hidden.yaml (1 rows)
 ---
 ```yaml
 show_hidden: true
 ```
 
-[9/32] configs/no_links.yaml (1 rows)
+[9/35] configs/no_links.yaml (1 rows)
 ---
 ```yaml
 no_file_links: true
 ```
 
-[10/32] doc/notes.txt (1 rows)
+[10/35] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[11/32] ignore_exception_test/data/index.json (1 rows)
+[11/35] ignore_exception_test/assets/logo.png - binary file skipped (10 B)
+
+[12/35] ignore_exception_test/data/index.json (1 rows)
 ---
 ```json
 {}
 ```
 
-[12/32] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
+[13/35] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
 ---
 ```
 excel_data
 ```
 
-[13/32] ignore_exception_test/langgraph.json (1 rows)
+[14/35] ignore_exception_test/langgraph.json (1 rows)
 ---
 ```json
 {}
 ```
 
-[14/32] ignore_exception_test/pyproject.toml (1 rows)
+[15/35] ignore_exception_test/migrations/001_init.sql (1 rows)
+---
+```sql
+SELECT 1;
+```
+
+[16/35] ignore_exception_test/pyproject.toml (1 rows)
 ---
 ```toml
 [tool]
 ```
 
-[15/32] ignore_exception_test/uv.lock (1 rows)
+[17/35] ignore_exception_test/src/main.go (1 rows)
+---
+```go
+package main
+```
+
+[18/35] ignore_exception_test/uv.lock (1 rows)
 ---
 ```
 lock_data
 ```
 
-[16/32] ignore_test/.gitignore (1 rows)
+[19/35] ignore_test/.gitignore (1 rows)
 ---
 ```gitignore
 bar.go
 ```
 
-[17/32] ignore_test/foo.go (1 rows)
+[20/35] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[18/32] langs/Dockerfile (1 rows)
+[21/35] langs/Dockerfile (1 rows)
 ---
 ```dockerfile
 FROM scratch
 ```
 
-[19/32] langs/main.rs (1 rows)
+[22/35] langs/main.rs (1 rows)
 ---
 ```rust
 fn main() {}
 ```
 
-[20/32] langs/script_no_ext (2 rows)
+[23/35] langs/script_no_ext (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo hi
 ```
 
-[21/32] links/cycle_a/visible.txt (1 rows)
+[24/35] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[22/32] links/cycle_b/visible.txt (1 rows)
+[25/35] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[23/32] links/link_to_main.go (~1 rows)
+[26/35] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[24/32] links/safe_target/recursion.txt (1 rows)
+[27/35] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
 ```
 
-[25/32] main.go (2 rows)
+[28/35] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[26/32] main_test.go (2 rows)
+[29/35] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[27/32] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+[30/35] parent_ignore_test/level1/level2/keep_me.go (1 rows)
 ---
 ```go
 package level2
 ```
 
-[28/32] pkg/util.go (1 rows)
+[31/35] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[29/32] spaces/file with spaces.txt (1 rows)
+[32/35] spaces/file with spaces.txt (1 rows)
 ---
 ```text
 content with spaces
 ```
 
-[30/32] src/large.txt (100 rows)
+[33/35] src/large.txt (100 rows)
 ---
 ```text
 Line xxxxxxxxxx
@@ -281,13 +295,13 @@ Line xxxxxxxxxx
 Line xxxxxxxxxx
 ```
 
-[31/32] src/script.py (1 rows)
+[34/35] src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
-[32/32] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
+[35/35] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
 
 
 --- STDERR ---
