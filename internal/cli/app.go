@@ -222,6 +222,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			}
 
 			rawPath := op.Value
+			isForced := op.Action == "file"
+
 			var fsys fs.FS
 			var walkRoot string
 			var displayPrefix string
@@ -234,13 +236,32 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			stat, err := os.Stat(absPath)
 			if err != nil {
+				// Prevent stat errors if the missing file (e.g., from git diff) is filtered out anyway
+				if !isForced && !lx.IsKept(rawPath, includes, excludes) {
+					slog.Debug("Skipping missing path due to filters", "path", rawPath)
+					continue
+				}
 				slog.Error("Failed to stat path", "path", absPath, "error", err)
 				continue
 			}
 
 			if !stat.IsDir() {
-				fsys = os.DirFS(filepath.Dir(absPath))
-				walkRoot = filepath.Base(absPath)
+				// Prevent processing an explicit file argument if it matches an exclude filter
+				if !isForced && !lx.IsKept(rawPath, includes, excludes) {
+					slog.Debug("Skipping file due to filters", "path", rawPath)
+					continue
+				}
+
+				rawPathClean := filepath.Clean(rawPath)
+
+				if !filepath.IsAbs(rawPathClean) && !strings.HasPrefix(rawPathClean, "..") {
+					fsys = os.DirFS(".")
+					walkRoot = filepath.ToSlash(rawPathClean)
+				} else {
+					fsys = os.DirFS(filepath.Dir(absPath))
+					walkRoot = filepath.Base(absPath)
+					displayPrefix = filepath.Dir(rawPathClean)
+				}
 			} else {
 				fsys = os.DirFS(absPath)
 				walkRoot = "."
@@ -253,8 +274,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			if cfg.IgnoreEnabled {
 				baseRules = append(baseRules, LoadGlobalIgnorePatterns()...)
 			}
-
-			isForced := op.Action == "file"
 
 			if cfg.IgnoreHidden && !isForced {
 				overrideRules = append(overrideRules, ".*")
@@ -291,7 +310,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				// Reconstruct display path relative to user input
 				var effectivePath string
 				if !stat.IsDir() {
-					effectivePath = rawPath
+					if displayPrefix != "" {
+						effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
+					} else {
+						effectivePath = filepath.FromSlash(path)
+					}
 				} else {
 					if path == "." {
 						effectivePath = displayPrefix
@@ -344,7 +367,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				f.Path = effectivePath
 
 				if !stat.IsDir() {
-					f.AbsPath = absPath
+					if displayPrefix != "" {
+						f.AbsPath = filepath.Join(filepath.Dir(absPath), path)
+					} else {
+						f.AbsPath = absPath
+					}
 				} else {
 					f.AbsPath = filepath.Join(absPath, path)
 				}
