@@ -106,51 +106,51 @@ func parseRules(lines []string, basePath, source string) []Rule {
 }
 
 func match(rule Rule, relPath string, isDir bool) bool {
-    targetPath := relPath
-    pattern := rule.Pattern
+	targetPath := relPath
+	pattern := rule.Pattern
 
-    isDirOnly := strings.HasSuffix(pattern, "/")
-    pattern = strings.TrimSuffix(pattern, "/")
+	isDirOnly := strings.HasSuffix(pattern, "/")
+	pattern = strings.TrimSuffix(pattern, "/")
 
-    if isDirOnly && !isDir {
-        return false
-    }
+	if isDirOnly && !isDir {
+		return false
+	}
 
-    if rule.BasePath != "" && rule.BasePath != "." {
-        if !strings.HasPrefix(relPath, rule.BasePath+"/") && relPath != rule.BasePath {
-            return false
-        }
-        if relPath == rule.BasePath {
-            targetPath = "."
-        } else {
-            targetPath = strings.TrimPrefix(relPath, rule.BasePath+"/")
-        }
-    }
+	if rule.BasePath != "" && rule.BasePath != "." {
+		if !strings.HasPrefix(relPath, rule.BasePath+"/") && relPath != rule.BasePath {
+			return false
+		}
+		if relPath == rule.BasePath {
+			targetPath = "."
+		} else {
+			targetPath = strings.TrimPrefix(relPath, rule.BasePath+"/")
+		}
+	}
 
-    isAnchored := strings.HasPrefix(pattern, "/")
-    pattern = strings.TrimPrefix(pattern, "/")
+	isAnchored := strings.HasPrefix(pattern, "/")
+	pattern = strings.TrimPrefix(pattern, "/")
 
-    // 1. Anchored or contains slash
-    if strings.Contains(pattern, "/") || isAnchored {
-        matched, _ := doublestar.Match(pattern, targetPath)
-        return matched
-    }
+	// 1. Anchored or contains slash
+	if strings.Contains(pattern, "/") || isAnchored {
+		matched, _ := doublestar.Match(pattern, targetPath)
+		return matched
+	}
 
-    // 2. Basename match
-    name := path.Base(targetPath)
-    if matched, _ := doublestar.Match(pattern, name); matched {
-        return true
-    }
+	// 2. Basename match
+	name := path.Base(targetPath)
+	if matched, _ := doublestar.Match(pattern, name); matched {
+		return true
+	}
 
-    // 3. Ubiquitous match
-    parts := strings.Split(targetPath, "/")
-    for _, part := range parts {
-        if matched, _ := doublestar.Match(pattern, part); matched {
-            return true
-        }
-    }
+	// 3. Ubiquitous match
+	parts := strings.Split(targetPath, "/")
+	for _, part := range parts {
+		if matched, _ := doublestar.Match(pattern, part); matched {
+			return true
+		}
+	}
 
-    return false
+	return false
 }
 
 // checkIgnore determines if a path should be ignored and returns the reason.
