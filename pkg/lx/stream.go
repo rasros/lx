@@ -303,11 +303,12 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 	}
 
 	go func() {
+	Loop:
 		for _, item := range s.prepared {
 			select {
 			case jobsCh <- seqJob{seqID: item.streamIndex, item: item}:
 			case <-ctx.Done():
-				break
+				break Loop
 			}
 		}
 		close(jobsCh)
