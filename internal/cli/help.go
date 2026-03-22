@@ -45,8 +45,9 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
 
   {{ "Stream Processing Model:" | bold }}
   lx treats command-line arguments as a sequential stream. State modifiers (like
-  --lines or --include) act like a paintbrush: if you set a modifier, it applies
-  to all {{ "subsequent" | underline }} files until it is changed or reset.
+  --lines or --include) are persistent: once a modifier is set, it applies to
+  all {{ "subsequent" | underline }} files and directories in the argument list
+  until it is explicitly changed or reset.
 
 {{ "Arguments:" | head }}
   {{ "[OPTIONS]" | bold }}
