@@ -138,6 +138,7 @@ func TestGolden(t *testing.T) {
 		{name: "093_force_file_flag", args: []string{"-f", ".gitignore"}},
 		{name: "094_force_file_flag_excludes", args: []string{"-e", "*.go", "-f", "main.go"}},
 		{name: "095_config_custom_sections", args: []string{"-y", "configs/custom_sections.yaml", "-s", "Head", "main.go"}},
+		{name: "096_direct_file_parent_ignore", args: []string{"direct_ignore_test/test.ignored", "direct_ignore_test/test.kept"}},
 
 		// --- 100+: Complex Combinations ---
 		{name: "100_complex_review_bundle", args: []string{
@@ -466,6 +467,10 @@ func setupComplexFixture(t *testing.T) string {
 	create("ignore_exception_test/data/secret.csv", "1,2,3", 0644)
 	create("ignore_exception_test/data/nested/deep/ignore.xlsx", "ignore", 0644)
 	create("ignore_exception_test/other_dir/file.go", "package other", 0644)
+
+	create("direct_ignore_test/.gitignore", "*.ignored\n", 0644)
+	create("direct_ignore_test/test.ignored", "should not appear", 0644)
+	create("direct_ignore_test/test.kept", "should appear", 0644)
 
 	// Image test asset
 	create("assets/logo.png", "\x89PNG\r\n\x1a\n\x00\x00\x00\x0D", 0644)

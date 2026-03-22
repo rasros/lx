@@ -238,8 +238,25 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	if !info.IsDir() {
 		var localRules []Rule
 		if w.IgnoreEnabled {
-			localRules = w.loadIgnoreFiles(fsys, ".")
+			dir := path.Dir(root)
+			// Always load root rules
+			localRules = append(localRules, w.loadIgnoreFiles(fsys, ".")...)
+
+			// Accumulate rules down the directory tree to the file's parent
+			if dir != "." {
+				parts := strings.Split(dir, "/")
+				curr := ""
+				for _, p := range parts {
+					if curr == "" {
+						curr = p
+					} else {
+						curr = curr + "/" + p
+					}
+					localRules = append(localRules, w.loadIgnoreFiles(fsys, curr)...)
+				}
+			}
 		}
+
 		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(localRules)+len(w.OverrideRules))
 		effectiveRules = append(effectiveRules, w.BaseRules...)
 		effectiveRules = append(effectiveRules, localRules...)

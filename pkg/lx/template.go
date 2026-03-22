@@ -56,14 +56,14 @@ func getFormatDefaults(fmtType string) formatDefaults {
 		}
 	default: // markdown
 		return formatDefaults{
-			FileContent:   defaultMarkdownContent,
-			FileError:     defaultMarkdownError,
-			FileBinary:    defaultMarkdownBinary,
-			FileCompact:   defaultMarkdownCompact,
-			FileHeader:    defaultMarkdownFileHeader,
-			Section:       defaultMarkdownSection,
-			Prompt:        defaultPrompt,
-			OutputFooter:  defaultMarkdownOutputFooter,
+			FileContent:  defaultMarkdownContent,
+			FileError:    defaultMarkdownError,
+			FileBinary:   defaultMarkdownBinary,
+			FileCompact:  defaultMarkdownCompact,
+			FileHeader:   defaultMarkdownFileHeader,
+			Section:      defaultMarkdownSection,
+			Prompt:       defaultPrompt,
+			OutputFooter: defaultMarkdownOutputFooter,
 		}
 	}
 }
