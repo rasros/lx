@@ -44,22 +44,18 @@ type TemplateEngine struct {
 
 // Config represents the core library configuration.
 type Config struct {
-	// File-level Templates
 	FileContentTemplate string
 	FileErrorTemplate   string
 	FileBinaryTemplate  string
 	FileCompactTemplate string
 	FileHeaderTemplate  string
 
-	// Item-level Templates
 	SectionTemplate string
 	PromptTemplate  string
 
-	// Group/Wrapper Templates
 	SectionHeaderTemplate string
 	SectionFooterTemplate string
 
-	// Global Output Templates
 	OutputHeaderTemplate string
 	OutputFooterTemplate string
 	StatsTemplate        string

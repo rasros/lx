@@ -6,9 +6,6 @@ import (
 )
 
 // layoutWriter acts as a middleman between the pipeline assembler and the output writer.
-// It manages section transitions and dynamic spacing between items.
-//
-// It is an internal helper for Stream.Execute.
 type layoutWriter struct {
 	w                io.Writer
 	engine           *TemplateEngine

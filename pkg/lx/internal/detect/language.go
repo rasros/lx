@@ -135,7 +135,6 @@ var shebangToLang = map[string]string{
 	"make":    "makefile",
 }
 
-// IsBinary detects if the given data sample contains null bytes or is invalid UTF-8.
 func IsBinary(data []byte) bool {
 	if len(data) == 0 {
 		return false
@@ -147,9 +146,6 @@ func IsBinary(data []byte) bool {
 
 	chunk := data
 
-	// Boundary cleanup: The caller passes a chunked read (e.g., 1024 bytes).
-	// This read might have sliced a multi-byte character in half.
-	// Backtrack up to 3 bytes to find the start of the last rune and drop it if incomplete.
 	for i := 1; i <= 3 && len(chunk) >= i; i++ {
 		if utf8.RuneStart(chunk[len(chunk)-i]) {
 			if !utf8.FullRune(chunk[len(chunk)-i:]) {
@@ -162,7 +158,6 @@ func IsBinary(data []byte) bool {
 	return !utf8.Valid(chunk)
 }
 
-// DetectLanguage identifies the programming language based on extension, filename, or shebang.
 func DetectLanguage(p string, data []byte) string {
 	base := strings.ToLower(path.Base(p))
 	if lang, ok := filenameToLang[base]; ok {

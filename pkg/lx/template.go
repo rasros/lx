@@ -68,9 +68,7 @@ func getFormatDefaults(fmtType string) formatDefaults {
 	}
 }
 
-// MARKDOWN DEFAULTS
 const defaultMarkdownFileHeader = `{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }}`
-
 const defaultMarkdownContent = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
 ---
 ` + "```{{ .Language }}" + `
@@ -79,52 +77,38 @@ const defaultMarkdownContent = `{{ template "file_header" . }} ({{ if .IsEstimat
 const defaultMarkdownError = `{{ template "file_header" . }} - error: {{ .ReadError }}`
 const defaultMarkdownBinary = `{{ template "file_header" . }} - binary file skipped ({{ .Size | humanize }})`
 const defaultMarkdownCompact = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)`
-
 const defaultMarkdownSection = `## {{ .Body | endNewline }}---`
 const defaultPrompt = `{{ .Body | endNewline }}`
 const defaultMarkdownOutputFooter = "\n\n"
 
-// XML DEFAULTS
 const defaultXMLContent = `  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
     <source>{{ .Path }}</source>
     <document_content>
 {{ .Content | endNewline }}    </document_content>
   </document>`
-
 const defaultXMLError = `  <document index="{{ .FileIndex }}">
     <source>{{ .Path }}</source>
     <error>{{ .ReadError }}</error>
   </document>`
-
 const defaultXMLBinary = `  <document index="{{ .FileIndex }}">
     <source>{{ .Path }}</source>
     <error>Binary file ({{ .Size | humanize }})</error>
   </document>`
-
 const defaultXMLCompact = `  <document index="{{ .FileIndex }}">
     <source>{{ .Path }}</source>
     <description>Compact view</description>
   </document>`
-
-// SectionHeader now only handles the implicit wrapper.
 const defaultXMLSectionHeader = `{{ if .IsImplicit }}<content>
 {{ end }}`
-
-// Section now handles the opening tag and title for explicit sections.
 const defaultXMLSection = `{{- if not .IsImplicit }}<section>
   <section_name>{{ .Body }}</section_name>{{ end }}`
-
-// SectionFooter closes what was opened (Implicit->Content, Explicit->Section).
 const defaultXMLSectionFooter = `
 {{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}`
-
 const defaultXMLPrompt = `  <instruction>` + "\n" +
 	`{{ .Body | endNewline }}` +
 	`  </instruction>`
-
 const defaultXMLOutputFooter = "\n\n"
 
-// HTML DEFAULTS
 const defaultHTMLOutputHeader = `<!DOCTYPE html>
 <html lang="en">
 <head>

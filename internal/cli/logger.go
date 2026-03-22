@@ -9,7 +9,6 @@ import (
 	"sync"
 )
 
-// CliHandler formats logs for human readability in a terminal.
 type CliHandler struct {
 	w     io.Writer
 	mu    sync.Mutex
@@ -85,7 +84,6 @@ func (h *CliHandler) Handle(_ context.Context, r slog.Record) error {
 	return err
 }
 
-// WithAttrs implements slog.Handler
 func (h *CliHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	newAttrs := make([]slog.Attr, len(h.attrs)+len(attrs))
 	copy(newAttrs, h.attrs)
@@ -98,7 +96,6 @@ func (h *CliHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 }
 
-// WithGroup implements slog.Handler
 func (h *CliHandler) WithGroup(name string) slog.Handler {
 	return h
 }

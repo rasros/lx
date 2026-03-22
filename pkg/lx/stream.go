@@ -8,7 +8,6 @@ import (
 	"sync"
 )
 
-// streamItem is an internal interface for types that can be added to the output stream.
 type streamItem interface {
 	isStreamItem()
 }
@@ -17,7 +16,6 @@ func (InputFile) isStreamItem()      {}
 func (SectionContext) isStreamItem() {}
 func (PromptContext) isStreamItem()  {}
 
-// FileErrorHandler is a callback invoked when the processor fails to read a file.
 type FileErrorHandler func(f InputFile, err error)
 
 type defaultTokenizer struct{}
@@ -47,12 +45,12 @@ type Stream struct {
 	prepared    []preparedItem
 }
 
-// NewStream initializes a new stream with the given configuration.
 func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
 	engine, err := CompileTemplates(cfg)
 	if err != nil {
 		return nil, err
 	}
+
 	fmtType := cfg.OutputFormat
 	if fmtType == "" {
 		fmtType = "markdown"
@@ -88,7 +86,6 @@ func (s *Stream) WithRunnerConfig(cfg RunnerConfig) *Stream {
 	return s
 }
 
-// WithOnFileError sets the callback for file reading errors.
 func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
 	s.onFileError = h
 	return s
@@ -130,7 +127,6 @@ func (s *Stream) Prepare() GlobalContext {
 		IsImplicit: true,
 	}
 	usingImplicit := true
-
 	if len(s.items) > 0 {
 		if _, ok := s.items[0].(SectionContext); ok {
 			usingImplicit = false
@@ -145,7 +141,6 @@ func (s *Stream) Prepare() GlobalContext {
 	if !usingImplicit {
 		sectionCounter = -1
 	}
-
 	globalFileIdx := 1
 
 	for i, item := range s.items {
@@ -193,7 +188,6 @@ func (s *Stream) Prepare() GlobalContext {
 	}
 
 	global.TotalSections = len(s.sections)
-
 	for _, sec := range s.sections {
 		sec.Global = global
 	}
@@ -201,11 +195,8 @@ func (s *Stream) Prepare() GlobalContext {
 	return global
 }
 
-func (s *Stream) GetGlobalContext() GlobalContext {
-	return s.Prepare()
-}
+func (s *Stream) GetGlobalContext() GlobalContext { return s.Prepare() }
 
-// Execute renders the stream content to w.
 func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	global := s.Prepare()
 	counter := &byteCounter{w: w}
@@ -242,9 +233,7 @@ type result struct {
 }
 
 var bufferPool = sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
+	New: func() interface{} { return new(bytes.Buffer) },
 }
 
 var readPool = sync.Pool{
@@ -263,7 +252,6 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 	defer cancel()
 
 	var wg sync.WaitGroup
-
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func() {
@@ -283,7 +271,6 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				localCounter := &byteCounter{w: buf}
 
 				err := proc.RenderPrepared(localCounter, j.item, readBuf)
-
 				readPool.Put(readBufPtr)
 
 				select {
@@ -327,7 +314,6 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		if res.err != nil {
 			return res.err
 		}
-
 		buffer[res.index] = res
 
 		for {
@@ -339,13 +325,11 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 			if err := layout.WriteItem(next); err != nil {
 				return err
 			}
-
 			bufferPool.Put(next.buffer)
 			delete(buffer, nextSeq)
 			nextSeq++
 		}
 	}
-
 	return nil
 }
 

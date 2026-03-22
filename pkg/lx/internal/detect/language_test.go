@@ -68,24 +68,21 @@ func TestIsBinary_Truncation(t *testing.T) {
 	}{
 		{
 			name: "Exact fit ASCII",
-			data: append(base, []byte("aaa")...), // 1024 bytes total
+			data: append(base, []byte("aaa")...),
 			want: false,
 		},
 		{
 			name: "Truncated 3-byte char missing 1 byte",
-			// 1022 bytes ASCII + 2 bytes of a 3-byte character (like the checkmark)
 			data: append(bytes.Repeat([]byte("a"), 1022), []byte("✓")[:2]...),
 			want: false,
 		},
 		{
 			name: "Truncated 4-byte char missing 2 bytes",
-			// 1022 bytes ASCII + 2 bytes of a 4-byte character (like a globe emoji)
 			data: append(bytes.Repeat([]byte("a"), 1022), []byte("🌍")[:2]...),
 			want: false,
 		},
 		{
 			name: "Truncated 4-byte char missing 1 byte",
-			// 1021 bytes ASCII + 3 bytes of a 4-byte character
 			data: append(bytes.Repeat([]byte("a"), 1021), []byte("🌍")[:3]...),
 			want: false,
 		},

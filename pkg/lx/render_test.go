@@ -17,7 +17,7 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 	proc := newProcessor(engine, global, nil, "markdown")
 
 	file := NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
-	file.Config = RunnerConfig{Head: 1, Tail: 1} // Head 1, Tail 1, Gap should exist
+	file.Config = RunnerConfig{Head: 1, Tail: 1}
 
 	scratch := make([]byte, 1024)
 	item := preparedItem{
@@ -41,24 +41,20 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 }
 
 func TestRender_DataURI(t *testing.T) {
-	// 1. Create a dummy image file
 	tmp := t.TempDir()
 	imgName := "test.png"
 	imgPath := filepath.Join(tmp, imgName)
-	// Minimal PNG header to satisfy potential magic byte checks
 	payload := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
 	if err := os.WriteFile(imgPath, payload, 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	// 2. Setup HTML output
 	cfg := NewConfig()
 	cfg.OutputFormat = "html"
 	engine, _ := CompileTemplates(cfg)
 
 	proc := newProcessor(engine, GlobalContext{}, nil, "html")
 
-	// 3. Create InputFile pointing to real FS
 	file, err := NewInputFileFromPath(os.DirFS(tmp), imgName)
 	if err != nil {
 		t.Fatal(err)

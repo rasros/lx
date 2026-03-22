@@ -49,23 +49,20 @@ func IsMatch(pattern, relPath string) bool {
 	isAnchored := strings.HasPrefix(pattern, "/")
 	pattern = strings.TrimPrefix(pattern, "/")
 
-	// 1. Anchored or contains slash (matches from root)
 	if strings.Contains(pattern, "/") || isAnchored {
 		matched, _ := doublestar.Match(pattern, relPath)
 		return matched
 	}
 
-	// 2. Basename match
 	name := path.Base(relPath)
 	if matched, _ := doublestar.Match(pattern, name); matched {
 		return true
 	}
 
-	// 3. Ubiquitous match (matches any directory segment in the path)
 	parts := strings.Split(relPath, "/")
 	for i, part := range parts {
 		if isDirOnly && i == len(parts)-1 {
-			continue // Skip matching the final segment if pattern explicitly targets directories
+			continue
 		}
 		if matched, _ := doublestar.Match(pattern, part); matched {
 			return true
@@ -130,19 +127,16 @@ func match(rule Rule, relPath string, isDir bool) bool {
 	isAnchored := strings.HasPrefix(pattern, "/")
 	pattern = strings.TrimPrefix(pattern, "/")
 
-	// 1. Anchored or contains slash
 	if strings.Contains(pattern, "/") || isAnchored {
 		matched, _ := doublestar.Match(pattern, targetPath)
 		return matched
 	}
 
-	// 2. Basename match
 	name := path.Base(targetPath)
 	if matched, _ := doublestar.Match(pattern, name); matched {
 		return true
 	}
 
-	// 3. Ubiquitous match
 	parts := strings.Split(targetPath, "/")
 	for _, part := range parts {
 		if matched, _ := doublestar.Match(pattern, part); matched {
@@ -162,7 +156,7 @@ func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool) (
 		if match(rule, relPath, isDir) {
 			if rule.Negate {
 				ignored = false
-				reason = "" // explicitly included
+				reason = ""
 			} else {
 				ignored = true
 				reason = fmt.Sprintf("rule %q in %s", rule.Pattern, rule.Source)
@@ -180,7 +174,6 @@ func hasNestedException(dirPath string, rules []Rule) bool {
 			continue
 		}
 
-		// Check Scope (BasePath)
 		if rule.BasePath != "" && rule.BasePath != "." {
 			if !strings.HasPrefix(dirPath, rule.BasePath) && !strings.HasPrefix(rule.BasePath, dirPath) {
 				continue
@@ -242,7 +235,6 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 			// Always load root rules
 			localRules = append(localRules, w.loadIgnoreFiles(fsys, ".")...)
 
-			// Accumulate rules down the directory tree to the file's parent
 			if dir != "." {
 				parts := strings.Split(dir, "/")
 				curr := ""

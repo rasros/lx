@@ -13,7 +13,6 @@ func TestEstimateLineCount(t *testing.T) {
 	smallData := []byte("1\n2\n3\n4\n5\n")
 	noNewline := []byte("oneline")
 
-	// Generate large data
 	var largeBuilder bytes.Buffer
 	for i := 0; i < 1000; i++ {
 		largeBuilder.WriteString("this is a reasonably long line to fill up the buffer fast\n")
@@ -61,7 +60,6 @@ func TestReadHead(t *testing.T) {
 	input := "line1\nline2\nline3\n"
 	r := strings.NewReader(input)
 
-	// Test exact read
 	got, lines, err := ReadHead(r, 2)
 	if err != nil {
 		t.Fatal(err)
@@ -105,8 +103,8 @@ func TestReadTailSeek(t *testing.T) {
 	}{
 		{"Subset", 2, "4\n5\n"},
 		{"Exact size", 5, "1\n2\n3\n4\n5\n"},
-		{"More than exist", 10, "1\n2\n3\n4\n5\n"}, // Should return whole file
-		{"Zero", 0, ""},                            // Should return nil/empty
+		{"More than exist", 10, "1\n2\n3\n4\n5\n"},
+		{"Zero", 0, ""},
 	}
 
 	for _, tt := range tests {

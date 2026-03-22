@@ -8,7 +8,6 @@ import (
 )
 
 // InputFile represents a file to be processed.
-// It holds metadata in memory and a lazy opener for content.
 type InputFile struct {
 	Path      string
 	AbsPath   string
@@ -16,10 +15,8 @@ type InputFile struct {
 	ModTime   time.Time
 	LoadError error
 
-	// Config defines how this specific file should be sliced and rendered.
 	Config RunnerConfig
 
-	// Open returns a ReadCloser for the file content.
 	Open func() (io.ReadCloser, error)
 }
 
