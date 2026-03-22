@@ -1,6 +1,7 @@
 package detect
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -53,5 +54,58 @@ func TestIsBinary(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("IsBinary(%q) = %v, want %v", tt.name, got, tt.want)
 		}
+	}
+}
+
+func TestIsBinary_Truncation(t *testing.T) {
+	// 1021 bytes of pure ASCII
+	base := bytes.Repeat([]byte("a"), 1021)
+
+	tests := []struct {
+		name string
+		data []byte
+		want bool
+	}{
+		{
+			name: "Exact fit ASCII",
+			data: append(base, []byte("aaa")...), // 1024 bytes total
+			want: false,
+		},
+		{
+			name: "Truncated 3-byte char missing 1 byte",
+			// 1022 bytes ASCII + 2 bytes of a 3-byte character (like the checkmark)
+			data: append(bytes.Repeat([]byte("a"), 1022), []byte("✓")[:2]...),
+			want: false,
+		},
+		{
+			name: "Truncated 4-byte char missing 2 bytes",
+			// 1022 bytes ASCII + 2 bytes of a 4-byte character (like a globe emoji)
+			data: append(bytes.Repeat([]byte("a"), 1022), []byte("🌍")[:2]...),
+			want: false,
+		},
+		{
+			name: "Truncated 4-byte char missing 1 byte",
+			// 1021 bytes ASCII + 3 bytes of a 4-byte character
+			data: append(bytes.Repeat([]byte("a"), 1021), []byte("🌍")[:3]...),
+			want: false,
+		},
+		{
+			name: "Genuine binary contains null",
+			data: append(bytes.Repeat([]byte("a"), 1023), 0x00),
+			want: true,
+		},
+		{
+			name: "Genuine invalid UTF-8 in middle",
+			data: append(bytes.Repeat([]byte("a"), 500), append([]byte{0xff, 0xfe}, bytes.Repeat([]byte("a"), 522)...)...),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsBinary(tt.data); got != tt.want {
+				t.Errorf("IsBinary() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
