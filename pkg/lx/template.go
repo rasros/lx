@@ -56,14 +56,14 @@ func getFormatDefaults(fmtType string) formatDefaults {
 		}
 	default: // markdown
 		return formatDefaults{
-			FileContent:  defaultMarkdownContent,
-			FileError:    defaultMarkdownError,
-			FileBinary:   defaultMarkdownBinary,
-			FileCompact:  defaultMarkdownCompact,
-			FileHeader:   defaultMarkdownFileHeader,
-			Section:      defaultMarkdownSection,
-			Prompt:       defaultPrompt,
-			OutputFooter: defaultMarkdownOutputFooter,
+			FileContent:   defaultMarkdownContent,
+			FileError:     defaultMarkdownError,
+			FileBinary:    defaultMarkdownBinary,
+			FileCompact:   defaultMarkdownCompact,
+			FileHeader:    defaultMarkdownFileHeader,
+			Section:       defaultMarkdownSection,
+			Prompt:        defaultPrompt,
+			OutputFooter:  defaultMarkdownOutputFooter,
 		}
 	}
 }
@@ -224,20 +224,9 @@ const defaultHTMLCompact = `<article id="file-{{ .FileIndex }}">
 </article>
 `
 
-// HTML: SectionHeader and Footer handle the implicit wrapper or nothing?
-// Actually, defaultHTMLSectionHeader was `<section id...`.
-// But if we move opening tag to Section item, SectionHeader for explicit sections should be empty?
-// Wait, if I move `<section>` to `Section`, then I can't put `{{ .Index }}` easily in the header for non-implicit?
-// Correction: The `Section` template receives `SectionContext` which HAS `.Index`.
-// So:
-const defaultHTMLSectionHeader = `` // Empty for HTML now? No, Implicit wrapper? HTML doesn't use implicit wrapper usually.
-
-// Moved opening tag to here.
+const defaultHTMLSectionHeader = ``
 const defaultHTMLSection = `<section id="section-{{ .Index }}"><h2><a href="#section-{{ .Index }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>`
-
-// Added closing tag to footer.
 const defaultHTMLSectionFooter = `</section>`
-
 const defaultHTMLPrompt = `<blockquote>{{ .Body | endNewline }}</blockquote>`
 
 const defaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
@@ -255,7 +244,11 @@ func templateFuncs() template.FuncMap {
 				return fmt.Sprintf("%d B", s)
 			}
 			e := math.Floor(math.Log(float64(s)) / math.Log(1000))
-			suffix := sizes[int(e)]
+			idx := int(e)
+			if idx >= len(sizes) {
+				idx = len(sizes) - 1
+			}
+			suffix := sizes[idx]
 			val := float64(s) / math.Pow(1000, e)
 			return fmt.Sprintf("%.1f %s", val, suffix)
 		},
