@@ -9,7 +9,7 @@ func TestIsImage(t *testing.T) {
 	}{
 		{"image.png", true},
 		{"photo.JPG", true},
-		{"vector.svg", true},
+		{"vector.svg", false},
 		{"icon.ico", true},
 		{"archive.zip", false},
 		{"source.go", false},
