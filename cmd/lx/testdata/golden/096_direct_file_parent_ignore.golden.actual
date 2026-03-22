@@ -1,9 +1,0 @@
---- STDOUT ---
-direct_ignore_test/test.kept (1 rows)
----
-```
-should appear
-```
-
-
---- STDERR ---

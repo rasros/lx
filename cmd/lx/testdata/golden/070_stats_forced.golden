@@ -8,6 +8,6 @@ func main() {}
 
 
 --- STDERR ---
-Est. Tokens: 6
+Est. Tokens: 15
 Files: 1
 Size: 60 B

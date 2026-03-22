@@ -214,6 +214,7 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	}
 
 	global.TotalWrittenBytes = counter.count
+	global.TokenEstimate = s.tokenizer.Estimate(counter.count, nil)
 	s.finalStats = &global
 	return nil
 }
