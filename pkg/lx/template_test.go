@@ -39,3 +39,46 @@ func TestTemplateFuncs_Date(t *testing.T) {
 		t.Errorf("date() = %q, want 2025-12-17", got)
 	}
 }
+
+func TestTemplateFuncs_EndNewline(t *testing.T) {
+	endNewline := templateFuncs()["endNewline"].(func(interface{}) string)
+
+	tests := []struct {
+		in   interface{}
+		want string
+	}{
+		{"hello", "hello\n"},
+		{"already\n", "already\n"},
+		{"", ""},
+		{42, "42"}, // non-string falls back to Sprintf
+	}
+
+	for _, tt := range tests {
+		got := endNewline(tt.in)
+		if got != tt.want {
+			t.Errorf("endNewline(%v) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestTemplateFuncs_Escape(t *testing.T) {
+	escape := templateFuncs()["escape"].(func(interface{}) string)
+
+	tests := []struct {
+		in   interface{}
+		want string
+	}{
+		{"<b>bold</b>", "&lt;b&gt;bold&lt;/b&gt;"},
+		{"safe text", "safe text"},
+		{"a & b", "a &amp; b"},
+		{`"quoted"`, "&#34;quoted&#34;"},
+		{99, "99"}, // non-string falls back to Sprintf
+	}
+
+	for _, tt := range tests {
+		got := escape(tt.in)
+		if got != tt.want {
+			t.Errorf("escape(%v) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}

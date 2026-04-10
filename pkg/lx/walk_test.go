@@ -271,3 +271,142 @@ func assertNotContains(t *testing.T, list []string, item string) {
 		}
 	}
 }
+
+func TestIsMatch(t *testing.T) {
+	tests := []struct {
+		pattern string
+		path    string
+		want    bool
+	}{
+		// Basename / floating patterns match at any depth
+		{"*.go", "main.go", true},
+		{"*.go", "sub/main.go", true},
+		{"*.go", "main.txt", false},
+		// Anchored pattern only matches at root
+		{"/foo.txt", "foo.txt", true},
+		{"/foo.txt", "sub/foo.txt", false},
+		// Path pattern (contains slash) is matched against full path
+		{"src/*.go", "src/main.go", true},
+		{"src/*.go", "pkg/main.go", false},
+		// Double star spans directories
+		{"**/test", "a/b/test", true},
+		{"**/test", "test", true},
+		{"**/test", "a/b/other", false},
+		// Literal floating name matches any segment
+		{"target", "target", true},
+		{"target", "src/target", true},
+		{"target", "other", false},
+		// Dir-only pattern: last segment of a plain path is excluded from matching
+		{"node_modules/", "node_modules/pkg/foo.go", true},
+		{"node_modules/", "other/foo.go", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.pattern+"|"+tt.path, func(t *testing.T) {
+			got := IsMatch(tt.pattern, tt.path)
+			if got != tt.want {
+				t.Errorf("IsMatch(%q, %q) = %v, want %v", tt.pattern, tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseRules(t *testing.T) {
+	t.Run("comment and blank lines skipped", func(t *testing.T) {
+		rules := parseRules([]string{"# comment", "  ", "foo"}, "", "test")
+		if len(rules) != 1 {
+			t.Fatalf("Expected 1 rule, got %d: %v", len(rules), rules)
+		}
+		if rules[0].Pattern != "foo" {
+			t.Errorf("Pattern = %q, want foo", rules[0].Pattern)
+		}
+	})
+
+	t.Run("negate prefix stripped and flagged", func(t *testing.T) {
+		rules := parseRules([]string{"!important.go"}, "", "test")
+		if !rules[0].Negate {
+			t.Error("Expected Negate=true")
+		}
+		if rules[0].Pattern != "important.go" {
+			t.Errorf("Pattern = %q, want important.go", rules[0].Pattern)
+		}
+	})
+
+	t.Run("IsLiteral set correctly", func(t *testing.T) {
+		rules := parseRules([]string{"foo", "*.go", "bar/baz", "a[bc]"}, "", "test")
+		cases := []struct {
+			idx  int
+			want bool
+			name string
+		}{
+			{0, true, "foo"},
+			{1, false, "*.go"},
+			{2, true, "bar/baz"},
+			{3, false, "a[bc]"},
+		}
+		for _, c := range cases {
+			if rules[c.idx].IsLiteral != c.want {
+				t.Errorf("rules[%d] (%s).IsLiteral = %v, want %v", c.idx, c.name, rules[c.idx].IsLiteral, c.want)
+			}
+		}
+	})
+
+	t.Run("trailing slash preserved after clean", func(t *testing.T) {
+		rules := parseRules([]string{"build/"}, "", "test")
+		if rules[0].Pattern != "build/" {
+			t.Errorf("Pattern = %q, want build/", rules[0].Pattern)
+		}
+	})
+}
+
+func TestWalker_AlternateIgnoreFiles(t *testing.T) {
+	for _, ignoreFile := range []string{".ignore", ".lxignore"} {
+		t.Run(ignoreFile, func(t *testing.T) {
+			tmp := t.TempDir()
+			mustWriteFile(t, tmp, ignoreFile, "secret.txt")
+			mustWriteFile(t, tmp, "secret.txt", "hidden")
+			mustWriteFile(t, tmp, "public.txt", "visible")
+
+			w := NewWalker(nil, nil)
+			files := collectPaths(t, w, tmp)
+
+			assertNotContains(t, files, "secret.txt")
+			assertContains(t, files, "public.txt")
+		})
+	}
+}
+
+func TestWalker_OnIgnore(t *testing.T) {
+	tmp := t.TempDir()
+	mustWriteFile(t, tmp, "junk.log", "trash")
+	mustWriteFile(t, tmp, "keep.go", "keep")
+
+	w := NewWalker([]string{"*.log"}, nil)
+	var ignored []string
+	w.OnIgnore = func(path string, reason string) {
+		ignored = append(ignored, path)
+	}
+
+	_ = collectPaths(t, w, tmp)
+
+	found := false
+	for _, p := range ignored {
+		if p == "junk.log" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("OnIgnore not called for junk.log; got: %v", ignored)
+	}
+}
+
+func TestWalker_IgnoreDisabled(t *testing.T) {
+	tmp := t.TempDir()
+	mustWriteFile(t, tmp, ".gitignore", "*.log")
+	mustWriteFile(t, tmp, "keep.log", "content")
+
+	w := NewWalker(nil, nil)
+	w.IgnoreEnabled = false
+
+	files := collectPaths(t, w, tmp)
+	assertContains(t, files, "keep.log")
+}

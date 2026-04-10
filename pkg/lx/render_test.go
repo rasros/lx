@@ -102,3 +102,71 @@ func TestRender_ErrorHandling(t *testing.T) {
 		t.Errorf("Expected error template output, got: %s", got)
 	}
 }
+
+func TestRender_BinaryFile(t *testing.T) {
+	cfg := NewConfig()
+	engine, _ := CompileTemplates(cfg)
+	proc := newProcessor(engine, GlobalContext{}, nil, "markdown")
+
+	// Null byte triggers binary detection.
+	binaryContent := append([]byte("ELF"), 0x00, 0x01, 0x02, 0x03)
+	file := NewBufferInputFile("program", binaryContent)
+	file.Config = RunnerConfig{Head: -1, Tail: -1}
+
+	item := preparedItem{raw: file, section: &SectionContext{}, fileIndexGlobal: 1}
+
+	var buf bytes.Buffer
+	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "binary file skipped") {
+		t.Errorf("Expected binary file message, got:\n%s", got)
+	}
+}
+
+func TestRender_CompactView(t *testing.T) {
+	cfg := NewConfig()
+	engine, _ := CompileTemplates(cfg)
+	proc := newProcessor(engine, GlobalContext{}, nil, "markdown")
+
+	file := NewBufferInputFile("data.txt", []byte("lots of content\n"))
+	file.Config = RunnerConfig{Head: 0, Tail: 0} // triggers compact
+
+	item := preparedItem{raw: file, section: &SectionContext{}, fileIndexGlobal: 1}
+
+	var buf bytes.Buffer
+	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "data.txt") {
+		t.Errorf("Expected filename in compact output, got:\n%s", got)
+	}
+	if strings.Contains(got, "lots of content") {
+		t.Errorf("Compact view should not include file content, got:\n%s", got)
+	}
+}
+
+func TestRender_LineNumbers(t *testing.T) {
+	cfg := NewConfig()
+	engine, _ := CompileTemplates(cfg)
+	proc := newProcessor(engine, GlobalContext{TotalFiles: 1}, nil, "markdown")
+
+	file := NewBufferInputFile("code.go", []byte("package main\nfunc main() {}\n"))
+	file.Config = RunnerConfig{Head: -1, Tail: -1, LineNumbers: true}
+
+	item := preparedItem{raw: file, section: &SectionContext{}, fileIndexGlobal: 1}
+
+	var buf bytes.Buffer
+	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "1: package main") {
+		t.Errorf("Expected line numbers in output, got:\n%s", got)
+	}
+}
