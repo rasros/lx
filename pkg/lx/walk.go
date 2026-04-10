@@ -281,7 +281,10 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 		return walkFn(root, dirEntryAdapter{info}, nil)
 	}
 
-	return w.recursiveWalk(fsys, root, w.BaseRules, walkFn, false)
+	initialRules := make([]Rule, 0, len(w.BaseRules)+len(w.OverrideRules))
+	initialRules = append(initialRules, w.BaseRules...)
+	initialRules = append(initialRules, w.OverrideRules...)
+	return w.recursiveWalk(fsys, root, initialRules, walkFn, false)
 }
 
 func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkFn fs.WalkDirFunc, parentIgnored bool) error {
