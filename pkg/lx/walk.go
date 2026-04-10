@@ -13,10 +13,11 @@ import (
 
 // Rule represents a single parsed line from the ignore file.
 type Rule struct {
-	Pattern  string
-	Negate   bool
-	BasePath string
-	Source   string
+	Pattern   string
+	Negate    bool
+	IsLiteral bool
+	BasePath  string
+	Source    string
 }
 
 // Walker configures the file traversal.
@@ -93,10 +94,11 @@ func parseRules(lines []string, basePath, source string) []Rule {
 		}
 
 		rules = append(rules, Rule{
-			Pattern:  p,
-			Negate:   negate,
-			BasePath: basePath,
-			Source:   source,
+			Pattern:   p,
+			Negate:    negate,
+			IsLiteral: !strings.ContainsAny(p, "*?[{"),
+			BasePath:  basePath,
+			Source:    source,
 		})
 	}
 	return rules
@@ -128,19 +130,34 @@ func match(rule Rule, relPath string, isDir bool) bool {
 	pattern = strings.TrimPrefix(pattern, "/")
 
 	if strings.Contains(pattern, "/") || isAnchored {
+		if rule.IsLiteral {
+			return pattern == targetPath
+		}
 		matched, _ := doublestar.Match(pattern, targetPath)
 		return matched
 	}
 
 	name := path.Base(targetPath)
-	if matched, _ := doublestar.Match(pattern, name); matched {
+	if rule.IsLiteral {
+		if pattern == name {
+			return true
+		}
+	} else if matched, _ := doublestar.Match(pattern, name); matched {
 		return true
 	}
 
-	parts := strings.Split(targetPath, "/")
-	for _, part := range parts {
-		if matched, _ := doublestar.Match(pattern, part); matched {
-			return true
+	start := 0
+	for i := 0; i <= len(targetPath); i++ {
+		if i == len(targetPath) || targetPath[i] == '/' {
+			part := targetPath[start:i]
+			start = i + 1
+			if rule.IsLiteral {
+				if pattern == part {
+					return true
+				}
+			} else if matched, _ := doublestar.Match(pattern, part); matched {
+				return true
+			}
 		}
 	}
 
@@ -273,10 +290,15 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 		localRules = w.loadIgnoreFiles(fsys, dir)
 	}
 
-	effectiveRules := make([]Rule, 0, len(parentRules)+len(localRules)+len(w.OverrideRules))
-	effectiveRules = append(effectiveRules, parentRules...)
-	effectiveRules = append(effectiveRules, localRules...)
-	effectiveRules = append(effectiveRules, w.OverrideRules...)
+	var effectiveRules []Rule
+	if len(localRules) == 0 {
+		effectiveRules = parentRules
+	} else {
+		effectiveRules = make([]Rule, 0, len(parentRules)+len(localRules)+len(w.OverrideRules))
+		effectiveRules = append(effectiveRules, parentRules...)
+		effectiveRules = append(effectiveRules, localRules...)
+		effectiveRules = append(effectiveRules, w.OverrideRules...)
+	}
 
 	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
