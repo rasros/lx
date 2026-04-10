@@ -73,3 +73,26 @@ func TestStream_TokenizerIntegration(t *testing.T) {
 		t.Errorf("Expected custom token estimate 999, got %d", stats.TokenEstimate)
 	}
 }
+
+func TestStream_Prepare_Counts(t *testing.T) {
+	cfg := NewConfig()
+	stream, _ := NewStream(cfg, RunnerConfig{Head: -1})
+
+	stream.AddSection("S1")
+	stream.AddFile(NewBufferInputFile("a.txt", []byte("aaa")))
+	stream.AddFile(NewBufferInputFile("b.txt", []byte("bb")))
+	stream.AddSection("S2")
+	stream.AddFile(NewBufferInputFile("c.txt", []byte("c")))
+
+	g := stream.GetGlobalContext()
+
+	if g.TotalFiles != 3 {
+		t.Errorf("TotalFiles = %d, want 3", g.TotalFiles)
+	}
+	if g.TotalSections != 2 {
+		t.Errorf("TotalSections = %d, want 2", g.TotalSections)
+	}
+	if g.TotalSize != 6 {
+		t.Errorf("TotalSize = %d, want 6", g.TotalSize)
+	}
+}
