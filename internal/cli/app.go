@@ -246,9 +246,15 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			}
 
 			if !stat.IsDir() {
-				// Prevent processing an explicit file argument if it matches an exclude filter
-				if !isForced && !lx.IsKept(rawPath, includes, excludes) {
+				// Prevent processing an explicit file argument if it matches an exclude filter.
+				// Expandable archives bypass the include check: the filter applies to their contents.
+				isExpandableArchive := cfg.ExpandArchives && lx.IsArchivePath(rawPath)
+				if !isForced && !isExpandableArchive && !lx.IsKept(rawPath, includes, excludes) {
 					slog.Debug("Skipping file due to filters", "path", rawPath)
+					continue
+				}
+				if !isForced && isExpandableArchive && !lx.IsKept(rawPath, nil, excludes) {
+					slog.Debug("Skipping archive due to exclude filter", "path", rawPath)
 					continue
 				}
 
@@ -333,6 +339,28 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						slog.Debug("Skipping directory symlink", "path", effectivePath)
 						return nil
 					}
+				}
+
+				// Expand archives inline before include filtering
+				if cfg.ExpandArchives && lx.IsArchivePath(path) {
+					var archiveAbsPath string
+					if stat.IsDir() {
+						archiveAbsPath = filepath.Join(absPath, filepath.FromSlash(path))
+					} else {
+						archiveAbsPath = absPath
+					}
+					archiveWalker := newArchiveWalker(cfg, isForced)
+					archiveWalker.OnIgnore = func(p, reason string) {
+						slog.Debug("Ignored in archive", "path", effectivePath+"/"+p, "reason", reason)
+					}
+					archiveIncludes := includes
+					if isForced {
+						archiveIncludes = nil
+					}
+					if err := lx.ExpandArchive(archiveAbsPath, effectivePath, archiveWalker, archiveIncludes, outPath, stream); err != nil {
+						slog.Error("Failed to expand archive", "path", effectivePath, "error", err)
+					}
+					return nil
 				}
 
 				// Post-walk filtering for includes (weak filter, respects .gitignore)
@@ -504,6 +532,15 @@ func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
 	if _, ok := globals["ignore"]; ok {
 		slog.Debug("Override: Ignore files enabled via flag")
 		c.IgnoreEnabled = true
+	}
+
+	if _, ok := globals["expand"]; ok {
+		slog.Debug("Override: Archive expansion enabled via flag")
+		c.ExpandArchives = true
+	}
+	if _, ok := globals["no-expand"]; ok {
+		slog.Debug("Override: Archive expansion disabled via flag")
+		c.ExpandArchives = false
 	}
 }
 

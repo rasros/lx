@@ -36,8 +36,9 @@ type CliConfig struct {
 	FollowSymlinks *bool `yaml:"follow_symlinks"`
 	NoFileSymlinks *bool `yaml:"no_file_links"`
 
-	ShowHidden *bool `yaml:"show_hidden"`
-	Ignore     *bool `yaml:"ignore"`
+	ShowHidden     *bool `yaml:"show_hidden"`
+	Ignore         *bool `yaml:"ignore"`
+	ExpandArchives *bool `yaml:"expand_archives"`
 
 	OutputMode string `yaml:"output_mode"`
 	ShowStats  string `yaml:"show_stats"`
@@ -127,6 +128,9 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		}
 		if loaded.Ignore != nil {
 			lxCfg.IgnoreEnabled = *loaded.Ignore
+		}
+		if loaded.ExpandArchives != nil {
+			lxCfg.ExpandArchives = *loaded.ExpandArchives
 		}
 
 		if loaded.OutputMode != "" {

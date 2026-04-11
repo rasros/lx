@@ -66,6 +66,7 @@ type Config struct {
 	IgnoreDirSymlinks  bool
 	IgnoreHidden       bool
 	IgnoreEnabled      bool
+	ExpandArchives     bool
 }
 
 // NewConfig returns a default configuration.
