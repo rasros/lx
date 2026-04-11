@@ -11,7 +11,6 @@ import (
 	"testing"
 )
 
-// makeTestZip writes a temporary ZIP file and returns its path.
 func makeTestZip(t *testing.T, entries [][2]string) string {
 	t.Helper()
 	f, err := os.CreateTemp(t.TempDir(), "archive_test_*.zip")
@@ -36,7 +35,6 @@ func makeTestZip(t *testing.T, entries [][2]string) string {
 	return f.Name()
 }
 
-// makeTestTarGz writes a temporary .tar.gz file and returns its path.
 func makeTestTarGz(t *testing.T, entries [][2]string) string {
 	t.Helper()
 	f, err := os.CreateTemp(t.TempDir(), "archive_test_*.tar.gz")
@@ -70,7 +68,6 @@ func makeTestTarGz(t *testing.T, entries [][2]string) string {
 	return f.Name()
 }
 
-// streamFiles extracts InputFile items from s for inspection in tests.
 func streamFiles(s *Stream) []InputFile {
 	var files []InputFile
 	for _, item := range s.items {
@@ -91,7 +88,6 @@ func newTestStream(t *testing.T) *Stream {
 	return s
 }
 
-// filePaths extracts Path from each InputFile.
 func filePaths(files []InputFile) []string {
 	out := make([]string, len(files))
 	for i, f := range files {
@@ -100,19 +96,15 @@ func filePaths(files []InputFile) []string {
 	return out
 }
 
-// --- IsArchivePath ---
-
 func TestIsArchivePath(t *testing.T) {
 	cases := []struct {
 		path string
 		want bool
 	}{
-		// ZIP-based
 		{"archive.zip", true},
 		{"lib.jar", true},
 		{"app.war", true},
 		{"deploy.ear", true},
-		// TAR variants
 		{"data.tar", true},
 		{"data.tar.gz", true},
 		{"data.tgz", true},
@@ -123,21 +115,17 @@ func TestIsArchivePath(t *testing.T) {
 		{"data.tar.zst", true},
 		{"data.tar.br", true},
 		{"data.tar.lz4", true},
-		// Other
 		{"backup.rar", true},
 		{"backup.7z", true},
-		// Case-insensitive
 		{"ARCHIVE.ZIP", true},
 		{"Archive.Zip", true},
 		{"Data.TAR.GZ", true},
-		// Not archives
 		{"file.gz", false},
 		{"file.bz2", false},
 		{"file.go", false},
 		{"file.txt", false},
 		{"noextension", false},
 		{"", false},
-		// Paths with directories
 		{"dir/sub/archive.zip", true},
 		{"dir/sub/data.tar.gz", true},
 		{"dir/sub/main.go", false},
@@ -151,8 +139,6 @@ func TestIsArchivePath(t *testing.T) {
 		})
 	}
 }
-
-// --- ExpandArchive (ZIP) ---
 
 func TestExpandArchive_BasicEntries(t *testing.T) {
 	path := makeTestZip(t, [][2]string{
@@ -211,7 +197,6 @@ func TestExpandArchive_ContentReadable(t *testing.T) {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
 
-	// Open() must work even after ExpandArchive has returned (re-open pattern).
 	rc, err := files[0].Open()
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
@@ -228,7 +213,6 @@ func TestExpandArchive_ContentReadable(t *testing.T) {
 }
 
 func TestExpandArchive_OpenIsIndependent(t *testing.T) {
-	// Each Open() call must return the correct content independently.
 	path := makeTestZip(t, [][2]string{
 		{"a.txt", "AAA"},
 		{"b.txt", "BBB"},
@@ -356,8 +340,6 @@ func TestExpandArchive_EmptyZip(t *testing.T) {
 }
 
 func TestExpandArchive_UnknownExtension(t *testing.T) {
-	// absPath has no archive extension: ExpandArchive must return nil immediately
-	// without touching the stream.
 	s := newTestStream(t)
 	w := NewWalker(nil, nil)
 
@@ -378,8 +360,6 @@ func TestExpandArchive_BadZipPath(t *testing.T) {
 		t.Fatal("expected error for nonexistent archive, got nil")
 	}
 }
-
-// --- ExpandArchive (TAR.GZ) ---
 
 func TestExpandArchive_TarGz_BasicEntries(t *testing.T) {
 	path := makeTestTarGz(t, [][2]string{
