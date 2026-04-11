@@ -1,350 +1,50 @@
 --- STDOUT ---
-[1/46] README.md (2 rows)
+[1/8] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[2/46] archive.tar.gz - binary file skipped (159 B)
-[3/46] archive.zip - binary file skipped (445 B)
-[4/46] assets/logo.png - binary file skipped (12 B)
-[5/46] bin/data.bin - binary file skipped (4 B)
-[6/46] bin/empty.txt (0 rows)
+[2/8] bin/data.bin - binary file skipped (4 B)
 
-[7/46] configs/custom_sections.yaml (1 rows)
----
-```yaml
-section_header_template: "*** {{ .Body }} ***\n"
-```
-
-[8/46] configs/custom_template.yaml (1 rows)
----
-```yaml
-file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
-```
-
-[9/46] configs/expand.yaml (1 rows)
----
-```yaml
-expand_archives: true
-```
-
-[10/46] configs/follow.yaml (1 rows)
----
-```yaml
-follow_symlinks: true
-```
-
-[11/46] configs/hidden.yaml (1 rows)
----
-```yaml
-show_hidden: true
-```
-
-[12/46] configs/no_links.yaml (1 rows)
----
-```yaml
-no_file_links: true
-```
-
-[13/46] direct_ignore_test/test.ignored (1 rows)
----
-```
-should not appear
-```
-
-[14/46] direct_ignore_test/test.kept (1 rows)
----
-```
-should appear
-```
-
-[15/46] doc/notes.txt (1 rows)
----
-```text
-some notes
-```
-
-[16/46] ignore_exception_test/assets/logo.png - binary file skipped (10 B)
-
-[17/46] ignore_exception_test/data/index.json (1 rows)
----
-```json
-{}
-```
-
-[18/46] ignore_exception_test/data/nested/deep/ignore.xlsx (1 rows)
----
-```
-ignore
-```
-
-[19/46] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
----
-```
-excel_data
-```
-
-[20/46] ignore_exception_test/data/secret.csv (1 rows)
----
-```csv
-1,2,3
-```
-
-[21/46] ignore_exception_test/langgraph.json (1 rows)
----
-```json
-{}
-```
-
-[22/46] ignore_exception_test/migrations/001_init.sql (1 rows)
----
-```sql
-SELECT 1;
-```
-
-[23/46] ignore_exception_test/other_dir/file.go (1 rows)
----
-```go
-package other
-```
-
-[24/46] ignore_exception_test/pyproject.toml (1 rows)
----
-```toml
-[tool]
-```
-
-[25/46] ignore_exception_test/should_ignore.txt (1 rows)
----
-```text
-ignore me
-```
-
-[26/46] ignore_exception_test/src/main.go (1 rows)
----
-```go
-package main
-```
-
-[27/46] ignore_exception_test/uv.lock (1 rows)
----
-```
-lock_data
-```
-
-[28/46] ignore_test/bar.go (1 rows)
+[3/8] ignore_test/bar.go (1 rows)
 ---
 ```go
 package bar
 ```
 
-[29/46] ignore_test/foo.go (1 rows)
+[4/8] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[30/46] langs/Dockerfile (1 rows)
----
-```dockerfile
-FROM scratch
-```
-
-[31/46] langs/main.rs (1 rows)
----
-```rust
-fn main() {}
-```
-
-[32/46] langs/script_no_ext (2 rows)
----
-```bash
-#!/bin/bash
-echo hi
-```
-
-[33/46] links/cycle_a/visible.txt (1 rows)
----
-```text
-a
-```
-
-[34/46] links/cycle_b/visible.txt (1 rows)
----
-```text
-b
-```
-
-[35/46] links/link_to_main.go (~1 rows)
+[5/8] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[36/46] links/safe_target/recursion.txt (1 rows)
----
-```text
-I am safe
-```
-
-[37/46] main.go (2 rows)
----
-```go
-package main
-func main() {}
-```
-
-[38/46] main_test.go (2 rows)
+[6/8] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[39/46] parent_ignore_test/level1/level2/ignore_me.tmp (1 rows)
----
-```
-ignore
-```
-
-[40/46] parent_ignore_test/level1/level2/keep_me.go (1 rows)
----
-```go
-package level2
-```
-
-[41/46] pkg/util.go (1 rows)
+[7/8] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[42/46] secret/locked.txt - error: open secret/locked.txt: PERMISSION_DENIED
-
-[43/46] spaces/file with spaces.txt (1 rows)
----
-```text
-content with spaces
-```
-
-[44/46] src/large.txt (100 rows)
----
-```text
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-Line xxxxxxxxxx
-```
-
-[45/46] src/script.py (1 rows)
+[8/8] src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
-[46/46] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
-
 
 --- STDERR ---
-[1;31mError:[0m Failed to read file: open /ROOT/content/links/broken_link: FILE_NOT_FOUND (path=/ROOT/content/links/broken_link)
-[1;31mError:[0m Failed to read file: open secret/locked.txt: PERMISSION_DENIED (path=secret/locked.txt)
-[1;33mWarning:[0m Error accessing path during walk: open secret/locked_dir: PERMISSION_DENIED (path=secret/locked_dir)

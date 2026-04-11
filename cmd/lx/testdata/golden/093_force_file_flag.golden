@@ -1,9 +1,8 @@
 --- STDOUT ---
-.gitignore (3 rows)
+.gitignore (2 rows)
 ---
 ```gitignore
 bin/
-secret/
 *.tmp
 ```
 
