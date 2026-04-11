@@ -1,0 +1,41 @@
+--- STDOUT ---
+[1/3] sample.odp/META-INF/manifest.xml (5 rows)
+---
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
+  <manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/>
+  <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+</manifest:manifest>
+```
+
+[2/3] sample.odp/content.xml (17 rows)
+---
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+    xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0">
+  <office:body>
+    <office:presentation>
+      <draw:page draw:name="page1">
+        <draw:text-box>
+          <text:p>Hello ODP World</text:p>
+          <text:p>Second paragraph</text:p>
+        </draw:text-box>
+      </draw:page>
+    </office:presentation>
+  </office:body>
+</office:document-content>
+```
+
+[3/3] sample.odp/mimetype (1 rows)
+---
+```
+application/vnd.oasis.opendocument.presentation
+```
+
+
+--- STDERR ---
