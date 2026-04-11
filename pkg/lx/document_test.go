@@ -51,7 +51,6 @@ func makeTestPPTX(t *testing.T, slides ...string) []byte {
 	return buf.Bytes()
 }
 
-
 const docxRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 	`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`
 
@@ -425,7 +424,6 @@ func TestExtractDocumentText_DispatchToPPTX(t *testing.T) {
 	}
 }
 
-
 func TestExtractPPTXText_SingleSlide(t *testing.T) {
 	data := makeTestPPTX(t, "Hello PPTX World")
 	r := bytes.NewReader(data)
@@ -461,7 +459,6 @@ func TestExtractPPTXText_Corrupted(t *testing.T) {
 		t.Error("expected error for corrupted PPTX, got nil")
 	}
 }
-
 
 func TestExtractDocumentText_CaseInsensitiveExtension(t *testing.T) {
 	data := makeTestDOCX(t, "case test")
