@@ -206,6 +206,36 @@ configuration setting.`,
 	},
 	{
 		Category:  CatDiscovery,
+		Name:      "expand",
+		Short:     "Z",
+		Type:      CmdGlobal,
+		ValueType: ValueNone,
+		Usage:     "Expand zip and other archive files inline",
+		Long: `Expand zip and other archive files inline during traversal.
+
+When enabled, archive files (e.g. .zip, .jar) are opened and their contents
+are processed as if they were regular files in the directory tree. The archive
+path is used as a prefix for entries inside it (e.g. archive.zip/hello.txt).
+
+Active include (-i) and exclude (-e) filters apply to entries inside the archive.
+Hidden entry filtering (leading dot) is also respected.
+
+Supported formats:
+  - .zip, .jar, .war, .ear (ZIP-compatible)`,
+	},
+	{
+		Category:  CatDiscovery,
+		Name:      "no-expand",
+		Type:      CmdGlobal,
+		ValueType: ValueNone,
+		Usage:     "Do not expand archive files (default)",
+		Long: `Do not expand archive files; treat them as regular binary files.
+
+This is the default behavior. Use this flag to override an
+'expand_archives: true' setting in your configuration file.`,
+	},
+	{
+		Category:  CatDiscovery,
 		Name:      "null",
 		Short:     "0",
 		Type:      CmdGlobal,
