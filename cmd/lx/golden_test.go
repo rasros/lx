@@ -315,6 +315,24 @@ func setupArchiveFixture(t *testing.T) string {
 	return dir
 }
 
+func setupDocumentsFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	for _, name := range []string{"sample.pdf", "sample.docx", "sample.xlsx", "sample.odt"} {
+		data, err := os.ReadFile(filepath.Join("testdata", "documents", name))
+		if err != nil {
+			t.Fatalf("read fixture %s: %v", name, err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0644); err != nil {
+			t.Fatalf("write fixture %s: %v", name, err)
+		}
+	}
+
+	return dir
+}
+
 func setupRelativePathsFixture(t *testing.T) (workDir, srcDir string) {
 	t.Helper()
 	setupMockConfig(t)
@@ -507,6 +525,18 @@ func TestGoldenArchive(t *testing.T) {
 		{name: "113_expand_archive_config", args: []string{"-y", "configs/expand.yaml", "archive.zip"}},
 		{name: "114_expand_archive_no_expand_override", args: []string{"-y", "configs/expand.yaml", "--no-expand", "archive.zip"}},
 		{name: "115_expand_archive_tar_gz", args: []string{"-Z", "archive.tar.gz"}},
+	})
+}
+
+func TestGoldenDocuments(t *testing.T) {
+	dir := setupDocumentsFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "120_docs_pdf_extracted", args: []string{"sample.pdf"}},
+		{name: "121_docs_docx_extracted", args: []string{"sample.docx"}},
+		{name: "122_docs_xlsx_extracted", args: []string{"sample.xlsx"}},
+		{name: "123_docs_no_extract_flag", args: []string{"-D", "sample.pdf", "sample.docx", "sample.xlsx"}},
+		{name: "124_docs_odt_expanded", args: []string{"-Z", "sample.odt"}},
+		{name: "125_docs_odt_binary", args: []string{"sample.odt"}},
 	})
 }
 
