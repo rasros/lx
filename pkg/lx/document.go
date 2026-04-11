@@ -62,8 +62,7 @@ func extractDOCXText(r io.ReaderAt, size int64) ([]byte, error) {
 		return nil, err
 	}
 	defer doc.Close()
-	xmlContent := doc.Editable().GetContent()
-	return []byte(xmlToText(xmlContent)), nil
+	return []byte(xmlToText(strings.NewReader(doc.Editable().GetContent()))), nil
 }
 
 func extractPPTXText(r io.ReaderAt, size int64) ([]byte, error) {
@@ -100,17 +99,16 @@ func extractPPTXText(r io.ReaderAt, size int64) ([]byte, error) {
 		if err != nil {
 			continue
 		}
-		data, _ := io.ReadAll(rc)
+		sb.WriteString(xmlToText(rc))
 		rc.Close()
-		sb.WriteString(xmlToText(string(data)))
 	}
 	return []byte(sb.String()), nil
 }
 
 // xmlToText extracts plain text from XML content.
 // Paragraph ends (</p> in any namespace) become newlines.
-func xmlToText(xmlContent string) string {
-	decoder := xml.NewDecoder(strings.NewReader(xmlContent))
+func xmlToText(r io.Reader) string {
+	decoder := xml.NewDecoder(r)
 	var sb strings.Builder
 	for {
 		tok, err := decoder.Token()

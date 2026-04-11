@@ -174,7 +174,7 @@ func TestIsDocumentPath(t *testing.T) {
 
 func TestDocxXMLToText_SingleParagraph(t *testing.T) {
 	xml := `<w:body><w:p><w:r><w:t>Hello World</w:t></w:r></w:p></w:body>`
-	got := xmlToText(xml)
+	got := xmlToText(strings.NewReader(xml))
 	if !strings.Contains(got, "Hello World") {
 		t.Errorf("expected 'Hello World', got %q", got)
 	}
@@ -182,7 +182,7 @@ func TestDocxXMLToText_SingleParagraph(t *testing.T) {
 
 func TestDocxXMLToText_ParagraphEndsWithNewline(t *testing.T) {
 	xml := `<w:body><w:p><w:r><w:t>Line 1</w:t></w:r></w:p><w:p><w:r><w:t>Line 2</w:t></w:r></w:p></w:body>`
-	got := xmlToText(xml)
+	got := xmlToText(strings.NewReader(xml))
 	if !strings.Contains(got, "\n") {
 		t.Errorf("expected newline between paragraphs, got %q", got)
 	}
@@ -196,27 +196,27 @@ func TestDocxXMLToText_ParagraphEndsWithNewline(t *testing.T) {
 
 func TestDocxXMLToText_MultipleRuns(t *testing.T) {
 	xml := `<w:p><w:r><w:t>Hello </w:t></w:r><w:r><w:t>World</w:t></w:r></w:p>`
-	got := xmlToText(xml)
+	got := xmlToText(strings.NewReader(xml))
 	if !strings.Contains(got, "Hello") || !strings.Contains(got, "World") {
 		t.Errorf("expected both run texts, got %q", got)
 	}
 }
 
 func TestDocxXMLToText_Empty(t *testing.T) {
-	got := xmlToText("")
+	got := xmlToText(strings.NewReader(""))
 	if got != "" {
 		t.Errorf("expected empty string for empty input, got %q", got)
 	}
 }
 
 func TestDocxXMLToText_InvalidXML_DoesNotPanic(t *testing.T) {
-	got := xmlToText("<unclosed <tag >>")
+	got := xmlToText(strings.NewReader("<unclosed <tag >>"))
 	_ = got
 }
 
 func TestDocxXMLToText_NoText(t *testing.T) {
 	xml := `<w:body><w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p></w:body>`
-	got := xmlToText(xml)
+	got := xmlToText(strings.NewReader(xml))
 	if strings.TrimSpace(got) != "" {
 		t.Errorf("expected no text content, got %q", got)
 	}
