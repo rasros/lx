@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] archive.zip/hello.txt (1 rows)
+---
+```text
+Hello from archive!
+```
+
+[2/2] archive.zip/nested/world.go (1 rows)
+---
+```go
+package nested
+```
+
+
+--- STDERR ---
