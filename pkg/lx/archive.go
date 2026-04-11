@@ -12,8 +12,7 @@ import (
 	"github.com/mholt/archives"
 )
 
-// archiveSuffixes lists recognised archive extensions.
-// Multi-part extensions must appear before their shorter suffix (.tar.gz before .gz).
+// multi-part extensions must appear before their shorter suffix (.tar.gz before .gz).
 var archiveSuffixes = []string{
 	// ZIP-based
 	".zip", ".jar", ".war", ".ear",
@@ -27,7 +26,6 @@ var archiveSuffixes = []string{
 	".rar", ".7z",
 }
 
-// IsArchivePath reports whether path has a recognised archive extension.
 func IsArchivePath(path string) bool {
 	lower := strings.ToLower(path)
 	for _, suffix := range archiveSuffixes {
@@ -39,10 +37,6 @@ func IsArchivePath(path string) bool {
 }
 
 // ExpandArchive opens the archive at absPath and adds each entry to stream.
-// displayPath is prepended to entry paths in the output. walker controls which
-// entries are visited (IgnoreEnabled should usually be false for archives).
-// includes is a post-walk filter applied to entry names; outPath, if non-empty,
-// is skipped to prevent infinite recursion.
 func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string, outPath string, stream *Stream) error {
 	if !IsArchivePath(absPath) {
 		return nil
@@ -103,9 +97,6 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Wal
 			Size:    info.Size(),
 			ModTime: info.ModTime(),
 			Open: func() (io.ReadCloser, error) {
-				// Re-open the archive independently for each read. The stream
-				// processes files concurrently (runtime.NumCPU workers), so we
-				// cannot share a single ArchiveFS safely.
 				af, err := archives.FileSystem(capturedCtx, capturedAbs, nil)
 				if err != nil {
 					return nil, fmt.Errorf("reopen archive %q: %w", capturedAbs, err)
@@ -129,15 +120,12 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Wal
 	return err
 }
 
-// closeFS closes fsys if it implements io.Closer (fs.FS has no Close method).
 func closeFS(fsys fs.FS) {
 	if c, ok := fsys.(io.Closer); ok {
 		_ = c.Close()
 	}
 }
 
-// archiveEntryReader wraps an fs.File and also closes the parent ArchiveFS on Close.
-// This ensures the underlying archive file handle is released when the caller is done.
 type archiveEntryReader struct {
 	fs.File
 	fsCloser fs.FS
