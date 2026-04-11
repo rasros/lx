@@ -1,10 +1,13 @@
 package lx
 
 import (
+	"archive/zip"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
 	pdflib "github.com/ledongthuc/pdf"
@@ -12,7 +15,7 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-var documentSuffixes = []string{".pdf", ".docx", ".xlsx"}
+var documentSuffixes = []string{".pdf", ".docx", ".xlsx", ".pptx"}
 
 // IsDocumentPath reports whether the path has a document file extension.
 func IsDocumentPath(path string) bool {
@@ -35,6 +38,8 @@ func ExtractDocumentText(path string, r io.ReaderAt, size int64) ([]byte, error)
 		return extractDOCXText(r, size)
 	case ".xlsx":
 		return extractXLSXText(r, size)
+	case ".pptx":
+		return extractPPTXText(r, size)
 	}
 	return nil, fmt.Errorf("unsupported document type: %s", ext)
 }
@@ -58,12 +63,53 @@ func extractDOCXText(r io.ReaderAt, size int64) ([]byte, error) {
 	}
 	defer doc.Close()
 	xmlContent := doc.Editable().GetContent()
-	return []byte(docxXMLToText(xmlContent)), nil
+	return []byte(xmlToText(xmlContent)), nil
 }
 
-// docxXMLToText extracts plain text from DOCX body XML content.
-// Paragraph ends (<w:p/>) become newlines.
-func docxXMLToText(xmlContent string) string {
+func extractPPTXText(r io.ReaderAt, size int64) ([]byte, error) {
+	zr, err := zip.NewReader(r, size)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect slide XML files from ppt/slides/slide<N>.xml.
+	type numberedFile struct {
+		n int
+		f *zip.File
+	}
+	var slides []numberedFile
+	for _, f := range zr.File {
+		name := f.Name
+		if !strings.HasPrefix(name, "ppt/slides/slide") || !strings.HasSuffix(name, ".xml") {
+			continue
+		}
+		// Extract the numeric part between "slide" and ".xml".
+		base := strings.TrimPrefix(name, "ppt/slides/slide")
+		base = strings.TrimSuffix(base, ".xml")
+		n, err := strconv.Atoi(base)
+		if err != nil {
+			continue
+		}
+		slides = append(slides, numberedFile{n, f})
+	}
+	sort.Slice(slides, func(i, j int) bool { return slides[i].n < slides[j].n })
+
+	var sb strings.Builder
+	for _, s := range slides {
+		rc, err := s.f.Open()
+		if err != nil {
+			continue
+		}
+		data, _ := io.ReadAll(rc)
+		rc.Close()
+		sb.WriteString(xmlToText(string(data)))
+	}
+	return []byte(sb.String()), nil
+}
+
+// xmlToText extracts plain text from XML content.
+// Paragraph ends (</p> in any namespace) become newlines.
+func xmlToText(xmlContent string) string {
 	decoder := xml.NewDecoder(strings.NewReader(xmlContent))
 	var sb strings.Builder
 	for {

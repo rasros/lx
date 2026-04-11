@@ -11,6 +11,47 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+func makeTestPPTX(t *testing.T, slides ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+
+	writeEntry := func(name, content string) {
+		t.Helper()
+		fw, err := w.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fw.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	writeEntry("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+		`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">`+
+		`<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>`+
+		`<Default Extension="xml" ContentType="application/xml"/>`+
+		`</Types>`)
+
+	for i, text := range slides {
+		name := fmt.Sprintf("ppt/slides/slide%d.xml", i+1)
+		content := fmt.Sprintf(
+			`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+				`<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"`+
+				` xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">`+
+				`<p:cSld><p:spTree><p:sp><p:txBody>`+
+				`<a:p><a:r><a:t>%s</a:t></a:r></a:p>`+
+				`</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`, text)
+		writeEntry(name, content)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+
 const docxRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 	`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`
 
@@ -105,12 +146,15 @@ func TestIsDocumentPath(t *testing.T) {
 		{"report.pdf", true},
 		{"letter.docx", true},
 		{"budget.xlsx", true},
+		{"slides.pptx", true},
 		{"REPORT.PDF", true},
 		{"Letter.DOCX", true},
 		{"Budget.XLSX", true},
 		{"docs/report.pdf", true},
 		{"dir/sub/letter.docx", true},
 		{"text.odt", false},
+		{"sheet.ods", false},
+		{"pres.odp", false},
 		{"legacy.doc", false},
 		{"old.xls", false},
 		{"main.go", false},
@@ -130,7 +174,7 @@ func TestIsDocumentPath(t *testing.T) {
 
 func TestDocxXMLToText_SingleParagraph(t *testing.T) {
 	xml := `<w:body><w:p><w:r><w:t>Hello World</w:t></w:r></w:p></w:body>`
-	got := docxXMLToText(xml)
+	got := xmlToText(xml)
 	if !strings.Contains(got, "Hello World") {
 		t.Errorf("expected 'Hello World', got %q", got)
 	}
@@ -138,7 +182,7 @@ func TestDocxXMLToText_SingleParagraph(t *testing.T) {
 
 func TestDocxXMLToText_ParagraphEndsWithNewline(t *testing.T) {
 	xml := `<w:body><w:p><w:r><w:t>Line 1</w:t></w:r></w:p><w:p><w:r><w:t>Line 2</w:t></w:r></w:p></w:body>`
-	got := docxXMLToText(xml)
+	got := xmlToText(xml)
 	if !strings.Contains(got, "\n") {
 		t.Errorf("expected newline between paragraphs, got %q", got)
 	}
@@ -152,27 +196,27 @@ func TestDocxXMLToText_ParagraphEndsWithNewline(t *testing.T) {
 
 func TestDocxXMLToText_MultipleRuns(t *testing.T) {
 	xml := `<w:p><w:r><w:t>Hello </w:t></w:r><w:r><w:t>World</w:t></w:r></w:p>`
-	got := docxXMLToText(xml)
+	got := xmlToText(xml)
 	if !strings.Contains(got, "Hello") || !strings.Contains(got, "World") {
 		t.Errorf("expected both run texts, got %q", got)
 	}
 }
 
 func TestDocxXMLToText_Empty(t *testing.T) {
-	got := docxXMLToText("")
+	got := xmlToText("")
 	if got != "" {
 		t.Errorf("expected empty string for empty input, got %q", got)
 	}
 }
 
 func TestDocxXMLToText_InvalidXML_DoesNotPanic(t *testing.T) {
-	got := docxXMLToText("<unclosed <tag >>")
+	got := xmlToText("<unclosed <tag >>")
 	_ = got
 }
 
 func TestDocxXMLToText_NoText(t *testing.T) {
 	xml := `<w:body><w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p></w:body>`
-	got := docxXMLToText(xml)
+	got := xmlToText(xml)
 	if strings.TrimSpace(got) != "" {
 		t.Errorf("expected no text content, got %q", got)
 	}
@@ -371,6 +415,53 @@ func TestExtractDocumentText_DispatchToXLSX(t *testing.T) {
 		t.Errorf("xlsx extension was not dispatched: %v", err)
 	}
 }
+
+func TestExtractDocumentText_DispatchToPPTX(t *testing.T) {
+	data := []byte("garbage")
+	r := bytes.NewReader(data)
+	_, err := ExtractDocumentText("file.pptx", r, int64(len(data)))
+	if err != nil && strings.Contains(err.Error(), "unsupported") {
+		t.Errorf("pptx extension was not dispatched: %v", err)
+	}
+}
+
+
+func TestExtractPPTXText_SingleSlide(t *testing.T) {
+	data := makeTestPPTX(t, "Hello PPTX World")
+	r := bytes.NewReader(data)
+	text, err := extractPPTXText(r, int64(len(data)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(text), "Hello PPTX World") {
+		t.Errorf("expected 'Hello PPTX World', got %q", string(text))
+	}
+}
+
+func TestExtractPPTXText_MultipleSlides(t *testing.T) {
+	data := makeTestPPTX(t, "Slide one content", "Slide two content", "Slide three content")
+	r := bytes.NewReader(data)
+	text, err := extractPPTXText(r, int64(len(data)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := string(text)
+	for _, want := range []string{"Slide one content", "Slide two content", "Slide three content"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %q in extracted text, got:\n%s", want, got)
+		}
+	}
+}
+
+func TestExtractPPTXText_Corrupted(t *testing.T) {
+	data := []byte("not a pptx file")
+	r := bytes.NewReader(data)
+	_, err := extractPPTXText(r, int64(len(data)))
+	if err == nil {
+		t.Error("expected error for corrupted PPTX, got nil")
+	}
+}
+
 
 func TestExtractDocumentText_CaseInsensitiveExtension(t *testing.T) {
 	data := makeTestDOCX(t, "case test")
