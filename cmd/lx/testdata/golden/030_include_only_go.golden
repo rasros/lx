@@ -1,44 +1,25 @@
 --- STDOUT ---
-[1/7] ignore_exception_test/src/main.go (1 rows)
----
-```go
-package main
-```
-
-[2/7] ignore_test/foo.go (1 rows)
+[1/4] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[3/7] links/link_to_main.go (~1 rows)
+[2/4] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[4/7] main.go (2 rows)
----
-```go
-package main
-func main() {}
-```
-
-[5/7] main_test.go (2 rows)
+[3/4] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[6/7] parent_ignore_test/level1/level2/keep_me.go (1 rows)
----
-```go
-package level2
-```
-
-[7/7] pkg/util.go (1 rows)
+[4/4] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
