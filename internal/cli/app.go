@@ -542,6 +542,15 @@ func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
 		slog.Debug("Override: Archive expansion disabled via flag")
 		c.ExpandArchives = false
 	}
+
+	if _, ok := globals["documents"]; ok {
+		slog.Debug("Override: Document extraction enabled via flag")
+		c.ExtractDocuments = true
+	}
+	if _, ok := globals["no-documents"]; ok {
+		slog.Debug("Override: Document extraction disabled via flag")
+		c.ExtractDocuments = false
+	}
 }
 
 func determineLogLevel(parsed *ParsedArgs, configVerbosity string) (slog.Level, error) {

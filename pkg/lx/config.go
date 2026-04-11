@@ -67,6 +67,7 @@ type Config struct {
 	IgnoreHidden       bool
 	IgnoreEnabled      bool
 	ExpandArchives     bool
+	ExtractDocuments   bool
 }
 
 // NewConfig returns a default configuration.
@@ -77,6 +78,7 @@ func NewConfig() *Config {
 		IgnoreHidden:       true,
 		IgnoreFileSymlinks: false,
 		IgnoreDirSymlinks:  true,
+		ExtractDocuments:   true,
 	}
 }
 

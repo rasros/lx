@@ -14,7 +14,7 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 	engine, _ := CompileTemplates(cfg)
 	global := GlobalContext{TotalFiles: 1}
 
-	proc := newProcessor(engine, global, nil, "markdown")
+	proc := newProcessor(engine, global, nil, "markdown", false)
 
 	file := NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
 	file.Config = RunnerConfig{Head: 1, Tail: 1}
@@ -53,7 +53,7 @@ func TestRender_DataURI(t *testing.T) {
 	cfg.OutputFormat = "html"
 	engine, _ := CompileTemplates(cfg)
 
-	proc := newProcessor(engine, GlobalContext{}, nil, "html")
+	proc := newProcessor(engine, GlobalContext{}, nil, "html", false)
 
 	file, err := NewInputFileFromPath(os.DirFS(tmp), imgName)
 	if err != nil {
@@ -83,7 +83,7 @@ func TestRender_ErrorHandling(t *testing.T) {
 	cfg := NewConfig()
 	engine, _ := CompileTemplates(cfg)
 
-	proc := newProcessor(engine, GlobalContext{}, nil, "markdown")
+	proc := newProcessor(engine, GlobalContext{}, nil, "markdown", false)
 
 	file := InputFile{
 		Path: "ghost.txt",
@@ -106,7 +106,7 @@ func TestRender_ErrorHandling(t *testing.T) {
 func TestRender_BinaryFile(t *testing.T) {
 	cfg := NewConfig()
 	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{}, nil, "markdown")
+	proc := newProcessor(engine, GlobalContext{}, nil, "markdown", false)
 
 	// Null byte triggers binary detection.
 	binaryContent := append([]byte("ELF"), 0x00, 0x01, 0x02, 0x03)
@@ -129,7 +129,7 @@ func TestRender_BinaryFile(t *testing.T) {
 func TestRender_CompactView(t *testing.T) {
 	cfg := NewConfig()
 	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{}, nil, "markdown")
+	proc := newProcessor(engine, GlobalContext{}, nil, "markdown", false)
 
 	file := NewBufferInputFile("data.txt", []byte("lots of content\n"))
 	file.Config = RunnerConfig{Head: 0, Tail: 0} // triggers compact
@@ -153,7 +153,7 @@ func TestRender_CompactView(t *testing.T) {
 func TestRender_LineNumbers(t *testing.T) {
 	cfg := NewConfig()
 	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{TotalFiles: 1}, nil, "markdown")
+	proc := newProcessor(engine, GlobalContext{TotalFiles: 1}, nil, "markdown", false)
 
 	file := NewBufferInputFile("code.go", []byte("package main\nfunc main() {}\n"))
 	file.Config = RunnerConfig{Head: -1, Tail: -1, LineNumbers: true}

@@ -14,8 +14,8 @@ import (
 
 // multi-part extensions must appear before their shorter suffix (.tar.gz before .gz).
 var archiveSuffixes = []string{
-	// ZIP-based
-	".zip", ".jar", ".war", ".ear",
+	// ZIP-based (including document formats that are ZIP archives)
+	".zip", ".jar", ".war", ".ear", ".odt",
 	// TAR with compression (multi-part first)
 	".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst",
 	".tar.br", ".tar.lz4", ".tar.sz", ".tar.s2",
