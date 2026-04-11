@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"flag"
@@ -151,6 +152,13 @@ func TestGolden(t *testing.T) {
 		{name: "101_stdin_null_terminated", args: []string{"-0"}, stdin: "main.go\x00README.md\x00spaces/file with spaces.txt\x00"},
 		{name: "102_walk_nested_respects_root_ignore", args: []string{"parent_ignore_test/level1/level2"}},
 		{name: "103_complex_ignore_exceptions", args: []string{"ignore_exception_test"}},
+
+		// --- 110-119: Archive Expansion ---
+		{name: "110_expand_archive_zip", args: []string{"-Z", "archive.zip"}},
+		{name: "111_expand_archive_no_flag", args: []string{"archive.zip"}},
+		{name: "112_expand_archive_filter", args: []string{"-Z", "-i", "*.go", "archive.zip"}},
+		{name: "113_expand_archive_config", args: []string{"-y", "configs/expand.yaml", "archive.zip"}},
+		{name: "114_expand_archive_no_expand_override", args: []string{"-y", "configs/expand.yaml", "--no-expand", "archive.zip"}},
 	}
 
 	runGoldenTests(t, cases, pkgDir, workDir, canonicalWorkDir)
@@ -475,10 +483,38 @@ func setupComplexFixture(t *testing.T) string {
 	// Image test asset
 	create("assets/logo.png", "\x89PNG\r\n\x1a\n\x00\x00\x00\x0D", 0644)
 
+	// Archive expansion test fixtures
+	createTestZip(filepath.Join(dir, "archive.zip"), [][2]string{
+		{"hello.txt", "Hello from archive!\n"},
+		{"nested/world.go", "package nested\n"},
+		{".hidden_in_zip", "hidden inside zip\n"},
+	})
+	create("configs/expand.yaml", "expand_archives: true\n", 0644)
+
 	t.Cleanup(func() {
 		os.Chmod(filepath.Join(dir, "secret/locked.txt"), 0644)
 		os.Chmod(secretDir, 0755)
 	})
 
 	return dir
+}
+
+// createTestZip creates a ZIP archive at path containing the given name/content pairs.
+func createTestZip(path string, files [][2]string) {
+	f, err := os.Create(path)
+	if err != nil {
+		panic("createTestZip: " + err.Error())
+	}
+	defer f.Close()
+	w := zip.NewWriter(f)
+	defer w.Close()
+	for _, file := range files {
+		fw, err := w.Create(file[0])
+		if err != nil {
+			panic("createTestZip: " + err.Error())
+		}
+		if _, err := fw.Write([]byte(file[1])); err != nil {
+			panic("createTestZip: " + err.Error())
+		}
+	}
 }
