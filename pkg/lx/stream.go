@@ -32,17 +32,18 @@ type preparedItem struct {
 
 // Stream manages a collection of files, sections, and prompts for rendering.
 type Stream struct {
-	items       []streamItem
-	tokenizer   Tokenizer
-	engine      *TemplateEngine
-	renderCfg   RunnerConfig
-	workDir     string
-	format      string
-	finalStats  *GlobalContext
-	sections    []*SectionContext
-	onFileError FileErrorHandler
-	concurrency int
-	prepared    []preparedItem
+	items            []streamItem
+	tokenizer        Tokenizer
+	engine           *TemplateEngine
+	renderCfg        RunnerConfig
+	workDir          string
+	format           string
+	finalStats       *GlobalContext
+	sections         []*SectionContext
+	onFileError      FileErrorHandler
+	concurrency      int
+	prepared         []preparedItem
+	extractDocuments bool
 }
 
 func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
@@ -57,12 +58,13 @@ func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
 	}
 
 	return &Stream{
-		engine:      engine,
-		renderCfg:   runnerCfg,
-		tokenizer:   defaultTokenizer{},
-		workDir:     ".",
-		format:      fmtType,
-		concurrency: runtime.NumCPU(),
+		engine:           engine,
+		renderCfg:        runnerCfg,
+		tokenizer:        defaultTokenizer{},
+		workDir:          ".",
+		format:           fmtType,
+		concurrency:      runtime.NumCPU(),
+		extractDocuments: cfg.ExtractDocuments,
 	}, nil
 }
 
@@ -262,7 +264,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					return
 				}
 
-				proc := newProcessor(s.engine, global, s.onFileError, s.format)
+				proc := newProcessor(s.engine, global, s.onFileError, s.format, s.extractDocuments)
 				proc.tokenCounter = s.tokenizer.Estimate
 
 				readBufPtr := readPool.Get().(*[]byte)

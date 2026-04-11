@@ -19,15 +19,17 @@ type processor struct {
 	hasRenderedFirst bool
 	lastWasCompact   bool
 	format           string
+	extractDocuments bool
 }
 
-func newProcessor(engine *TemplateEngine, global GlobalContext, onError FileErrorHandler, format string) *processor {
+func newProcessor(engine *TemplateEngine, global GlobalContext, onError FileErrorHandler, format string, extractDocuments bool) *processor {
 	return &processor{
-		engine:       engine,
-		global:       global,
-		onFileError:  onError,
-		tokenCounter: DefaultTokenCounter,
-		format:       format,
+		engine:           engine,
+		global:           global,
+		onFileError:      onError,
+		tokenCounter:     DefaultTokenCounter,
+		format:           format,
+		extractDocuments: extractDocuments,
 	}
 }
 
@@ -134,6 +136,14 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 	} else {
 		data, _ := io.ReadAll(rc)
 		reader, size = bytes.NewReader(data), int64(len(data))
+	}
+
+	if p.extractDocuments && IsDocumentPath(file.Path) {
+		if text, err := ExtractDocumentText(file.Path, reader, size); err == nil {
+			reader = bytes.NewReader(text)
+			size = int64(len(text))
+		}
+		// On extraction failure, fall through to normal binary detection.
 	}
 
 	if scratch == nil {

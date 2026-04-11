@@ -211,17 +211,26 @@ configuration setting.`,
 		Type:      CmdGlobal,
 		ValueType: ValueNone,
 		Usage:     "Expand zip and other archive files inline",
-		Long: `Expand zip and other archive files inline during traversal.
+		Long: `Expand archive files inline during traversal.
 
-When enabled, archive files (e.g. .zip, .jar) are opened and their contents
-are processed as if they were regular files in the directory tree. The archive
-path is used as a prefix for entries inside it (e.g. archive.zip/hello.txt).
+When enabled, archive files are opened and their contents are processed as if
+they were regular files in the directory tree. The archive path is used as a
+prefix for entries inside it (e.g. archive.zip/hello.txt).
 
 Active include (-i) and exclude (-e) filters apply to entries inside the archive.
 Hidden entry filtering (leading dot) is also respected.
 
 Supported formats:
-  - .zip, .jar, .war, .ear (ZIP-compatible)`,
+  ZIP-based:
+    .zip, .jar, .war, .ear, .odt
+  TAR (plain and compressed):
+    .tar, .tar.gz, .tar.bz2, .tar.xz, .tar.zst,
+    .tar.br, .tar.lz4, .tar.sz, .tar.s2,
+    .tgz, .tbz2, .txz
+  Other multi-file archives:
+    .rar, .7z
+  Single-file compression (exposed as one virtual entry):
+    .gz, .bz2, .xz, .zst, .br, .lz4, .sz, .s2, .lz`,
 	},
 	{
 		Category:  CatDiscovery,
@@ -233,6 +242,38 @@ Supported formats:
 
 This is the default behavior. Use this flag to override an
 'expand_archives: true' setting in your configuration file.`,
+	},
+	{
+		Category:  CatDiscovery,
+		Name:      "documents",
+		Type:      CmdGlobal,
+		ValueType: ValueNone,
+		Usage:     "Extract text from document files (default)",
+		Long: `Extract plain text from document files during processing (default).
+
+When enabled, document files are converted to plain text instead of being
+treated as binary:
+  - .pdf  — via PDF text extraction
+  - .docx — via Word document parsing
+  - .xlsx — via spreadsheet cell values (one sheet per section)
+
+Note: .odt files are ZIP-based and are handled separately by the archive
+expansion flag (--expand / -Z).
+
+Use this flag to override a 'extract_documents: false' setting in your
+configuration file.`,
+	},
+	{
+		Category:  CatDiscovery,
+		Name:      "no-documents",
+		Short:     "D",
+		Type:      CmdGlobal,
+		ValueType: ValueNone,
+		Usage:     "Do not extract document content (treat as binary)",
+		Long: `Do not extract text from document files; treat them as binary.
+
+Applies to .pdf, .docx, and .xlsx. Use this to override the default
+'extract_documents: true' setting or a matching entry in your config file.`,
 	},
 	{
 		Category:  CatDiscovery,
