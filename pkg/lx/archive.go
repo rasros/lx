@@ -1,51 +1,61 @@
 package lx
 
 import (
-	"archive/zip"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
 	"path/filepath"
 	"strings"
+
+	"github.com/mholt/archives"
 )
 
-var zipExtensions = map[string]bool{
-	".zip": true,
-	".jar": true,
-	".war": true,
-	".ear": true,
+// archiveSuffixes lists recognised archive extensions.
+// Multi-part extensions must appear before their shorter suffix (.tar.gz before .gz).
+var archiveSuffixes = []string{
+	// ZIP-based
+	".zip", ".jar", ".war", ".ear",
+	// TAR with compression (multi-part first)
+	".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst",
+	".tar.br", ".tar.lz4", ".tar.sz", ".tar.s2",
+	".tgz", ".tbz2", ".txz",
+	// Plain TAR
+	".tar",
+	// Other
+	".rar", ".7z",
 }
 
 // IsArchivePath reports whether path has a recognised archive extension.
 func IsArchivePath(path string) bool {
-	ext := strings.ToLower(filepath.Ext(path))
-	return zipExtensions[ext]
-}
-
-// ExpandArchive opens the archive at absPath and walks its contents using walker,
-// adding matched entries to stream. displayPath is prepended to entry paths.
-// includes is a post-walk filter applied to entry paths (empty means all pass).
-// outPath, if non-empty, is skipped to avoid infinite recursion.
-func ExpandArchive(absPath, displayPath string, walker *Walker, includes []string, outPath string, stream *Stream) error {
-	ext := strings.ToLower(filepath.Ext(absPath))
-	if zipExtensions[ext] {
-		return expandZip(absPath, displayPath, walker, includes, outPath, stream)
+	lower := strings.ToLower(path)
+	for _, suffix := range archiveSuffixes {
+		if strings.HasSuffix(lower, suffix) {
+			return true
+		}
 	}
-	return nil
+	return false
 }
 
-func expandZip(absPath, displayPath string, walker *Walker, includes []string, outPath string, stream *Stream) error {
-	r, err := zip.OpenReader(absPath)
+// ExpandArchive opens the archive at absPath and adds each entry to stream.
+// displayPath is prepended to entry paths in the output. walker controls which
+// entries are visited (IgnoreEnabled should usually be false for archives).
+// includes is a post-walk filter applied to entry names; outPath, if non-empty,
+// is skipped to prevent infinite recursion.
+func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string, outPath string, stream *Stream) error {
+	if !IsArchivePath(absPath) {
+		return nil
+	}
+	fsys, err := archives.FileSystem(ctx, absPath, nil)
 	if err != nil {
-		return fmt.Errorf("open zip: %w", err)
+		return fmt.Errorf("open archive %q: %w", absPath, err)
 	}
-	defer r.Close()
 
 	archiveBase := filepath.ToSlash(filepath.Clean(displayPath))
 	count := 0
 
-	err = walker.Walk(&r.Reader, ".", func(entryPath string, d fs.DirEntry, err error) error {
+	err = walker.Walk(fsys, ".", func(entryPath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			slog.Warn("Error accessing archive entry", "archive", displayPath, "path", entryPath, "error", err)
 			return nil
@@ -85,6 +95,7 @@ func expandZip(absPath, displayPath string, walker *Walker, includes []string, o
 
 		capturedEntry := entryPath
 		capturedAbs := absPath
+		capturedCtx := ctx
 
 		f := InputFile{
 			Path:    effectivePath,
@@ -92,22 +103,19 @@ func expandZip(absPath, displayPath string, walker *Walker, includes []string, o
 			Size:    info.Size(),
 			ModTime: info.ModTime(),
 			Open: func() (io.ReadCloser, error) {
-				ar, err := zip.OpenReader(capturedAbs)
+				// Re-open the archive independently for each read. The stream
+				// processes files concurrently (runtime.NumCPU workers), so we
+				// cannot share a single ArchiveFS safely.
+				af, err := archives.FileSystem(capturedCtx, capturedAbs, nil)
 				if err != nil {
-					return nil, fmt.Errorf("reopen zip: %w", err)
+					return nil, fmt.Errorf("reopen archive %q: %w", capturedAbs, err)
 				}
-				for _, ze := range ar.File {
-					if ze.Name == capturedEntry {
-						rc, err := ze.Open()
-						if err != nil {
-							ar.Close()
-							return nil, err
-						}
-						return &zipEntryReader{rc: rc, ar: ar}, nil
-					}
+				file, err := af.Open(capturedEntry)
+				if err != nil {
+					closeFS(af)
+					return nil, err
 				}
-				ar.Close()
-				return nil, fmt.Errorf("entry %q not found in zip", capturedEntry)
+				return &archiveEntryReader{File: file, fsCloser: af}, nil
 			},
 		}
 
@@ -121,16 +129,22 @@ func expandZip(absPath, displayPath string, walker *Walker, includes []string, o
 	return err
 }
 
-// zipEntryReader wraps a zip entry reader and closes the parent archive on Close.
-type zipEntryReader struct {
-	rc io.ReadCloser
-	ar io.Closer
+// closeFS closes fsys if it implements io.Closer (fs.FS has no Close method).
+func closeFS(fsys fs.FS) {
+	if c, ok := fsys.(io.Closer); ok {
+		_ = c.Close()
+	}
 }
 
-func (z *zipEntryReader) Read(p []byte) (int, error) { return z.rc.Read(p) }
+// archiveEntryReader wraps an fs.File and also closes the parent ArchiveFS on Close.
+// This ensures the underlying archive file handle is released when the caller is done.
+type archiveEntryReader struct {
+	fs.File
+	fsCloser fs.FS
+}
 
-func (z *zipEntryReader) Close() error {
-	err := z.rc.Close()
-	z.ar.Close()
+func (r *archiveEntryReader) Close() error {
+	err := r.File.Close()
+	closeFS(r.fsCloser)
 	return err
 }

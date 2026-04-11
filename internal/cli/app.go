@@ -357,7 +357,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 					if isForced {
 						archiveIncludes = nil
 					}
-					if err := lx.ExpandArchive(archiveAbsPath, effectivePath, archiveWalker, archiveIncludes, outPath, stream); err != nil {
+					if err := lx.ExpandArchive(ctx, archiveAbsPath, effectivePath, archiveWalker, archiveIncludes, outPath, stream); err != nil {
 						slog.Error("Failed to expand archive", "path", effectivePath, "error", err)
 					}
 					return nil
