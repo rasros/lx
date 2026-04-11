@@ -1,183 +1,184 @@
 --- STDOUT ---
-[1/32] README.md (2 rows)
+[1/33] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[2/32] archive.zip - binary file skipped (445 B)
-[3/32] assets/logo.png - binary file skipped (12 B)
+[2/33] archive.tar.gz - binary file skipped (159 B)
+[3/33] archive.zip - binary file skipped (445 B)
+[4/33] assets/logo.png - binary file skipped (12 B)
 
-[4/32] configs/custom_sections.yaml (1 rows)
+[5/33] configs/custom_sections.yaml (1 rows)
 ---
 ```yaml
 section_header_template: "*** {{ .Body }} ***\n"
 ```
 
-[5/32] configs/custom_template.yaml (1 rows)
+[6/33] configs/custom_template.yaml (1 rows)
 ---
 ```yaml
 file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
-[6/32] configs/expand.yaml (1 rows)
+[7/33] configs/expand.yaml (1 rows)
 ---
 ```yaml
 expand_archives: true
 ```
 
-[7/32] configs/follow.yaml (1 rows)
+[8/33] configs/follow.yaml (1 rows)
 ---
 ```yaml
 follow_symlinks: true
 ```
 
-[8/32] configs/hidden.yaml (1 rows)
+[9/33] configs/hidden.yaml (1 rows)
 ---
 ```yaml
 show_hidden: true
 ```
 
-[9/32] configs/no_links.yaml (1 rows)
+[10/33] configs/no_links.yaml (1 rows)
 ---
 ```yaml
 no_file_links: true
 ```
 
-[10/32] direct_ignore_test/test.kept (1 rows)
+[11/33] direct_ignore_test/test.kept (1 rows)
 ---
 ```
 should appear
 ```
 
-[11/32] doc/notes.txt (1 rows)
+[12/33] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[12/32] ignore_exception_test/assets/logo.png - binary file skipped (10 B)
+[13/33] ignore_exception_test/assets/logo.png - binary file skipped (10 B)
 
-[13/32] ignore_exception_test/data/index.json (1 rows)
+[14/33] ignore_exception_test/data/index.json (1 rows)
 ---
 ```json
 {}
 ```
 
-[14/32] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
+[15/33] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
 ---
 ```
 excel_data
 ```
 
-[15/32] ignore_exception_test/langgraph.json (1 rows)
+[16/33] ignore_exception_test/langgraph.json (1 rows)
 ---
 ```json
 {}
 ```
 
-[16/32] ignore_exception_test/migrations/001_init.sql (1 rows)
+[17/33] ignore_exception_test/migrations/001_init.sql (1 rows)
 ---
 ```sql
 SELECT 1;
 ```
 
-[17/32] ignore_exception_test/pyproject.toml (1 rows)
+[18/33] ignore_exception_test/pyproject.toml (1 rows)
 ---
 ```toml
 [tool]
 ```
 
-[18/32] ignore_exception_test/uv.lock (1 rows)
+[19/33] ignore_exception_test/uv.lock (1 rows)
 ---
 ```
 lock_data
 ```
 
-[19/32] ignore_test/foo.go (1 rows)
+[20/33] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[20/32] langs/Dockerfile (1 rows)
+[21/33] langs/Dockerfile (1 rows)
 ---
 ```dockerfile
 FROM scratch
 ```
 
-[21/32] langs/main.rs (1 rows)
+[22/33] langs/main.rs (1 rows)
 ---
 ```rust
 fn main() {}
 ```
 
-[22/32] langs/script_no_ext (2 rows)
+[23/33] langs/script_no_ext (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo hi
 ```
 
-[23/32] links/cycle_a/visible.txt (1 rows)
+[24/33] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[24/32] links/cycle_b/visible.txt (1 rows)
+[25/33] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[25/32] links/link_to_main.go (~1 rows)
+[26/33] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[26/32] links/safe_target/recursion.txt (1 rows)
+[27/33] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
 ```
 
-[27/32] main.go (2 rows)
+[28/33] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[28/32] main_test.go (2 rows)
+[29/33] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[29/32] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+[30/33] parent_ignore_test/level1/level2/keep_me.go (1 rows)
 ---
 ```go
 package level2
 ```
 
-[30/32] pkg/util.go (1 rows)
+[31/33] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[31/32] spaces/file with spaces.txt (1 rows)
+[32/33] spaces/file with spaces.txt (1 rows)
 ---
 ```text
 content with spaces
 ```
 
-[32/32] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
+[33/33] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
 
 
 --- STDERR ---
