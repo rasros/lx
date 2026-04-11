@@ -320,7 +320,12 @@ func setupDocumentsFixture(t *testing.T) string {
 	setupMockConfig(t)
 	dir := t.TempDir()
 
-	for _, name := range []string{"sample.pdf", "sample.docx", "sample.xlsx", "sample.odt"} {
+	fixtures := []string{
+		"sample.pdf", "sample.docx", "sample.xlsx",
+		"sample.pptx", "sample.fodt", "sample.fods",
+		"sample.odt", "sample.ods", "sample.odp",
+	}
+	for _, name := range fixtures {
 		data, err := os.ReadFile(filepath.Join("testdata", "documents", name))
 		if err != nil {
 			t.Fatalf("read fixture %s: %v", name, err)
@@ -537,6 +542,13 @@ func TestGoldenDocuments(t *testing.T) {
 		{name: "123_docs_no_extract_flag", args: []string{"-D", "sample.pdf", "sample.docx", "sample.xlsx"}},
 		{name: "124_docs_odt_expanded", args: []string{"-Z", "sample.odt"}},
 		{name: "125_docs_odt_binary", args: []string{"sample.odt"}},
+		{name: "126_docs_pptx_extracted", args: []string{"sample.pptx"}},
+		{name: "127_docs_fodt_extracted", args: []string{"sample.fodt"}},
+		{name: "128_docs_fods_extracted", args: []string{"sample.fods"}},
+{name: "130_docs_ods_expanded", args: []string{"-Z", "sample.ods"}},
+		{name: "131_docs_odp_expanded", args: []string{"-Z", "sample.odp"}},
+		{name: "132_docs_ods_binary", args: []string{"sample.ods"}},
+		{name: "133_docs_odp_binary", args: []string{"sample.odp"}},
 	})
 }
 
