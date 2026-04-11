@@ -1,8 +1,10 @@
 package main
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"flag"
 	"io"
@@ -159,6 +161,7 @@ func TestGolden(t *testing.T) {
 		{name: "112_expand_archive_filter", args: []string{"-Z", "-i", "*.go", "archive.zip"}},
 		{name: "113_expand_archive_config", args: []string{"-y", "configs/expand.yaml", "archive.zip"}},
 		{name: "114_expand_archive_no_expand_override", args: []string{"-y", "configs/expand.yaml", "--no-expand", "archive.zip"}},
+		{name: "115_expand_archive_tar_gz", args: []string{"-Z", "archive.tar.gz"}},
 	}
 
 	runGoldenTests(t, cases, pkgDir, workDir, canonicalWorkDir)
@@ -489,6 +492,10 @@ func setupComplexFixture(t *testing.T) string {
 		{"nested/world.go", "package nested\n"},
 		{".hidden_in_zip", "hidden inside zip\n"},
 	})
+	createTestTarGz(filepath.Join(dir, "archive.tar.gz"), [][2]string{
+		{"hello.txt", "Hello from tar!\n"},
+		{"nested/world.go", "package nested\n"},
+	})
 	create("configs/expand.yaml", "expand_archives: true\n", 0644)
 
 	t.Cleanup(func() {
@@ -497,6 +504,33 @@ func setupComplexFixture(t *testing.T) string {
 	})
 
 	return dir
+}
+
+// createTestTarGz creates a .tar.gz archive at path containing the given name/content pairs.
+func createTestTarGz(path string, files [][2]string) {
+	f, err := os.Create(path)
+	if err != nil {
+		panic("createTestTarGz: " + err.Error())
+	}
+	defer f.Close()
+	gw := gzip.NewWriter(f)
+	tw := tar.NewWriter(gw)
+	for _, file := range files {
+		body := []byte(file[1])
+		hdr := &tar.Header{Name: file[0], Mode: 0644, Size: int64(len(body))}
+		if err := tw.WriteHeader(hdr); err != nil {
+			panic("createTestTarGz: " + err.Error())
+		}
+		if _, err := tw.Write(body); err != nil {
+			panic("createTestTarGz: " + err.Error())
+		}
+	}
+	if err := tw.Close(); err != nil {
+		panic("createTestTarGz: " + err.Error())
+	}
+	if err := gw.Close(); err != nil {
+		panic("createTestTarGz: " + err.Error())
+	}
 }
 
 // createTestZip creates a ZIP archive at path containing the given name/content pairs.

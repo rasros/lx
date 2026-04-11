@@ -1,5 +1,5 @@
 --- STDOUT ---
-[1/39] .gitignore (3 rows)
+[1/40] .gitignore (3 rows)
 ---
 ```gitignore
 bin/
@@ -7,209 +7,210 @@ secret/
 *.tmp
 ```
 
-[2/39] .hidden (1 rows)
+[2/40] .hidden (1 rows)
 ---
 ```
 i am hidden
 ```
 
-[3/39] README.md (2 rows)
+[3/40] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-[4/39] archive.zip - binary file skipped (445 B)
-[5/39] assets/logo.png - binary file skipped (12 B)
+[4/40] archive.tar.gz - binary file skipped (159 B)
+[5/40] archive.zip - binary file skipped (445 B)
+[6/40] assets/logo.png - binary file skipped (12 B)
 
-[6/39] configs/custom_sections.yaml (1 rows)
+[7/40] configs/custom_sections.yaml (1 rows)
 ---
 ```yaml
 section_header_template: "*** {{ .Body }} ***\n"
 ```
 
-[7/39] configs/custom_template.yaml (1 rows)
+[8/40] configs/custom_template.yaml (1 rows)
 ---
 ```yaml
 file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
-[8/39] configs/expand.yaml (1 rows)
+[9/40] configs/expand.yaml (1 rows)
 ---
 ```yaml
 expand_archives: true
 ```
 
-[9/39] configs/follow.yaml (1 rows)
+[10/40] configs/follow.yaml (1 rows)
 ---
 ```yaml
 follow_symlinks: true
 ```
 
-[10/39] configs/hidden.yaml (1 rows)
+[11/40] configs/hidden.yaml (1 rows)
 ---
 ```yaml
 show_hidden: true
 ```
 
-[11/39] configs/no_links.yaml (1 rows)
+[12/40] configs/no_links.yaml (1 rows)
 ---
 ```yaml
 no_file_links: true
 ```
 
-[12/39] direct_ignore_test/.gitignore (1 rows)
+[13/40] direct_ignore_test/.gitignore (1 rows)
 ---
 ```gitignore
 *.ignored
 ```
 
-[13/39] direct_ignore_test/test.kept (1 rows)
+[14/40] direct_ignore_test/test.kept (1 rows)
 ---
 ```
 should appear
 ```
 
-[14/39] doc/notes.txt (1 rows)
+[15/40] doc/notes.txt (1 rows)
 ---
 ```text
 some notes
 ```
 
-[15/39] ignore_exception_test/assets/logo.png - binary file skipped (10 B)
+[16/40] ignore_exception_test/assets/logo.png - binary file skipped (10 B)
 
-[16/39] ignore_exception_test/data/index.json (1 rows)
+[17/40] ignore_exception_test/data/index.json (1 rows)
 ---
 ```json
 {}
 ```
 
-[17/39] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
+[18/40] ignore_exception_test/data/nested/deep/my.data.xlsx (1 rows)
 ---
 ```
 excel_data
 ```
 
-[18/39] ignore_exception_test/langgraph.json (1 rows)
+[19/40] ignore_exception_test/langgraph.json (1 rows)
 ---
 ```json
 {}
 ```
 
-[19/39] ignore_exception_test/migrations/001_init.sql (1 rows)
+[20/40] ignore_exception_test/migrations/001_init.sql (1 rows)
 ---
 ```sql
 SELECT 1;
 ```
 
-[20/39] ignore_exception_test/pyproject.toml (1 rows)
+[21/40] ignore_exception_test/pyproject.toml (1 rows)
 ---
 ```toml
 [tool]
 ```
 
-[21/39] ignore_exception_test/src/main.go (1 rows)
+[22/40] ignore_exception_test/src/main.go (1 rows)
 ---
 ```go
 package main
 ```
 
-[22/39] ignore_exception_test/uv.lock (1 rows)
+[23/40] ignore_exception_test/uv.lock (1 rows)
 ---
 ```
 lock_data
 ```
 
-[23/39] ignore_test/.gitignore (1 rows)
+[24/40] ignore_test/.gitignore (1 rows)
 ---
 ```gitignore
 bar.go
 ```
 
-[24/39] ignore_test/foo.go (1 rows)
+[25/40] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[25/39] langs/Dockerfile (1 rows)
+[26/40] langs/Dockerfile (1 rows)
 ---
 ```dockerfile
 FROM scratch
 ```
 
-[26/39] langs/main.rs (1 rows)
+[27/40] langs/main.rs (1 rows)
 ---
 ```rust
 fn main() {}
 ```
 
-[27/39] langs/script_no_ext (2 rows)
+[28/40] langs/script_no_ext (2 rows)
 ---
 ```bash
 #!/bin/bash
 echo hi
 ```
 
-[28/39] links/cycle_a/visible.txt (1 rows)
+[29/40] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[29/39] links/cycle_b/visible.txt (1 rows)
+[30/40] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[30/39] links/link_to_main.go (~1 rows)
+[31/40] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[31/39] links/safe_target/recursion.txt (1 rows)
+[32/40] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
 ```
 
-[32/39] main.go (2 rows)
+[33/40] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[33/39] main_test.go (2 rows)
+[34/40] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[34/39] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+[35/40] parent_ignore_test/level1/level2/keep_me.go (1 rows)
 ---
 ```go
 package level2
 ```
 
-[35/39] pkg/util.go (1 rows)
+[36/40] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[36/39] spaces/file with spaces.txt (1 rows)
+[37/40] spaces/file with spaces.txt (1 rows)
 ---
 ```text
 content with spaces
 ```
 
-[37/39] src/large.txt (100 rows)
+[38/40] src/large.txt (100 rows)
 ---
 ```text
 Line xxxxxxxxxx
@@ -314,13 +315,13 @@ Line xxxxxxxxxx
 Line xxxxxxxxxx
 ```
 
-[38/39] src/script.py (1 rows)
+[39/40] src/script.py (1 rows)
 ---
 ```python
 print('hello')
 ```
 
-[39/39] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
+[40/40] /ROOT/content/links/broken_link - error: open /ROOT/content/links/broken_link: FILE_NOT_FOUND
 
 
 --- STDERR ---
