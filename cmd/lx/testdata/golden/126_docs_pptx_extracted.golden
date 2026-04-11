@@ -1,0 +1,14 @@
+--- STDOUT ---
+sample.pptx (6 rows)
+---
+```
+
+Hello PPTX World
+First slide content
+
+Second Slide
+Second slide content
+```
+
+
+--- STDERR ---

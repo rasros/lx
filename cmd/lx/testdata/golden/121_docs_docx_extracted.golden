@@ -1,0 +1,11 @@
+--- STDOUT ---
+sample.docx (3 rows)
+---
+```
+
+Hello DOCX World
+Second paragraph
+```
+
+
+--- STDERR ---

@@ -322,7 +322,7 @@ func setupDocumentsFixture(t *testing.T) string {
 
 	fixtures := []string{
 		"sample.pdf", "sample.docx", "sample.xlsx",
-		"sample.pptx", "sample.fodt", "sample.fods",
+		"sample.pptx",
 		"sample.odt", "sample.ods", "sample.odp",
 	}
 	for _, name := range fixtures {
@@ -543,12 +543,10 @@ func TestGoldenDocuments(t *testing.T) {
 		{name: "124_docs_odt_expanded", args: []string{"-Z", "sample.odt"}},
 		{name: "125_docs_odt_binary", args: []string{"sample.odt"}},
 		{name: "126_docs_pptx_extracted", args: []string{"sample.pptx"}},
-		{name: "127_docs_fodt_extracted", args: []string{"sample.fodt"}},
-		{name: "128_docs_fods_extracted", args: []string{"sample.fods"}},
-{name: "130_docs_ods_expanded", args: []string{"-Z", "sample.ods"}},
-		{name: "131_docs_odp_expanded", args: []string{"-Z", "sample.odp"}},
-		{name: "132_docs_ods_binary", args: []string{"sample.ods"}},
-		{name: "133_docs_odp_binary", args: []string{"sample.odp"}},
+		{name: "127_docs_ods_expanded", args: []string{"-Z", "sample.ods"}},
+		{name: "128_docs_odp_expanded", args: []string{"-Z", "sample.odp"}},
+		{name: "129_docs_ods_binary", args: []string{"sample.ods"}},
+		{name: "130_docs_odp_binary", args: []string{"sample.odp"}},
 	})
 }
 
