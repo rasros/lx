@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generate document test fixtures for document_test.go."""
 
+import io
+import zipfile
 import pathlib
 
 out = pathlib.Path(__file__).parent
 
-# --- PDF ---
 from fpdf import FPDF
 
 pdf = FPDF()
@@ -17,7 +17,6 @@ pdf.cell(0, 10, "Second line of text")
 pdf.output(out / "sample.pdf")
 print("wrote sample.pdf")
 
-# --- DOCX ---
 from docx import Document
 
 doc = Document()
@@ -26,7 +25,6 @@ doc.add_paragraph("Second paragraph")
 doc.save(out / "sample.docx")
 print("wrote sample.docx")
 
-# --- XLSX ---
 from openpyxl import Workbook
 
 wb = Workbook()
@@ -38,3 +36,36 @@ ws["A2"] = "Alice"
 ws["B2"] = 42
 wb.save(out / "sample.xlsx")
 print("wrote sample.xlsx")
+
+content_xml = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+  <office:body>
+    <office:text>
+      <text:p>Hello ODT World</text:p>
+      <text:p>Second paragraph</text:p>
+    </office:text>
+  </office:body>
+</office:document-content>
+"""
+
+manifest_xml = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
+  <manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>
+  <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+</manifest:manifest>
+"""
+
+buf = io.BytesIO()
+with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+    info = zipfile.ZipInfo("mimetype")
+    info.compress_type = zipfile.ZIP_STORED
+    zf.writestr(info, "application/vnd.oasis.opendocument.text")
+    zf.writestr("META-INF/manifest.xml", manifest_xml)
+    zf.writestr("content.xml", content_xml)
+
+(out / "sample.odt").write_bytes(buf.getvalue())
+print("wrote sample.odt")
