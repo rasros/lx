@@ -1,0 +1,11 @@
+--- STDOUT ---
+sample.xlsx (3 rows)
+---
+```
+Sheet1:
+Name	Score
+Alice	42
+```
+
+
+--- STDERR ---
