@@ -22,8 +22,10 @@ var archiveSuffixes = []string{
 	".tgz", ".tbz2", ".txz",
 	// Plain TAR
 	".tar",
-	// Other
+	// Other multi-file archives
 	".rar", ".7z",
+	// Single-file compression (library exposes one virtual entry)
+	".gz", ".bz2", ".xz", ".zst", ".br", ".lz4", ".sz", ".s2", ".lz",
 }
 
 func IsArchivePath(path string) bool {

@@ -120,8 +120,15 @@ func TestIsArchivePath(t *testing.T) {
 		{"ARCHIVE.ZIP", true},
 		{"Archive.Zip", true},
 		{"Data.TAR.GZ", true},
-		{"file.gz", false},
-		{"file.bz2", false},
+		{"file.gz", true},
+		{"file.bz2", true},
+		{"file.xz", true},
+		{"file.zst", true},
+		{"file.br", true},
+		{"file.lz4", true},
+		{"file.sz", true},
+		{"file.s2", true},
+		{"file.lz", true},
 		{"file.go", false},
 		{"file.txt", false},
 		{"noextension", false},
@@ -390,6 +397,59 @@ func TestExpandArchive_TarGz_ContentReadable(t *testing.T) {
 	w.IgnoreEnabled = false
 
 	if err := ExpandArchive(context.Background(), path, "arc.tar.gz", w, nil, "", s); err != nil {
+		t.Fatalf("ExpandArchive error: %v", err)
+	}
+
+	files := streamFiles(s)
+	if len(files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(files))
+	}
+
+	rc, err := files[0].Open()
+	if err != nil {
+		t.Fatalf("Open error: %v", err)
+	}
+	defer rc.Close()
+
+	got, _ := io.ReadAll(rc)
+	if string(got) != content {
+		t.Errorf("content = %q, want %q", got, content)
+	}
+}
+
+// makeTestGz creates a plain gzip-compressed file (not tar) from a single payload.
+// The decompressed name the library exposes is derived from the filename (strip .gz).
+func makeTestGz(t *testing.T, name, content string) string {
+	t.Helper()
+	// Use * before the extension so os.CreateTemp inserts the random part there,
+	// keeping the .gz suffix so IsArchivePath recognises the file.
+	baseName := name[:len(name)-3] // strip .gz
+	f, err := os.CreateTemp(t.TempDir(), "archive_test_*_"+baseName+".gz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	gw := gzip.NewWriter(f)
+	gw.Name = baseName // embedded name inside the gz stream
+	if _, err := gw.Write([]byte(content)); err != nil {
+		t.Fatal(err)
+	}
+	if err := gw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return f.Name()
+}
+
+func TestExpandArchive_Gz_SingleEntry(t *testing.T) {
+	const content = "hello from gzip\n"
+	path := makeTestGz(t, "data.txt.gz", content)
+
+	s := newTestStream(t)
+	w := NewWalker(nil, nil)
+	w.IgnoreEnabled = false
+
+	if err := ExpandArchive(context.Background(), path, "data.txt.gz", w, nil, "", s); err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
