@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/main.jsx (5 rows)
+---
+```jsx
+export class Card extends React.Component {
+    title = "default";
+    render() {
+}
+export function makeCard(name) {
+```
+
+
+--- STDERR ---

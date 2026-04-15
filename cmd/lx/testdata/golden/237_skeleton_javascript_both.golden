@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/main.js (5 rows)
+---
+```javascript
+export class Greeter {
+    message = "hi";
+    greet(name) {
+}
+export function topLevel(x) {
+```
+
+
+--- STDERR ---
