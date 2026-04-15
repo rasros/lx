@@ -4,7 +4,7 @@ skeleton/main.rb (11 rows)
 ```ruby
 class Animal
   attr_reader :name
-  MAX = 100
+  MAX = 100 # class constant
   def initialize(name)
   def speak
 end

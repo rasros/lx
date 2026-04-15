@@ -3,7 +3,7 @@ skeleton/main.js (9 rows)
 ---
 ```javascript
 export class Greeter {
-    message = "hi";
+    message = "hi"; // default message
     greet(name) {
 }
 export function topLevel(x) {

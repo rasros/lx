@@ -1,9 +1,12 @@
 --- STDOUT ---
-skeleton/Main.java (9 rows)
+skeleton/Main.java (12 rows)
 ---
 ```java
+/**
+ * Simple calculator with a running value.
+ */
 public class Calculator {
-    public static final int MAX = 100;
+    public static final int MAX = 100; // upper bound
     public Calculator(int initial) {
     public int add(int x) {
     public int combine(

@@ -4,7 +4,7 @@ skeleton/main.groovy (10 rows)
 ```groovy
 class Animal {
     String name
-    String species
+    String species // taxonomy
     def speak() {
     private def helper() {
 }

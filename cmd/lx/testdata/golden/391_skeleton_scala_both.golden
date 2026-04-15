@@ -7,14 +7,14 @@ trait Shape {
     def perimeter(): Double
 }
 case class Point(x: Double, y: Double) {
-    val label: String = ""
+    val label: String = "" // display label
     def scale(factor: Double): Point = Point(x * factor, y * factor)
 }
 object Calculator {
     val Max: Int = 100
     def add(x: Int): Int = x + Max
 }
-def topLevel(x: Int): Int = x + 1
+def topLevel(x: Int): Int = x + 1 // simple increment
 def combine(
     x: Int,
     y: Int,

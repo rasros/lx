@@ -3,15 +3,15 @@ skeleton/main.c (10 rows)
 ---
 ```c
 typedef struct Point {
-    int x;
-    int y;
+    int x; /* x coordinate */
+    int y; /* y coordinate */
 } Point;
 int add(int a, int b) {
 int subtract(
     int a,
     int b
 ) {
-void greet(const char *name);
+void greet(const char *name); // forward declaration
 ```
 
 

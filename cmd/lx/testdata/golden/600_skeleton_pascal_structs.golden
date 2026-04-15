@@ -4,8 +4,8 @@ skeleton/main.pas (5 rows)
 ```pascal
 type
   TAnimal = record
-    Name: string;
-    Species: string;
+    Name: string;    (* display name *)
+    Species: string; (* taxonomy     *)
   end;
 ```
 

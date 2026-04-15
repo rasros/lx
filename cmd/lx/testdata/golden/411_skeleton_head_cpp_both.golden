@@ -3,7 +3,7 @@ skeleton/main.cpp (10 rows)
 ---
 ```cpp
 class Widget {
-    int value;
+    int value; // current value
     void set(int v) {
 ```
 

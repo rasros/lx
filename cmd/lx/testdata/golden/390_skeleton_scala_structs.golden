@@ -5,7 +5,7 @@ skeleton/main.scala (8 rows)
 trait Shape {
 }
 case class Point(x: Double, y: Double) {
-    val label: String = ""
+    val label: String = "" // display label
 }
 object Calculator {
     val Max: Int = 100

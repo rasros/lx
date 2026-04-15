@@ -4,7 +4,7 @@ skeleton/main.ts (15 rows)
 ```typescript
 export interface Shape {
     area(): number;
-    name: string;
+    name: string; // display label
 }
 export class Point {
     public x: number;

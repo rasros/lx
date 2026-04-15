@@ -8,7 +8,7 @@ interface Shape {
     fun perimeter(): Double
 }
 class Calculator {
-    val max: Int = 100
+    val max: Int = 100 // upper bound
     fun add(x: Int): Int {
 }
 fun topLevel(x: Int): Int {

@@ -4,7 +4,7 @@ skeleton/main.sh (3 rows)
 ```bash
 greet() {
 add() {
-_helper() {
+_helper() { # internal
 ```
 
 
