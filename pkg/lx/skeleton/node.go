@@ -35,12 +35,15 @@ func hasDescendantOfType(n *gotreesitter.Node, typ string, lang *gotreesitter.La
 	return false
 }
 
-func emitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string) []byte {
+func emitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string, singleLineSig bool) []byte {
+	startRow := int(n.StartPoint().Row)
+	if singleLineSig {
+		return content.AppendLine(out, lines, startRow)
+	}
 	body := n.ChildByFieldName("body", lang)
 	if body == nil && bodyChildType != "" {
 		body = findChildByType(n, bodyChildType, lang)
 	}
-	startRow := int(n.StartPoint().Row)
 	if body == nil {
 		return content.AppendLines(out, lines, startRow, int(n.EndPoint().Row))
 	}
