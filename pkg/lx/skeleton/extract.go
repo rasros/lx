@@ -46,7 +46,11 @@ func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines 
 	switch {
 	case functions && containsStr(def.funcTypes, nodeType):
 		if def.funcVisible == nil || def.funcVisible(node, src, lang) {
-			out = emitFuncSig(out, lines, node, lang, def.indentBody, def.bodyChildType, def.singleLineSig)
+			if def.emitFunc != nil {
+				out = def.emitFunc(out, src, lines, node, lang)
+			} else {
+				out = emitFuncSig(out, lines, node, lang, def.indentBody, def.bodyChildType, def.singleLineSig)
+			}
 		}
 	case structs && containsStr(def.structTypes, nodeType):
 		out = def.emitStruct(out, src, lines, node, lang, functions)

@@ -1,12 +1,11 @@
 --- STDOUT ---
-skeleton/main.groovy (10 rows)
+skeleton/main.groovy (9 rows)
 ---
 ```groovy
 class Animal {
     String name
     String species // taxonomy
     def speak() {
-    private def helper() {
 }
 def standalone(x) {
 def combine(

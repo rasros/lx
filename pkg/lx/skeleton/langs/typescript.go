@@ -74,3 +74,29 @@ func tsIsPrivate(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) 
 	}
 	return false
 }
+
+// TSEmitFunc handles top-level function_declaration and lexical_declaration (arrow/const functions).
+func TSEmitFunc(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []byte {
+	if n.Type(lang) == "function_declaration" {
+		return emitFuncSig(out, lines, n, lang, false, "")
+	}
+	// lexical_declaration: emit only if it wraps an arrow_function or function_expression.
+	decl := findChildByType(n, "variable_declarator", lang)
+	if decl == nil {
+		return out
+	}
+	val := decl.ChildByFieldName("value", lang)
+	if val == nil {
+		return out
+	}
+	valType := val.Type(lang)
+	if valType != "arrow_function" && valType != "function_expression" {
+		return out
+	}
+	body := val.ChildByFieldName("body", lang)
+	startRow := int(n.StartPoint().Row)
+	if body != nil && body.Type(lang) == "statement_block" {
+		return content.AppendLines(out, lines, startRow, int(body.StartPoint().Row))
+	}
+	return content.AppendLines(out, lines, startRow, int(n.EndPoint().Row))
+}

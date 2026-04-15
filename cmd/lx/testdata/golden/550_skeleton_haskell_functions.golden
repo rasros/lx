@@ -1,8 +1,10 @@
 --- STDOUT ---
-skeleton/main.hs (2 rows)
+skeleton/main.hs (4 rows)
 ---
 ```haskell
+greet :: String -> String
 greet name
+add :: Int -> Int -> Int
 add x y
 ```
 

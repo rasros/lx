@@ -8,11 +8,13 @@ data Animal = Dog | Cat
 newtype Name = Name String
 
 -- | Greet by name, with a fallback.
+greet :: String -> String
 greet name
   | name == "" = "Hello!"
   | otherwise  = "Hello, " ++ name -- append name
 
 -- | Add two integers.
+add :: Int -> Int -> Int
 add x y
   | x >= 0    = x + y
   | otherwise = y

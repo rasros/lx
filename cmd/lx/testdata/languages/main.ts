@@ -38,3 +38,8 @@ export function combine(
 ): number {
     return x + y;
 }
+
+// Arrow function handler.
+export const handler = async (req: Request): Promise<void> => {
+    return;
+};

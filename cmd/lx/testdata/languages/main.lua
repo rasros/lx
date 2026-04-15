@@ -4,8 +4,8 @@ function greet(
     return "Hello, " .. name
 end
 
---[[ Add two numbers together.
-     Returns their sum. ]]
+-- Add two numbers together.
+-- Returns their sum.
 function add(a, b)
     return a + b
 end

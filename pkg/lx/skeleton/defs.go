@@ -22,6 +22,7 @@ type langDef struct {
 
 	funcVisible func(node *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool
 
+	emitFunc   func(out, src []byte, lines [][]byte, node *gotreesitter.Node, lang *gotreesitter.Language) []byte
 	emitStruct func(out, src []byte, lines [][]byte, node *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte
 }
 
@@ -77,37 +78,41 @@ var langDefs = map[string]langDef{
 
 	"typescript": {
 		newLang:         grammars.TypescriptLanguage,
-		funcTypes:       []string{"function_declaration"},
+		funcTypes:       []string{"function_declaration", "lexical_declaration"},
 		structTypes:     []string{"class_declaration", "interface_declaration"},
 		decoratedType:   "export_statement",
 		definitionField: "declaration",
+		emitFunc:        langs.TSEmitFunc,
 		emitStruct:      langs.TSEmitClassOrInterface,
 	},
 
 	"tsx": {
 		newLang:         grammars.TsxLanguage,
-		funcTypes:       []string{"function_declaration"},
+		funcTypes:       []string{"function_declaration", "lexical_declaration"},
 		structTypes:     []string{"class_declaration", "interface_declaration"},
 		decoratedType:   "export_statement",
 		definitionField: "declaration",
+		emitFunc:        langs.TSEmitFunc,
 		emitStruct:      langs.TSEmitClassOrInterface,
 	},
 
 	"javascript": {
 		newLang:         grammars.JavascriptLanguage,
-		funcTypes:       []string{"function_declaration"},
+		funcTypes:       []string{"function_declaration", "lexical_declaration"},
 		structTypes:     []string{"class_declaration"},
 		decoratedType:   "export_statement",
 		definitionField: "declaration",
+		emitFunc:        langs.TSEmitFunc,
 		emitStruct:      langs.TSEmitClassOrInterface,
 	},
 
 	"jsx": {
 		newLang:         grammars.JavascriptLanguage,
-		funcTypes:       []string{"function_declaration"},
+		funcTypes:       []string{"function_declaration", "lexical_declaration"},
 		structTypes:     []string{"class_declaration"},
 		decoratedType:   "export_statement",
 		definitionField: "declaration",
+		emitFunc:        langs.TSEmitFunc,
 		emitStruct:      langs.TSEmitClassOrInterface,
 	},
 
@@ -202,7 +207,7 @@ var langDefs = map[string]langDef{
 
 	"haskell": {
 		newLang:         grammars.HaskellLanguage,
-		funcTypes:       []string{"function"},
+		funcTypes:       []string{"signature", "function"},
 		structTypes:     []string{"data_type", "newtype"},
 		indentBody:      true,
 		bodyChildType:   "match",
@@ -259,5 +264,7 @@ var langDefs = map[string]langDef{
 		iterateChildren: []string{"compilation", "compilation_unit"},
 		emitStruct:      langs.AdaEmitDecl,
 		funcVisible:     langs.AdaFuncVisible,
+		bodyChildType:   "begin",
+		indentBody:      true,
 	},
 }

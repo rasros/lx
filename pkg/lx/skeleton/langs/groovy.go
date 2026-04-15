@@ -1,6 +1,8 @@
 package langs
 
 import (
+	"strings"
+
 	"github.com/odvcencio/gotreesitter"
 	"github.com/rasros/lx/pkg/lx/internal/content"
 )
@@ -19,7 +21,7 @@ func GroovyEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		case "declaration":
 			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "function_definition":
-			if functions {
+			if functions && !strings.HasPrefix(strings.TrimSpace(string(child.Text(src))), "private ") {
 				out = emitFuncSig(out, lines, child, lang, false, "closure")
 			}
 		}
