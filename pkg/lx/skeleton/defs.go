@@ -189,14 +189,6 @@ var langDefs = map[string]langDef{
 		bodyChildType: "end",
 	},
 
-	"julia": {
-		newLang:       grammars.JuliaLanguage,
-		funcTypes:     []string{"function_definition"},
-		structTypes:   []string{"struct_definition", "abstract_definition"},
-		indentBody:    true,
-		bodyChildType: "block",
-		emitStruct:    langs.JuliaEmitStruct,
-	},
 
 	"zig": {
 		newLang:       grammars.ZigLanguage,
@@ -223,12 +215,6 @@ var langDefs = map[string]langDef{
 		emitStruct:    langs.GroovyEmitClass,
 	},
 
-	"perl": {
-		newLang:       grammars.PerlLanguage,
-		funcTypes:     []string{"subroutine_declaration_statement"},
-		bodyChildType: "block",
-	},
-
 	"objectivec": {
 		newLang:       grammars.ObjcLanguage,
 		funcTypes:     []string{"function_definition"},
@@ -243,28 +229,4 @@ var langDefs = map[string]langDef{
 		emitStruct:  langs.OCamlEmitDefinition,
 	},
 
-	"pascal": {
-		newLang:         grammars.PascalLanguage,
-		structTypes:     []string{"defProc", "declTypes"},
-		iterateChildren: []string{"program"},
-		emitStruct:      langs.PascalEmitDecl,
-	},
-
-	"lisp": {
-		newLang:       grammars.CommonlispLanguage,
-		funcTypes:     []string{"list_lit"},
-		singleLineSig: true,
-		funcVisible:   langs.CLFuncVisible,
-	},
-
-	"ada": {
-		newLang:         grammars.AdaLanguage,
-		funcTypes:       []string{"subprogram_body"},
-		structTypes:     []string{"package_declaration", "subprogram_declaration"},
-		iterateChildren: []string{"compilation", "compilation_unit"},
-		emitStruct:      langs.AdaEmitDecl,
-		funcVisible:     langs.AdaFuncVisible,
-		bodyChildType:   "begin",
-		indentBody:      true,
-	},
 }

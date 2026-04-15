@@ -81,9 +81,6 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "561_skeleton_groovy_structs", args: []string{"-T", "skeleton/main.groovy"}},
 		{name: "562_skeleton_groovy_both", args: []string{"-F", "-T", "skeleton/main.groovy"}},
 
-		// 570-579: Perl
-		{name: "570_skeleton_perl_functions", args: []string{"-F", "skeleton/main.pl"}},
-
 		// 580-589: Objective-C
 		{name: "580_skeleton_objc_functions", args: []string{"-F", "skeleton/main.m"}},
 		{name: "581_skeleton_objc_structs", args: []string{"-T", "skeleton/main.m"}},
@@ -93,22 +90,6 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "590_skeleton_ocaml_structs", args: []string{"-T", "skeleton/main.ml"}},
 		{name: "591_skeleton_ocaml_both", args: []string{"-F", "-T", "skeleton/main.ml"}},
 
-		// 600-609: Pascal
-		{name: "600_skeleton_pascal_structs", args: []string{"-T", "skeleton/main.pas"}},
-		{name: "601_skeleton_pascal_both", args: []string{"-F", "-T", "skeleton/main.pas"}},
-
-		// 610-619: Lisp
-		{name: "610_skeleton_lisp_functions", args: []string{"-F", "skeleton/main.lisp"}},
-
-		// 620-629: Julia
-		{name: "620_skeleton_julia_functions", args: []string{"-F", "skeleton/main.jl"}},
-		{name: "621_skeleton_julia_structs", args: []string{"-T", "skeleton/main.jl"}},
-		{name: "622_skeleton_julia_both", args: []string{"-F", "-T", "skeleton/main.jl"}},
-
-		// 630-639: Ada
-		{name: "630_skeleton_ada_functions", args: []string{"-F", "skeleton/main.adb"}},
-		{name: "631_skeleton_ada_structs", args: []string{"-T", "skeleton/main.adb"}},
-		{name: "632_skeleton_ada_both", args: []string{"-F", "-T", "skeleton/main.adb"}},
 	})
 }
 
