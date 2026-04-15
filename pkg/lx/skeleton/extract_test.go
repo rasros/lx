@@ -482,3 +482,601 @@ func TestPython_NestedFunctionExcluded(t *testing.T) {
 		t.Errorf("nested inner() should not appear:\n%s", out)
 	}
 }
+
+var rustSrc = `pub struct Point {
+    pub x: f64,
+    pub y: f64,
+    label: String,
+}
+
+pub enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+pub trait Shape {
+    fn area(&self) -> f64;
+    fn perimeter(&self) -> f64;
+}
+
+impl Point {
+    pub fn new(x: f64, y: f64) -> Self {
+        Point { x, y, label: String::new() }
+    }
+
+    pub fn scale(&self, factor: f64) -> Point {
+        Point { x: self.x * factor, y: self.y * factor, label: self.label.clone() }
+    }
+
+    fn helper(&self) {}
+}
+
+pub fn top_level(x: i32) -> i32 {
+    x + 1
+}
+
+fn private_fn() {}
+`
+
+func TestRust_Functions(t *testing.T) {
+	out := string(Extract("rust", []byte(rustSrc), true, false))
+	if !strings.Contains(out, "pub fn top_level(x: i32) -> i32 {") {
+		t.Errorf("expected top_level, got:\n%s", out)
+	}
+	if strings.Contains(out, "private_fn") {
+		t.Errorf("private fn should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "fn helper") {
+		t.Errorf("private helper should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "x + 1") {
+		t.Errorf("function body should not appear:\n%s", out)
+	}
+}
+
+func TestRust_Structs(t *testing.T) {
+	out := string(Extract("rust", []byte(rustSrc), false, true))
+	if !strings.Contains(out, "pub struct Point {") {
+		t.Errorf("expected struct Point, got:\n%s", out)
+	}
+	if !strings.Contains(out, "pub x: f64,") {
+		t.Errorf("expected pub field x, got:\n%s", out)
+	}
+	if !strings.Contains(out, "pub y: f64,") {
+		t.Errorf("expected pub field y, got:\n%s", out)
+	}
+	if strings.Contains(out, "label") {
+		t.Errorf("private field label should not appear:\n%s", out)
+	}
+	if !strings.Contains(out, "pub enum Color {") {
+		t.Errorf("expected enum Color, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Red,") {
+		t.Errorf("expected enum variant Red, got:\n%s", out)
+	}
+	if !strings.Contains(out, "pub trait Shape {") {
+		t.Errorf("expected trait Shape, got:\n%s", out)
+	}
+	if !strings.Contains(out, "impl Point {") {
+		t.Errorf("expected impl Point, got:\n%s", out)
+	}
+}
+
+func TestRust_Both(t *testing.T) {
+	out := string(Extract("rust", []byte(rustSrc), true, true))
+	if !strings.Contains(out, "pub struct Point {") {
+		t.Errorf("expected struct Point")
+	}
+	if !strings.Contains(out, "fn area(&self) -> f64;") {
+		t.Errorf("expected trait method area, got:\n%s", out)
+	}
+	if !strings.Contains(out, "pub fn new(x: f64, y: f64) -> Self {") {
+		t.Errorf("expected impl method new, got:\n%s", out)
+	}
+	if !strings.Contains(out, "pub fn scale(&self, factor: f64) -> Point {") {
+		t.Errorf("expected impl method scale, got:\n%s", out)
+	}
+	if strings.Contains(out, "fn helper") {
+		t.Errorf("private helper should not appear:\n%s", out)
+	}
+	if !strings.Contains(out, "pub fn top_level(x: i32) -> i32 {") {
+		t.Errorf("expected top_level, got:\n%s", out)
+	}
+	if strings.Contains(out, "x + 1") {
+		t.Errorf("function body should not appear:\n%s", out)
+	}
+}
+
+var tsSrc = `export interface Shape {
+    area(): number;
+    name: string;
+}
+
+export class Point {
+    public x: number;
+    public y: number;
+    private label: string;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+        this.label = "";
+    }
+
+    public scale(factor: number): Point {
+        return new Point(this.x * factor, this.y * factor);
+    }
+
+    private helper(): void {}
+}
+
+export function topLevel(x: number): number {
+    return x + 1;
+}
+
+function localFn(): void {}
+`
+
+func TestTypeScript_Functions(t *testing.T) {
+	out := string(Extract("typescript", []byte(tsSrc), true, false))
+	if !strings.Contains(out, "export function topLevel(x: number): number {") {
+		t.Errorf("expected exported topLevel, got:\n%s", out)
+	}
+	if !strings.Contains(out, "function localFn(): void {") {
+		t.Errorf("expected non-exported localFn, got:\n%s", out)
+	}
+	if strings.Contains(out, "return x + 1") {
+		t.Errorf("function body should not appear:\n%s", out)
+	}
+}
+
+func TestTypeScript_Structs(t *testing.T) {
+	out := string(Extract("typescript", []byte(tsSrc), false, true))
+	if !strings.Contains(out, "export interface Shape {") {
+		t.Errorf("expected Shape interface, got:\n%s", out)
+	}
+	if !strings.Contains(out, "area(): number;") {
+		t.Errorf("expected interface method area, got:\n%s", out)
+	}
+	if !strings.Contains(out, "export class Point {") {
+		t.Errorf("expected Point class, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public x: number;") {
+		t.Errorf("expected public field x, got:\n%s", out)
+	}
+	if strings.Contains(out, "private label") {
+		t.Errorf("private field should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "scale(") {
+		t.Errorf("methods should not appear in structs-only mode:\n%s", out)
+	}
+}
+
+func TestTypeScript_Both(t *testing.T) {
+	out := string(Extract("typescript", []byte(tsSrc), true, true))
+	if !strings.Contains(out, "export interface Shape {") {
+		t.Errorf("expected Shape interface")
+	}
+	if !strings.Contains(out, "export class Point {") {
+		t.Errorf("expected Point class")
+	}
+	if !strings.Contains(out, "public x: number;") {
+		t.Errorf("expected public field x")
+	}
+	if !strings.Contains(out, "constructor(x: number, y: number) {") {
+		t.Errorf("expected constructor")
+	}
+	if !strings.Contains(out, "public scale(factor: number): Point {") {
+		t.Errorf("expected scale method")
+	}
+	if strings.Contains(out, "private helper") {
+		t.Errorf("private method should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "this.x = x") {
+		t.Errorf("constructor body should not appear:\n%s", out)
+	}
+}
+
+var kotlinSrc = `data class Point(val x: Double, val y: Double)
+
+interface Shape {
+    fun area(): Double
+    fun perimeter(): Double
+}
+
+class Calculator {
+    val max: Int = 100
+    private val secret: Int = 42
+
+    fun add(x: Int): Int {
+        return x + max
+    }
+
+    private fun helper(): Int = 42
+}
+
+fun topLevel(x: Int): Int {
+    return x + 1
+}
+`
+
+func TestKotlin_Functions(t *testing.T) {
+	out := string(Extract("kotlin", []byte(kotlinSrc), true, false))
+	if !strings.Contains(out, "fun topLevel(x: Int): Int {") {
+		t.Errorf("expected topLevel, got:\n%s", out)
+	}
+	if strings.Contains(out, "return x + 1") {
+		t.Errorf("function body should not appear:\n%s", out)
+	}
+}
+
+func TestKotlin_Structs(t *testing.T) {
+	out := string(Extract("kotlin", []byte(kotlinSrc), false, true))
+	if !strings.Contains(out, "data class Point(val x: Double, val y: Double)") {
+		t.Errorf("expected Point data class, got:\n%s", out)
+	}
+	if !strings.Contains(out, "interface Shape {") {
+		t.Errorf("expected Shape interface, got:\n%s", out)
+	}
+	if !strings.Contains(out, "class Calculator {") {
+		t.Errorf("expected Calculator class, got:\n%s", out)
+	}
+	if !strings.Contains(out, "val max: Int = 100") {
+		t.Errorf("expected public property max, got:\n%s", out)
+	}
+	if strings.Contains(out, "private val secret") {
+		t.Errorf("private property should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "fun add") {
+		t.Errorf("methods should not appear in structs-only mode:\n%s", out)
+	}
+}
+
+func TestKotlin_Both(t *testing.T) {
+	out := string(Extract("kotlin", []byte(kotlinSrc), true, true))
+	if !strings.Contains(out, "fun area(): Double") {
+		t.Errorf("expected interface method area, got:\n%s", out)
+	}
+	if !strings.Contains(out, "fun add(x: Int): Int {") {
+		t.Errorf("expected add method, got:\n%s", out)
+	}
+	if strings.Contains(out, "private fun helper") {
+		t.Errorf("private method should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "return x + max") {
+		t.Errorf("method body should not appear:\n%s", out)
+	}
+}
+
+var csharpSrc = `public interface IShape {
+    double Area();
+    double Perimeter();
+}
+
+public class Point {
+    public double X { get; set; }
+    public double Y { get; set; }
+    private string label;
+
+    public Point(double x, double y) {
+        X = x;
+        Y = y;
+    }
+
+    public Point Scale(double factor) {
+        return new Point(X * factor, Y * factor);
+    }
+
+    private void Helper() {}
+}
+`
+
+func TestCSharp_Structs(t *testing.T) {
+	out := string(Extract("csharp", []byte(csharpSrc), false, true))
+	if !strings.Contains(out, "public interface IShape {") {
+		t.Errorf("expected IShape interface, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public class Point {") {
+		t.Errorf("expected Point class, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public double X { get; set; }") {
+		t.Errorf("expected public property X, got:\n%s", out)
+	}
+	if strings.Contains(out, "private string label") {
+		t.Errorf("private field should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "Scale(") {
+		t.Errorf("methods should not appear in structs-only mode:\n%s", out)
+	}
+}
+
+func TestCSharp_Both(t *testing.T) {
+	out := string(Extract("csharp", []byte(csharpSrc), true, true))
+	if !strings.Contains(out, "double Area();") {
+		t.Errorf("expected interface method Area, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public Point(double x, double y) {") {
+		t.Errorf("expected constructor, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public Point Scale(double factor) {") {
+		t.Errorf("expected Scale method, got:\n%s", out)
+	}
+	if strings.Contains(out, "private void Helper") {
+		t.Errorf("private method should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "X = x") {
+		t.Errorf("constructor body should not appear:\n%s", out)
+	}
+}
+
+var rubySrc = `class Animal
+  attr_reader :name
+  MAX = 100
+
+  def initialize(name)
+    @name = name
+  end
+
+  def speak
+    "..."
+  end
+
+  private
+
+  def helper
+    42
+  end
+end
+
+def standalone(x)
+  x + 1
+end
+`
+
+func TestRuby_Functions(t *testing.T) {
+	out := string(Extract("ruby", []byte(rubySrc), true, false))
+	if !strings.Contains(out, "def standalone(x)") {
+		t.Errorf("expected standalone, got:\n%s", out)
+	}
+	if strings.Contains(out, "x + 1") {
+		t.Errorf("function body should not appear:\n%s", out)
+	}
+}
+
+func TestRuby_Structs(t *testing.T) {
+	out := string(Extract("ruby", []byte(rubySrc), false, true))
+	if !strings.Contains(out, "class Animal") {
+		t.Errorf("expected Animal class, got:\n%s", out)
+	}
+	if !strings.Contains(out, "attr_reader :name") {
+		t.Errorf("expected attr_reader, got:\n%s", out)
+	}
+	if !strings.Contains(out, "MAX = 100") {
+		t.Errorf("expected constant MAX, got:\n%s", out)
+	}
+	if strings.Contains(out, "def standalone") {
+		t.Errorf("standalone function should not appear in structs-only mode:\n%s", out)
+	}
+}
+
+func TestRuby_Both(t *testing.T) {
+	out := string(Extract("ruby", []byte(rubySrc), true, true))
+	if !strings.Contains(out, "class Animal") {
+		t.Errorf("expected Animal class")
+	}
+	if !strings.Contains(out, "def initialize(name)") {
+		t.Errorf("expected initialize method, got:\n%s", out)
+	}
+	if !strings.Contains(out, "def speak") {
+		t.Errorf("expected speak method, got:\n%s", out)
+	}
+	if strings.Contains(out, "def helper") {
+		t.Errorf("private method should not appear:\n%s", out)
+	}
+	if !strings.Contains(out, "def standalone(x)") {
+		t.Errorf("expected standalone function, got:\n%s", out)
+	}
+	if strings.Contains(out, "@name = name") {
+		t.Errorf("method body should not appear:\n%s", out)
+	}
+}
+
+var swiftSrc = `public protocol Shape {
+    func area() -> Double
+    func perimeter() -> Double
+}
+
+public struct Point {
+    public var x: Double
+    public var y: Double
+    private var label: String
+
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
+        self.label = ""
+    }
+
+    public func scale(factor: Double) -> Point {
+        return Point(x: x * factor, y: y * factor, label: label)
+    }
+
+    private func helper() -> Int { 42 }
+}
+
+public func topLevel(x: Double) -> Double {
+    return x + 1
+}
+`
+
+func TestSwift_Structs(t *testing.T) {
+	out := string(Extract("swift", []byte(swiftSrc), false, true))
+	if !strings.Contains(out, "public protocol Shape {") {
+		t.Errorf("expected Shape protocol, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public struct Point {") {
+		t.Errorf("expected Point struct, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public var x: Double") {
+		t.Errorf("expected public property x, got:\n%s", out)
+	}
+	if strings.Contains(out, "private var label") {
+		t.Errorf("private property should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "func scale") {
+		t.Errorf("methods should not appear in structs-only mode:\n%s", out)
+	}
+}
+
+func TestSwift_Both(t *testing.T) {
+	out := string(Extract("swift", []byte(swiftSrc), true, true))
+	if !strings.Contains(out, "public init(x: Double, y: Double) {") {
+		t.Errorf("expected init, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public func scale(factor: Double) -> Point {") {
+		t.Errorf("expected scale, got:\n%s", out)
+	}
+	if strings.Contains(out, "private func helper") {
+		t.Errorf("private method should not appear:\n%s", out)
+	}
+	if !strings.Contains(out, "public func topLevel(x: Double) -> Double {") {
+		t.Errorf("expected topLevel, got:\n%s", out)
+	}
+	if strings.Contains(out, "self.x = x") {
+		t.Errorf("init body should not appear:\n%s", out)
+	}
+}
+
+var scalaSrc = `trait Shape {
+    def area(): Double
+    def perimeter(): Double
+}
+
+case class Point(x: Double, y: Double) {
+    val label: String = ""
+    private val secret: Int = 42
+
+    def scale(factor: Double): Point = Point(x * factor, y * factor)
+
+    private def helper(): Unit = ()
+}
+
+object Calculator {
+    val Max: Int = 100
+
+    def add(x: Int): Int = x + Max
+}
+
+def topLevel(x: Int): Int = x + 1
+`
+
+func TestScala_Structs(t *testing.T) {
+	out := string(Extract("scala", []byte(scalaSrc), false, true))
+	if !strings.Contains(out, "trait Shape {") {
+		t.Errorf("expected Shape trait, got:\n%s", out)
+	}
+	if !strings.Contains(out, "case class Point(x: Double, y: Double) {") {
+		t.Errorf("expected Point class, got:\n%s", out)
+	}
+	if !strings.Contains(out, `val label: String = ""`) {
+		t.Errorf("expected public val label, got:\n%s", out)
+	}
+	if strings.Contains(out, "private val secret") {
+		t.Errorf("private val should not appear:\n%s", out)
+	}
+	if !strings.Contains(out, "object Calculator {") {
+		t.Errorf("expected Calculator object, got:\n%s", out)
+	}
+	if strings.Contains(out, "def scale") {
+		t.Errorf("methods should not appear in structs-only mode:\n%s", out)
+	}
+}
+
+func TestScala_Both(t *testing.T) {
+	out := string(Extract("scala", []byte(scalaSrc), true, true))
+	if !strings.Contains(out, "def area(): Double") {
+		t.Errorf("expected trait method area, got:\n%s", out)
+	}
+	if !strings.Contains(out, "def scale(factor: Double): Point") {
+		t.Errorf("expected scale method, got:\n%s", out)
+	}
+	if strings.Contains(out, "private def helper") {
+		t.Errorf("private method should not appear:\n%s", out)
+	}
+	if !strings.Contains(out, "def add(x: Int): Int") {
+		t.Errorf("expected add method, got:\n%s", out)
+	}
+	if !strings.Contains(out, "def topLevel(x: Int): Int") {
+		t.Errorf("expected topLevel, got:\n%s", out)
+	}
+}
+
+var phpSrc = `<?php
+interface Shape {
+    public function area(): float;
+    public function perimeter(): float;
+}
+
+class Point {
+    public float $x;
+    public float $y;
+    private string $label;
+
+    public function __construct(float $x, float $y) {
+        $this->x = $x;
+        $this->y = $y;
+    }
+
+    public function scale(float $factor): Point {
+        return new Point($this->x * $factor, $this->y * $factor);
+    }
+
+    private function helper(): void {}
+}
+
+function topLevel(int $x): int {
+    return $x + 1;
+}
+`
+
+func TestPHP_Structs(t *testing.T) {
+	out := string(Extract("php", []byte(phpSrc), false, true))
+	if !strings.Contains(out, "interface Shape {") {
+		t.Errorf("expected Shape interface, got:\n%s", out)
+	}
+	if !strings.Contains(out, "class Point {") {
+		t.Errorf("expected Point class, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public float $x;") {
+		t.Errorf("expected public property x, got:\n%s", out)
+	}
+	if strings.Contains(out, "private string $label") {
+		t.Errorf("private property should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "function scale") {
+		t.Errorf("methods should not appear in structs-only mode:\n%s", out)
+	}
+}
+
+func TestPHP_Both(t *testing.T) {
+	out := string(Extract("php", []byte(phpSrc), true, true))
+	if !strings.Contains(out, "public function area(): float;") {
+		t.Errorf("expected interface method area, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public function __construct(float $x, float $y) {") {
+		t.Errorf("expected constructor, got:\n%s", out)
+	}
+	if !strings.Contains(out, "public function scale(float $factor): Point {") {
+		t.Errorf("expected scale method, got:\n%s", out)
+	}
+	if strings.Contains(out, "private function helper") {
+		t.Errorf("private method should not appear:\n%s", out)
+	}
+	if !strings.Contains(out, "function topLevel(int $x): int {") {
+		t.Errorf("expected topLevel, got:\n%s", out)
+	}
+	if strings.Contains(out, "return $x + 1") {
+		t.Errorf("function body should not appear:\n%s", out)
+	}
+}

@@ -1,0 +1,19 @@
+--- STDOUT ---
+skeleton/main.ts (11 rows)
+---
+```typescript
+export interface Shape {
+    area(): number;
+    name: string;
+}
+export class Point {
+    public x: number;
+    public y: number;
+    constructor(x: number, y: number) {
+    public scale(factor: number): Point {
+}
+export function topLevel(x: number): number {
+```
+
+
+--- STDERR ---

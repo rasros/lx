@@ -34,7 +34,7 @@ func extract(langName string, src []byte, functions, structs bool) []byte {
 		switch {
 		case functions && containsStr(def.funcTypes, nodeType):
 			if def.funcVisible == nil || def.funcVisible(node, src, lang) {
-				out = emitFuncSig(out, lines, node, lang, def.indentBody)
+				out = emitFuncSig(out, lines, node, lang, def.indentBody, def.bodyChildType)
 			}
 		case structs && containsStr(def.structTypes, nodeType):
 			out = def.emitStruct(out, src, lines, node, lang, functions)

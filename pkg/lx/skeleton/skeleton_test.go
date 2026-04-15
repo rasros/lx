@@ -4,7 +4,7 @@ import "testing"
 
 func TestExtract_Unsupported(t *testing.T) {
 	src := []byte("hello world\n")
-	got := Extract("rust", src, true, true)
+	got := Extract("lua", src, true, true)
 	if string(got) != string(src) {
 		t.Errorf("unsupported lang should return src unchanged")
 	}

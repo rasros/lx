@@ -430,13 +430,112 @@ int FreeFn(int v) {
 }
 `, 0644)
 
-	writeFile(t, dir, "skeleton/main.rs", `struct User {
-    name: String,
+	writeFile(t, dir, "skeleton/main.rs", `pub struct User {
+    pub name: String,
+    email: String,
 }
 
-fn main() {
-    println!("hello");
+pub enum Role {
+    Admin,
+    User,
 }
+
+pub trait Greet {
+    fn greet(&self) -> String;
+}
+
+impl User {
+    pub fn new(name: String) -> Self {
+        User { name, email: String::new() }
+    }
+
+    pub fn display(&self) -> String {
+        self.name.clone()
+    }
+
+    fn helper(&self) {}
+}
+
+pub fn create(name: String) -> User {
+    User::new(name)
+}
+
+fn private_fn() {}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.ts", `export interface Shape {
+    area(): number;
+    name: string;
+}
+
+export class Point {
+    public x: number;
+    public y: number;
+    private label: string;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+        this.label = "";
+    }
+
+    public scale(factor: number): Point {
+        return new Point(this.x * factor, this.y * factor);
+    }
+
+    private helper(): void {}
+}
+
+export function topLevel(x: number): number {
+    return x + 1;
+}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.kt", `data class Point(val x: Double, val y: Double)
+
+interface Shape {
+    fun area(): Double
+    fun perimeter(): Double
+}
+
+class Calculator {
+    val max: Int = 100
+    private val secret: Int = 42
+
+    fun add(x: Int): Int {
+        return x + max
+    }
+
+    private fun helper(): Int = 42
+}
+
+fun topLevel(x: Int): Int {
+    return x + 1
+}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.rb", `class Animal
+  attr_reader :name
+  MAX = 100
+
+  def initialize(name)
+    @name = name
+  end
+
+  def speak
+    "..."
+  end
+
+  private
+
+  def helper
+    42
+  end
+end
+
+def standalone(x)
+  x + 1
+end
 `, 0644)
 
 	return dir
@@ -671,7 +770,10 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "211_skeleton_java_both", args: []string{"-F", "-T", "skeleton/Main.java"}},
 		{name: "212_skeleton_interleaved_reset", args: []string{"-F", "-T", "skeleton/main.py", "--reset-skeleton", "skeleton/main.py"}},
 		{name: "213_skeleton_toggle_off_functions", args: []string{"-F", "-T", "skeleton/main.go", "--no-functions", "skeleton/main.go"}},
-		{name: "214_skeleton_unsupported_passthrough", args: []string{"-F", "-T", "skeleton/main.rs"}},
+		{name: "214_skeleton_rust_both", args: []string{"-F", "-T", "skeleton/main.rs"}},
+		{name: "215_skeleton_typescript_both", args: []string{"-F", "-T", "skeleton/main.ts"}},
+		{name: "216_skeleton_kotlin_both", args: []string{"-F", "-T", "skeleton/main.kt"}},
+		{name: "217_skeleton_ruby_both", args: []string{"-F", "-T", "skeleton/main.rb"}},
 	})
 }
 

@@ -7,35 +7,29 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal/content"
 )
 
-func JavaEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
-	var body *gotreesitter.Node
-	for _, bodyType := range []string{"class_body", "interface_body", "enum_body"} {
-		if b := findChildByType(n, bodyType, lang); b != nil {
-			body = b
-			break
-		}
-	}
+func PHPEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+	isInterface := n.Type(lang) == "interface_declaration"
+	body := findChildByType(n, "declaration_list", lang)
 	if body == nil {
 		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
 	out = content.AppendLines(out, lines, headerStart, headerEnd)
-
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
-		if javaIsPrivate(child, src) {
+		if !isInterface && phpIsPrivate(child, src, lang) {
 			continue
 		}
 		switch child.Type(lang) {
-		case "field_declaration":
+		case "property_declaration":
 			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-		case "method_declaration", "constructor_declaration":
+		case "method_declaration":
 			if functions {
 				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
-		case "class_declaration", "interface_declaration", "enum_declaration", "record_declaration":
-			out = JavaEmitClass(out, src, lines, child, lang, functions)
+		case "const_declaration":
+			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
@@ -44,6 +38,10 @@ func JavaEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 	return out
 }
 
-func javaIsPrivate(n *gotreesitter.Node, src []byte) bool {
-	return strings.HasPrefix(strings.TrimSpace(n.Text(src)), "private ")
+func phpIsPrivate(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
+	vis := findChildByType(n, "visibility_modifier", lang)
+	if vis == nil {
+		return false
+	}
+	return strings.TrimSpace(vis.Text(src)) == "private"
 }

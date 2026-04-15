@@ -1,0 +1,15 @@
+--- STDOUT ---
+skeleton/main.rb (7 rows)
+---
+```ruby
+class Animal
+  attr_reader :name
+  MAX = 100
+  def initialize(name)
+  def speak
+end
+def standalone(x)
+```
+
+
+--- STDERR ---
