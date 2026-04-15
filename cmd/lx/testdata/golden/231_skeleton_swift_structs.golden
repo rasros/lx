@@ -1,0 +1,16 @@
+--- STDOUT ---
+skeleton/main.swift (8 rows)
+---
+```swift
+public protocol Shape {
+    func area() -> Double
+    func perimeter() -> Double
+}
+public struct Point {
+    public var x: Double
+    public var y: Double
+}
+```
+
+
+--- STDERR ---

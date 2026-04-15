@@ -1,0 +1,10 @@
+--- STDOUT ---
+skeleton/main.swift (11 rows)
+---
+```swift
+public protocol Shape {
+    func area() -> Double
+```
+
+
+--- STDERR ---

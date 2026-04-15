@@ -1,0 +1,16 @@
+--- STDOUT ---
+skeleton/main.scala (8 rows)
+---
+```scala
+trait Shape {
+}
+case class Point(x: Double, y: Double) {
+    val label: String = ""
+}
+object Calculator {
+    val Max: Int = 100
+}
+```
+
+
+--- STDERR ---

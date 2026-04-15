@@ -1,0 +1,14 @@
+--- STDOUT ---
+skeleton/main.php (6 rows)
+---
+```php
+interface Shape {
+}
+class Point {
+    public float $x;
+    public float $y;
+}
+```
+
+
+--- STDERR ---

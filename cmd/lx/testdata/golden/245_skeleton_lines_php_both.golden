@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/main.php (11 rows)
+---
+```php
+interface Shape {
+    public function area(): float;
+... (8 rows skipped)
+function topLevel(int $x): int {
+```
+
+
+--- STDERR ---

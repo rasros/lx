@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/main.tsx (9 rows)
+---
+```tsx
+export interface Props {
+    title: string;
+}
+```
+
+
+--- STDERR ---

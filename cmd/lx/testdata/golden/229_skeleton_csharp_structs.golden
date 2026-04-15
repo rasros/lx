@@ -1,0 +1,14 @@
+--- STDOUT ---
+skeleton/main.cs (6 rows)
+---
+```csharp
+public interface IShape {
+}
+public class Point {
+    public double X { get; set; }
+    public double Y { get; set; }
+}
+```
+
+
+--- STDERR ---

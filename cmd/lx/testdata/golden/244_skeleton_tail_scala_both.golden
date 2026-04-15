@@ -1,0 +1,10 @@
+--- STDOUT ---
+skeleton/main.scala (13 rows)
+---
+```scala
+}
+def topLevel(x: Int): Int = x + 1
+```
+
+
+--- STDERR ---

@@ -538,6 +538,162 @@ def standalone(x)
 end
 `, 0644)
 
+	writeFile(t, dir, "skeleton/main.cs", `public interface IShape {
+    double Area();
+    double Perimeter();
+}
+
+public class Point {
+    public double X { get; set; }
+    public double Y { get; set; }
+    private string label;
+
+    public Point(double x, double y) {
+        X = x;
+        Y = y;
+    }
+
+    public Point Scale(double factor) {
+        return new Point(X * factor, Y * factor);
+    }
+
+    private void Helper() {}
+}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.swift", `public protocol Shape {
+    func area() -> Double
+    func perimeter() -> Double
+}
+
+public struct Point {
+    public var x: Double
+    public var y: Double
+    private var label: String
+
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
+        self.label = ""
+    }
+
+    public func scale(factor: Double) -> Point {
+        return Point(x: x * factor, y: y * factor, label: label)
+    }
+
+    private func helper() -> Int { 42 }
+}
+
+public func topLevel(x: Double) -> Double {
+    return x + 1
+}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.scala", `trait Shape {
+    def area(): Double
+    def perimeter(): Double
+}
+
+case class Point(x: Double, y: Double) {
+    val label: String = ""
+    private val secret: Int = 42
+
+    def scale(factor: Double): Point = Point(x * factor, y * factor)
+
+    private def helper(): Unit = ()
+}
+
+object Calculator {
+    val Max: Int = 100
+
+    def add(x: Int): Int = x + Max
+}
+
+def topLevel(x: Int): Int = x + 1
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.php", `<?php
+interface Shape {
+    public function area(): float;
+    public function perimeter(): float;
+}
+
+class Point {
+    public float $x;
+    public float $y;
+    private string $label;
+
+    public function __construct(float $x, float $y) {
+        $this->x = $x;
+        $this->y = $y;
+    }
+
+    public function scale(float $factor): Point {
+        return new Point($this->x * $factor, $this->y * $factor);
+    }
+
+    private function helper(): void {}
+}
+
+function topLevel(int $x): int {
+    return $x + 1;
+}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.js", `export class Greeter {
+    message = "hi";
+
+    greet(name) {
+        return this.message + " " + name;
+    }
+}
+
+export function topLevel(x) {
+    return x + 1;
+}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.jsx", `import React from "react";
+
+export class Card extends React.Component {
+    title = "default";
+
+    render() {
+        return <div>{this.title}</div>;
+    }
+}
+
+export function makeCard(name) {
+    return <Card title={name} />;
+}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.tsx", `import React from "react";
+
+export interface Props {
+    title: string;
+}
+
+export class Panel extends React.Component<Props> {
+    public value: number;
+    private secret: string;
+
+    constructor(props: Props) {
+        super(props);
+        this.value = 1;
+        this.secret = "";
+    }
+
+    public render(): JSX.Element {
+        return <div>{this.props.title}</div>;
+    }
+}
+
+export function buildPanel(title: string): JSX.Element {
+    return <Panel title={title} />;
+}
+`, 0644)
+
 	return dir
 }
 

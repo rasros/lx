@@ -1,0 +1,19 @@
+--- STDOUT ---
+skeleton/main.php (11 rows)
+---
+```php
+interface Shape {
+    public function area(): float;
+    public function perimeter(): float;
+}
+class Point {
+    public float $x;
+    public float $y;
+    public function __construct(float $x, float $y) {
+    public function scale(float $factor): Point {
+}
+function topLevel(int $x): int {
+```
+
+
+--- STDERR ---
