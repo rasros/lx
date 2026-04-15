@@ -1,0 +1,18 @@
+--- STDOUT ---
+skeleton/main.jl (10 rows)
+---
+```julia
+struct Animal
+    name::String
+    species::String
+end
+abstract type Shape end
+function greet(name::String)
+function combine(
+    name::String,
+    greeting::String,
+)
+```
+
+
+--- STDERR ---

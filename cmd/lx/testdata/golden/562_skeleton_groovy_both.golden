@@ -1,0 +1,18 @@
+--- STDOUT ---
+skeleton/main.groovy (10 rows)
+---
+```groovy
+class Animal {
+    String name
+    String species
+    def speak() {
+    private def helper() {
+}
+def standalone(x) {
+def combine(
+    x,
+    y) {
+```
+
+
+--- STDERR ---

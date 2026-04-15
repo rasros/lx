@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/main.dart (5 rows)
+---
+```dart
+String greet(String name) {
+String combine(
+  String name,
+  String greeting,
+) {
+```
+
+
+--- STDERR ---

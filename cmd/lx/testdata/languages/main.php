@@ -24,3 +24,10 @@ class Point {
 function topLevel(int $x): int {
     return $x + 1;
 }
+
+function combine(
+    int $x,
+    int $y,
+): int {
+    return $x + $y;
+}

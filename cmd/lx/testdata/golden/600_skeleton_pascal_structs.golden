@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/main.pas (5 rows)
+---
+```pascal
+type
+  TAnimal = record
+    Name: string;
+    Species: string;
+  end;
+```
+
+
+--- STDERR ---

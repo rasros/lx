@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.cs (10 rows)
+skeleton/main.cs (14 rows)
 ---
 ```csharp
 public interface IShape {
@@ -11,6 +11,10 @@ public class Point {
     public double Y { get; set; }
     public Point(double x, double y) {
     public Point Scale(double factor) {
+    public Point Combine(
+        double dx,
+        double dy
+    ) {
 }
 ```
 

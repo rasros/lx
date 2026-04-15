@@ -1,0 +1,15 @@
+--- STDOUT ---
+skeleton/main.adb (7 rows)
+---
+```ada
+package Demo is
+   procedure Greet(Name : String);
+   function Add(A, B : Integer) return Integer;
+   function Combine(
+      A : String;
+      B : String) return String;
+end Demo;
+```
+
+
+--- STDERR ---

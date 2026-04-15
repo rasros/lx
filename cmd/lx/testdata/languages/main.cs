@@ -17,5 +17,12 @@ public class Point {
         return new Point(X * factor, Y * factor);
     }
 
+    public Point Combine(
+        double dx,
+        double dy
+    ) {
+        return new Point(X + dx, Y + dy);
+    }
+
     private void Helper() {}
 }

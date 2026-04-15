@@ -22,3 +22,10 @@ export class Panel extends React.Component<Props> {
 export function buildPanel(title: string): JSX.Element {
     return <Panel title={title} />;
 }
+
+export function combine(
+    title: string,
+    value: number,
+): JSX.Element {
+    return <Panel title={title} />;
+}

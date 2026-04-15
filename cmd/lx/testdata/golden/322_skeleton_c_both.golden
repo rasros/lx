@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.c (6 rows)
+skeleton/main.c (10 rows)
 ---
 ```c
 typedef struct Point {
@@ -7,6 +7,10 @@ typedef struct Point {
     int y;
 } Point;
 int add(int a, int b) {
+int subtract(
+    int a,
+    int b
+) {
 void greet(const char *name);
 ```
 

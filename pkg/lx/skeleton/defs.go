@@ -202,7 +202,7 @@ var langDefs = map[string]langDef{
 
 	"haskell": {
 		newLang:         grammars.HaskellLanguage,
-		funcTypes:       []string{"bind"},
+		funcTypes:       []string{"function"},
 		structTypes:     []string{"data_type", "newtype"},
 		indentBody:      true,
 		bodyChildType:   "match",
@@ -239,9 +239,10 @@ var langDefs = map[string]langDef{
 	},
 
 	"pascal": {
-		newLang:     grammars.PascalLanguage,
-		structTypes: []string{"defProc", "declTypes"},
-		emitStruct:  langs.PascalEmitDecl,
+		newLang:         grammars.PascalLanguage,
+		structTypes:     []string{"defProc", "declTypes"},
+		iterateChildren: []string{"program"},
+		emitStruct:      langs.PascalEmitDecl,
 	},
 
 	"lisp": {

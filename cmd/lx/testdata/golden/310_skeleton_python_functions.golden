@@ -1,8 +1,12 @@
 --- STDOUT ---
-skeleton/main.py (1 rows)
+skeleton/main.py (5 rows)
 ---
 ```python
 def top_level():
+def create(
+    name: str,
+    tag: str = "default",
+) -> "Animal":
 ```
 
 

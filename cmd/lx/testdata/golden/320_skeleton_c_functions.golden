@@ -1,8 +1,12 @@
 --- STDOUT ---
-skeleton/main.c (2 rows)
+skeleton/main.c (6 rows)
 ---
 ```c
 int add(int a, int b) {
+int subtract(
+    int a,
+    int b
+) {
 void greet(const char *name);
 ```
 

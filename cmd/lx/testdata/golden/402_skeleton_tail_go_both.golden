@@ -1,8 +1,8 @@
 --- STDOUT ---
-skeleton/main.go (8 rows)
+skeleton/main.go (12 rows)
 ---
 ```go
-func NewPerson(name string) Person {
+) Person {
 func (p Person) Greet() string {
 ```
 

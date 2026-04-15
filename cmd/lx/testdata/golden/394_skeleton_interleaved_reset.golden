@@ -1,14 +1,18 @@
 --- STDOUT ---
-[1/2] skeleton/main.py (4 rows)
+[1/2] skeleton/main.py (8 rows)
 ---
 ```python
 class Animal:
     species = "unknown"
     def speak(self):
 def top_level():
+def create(
+    name: str,
+    tag: str = "default",
+) -> "Animal":
 ```
 
-[2/2] skeleton/main.py (16 rows)
+[2/2] skeleton/main.py (22 rows)
 ---
 ```python
 class Animal:
@@ -24,6 +28,12 @@ class Animal:
 
 def top_level():
     return 1
+
+def create(
+    name: str,
+    tag: str = "default",
+) -> "Animal":
+    return Animal()
 
 def _secret():
     return 0

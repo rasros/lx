@@ -24,3 +24,10 @@ public struct Point {
 public func topLevel(x: Double) -> Double {
     return x + 1
 }
+
+public func combine(
+    x: Double,
+    y: Double,
+) -> Double {
+    return x + y
+}

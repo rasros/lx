@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/main.groovy (4 rows)
+---
+```groovy
+class Animal {
+    String name
+    String species
+}
+```
+
+
+--- STDERR ---

@@ -1,8 +1,12 @@
 --- STDOUT ---
-skeleton/main.go (2 rows)
+skeleton/main.go (6 rows)
 ---
 ```go
 func NewPerson(name string) Person {
+func NewWorker(
+	name string,
+	role string,
+) Person {
 func (p Person) Greet() string {
 ```
 

@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/main.dart (5 rows)
+---
+```dart
+class Animal {
+  final String name;
+  final String species;
+  Animal(this.name, this.species);
+}
+```
+
+
+--- STDERR ---

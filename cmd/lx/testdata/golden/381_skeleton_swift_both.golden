@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.swift (11 rows)
+skeleton/main.swift (15 rows)
 ---
 ```swift
 public protocol Shape {
@@ -13,6 +13,10 @@ public struct Point {
     public func scale(factor: Double) -> Point {
 }
 public func topLevel(x: Double) -> Double {
+public func combine(
+    x: Double,
+    y: Double,
+) -> Double {
 ```
 
 
