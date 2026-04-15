@@ -1,11 +1,15 @@
 --- STDOUT ---
-skeleton/main.py (4 rows)
+skeleton/main.py (8 rows)
 ---
 ```python
 class Animal:
     species = "unknown"
     def speak(self):
 def top_level():
+def create(
+    name: str,
+    tag: str = "default",
+) -> "Animal":
 ```
 
 

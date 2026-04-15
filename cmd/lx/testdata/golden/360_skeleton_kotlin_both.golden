@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.kt (10 rows)
+skeleton/main.kt (14 rows)
 ---
 ```kotlin
 data class Point(val x: Double, val y: Double)
@@ -12,6 +12,10 @@ class Calculator {
     fun add(x: Int): Int {
 }
 fun topLevel(x: Int): Int {
+fun combine(
+    x: Int,
+    y: Int,
+): Int {
 ```
 
 

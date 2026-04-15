@@ -1,0 +1,18 @@
+--- STDOUT ---
+skeleton/main.pas (10 rows)
+---
+```pascal
+type
+  TAnimal = record
+    Name: string;
+    Species: string;
+  end;
+procedure Greet(Name: string);
+function Add(A, B: Integer): Integer;
+function Combine(
+  A: string;
+  B: string): string;
+```
+
+
+--- STDERR ---

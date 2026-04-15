@@ -53,6 +53,62 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "394_skeleton_interleaved_reset", args: []string{"-F", "-T", "skeleton/main.py", "--reset-skeleton", "skeleton/main.py"}},
 		{name: "395_skeleton_toggle_off_functions", args: []string{"-F", "-T", "skeleton/main.go", "--no-functions", "skeleton/main.go"}},
 		{name: "396_skeleton_toggle_off_structs", args: []string{"-F", "-T", "skeleton/main.go", "--no-structs", "skeleton/main.go"}},
+
+		// 500-509: Dart
+		{name: "500_skeleton_dart_functions", args: []string{"-F", "skeleton/main.dart"}},
+		{name: "501_skeleton_dart_structs", args: []string{"-T", "skeleton/main.dart"}},
+		{name: "502_skeleton_dart_both", args: []string{"-F", "-T", "skeleton/main.dart"}},
+
+		// 510-519: Lua
+		{name: "510_skeleton_lua_functions", args: []string{"-F", "skeleton/main.lua"}},
+
+		// 520-529: Bash
+		{name: "520_skeleton_bash_functions", args: []string{"-F", "skeleton/main.sh"}},
+
+		// 530-539: PowerShell
+		{name: "530_skeleton_powershell_functions", args: []string{"-F", "skeleton/main.ps1"}},
+
+		// 540-549: Zig
+		{name: "540_skeleton_zig_functions", args: []string{"-F", "skeleton/main.zig"}},
+
+		// 550-559: Haskell
+		{name: "550_skeleton_haskell_functions", args: []string{"-F", "skeleton/main.hs"}},
+		{name: "551_skeleton_haskell_structs", args: []string{"-T", "skeleton/main.hs"}},
+		{name: "552_skeleton_haskell_both", args: []string{"-F", "-T", "skeleton/main.hs"}},
+
+		// 560-569: Groovy
+		{name: "560_skeleton_groovy_functions", args: []string{"-F", "skeleton/main.groovy"}},
+		{name: "561_skeleton_groovy_structs", args: []string{"-T", "skeleton/main.groovy"}},
+		{name: "562_skeleton_groovy_both", args: []string{"-F", "-T", "skeleton/main.groovy"}},
+
+		// 570-579: Perl
+		{name: "570_skeleton_perl_functions", args: []string{"-F", "skeleton/main.pl"}},
+
+		// 580-589: Objective-C
+		{name: "580_skeleton_objc_functions", args: []string{"-F", "skeleton/main.m"}},
+		{name: "581_skeleton_objc_structs", args: []string{"-T", "skeleton/main.m"}},
+		{name: "582_skeleton_objc_both", args: []string{"-F", "-T", "skeleton/main.m"}},
+
+		// 590-599: OCaml
+		{name: "590_skeleton_ocaml_structs", args: []string{"-T", "skeleton/main.ml"}},
+		{name: "591_skeleton_ocaml_both", args: []string{"-F", "-T", "skeleton/main.ml"}},
+
+		// 600-609: Pascal
+		{name: "600_skeleton_pascal_structs", args: []string{"-T", "skeleton/main.pas"}},
+		{name: "601_skeleton_pascal_both", args: []string{"-F", "-T", "skeleton/main.pas"}},
+
+		// 610-619: Lisp
+		{name: "610_skeleton_lisp_functions", args: []string{"-F", "skeleton/main.lisp"}},
+
+		// 620-629: Julia
+		{name: "620_skeleton_julia_functions", args: []string{"-F", "skeleton/main.jl"}},
+		{name: "621_skeleton_julia_structs", args: []string{"-T", "skeleton/main.jl"}},
+		{name: "622_skeleton_julia_both", args: []string{"-F", "-T", "skeleton/main.jl"}},
+
+		// 630-639: Ada
+		{name: "630_skeleton_ada_functions", args: []string{"-F", "skeleton/main.adb"}},
+		{name: "631_skeleton_ada_structs", args: []string{"-T", "skeleton/main.adb"}},
+		{name: "632_skeleton_ada_both", args: []string{"-F", "-T", "skeleton/main.adb"}},
 	})
 }
 

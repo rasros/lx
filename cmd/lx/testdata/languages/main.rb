@@ -20,3 +20,10 @@ end
 def standalone(x)
   x + 1
 end
+
+def combine(
+  x,
+  y
+)
+  x + y
+end

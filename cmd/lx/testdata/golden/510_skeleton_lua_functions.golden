@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/main.lua (4 rows)
+---
+```lua
+function greet(
+    name)
+function add(a, b)
+function helper()
+```
+
+
+--- STDERR ---

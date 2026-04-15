@@ -27,6 +27,20 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"main.js",
 		"main.jsx",
 		"main.tsx",
+		"main.dart",
+		"main.lua",
+		"main.sh",
+		"main.ps1",
+		"main.zig",
+		"main.hs",
+		"main.groovy",
+		"main.pl",
+		"main.m",
+		"main.ml",
+		"main.pas",
+		"main.lisp",
+		"main.adb",
+		"main.jl",
 	}
 	for _, name := range languageFiles {
 		content := readFixtureFile(t, filepath.Join("languages", name))

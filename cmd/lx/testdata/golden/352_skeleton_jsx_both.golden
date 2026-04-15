@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.jsx (5 rows)
+skeleton/main.jsx (9 rows)
 ---
 ```jsx
 export class Card extends React.Component {
@@ -7,6 +7,10 @@ export class Card extends React.Component {
     render() {
 }
 export function makeCard(name) {
+export function buildCard(
+    name,
+    title,
+) {
 ```
 
 

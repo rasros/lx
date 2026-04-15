@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.ts (11 rows)
+skeleton/main.ts (15 rows)
 ---
 ```typescript
 export interface Shape {
@@ -13,6 +13,10 @@ export class Point {
     public scale(factor: number): Point {
 }
 export function topLevel(x: number): number {
+export function combine(
+    x: number,
+    y: number,
+): number {
 ```
 
 

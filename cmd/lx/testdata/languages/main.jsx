@@ -11,3 +11,10 @@ export class Card extends React.Component {
 export function makeCard(name) {
     return <Card title={name} />;
 }
+
+export function buildCard(
+    name,
+    title,
+) {
+    return <Card title={title} />;
+}

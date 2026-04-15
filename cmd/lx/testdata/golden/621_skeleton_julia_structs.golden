@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/main.jl (5 rows)
+---
+```julia
+struct Animal
+    name::String
+    species::String
+end
+abstract type Shape end
+```
+
+
+--- STDERR ---

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.rs (15 rows)
+skeleton/main.rs (19 rows)
 ---
 ```rust
 pub struct User {
@@ -17,6 +17,10 @@ impl User {
     pub fn display(&self) -> String {
 }
 pub fn create(name: String) -> User {
+pub fn combine(
+    name: String,
+    email: String,
+) -> User {
 ```
 
 

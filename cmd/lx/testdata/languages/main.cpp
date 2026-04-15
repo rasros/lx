@@ -12,3 +12,10 @@ private:
 int FreeFn(int v) {
     return v;
 }
+
+int Combine(
+    int a,
+    int b
+) {
+    return a + b;
+}

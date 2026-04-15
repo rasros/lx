@@ -1,0 +1,17 @@
+--- STDOUT ---
+skeleton/main.ml (9 rows)
+---
+```ocaml
+type animal = Dog | Cat
+type point = {
+  x: float;
+  y: float;
+}
+let greet name =
+let combine
+    name
+    greeting =
+```
+
+
+--- STDERR ---

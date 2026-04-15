@@ -1,0 +1,9 @@
+--- STDOUT ---
+skeleton/main.m (1 rows)
+---
+```objectivec
+int standalone(int x) {
+```
+
+
+--- STDERR ---

@@ -1,0 +1,10 @@
+--- STDOUT ---
+skeleton/main.hs (2 rows)
+---
+```haskell
+greet name
+add x y
+```
+
+
+--- STDERR ---

@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/main.zig (5 rows)
+---
+```zig
+pub fn greet(name: []const u8) void {
+pub fn add(
+    a: i32,
+    b: i32,
+) i32 {
+```
+
+
+--- STDERR ---

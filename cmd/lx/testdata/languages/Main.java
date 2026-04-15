@@ -10,6 +10,13 @@ public class Calculator {
         return value + x;
     }
 
+    public int combine(
+        int x,
+        int y
+    ) {
+        return value + x + y;
+    }
+
     private int secret() {
         return 42;
     }

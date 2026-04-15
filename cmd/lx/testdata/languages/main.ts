@@ -24,3 +24,10 @@ export class Point {
 export function topLevel(x: number): number {
     return x + 1;
 }
+
+export function combine(
+    x: number,
+    y: number,
+): number {
+    return x + y;
+}

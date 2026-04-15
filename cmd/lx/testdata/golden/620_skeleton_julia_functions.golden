@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/main.jl (5 rows)
+---
+```julia
+function greet(name::String)
+function combine(
+    name::String,
+    greeting::String,
+)
+```
+
+
+--- STDERR ---

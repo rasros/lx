@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/main.groovy (4 rows)
+---
+```groovy
+def standalone(x) {
+def combine(
+    x,
+    y) {
+```
+
+
+--- STDERR ---

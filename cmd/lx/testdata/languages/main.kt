@@ -19,3 +19,10 @@ class Calculator {
 fun topLevel(x: Int): Int {
     return x + 1
 }
+
+fun combine(
+    x: Int,
+    y: Int,
+): Int {
+    return x + y
+}

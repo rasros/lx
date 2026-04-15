@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.scala (13 rows)
+skeleton/main.scala (17 rows)
 ---
 ```scala
 trait Shape {
@@ -15,6 +15,10 @@ object Calculator {
     def add(x: Int): Int = x + Max
 }
 def topLevel(x: Int): Int = x + 1
+def combine(
+    x: Int,
+    y: Int,
+): Int = x + y
 ```
 
 

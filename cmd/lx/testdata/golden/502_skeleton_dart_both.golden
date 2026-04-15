@@ -1,0 +1,19 @@
+--- STDOUT ---
+skeleton/main.dart (11 rows)
+---
+```dart
+class Animal {
+  final String name;
+  final String species;
+  Animal(this.name, this.species);
+  String speak() {
+}
+String greet(String name) {
+String combine(
+  String name,
+  String greeting,
+) {
+```
+
+
+--- STDERR ---

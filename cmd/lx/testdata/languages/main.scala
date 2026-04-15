@@ -19,3 +19,8 @@ object Calculator {
 }
 
 def topLevel(x: Int): Int = x + 1
+
+def combine(
+    x: Int,
+    y: Int,
+): Int = x + y

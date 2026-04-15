@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.rb (7 rows)
+skeleton/main.rb (11 rows)
 ---
 ```ruby
 class Animal
@@ -9,6 +9,10 @@ class Animal
   def speak
 end
 def standalone(x)
+def combine(
+  x,
+  y
+)
 ```
 
 

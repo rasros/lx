@@ -28,4 +28,11 @@ pub fn create(name: String) -> User {
     User::new(name)
 }
 
+pub fn combine(
+    name: String,
+    email: String,
+) -> User {
+    User { name, email }
+}
+
 fn private_fn() {}

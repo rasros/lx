@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.php (11 rows)
+skeleton/main.php (15 rows)
 ---
 ```php
 interface Shape {
@@ -13,6 +13,10 @@ class Point {
     public function scale(float $factor): Point {
 }
 function topLevel(int $x): int {
+function combine(
+    int $x,
+    int $y,
+): int {
 ```
 
 

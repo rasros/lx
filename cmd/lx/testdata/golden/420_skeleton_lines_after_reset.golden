@@ -1,9 +1,9 @@
 --- STDOUT ---
-skeleton/main.py (16 rows)
+skeleton/main.py (22 rows)
 ---
 ```python
 class Animal:
-... (14 rows skipped)
+... (20 rows skipped)
     return 0
 ```
 

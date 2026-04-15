@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/main.hs (4 rows)
+---
+```haskell
+data Animal = Dog | Cat
+newtype Name = Name String
+greet name
+add x y
+```
+
+
+--- STDERR ---

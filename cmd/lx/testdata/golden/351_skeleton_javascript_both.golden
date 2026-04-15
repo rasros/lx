@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.js (5 rows)
+skeleton/main.js (9 rows)
 ---
 ```javascript
 export class Greeter {
@@ -7,6 +7,10 @@ export class Greeter {
     greet(name) {
 }
 export function topLevel(x) {
+export function combine(
+    x,
+    y,
+) {
 ```
 
 

@@ -1,9 +1,9 @@
 --- STDOUT ---
-skeleton/main.scala (13 rows)
+skeleton/main.scala (17 rows)
 ---
 ```scala
-}
-def topLevel(x: Int): Int = x + 1
+    y: Int,
+): Int = x + y
 ```
 
 

@@ -1,8 +1,8 @@
 --- STDOUT ---
-skeleton/Main.java (5 rows)
+skeleton/Main.java (9 rows)
 ---
 ```java
-    public int add(int x) {
+    ) {
 }
 ```
 
