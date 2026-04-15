@@ -1,0 +1,14 @@
+--- STDOUT ---
+skeleton/main.c (6 rows)
+---
+```c
+typedef struct Point {
+    int x;
+    int y;
+} Point;
+int add(int a, int b) {
+void greet(const char *name);
+```
+
+
+--- STDERR ---

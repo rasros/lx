@@ -1,0 +1,24 @@
+--- STDOUT ---
+[1/3] skeleton/main.go (8 rows)
+---
+```go
+type Person struct {
+	Name string
+... (5 rows skipped)
+func (p Person) Greet() string {
+```
+
+[2/3] skeleton/main.go (8 rows)
+---
+```go
+type Person struct {
+```
+
+[3/3] skeleton/main.go (8 rows)
+---
+```go
+func (p Person) Greet() string {
+```
+
+
+--- STDERR ---

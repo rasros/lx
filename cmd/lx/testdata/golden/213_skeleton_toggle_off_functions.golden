@@ -1,0 +1,26 @@
+--- STDOUT ---
+[1/2] skeleton/main.go (8 rows)
+---
+```go
+type Person struct {
+	Name string
+}
+type Worker interface {
+	Work()
+}
+func NewPerson(name string) Person {
+func (p Person) Greet() string {
+```
+
+[2/2] skeleton/main.go (5 rows)
+---
+```go
+type Person struct {
+	Name string
+}
+type Worker interface {
+}
+```
+
+
+--- STDERR ---

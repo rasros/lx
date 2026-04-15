@@ -338,6 +338,110 @@ func setupDocumentsFixture(t *testing.T) string {
 	return dir
 }
 
+func setupSkeletonFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	writeFile(t, dir, "skeleton/main.go", `package demo
+
+type Person struct {
+	Name string
+	age  int
+}
+
+type Worker interface {
+	Work()
+	rest()
+}
+
+func NewPerson(name string) Person {
+	return Person{Name: name}
+}
+
+func (p Person) Greet() string {
+	return p.Name
+}
+
+func helper() {}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.py", `class Animal:
+    species = "unknown"
+    _tag = "internal"
+
+    def speak(self):
+        return "..."
+
+    def _private(self):
+        return "x"
+
+
+def top_level():
+    return 1
+
+def _secret():
+    return 0
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.c", `typedef struct Point {
+    int x;
+    int y;
+} Point;
+
+int add(int a, int b) {
+    return a + b;
+}
+
+void greet(const char *name);
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.cpp", `class Widget {
+public:
+    int value;
+    void set(int v) {
+        value = v;
+    }
+private:
+    int secret;
+    void hide();
+};
+
+int FreeFn(int v) {
+    return v;
+}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/Main.java", `public class Calculator {
+    private int value;
+    public static final int MAX = 100;
+
+    public Calculator(int initial) {
+        this.value = initial;
+    }
+
+    public int add(int x) {
+        return value + x;
+    }
+
+    private int secret() {
+        return 42;
+    }
+}
+`, 0644)
+
+	writeFile(t, dir, "skeleton/main.rs", `struct User {
+    name: String,
+}
+
+fn main() {
+    println!("hello");
+}
+`, 0644)
+
+	return dir
+}
+
 func setupRelativePathsFixture(t *testing.T) (workDir, srcDir string) {
 	t.Helper()
 	setupMockConfig(t)
@@ -547,6 +651,42 @@ func TestGoldenDocuments(t *testing.T) {
 		{name: "128_docs_odp_expanded", args: []string{"-Z", "sample.odp"}},
 		{name: "129_docs_ods_binary", args: []string{"sample.ods"}},
 		{name: "130_docs_odp_binary", args: []string{"sample.odp"}},
+	})
+}
+
+func TestGoldenSkeleton(t *testing.T) {
+	dir := setupSkeletonFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "200_skeleton_go_functions", args: []string{"-F", "skeleton/main.go"}},
+		{name: "201_skeleton_go_structs", args: []string{"-T", "skeleton/main.go"}},
+		{name: "202_skeleton_go_both", args: []string{"-F", "-T", "skeleton/main.go"}},
+		{name: "203_skeleton_python_functions", args: []string{"-F", "skeleton/main.py"}},
+		{name: "204_skeleton_python_structs", args: []string{"-T", "skeleton/main.py"}},
+		{name: "205_skeleton_python_both", args: []string{"-F", "-T", "skeleton/main.py"}},
+		{name: "206_skeleton_c_functions", args: []string{"-F", "skeleton/main.c"}},
+		{name: "207_skeleton_c_structs", args: []string{"-T", "skeleton/main.c"}},
+		{name: "208_skeleton_c_both", args: []string{"-F", "-T", "skeleton/main.c"}},
+		{name: "209_skeleton_cpp_both", args: []string{"-F", "-T", "skeleton/main.cpp"}},
+		{name: "210_skeleton_java_structs", args: []string{"-T", "skeleton/Main.java"}},
+		{name: "211_skeleton_java_both", args: []string{"-F", "-T", "skeleton/Main.java"}},
+		{name: "212_skeleton_interleaved_reset", args: []string{"-F", "-T", "skeleton/main.py", "--reset-skeleton", "skeleton/main.py"}},
+		{name: "213_skeleton_toggle_off_functions", args: []string{"-F", "-T", "skeleton/main.go", "--no-functions", "skeleton/main.go"}},
+		{name: "214_skeleton_unsupported_passthrough", args: []string{"-F", "-T", "skeleton/main.rs"}},
+	})
+}
+
+func TestGoldenSkeletonSlicing(t *testing.T) {
+	dir := setupSkeletonFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "220_skeleton_lines_go_both", args: []string{"-F", "-T", "--lines", "3", "skeleton/main.go"}},
+		{name: "221_skeleton_head_go_both", args: []string{"-F", "-T", "--head", "2", "skeleton/main.go"}},
+		{name: "222_skeleton_tail_go_both", args: []string{"-F", "-T", "--tail", "2", "skeleton/main.go"}},
+		{name: "223_skeleton_head_tail_go_both", args: []string{"-F", "-T", "--head", "2", "--tail", "2", "skeleton/main.go"}},
+		{name: "224_skeleton_lines_python_both", args: []string{"-F", "-T", "--lines", "2", "skeleton/main.py"}},
+		{name: "225_skeleton_head_cpp_both", args: []string{"-F", "-T", "--head", "3", "skeleton/main.cpp"}},
+		{name: "226_skeleton_tail_java_both", args: []string{"-F", "-T", "--tail", "2", "skeleton/Main.java"}},
+		{name: "227_skeleton_lines_after_reset", args: []string{"-F", "-T", "--reset-skeleton", "--lines", "2", "skeleton/main.py"}},
+		{name: "228_skeleton_progressive_lines_head_tail", args: []string{"-F", "-T", "--lines", "3", "skeleton/main.go", "--head", "1", "skeleton/main.go", "--tail", "1", "skeleton/main.go"}},
 	})
 }
 

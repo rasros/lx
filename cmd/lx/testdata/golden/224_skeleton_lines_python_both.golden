@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/main.py (4 rows)
+---
+```python
+class Animal:
+... (2 rows skipped)
+def top_level():
+```
+
+
+--- STDERR ---

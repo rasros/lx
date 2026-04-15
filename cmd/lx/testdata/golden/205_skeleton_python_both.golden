@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/main.py (4 rows)
+---
+```python
+class Animal:
+    species = "unknown"
+    def speak(self):
+def top_level():
+```
+
+
+--- STDERR ---

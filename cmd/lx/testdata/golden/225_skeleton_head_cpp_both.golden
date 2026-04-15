@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/main.cpp (6 rows)
+---
+```cpp
+class Widget {
+    int value;
+    void set(int v) {
+```
+
+
+--- STDERR ---

@@ -1,0 +1,10 @@
+--- STDOUT ---
+skeleton/Main.java (5 rows)
+---
+```java
+    public int add(int x) {
+}
+```
+
+
+--- STDERR ---

@@ -1,0 +1,10 @@
+--- STDOUT ---
+skeleton/main.go (8 rows)
+---
+```go
+type Person struct {
+	Name string
+```
+
+
+--- STDERR ---
