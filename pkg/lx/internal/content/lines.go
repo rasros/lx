@@ -190,6 +190,29 @@ func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
 	return result, nil
 }
 
+// SplitLines splits src into lines on \n boundaries.
+func SplitLines(src []byte) [][]byte {
+	return bytes.Split(src, []byte("\n"))
+}
+
+// AppendLines appends lines[from..to] (inclusive) to out, each followed by \n.
+func AppendLines(out []byte, lines [][]byte, from, to int) []byte {
+	for i := from; i <= to && i < len(lines); i++ {
+		out = append(out, lines[i]...)
+		out = append(out, '\n')
+	}
+	return out
+}
+
+// AppendLine appends lines[row] to out followed by \n.
+func AppendLine(out []byte, lines [][]byte, row int) []byte {
+	if row >= 0 && row < len(lines) {
+		out = append(out, lines[row]...)
+		out = append(out, '\n')
+	}
+	return out
+}
+
 func countLines(data []byte) int {
 	if len(data) == 0 {
 		return 0

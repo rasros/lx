@@ -9,6 +9,7 @@ import (
 
 	"github.com/rasros/lx/pkg/lx/internal/content"
 	"github.com/rasros/lx/pkg/lx/internal/detect"
+	"github.com/rasros/lx/pkg/lx/skeleton"
 )
 
 type processor struct {
@@ -143,7 +144,6 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 			reader = bytes.NewReader(text)
 			size = int64(len(text))
 		}
-		// On extraction failure, fall through to normal binary detection.
 	}
 
 	if scratch == nil {
@@ -159,6 +159,20 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 	lang := detect.DetectLanguage(file.Path, scratch[:n])
 	isImage := detect.IsImage(file.Path)
 	cfg := file.Config
+
+	if !isBinary && !isImage && (cfg.SkeletonFunctions || cfg.SkeletonStructs) && skeleton.Supported(lang) {
+		allData := make([]byte, size)
+		if _, err := reader.ReadAt(allData, 0); err == nil {
+			filtered := skeleton.Extract(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonStructs)
+			reader = bytes.NewReader(filtered)
+			size = int64(len(filtered))
+			if int64(headerLen) > size {
+				headerLen = int(size)
+			}
+			n, _ = reader.ReadAt(scratch[:headerLen], 0)
+		}
+	}
+
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
 	totalRows, exact, _ := content.EstimateLineCount(reader, size, scratch)
 

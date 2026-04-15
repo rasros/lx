@@ -198,6 +198,27 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			slog.Debug("Resetting line numbers")
 			runCfg.LineNumbers = false
 			stream.WithRunnerConfig(runCfg)
+		case "functions":
+			slog.Debug("Enabling function skeleton")
+			runCfg.SkeletonFunctions = true
+			stream.WithRunnerConfig(runCfg)
+		case "no-functions":
+			slog.Debug("Disabling function skeleton")
+			runCfg.SkeletonFunctions = false
+			stream.WithRunnerConfig(runCfg)
+		case "structs":
+			slog.Debug("Enabling struct skeleton")
+			runCfg.SkeletonStructs = true
+			stream.WithRunnerConfig(runCfg)
+		case "no-structs":
+			slog.Debug("Disabling struct skeleton")
+			runCfg.SkeletonStructs = false
+			stream.WithRunnerConfig(runCfg)
+		case "reset-skeleton":
+			slog.Debug("Resetting skeleton filters")
+			runCfg.SkeletonFunctions = false
+			runCfg.SkeletonStructs = false
+			stream.WithRunnerConfig(runCfg)
 		case "include":
 			slog.Debug("Adding include filter", "pattern", op.Value)
 			includes = append(includes, op.Value)

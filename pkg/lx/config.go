@@ -19,9 +19,11 @@ type GlobalContext struct {
 
 // RunnerConfig defines slicing and formatting state for the rendering processor.
 type RunnerConfig struct {
-	Head        int
-	Tail        int
-	LineNumbers bool
+	Head              int
+	Tail              int
+	LineNumbers       bool
+	SkeletonFunctions bool
+	SkeletonStructs   bool
 }
 
 // TemplateEngine holds the parsed text/template instances.
