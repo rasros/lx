@@ -42,6 +42,7 @@ jobs:
           set -euo pipefail
 
           mkdir -p dist
+          BUILD_TAGS="grammar_set_core"
 
           # Loop over platforms
           for GOOS in linux darwin windows; do
@@ -60,9 +61,11 @@ jobs:
               
               echo "Building $asset_name ..."
 
-              # We pass the VERSION and the custom output path (OR_OUT) to make.
-              # make will inherit GOOS and GOARCH from the env vars below.
-              GOOS=$GOOS GOARCH=$GOARCH make build \
+              # Use the curated Core100 Tree-sitter grammar set to reduce binary size.
+              # make will inherit GOOS/GOARCH/GOFLAGS from the env vars below.
+              GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=0 \
+              GOFLAGS="-trimpath -buildvcs=false -tags=${BUILD_TAGS}" \
+              make build \
                 VERSION=${VERSION} \
                 OR_OUT="$asset_name"
 
