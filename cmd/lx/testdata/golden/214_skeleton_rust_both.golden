@@ -1,0 +1,23 @@
+--- STDOUT ---
+skeleton/main.rs (15 rows)
+---
+```rust
+pub struct User {
+    pub name: String,
+}
+pub enum Role {
+    Admin,
+    User,
+}
+pub trait Greet {
+    fn greet(&self) -> String;
+}
+impl User {
+    pub fn new(name: String) -> Self {
+    pub fn display(&self) -> String {
+}
+pub fn create(name: String) -> User {
+```
+
+
+--- STDERR ---

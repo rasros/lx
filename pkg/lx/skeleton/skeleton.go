@@ -2,11 +2,8 @@ package skeleton
 
 // Supported reports whether skeleton extraction is available for lang.
 func Supported(lang string) bool {
-	switch lang {
-	case "go", "python", "c", "cpp", "java":
-		return true
-	}
-	return false
+	_, ok := langDefs[lang]
+	return ok
 }
 
 // Extract returns filtered content from src showing only the skeleton

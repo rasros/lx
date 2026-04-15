@@ -44,7 +44,7 @@ func pyProcessMember(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		if nameNode == nil || isPrivateName(nameNode.Text(src)) {
 			return out
 		}
-		return emitFuncSig(out, lines, actual, lang, true)
+		return emitFuncSig(out, lines, actual, lang, true, "")
 	case "class_definition":
 		return PyEmitClass(out, src, lines, actual, lang, functions)
 	default:

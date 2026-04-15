@@ -45,7 +45,7 @@ func CppEmitClassOrStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node,
 			}
 		case "function_definition":
 			if functions {
-				out = emitFuncSig(out, lines, child, lang, false)
+				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
 		case "declaration":
 			if hasDescendantOfType(child, "function_declarator", lang) {

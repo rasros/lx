@@ -1,0 +1,10 @@
+--- STDOUT ---
+skeleton/main.rs (2 rows)
+---
+```rust
+struct User {
+}
+```
+
+
+--- STDERR ---

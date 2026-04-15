@@ -1,0 +1,18 @@
+--- STDOUT ---
+skeleton/main.kt (10 rows)
+---
+```kotlin
+data class Point(val x: Double, val y: Double)
+interface Shape {
+    fun area(): Double
+    fun perimeter(): Double
+}
+class Calculator {
+    val max: Int = 100
+    fun add(x: Int): Int {
+}
+fun topLevel(x: Int): Int {
+```
+
+
+--- STDERR ---
