@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.kt (14 rows)
+skeleton/main.kt (19 rows)
 ---
 ```kotlin
 data class Point(val x: Double, val y: Double)
@@ -10,6 +10,11 @@ interface Shape {
 class Calculator {
     val max: Int = 100 // upper bound
     fun add(x: Int): Int {
+}
+object Defaults {
+    val max: Int = 100
+    val name: String = "default" // fallback name
+    fun scaled(factor: Int): Int {
 }
 fun topLevel(x: Int): Int {
 fun combine(
