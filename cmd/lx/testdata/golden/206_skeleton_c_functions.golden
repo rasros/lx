@@ -1,0 +1,10 @@
+--- STDOUT ---
+skeleton/main.c (2 rows)
+---
+```c
+int add(int a, int b) {
+void greet(const char *name);
+```
+
+
+--- STDERR ---

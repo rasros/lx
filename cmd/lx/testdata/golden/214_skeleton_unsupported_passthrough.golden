@@ -1,0 +1,15 @@
+--- STDOUT ---
+skeleton/main.rs (7 rows)
+---
+```rust
+struct User {
+    name: String,
+}
+
+fn main() {
+    println!("hello");
+}
+```
+
+
+--- STDERR ---

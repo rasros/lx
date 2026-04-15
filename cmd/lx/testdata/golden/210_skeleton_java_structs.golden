@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/Main.java (3 rows)
+---
+```java
+public class Calculator {
+    public static final int MAX = 100;
+}
+```
+
+
+--- STDERR ---

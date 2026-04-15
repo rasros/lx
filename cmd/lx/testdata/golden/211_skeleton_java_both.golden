@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/Main.java (5 rows)
+---
+```java
+public class Calculator {
+    public static final int MAX = 100;
+    public Calculator(int initial) {
+    public int add(int x) {
+}
+```
+
+
+--- STDERR ---

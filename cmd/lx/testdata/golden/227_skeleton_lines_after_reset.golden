@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/main.py (16 rows)
+---
+```python
+class Animal:
+... (14 rows skipped)
+    return 0
+```
+
+
+--- STDERR ---

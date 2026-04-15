@@ -1,0 +1,10 @@
+--- STDOUT ---
+skeleton/main.py (2 rows)
+---
+```python
+class Animal:
+    species = "unknown"
+```
+
+
+--- STDERR ---

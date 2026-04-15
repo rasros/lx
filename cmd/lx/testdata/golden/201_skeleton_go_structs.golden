@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/main.go (5 rows)
+---
+```go
+type Person struct {
+	Name string
+}
+type Worker interface {
+}
+```
+
+
+--- STDERR ---

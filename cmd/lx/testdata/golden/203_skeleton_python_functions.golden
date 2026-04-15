@@ -1,0 +1,9 @@
+--- STDOUT ---
+skeleton/main.py (1 rows)
+---
+```python
+def top_level():
+```
+
+
+--- STDERR ---

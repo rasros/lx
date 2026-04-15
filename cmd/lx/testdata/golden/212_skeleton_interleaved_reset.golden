@@ -1,0 +1,33 @@
+--- STDOUT ---
+[1/2] skeleton/main.py (4 rows)
+---
+```python
+class Animal:
+    species = "unknown"
+    def speak(self):
+def top_level():
+```
+
+[2/2] skeleton/main.py (16 rows)
+---
+```python
+class Animal:
+    species = "unknown"
+    _tag = "internal"
+
+    def speak(self):
+        return "..."
+
+    def _private(self):
+        return "x"
+
+
+def top_level():
+    return 1
+
+def _secret():
+    return 0
+```
+
+
+--- STDERR ---
