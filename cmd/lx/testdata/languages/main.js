@@ -20,3 +20,8 @@ export function combine(
 ) {
     return x + y;
 }
+
+// Arrow function handler.
+export const handler = async (req, res) => {
+    return "ok";
+};

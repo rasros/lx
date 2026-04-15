@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.js (9 rows)
+skeleton/main.js (10 rows)
 ---
 ```javascript
 export class Greeter {
@@ -11,6 +11,7 @@ export function combine(
     x,
     y,
 ) {
+export const handler = async (req, res) => {
 ```
 
 

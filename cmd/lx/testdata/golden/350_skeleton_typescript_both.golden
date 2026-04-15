@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.ts (15 rows)
+skeleton/main.ts (16 rows)
 ---
 ```typescript
 export interface Shape {
@@ -17,6 +17,7 @@ export function combine(
     x: number,
     y: number,
 ): number {
+export const handler = async (req: Request): Promise<void> => {
 ```
 
 

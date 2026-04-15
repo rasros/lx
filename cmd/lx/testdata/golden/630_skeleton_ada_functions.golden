@@ -1,21 +1,12 @@
 --- STDOUT ---
-skeleton/main.adb (14 rows)
+skeleton/main.adb (5 rows)
 ---
 ```ada
 procedure Greet(Name : String) is
-begin
-   Put_Line("Hello, " & Name);
-end Greet;
 function Add(A, B : Integer) return Integer is
-begin
-   return A + B;
-end Add;
 function Combine(
    A : String;
    B : String) return String is
-begin
-   return A & ", " & B;
-end Combine;
 ```
 
 

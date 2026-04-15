@@ -1,6 +1,8 @@
 package langs
 
 import (
+	"strings"
+
 	"github.com/odvcencio/gotreesitter"
 	"github.com/rasros/lx/pkg/lx/internal/content"
 )
@@ -15,6 +17,9 @@ func DartEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
+		if dartMemberIsPrivate(lines, child) {
+			continue
+		}
 		switch child.Type(lang) {
 		case "declaration":
 			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
@@ -29,4 +34,26 @@ func DartEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		out = content.AppendLine(out, lines, closingRow)
 	}
 	return out
+}
+
+// dartMemberIsPrivate returns true if the member's name starts with "_".
+// Dart uses the "_" prefix (library-private) rather than access modifiers.
+// We parse the first line of the member: the name is the last word before "(" or ";".
+func dartMemberIsPrivate(lines [][]byte, n *gotreesitter.Node) bool {
+	row := int(n.StartPoint().Row)
+	if row >= len(lines) {
+		return false
+	}
+	line := strings.TrimSpace(string(lines[row]))
+	if idx := strings.Index(line, "//"); idx >= 0 {
+		line = strings.TrimSpace(line[:idx])
+	}
+	if idx := strings.IndexAny(line, "(;{="); idx >= 0 {
+		line = strings.TrimSpace(line[:idx])
+	}
+	parts := strings.Fields(line)
+	if len(parts) == 0 {
+		return false
+	}
+	return isPrivateName(parts[len(parts)-1])
 }
