@@ -1,17 +1,26 @@
+# Animal hierarchy
+
+
 class Animal:
+    """Base class for all animals."""
+
     species = "unknown"
-    _tag = "internal"
+    _tag = "internal"  # private metadata
 
     def speak(self):
+        """Return the animal's sound."""
         return "..."
 
     def _private(self):
         return "x"
 
 
+# Standalone functions
+
 def top_level():
     return 1
 
+# factory helper
 def create(
     name: str,
     tag: str = "default",

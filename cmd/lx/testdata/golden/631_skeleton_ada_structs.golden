@@ -1,10 +1,11 @@
 --- STDOUT ---
-skeleton/main.adb (7 rows)
+skeleton/main.adb (8 rows)
 ---
 ```ada
 package Demo is
    procedure Greet(Name : String);
    function Add(A, B : Integer) return Integer;
+   -- Multi-line signature.
    function Combine(
       A : String;
       B : String) return String;

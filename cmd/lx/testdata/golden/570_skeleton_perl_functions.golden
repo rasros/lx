@@ -4,7 +4,7 @@ skeleton/main.pl (3 rows)
 ```perl
 sub greet {
 sub add {
-sub _helper {
+sub _helper { # internal
 ```
 
 

@@ -7,7 +7,7 @@ int subtract(
     int a,
     int b
 ) {
-void greet(const char *name);
+void greet(const char *name); // forward declaration
 ```
 
 

@@ -1,11 +1,9 @@
 --- STDOUT ---
-skeleton/main.lua (4 rows)
+skeleton/main.lua (2 rows)
 ---
 ```lua
 function greet(
     name)
-function add(a, b)
-function helper()
 ```
 
 

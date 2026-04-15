@@ -3,8 +3,8 @@ skeleton/main.c (4 rows)
 ---
 ```c
 typedef struct Point {
-    int x;
-    int y;
+    int x; /* x coordinate */
+    int y; /* y coordinate */
 } Point;
 ```
 

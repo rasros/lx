@@ -4,8 +4,8 @@ skeleton/main.pas (10 rows)
 ```pascal
 type
   TAnimal = record
-    Name: string;
-    Species: string;
+    Name: string;    (* display name *)
+    Species: string; (* taxonomy     *)
   end;
 procedure Greet(Name: string);
 function Add(A, B: Integer): Integer;

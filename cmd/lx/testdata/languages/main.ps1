@@ -1,7 +1,13 @@
+<#
+  Module: Demo utilities
+  Provides greeting and arithmetic helpers.
+#>
+
+# Greet someone by name.
 function Get-Greeting {
     param(
         [string]$Name,
-        [string]$Greeting = "Hello"
+        [string]$Greeting = "Hello" # default greeting
     )
     "$Greeting, $Name"
 }
@@ -11,6 +17,6 @@ function Add-Numbers {
     $A + $B
 }
 
-function helper {
+function helper { # internal
     "internal"
 }

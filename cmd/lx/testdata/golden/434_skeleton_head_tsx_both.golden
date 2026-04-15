@@ -3,7 +3,7 @@ skeleton/main.tsx (13 rows)
 ---
 ```tsx
 export interface Props {
-    title: string;
+    title: string; // display title
 }
 ```
 

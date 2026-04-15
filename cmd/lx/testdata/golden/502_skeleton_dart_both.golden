@@ -4,7 +4,7 @@ skeleton/main.dart (11 rows)
 ```dart
 class Animal {
   final String name;
-  final String species;
+  final String species; // taxonomy
   Animal(this.name, this.species);
   String speak() {
 }
