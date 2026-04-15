@@ -7,8 +7,8 @@ import (
 )
 
 type langDef struct {
-	newLang func() *gotreesitter.Language
-	funcTypes []string
+	newLang     func() *gotreesitter.Language
+	funcTypes   []string
 	structTypes []string
 
 	indentBody    bool
