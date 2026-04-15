@@ -13,9 +13,12 @@ type langDef struct {
 
 	indentBody    bool
 	bodyChildType string
+	singleLineSig bool
 
 	decoratedType   string
 	definitionField string
+
+	iterateChildren []string
 
 	funcVisible func(node *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool
 
@@ -60,9 +63,7 @@ var langDefs = map[string]langDef{
 
 	"java": {
 		newLang:     grammars.JavaLanguage,
-		funcTypes:   nil,
 		structTypes: []string{"class_declaration", "interface_declaration", "enum_declaration", "record_declaration"},
-		funcVisible: nil,
 		emitStruct:  langs.JavaEmitClass,
 	},
 
@@ -121,7 +122,6 @@ var langDefs = map[string]langDef{
 
 	"csharp": {
 		newLang:     grammars.CSharpLanguage,
-		funcTypes:   nil,
 		structTypes: []string{"class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"},
 		emitStruct:  langs.CSharpEmitClass,
 	},
@@ -155,5 +155,108 @@ var langDefs = map[string]langDef{
 		funcTypes:   []string{"function_definition"},
 		structTypes: []string{"class_declaration", "interface_declaration"},
 		emitStruct:  langs.PHPEmitClass,
+	},
+
+	"bash": {
+		newLang:       grammars.BashLanguage,
+		funcTypes:     []string{"function_definition"},
+		bodyChildType: "compound_statement",
+	},
+
+	"powershell": {
+		newLang:         grammars.PowershellLanguage,
+		funcTypes:       []string{"function_statement"},
+		bodyChildType:   "{",
+		iterateChildren: []string{"statement_list"},
+	},
+
+	"dart": {
+		newLang:     grammars.DartLanguage,
+		funcTypes:   []string{"function_signature"},
+		structTypes: []string{"class_definition"},
+		emitStruct:  langs.DartEmitClass,
+	},
+
+	"lua": {
+		newLang:       grammars.LuaLanguage,
+		funcTypes:     []string{"function_declaration"},
+		indentBody:    true,
+		bodyChildType: "end",
+	},
+
+	"julia": {
+		newLang:       grammars.JuliaLanguage,
+		funcTypes:     []string{"function_definition"},
+		structTypes:   []string{"struct_definition", "abstract_definition"},
+		indentBody:    true,
+		bodyChildType: "block",
+		emitStruct:    langs.JuliaEmitStruct,
+	},
+
+	"zig": {
+		newLang:       grammars.ZigLanguage,
+		funcTypes:     []string{"Decl"},
+		bodyChildType: "Block",
+		funcVisible:   langs.ZigFuncVisible,
+	},
+
+	"haskell": {
+		newLang:         grammars.HaskellLanguage,
+		funcTypes:       []string{"bind"},
+		structTypes:     []string{"data_type", "newtype"},
+		indentBody:      true,
+		bodyChildType:   "match",
+		iterateChildren: []string{"declarations"},
+		emitStruct:      langs.HaskellEmitType,
+	},
+
+	"groovy": {
+		newLang:       grammars.GroovyLanguage,
+		funcTypes:     []string{"function_definition"},
+		structTypes:   []string{"class_definition"},
+		bodyChildType: "closure",
+		emitStruct:    langs.GroovyEmitClass,
+	},
+
+	"perl": {
+		newLang:       grammars.PerlLanguage,
+		funcTypes:     []string{"subroutine_declaration_statement"},
+		bodyChildType: "block",
+	},
+
+	"objectivec": {
+		newLang:       grammars.ObjcLanguage,
+		funcTypes:     []string{"function_definition"},
+		structTypes:   []string{"class_interface", "protocol_declaration"},
+		bodyChildType: "compound_statement",
+		emitStruct:    langs.ObjCEmitInterface,
+	},
+
+	"ocaml": {
+		newLang:     grammars.OcamlLanguage,
+		structTypes: []string{"value_definition", "type_definition"},
+		emitStruct:  langs.OCamlEmitDefinition,
+	},
+
+	"pascal": {
+		newLang:     grammars.PascalLanguage,
+		structTypes: []string{"defProc", "declTypes"},
+		emitStruct:  langs.PascalEmitDecl,
+	},
+
+	"lisp": {
+		newLang:       grammars.CommonlispLanguage,
+		funcTypes:     []string{"list_lit"},
+		singleLineSig: true,
+		funcVisible:   langs.CLFuncVisible,
+	},
+
+	"ada": {
+		newLang:         grammars.AdaLanguage,
+		funcTypes:       []string{"subprogram_body"},
+		structTypes:     []string{"package_declaration", "subprogram_declaration"},
+		iterateChildren: []string{"compilation", "compilation_unit"},
+		emitStruct:      langs.AdaEmitDecl,
+		funcVisible:     langs.AdaFuncVisible,
 	},
 }

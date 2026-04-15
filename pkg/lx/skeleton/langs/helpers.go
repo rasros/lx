@@ -50,3 +50,7 @@ func emitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotrees
 	}
 	return content.AppendLines(out, lines, startRow, endRow)
 }
+
+func emitAllLines(out []byte, lines [][]byte, n *gotreesitter.Node) []byte {
+	return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+}
