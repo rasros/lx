@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.ml (5 rows)
+skeleton/main.ml (11 rows)
 ---
 ```ocaml
 type animal = Dog | Cat
@@ -7,6 +7,12 @@ type point = {
   x: float;
   y: float;
 }
+module Geometry = struct
+  type shape = Circle | Square
+end
+module type Printable = sig
+  val to_string : 'a -> string
+end
 ```
 
 

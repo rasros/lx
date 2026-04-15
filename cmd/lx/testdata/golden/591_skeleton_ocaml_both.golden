@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.ml (9 rows)
+skeleton/main.ml (17 rows)
 ---
 ```ocaml
 type animal = Dog | Cat
@@ -11,6 +11,14 @@ let greet name =
 let combine
     name
     greeting =
+module Geometry = struct
+  type shape = Circle | Square
+  let pi = 3.14159
+  let area radius =
+end
+module type Printable = sig
+  val to_string : 'a -> string
+end
 ```
 
 

@@ -22,6 +22,17 @@ class Calculator {
     private fun helper(): Int = 42
 }
 
+/** Singleton registry of default values. */
+object Defaults {
+    val max: Int = 100
+    val name: String = "default" // fallback name
+
+    // Return max scaled by factor.
+    fun scaled(factor: Int): Int {
+        return max * factor
+    }
+}
+
 /** Simple top-level increment. */
 fun topLevel(x: Int): Int {
     return x + 1
