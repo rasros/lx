@@ -1,4 +1,4 @@
-package lx
+package templatex
 
 import (
 	"encoding/base64"
@@ -279,3 +279,6 @@ func templateFuncs() template.FuncMap {
 		},
 	}
 }
+
+// TemplateFuncs exposes the default template function map.
+func TemplateFuncs() template.FuncMap { return templateFuncs() }

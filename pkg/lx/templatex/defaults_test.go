@@ -1,4 +1,4 @@
-package lx
+package templatex
 
 import (
 	"testing"

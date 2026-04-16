@@ -1,9 +1,8 @@
-package lx
+package sources
 
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -469,114 +468,5 @@ func TestExtractDocumentText_CaseInsensitiveExtension(t *testing.T) {
 	}
 	if !strings.Contains(string(text), "case test") {
 		t.Errorf("expected 'case test', got %q", string(text))
-	}
-}
-
-func TestProcessor_ExtractDocuments_DOCX(t *testing.T) {
-	cfg := NewConfig()
-	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{}, nil, "markdown", true)
-
-	data := makeTestDOCX(t, "Important document content")
-	file := NewBufferInputFile("report.docx", data)
-	file.Config = RunnerConfig{Head: -1}
-
-	var buf bytes.Buffer
-	if err := proc.RenderPrepared(&buf, preparedItem{raw: file, section: &SectionContext{}, fileIndexGlobal: 1}, nil); err != nil {
-		t.Fatal(err)
-	}
-	got := buf.String()
-
-	if strings.Contains(got, "binary file skipped") {
-		t.Error("DOCX should be rendered as text, not binary")
-	}
-	if !strings.Contains(got, "Important document content") {
-		t.Errorf("expected extracted text in output, got:\n%s", got)
-	}
-}
-
-func TestProcessor_ExtractDocuments_XLSX(t *testing.T) {
-	cfg := NewConfig()
-	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{}, nil, "markdown", true)
-
-	data := makeTestXLSX(t, "Sheet1", map[string]interface{}{"A1": "Revenue", "B1": "12345"})
-	file := NewBufferInputFile("budget.xlsx", data)
-	file.Config = RunnerConfig{Head: -1}
-
-	var buf bytes.Buffer
-	if err := proc.RenderPrepared(&buf, preparedItem{raw: file, section: &SectionContext{}, fileIndexGlobal: 1}, nil); err != nil {
-		t.Fatal(err)
-	}
-	got := buf.String()
-
-	if strings.Contains(got, "binary file skipped") {
-		t.Error("XLSX should be rendered as text, not binary")
-	}
-	if !strings.Contains(got, "Revenue") {
-		t.Errorf("expected extracted cell value in output, got:\n%s", got)
-	}
-}
-
-func TestProcessor_NoExtractDocuments_DOCX(t *testing.T) {
-	cfg := NewConfig()
-	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{}, nil, "markdown", false)
-
-	data := makeTestDOCX(t, "Should not appear")
-	file := NewBufferInputFile("report.docx", data)
-	file.Config = RunnerConfig{Head: -1}
-
-	var buf bytes.Buffer
-	if err := proc.RenderPrepared(&buf, preparedItem{raw: file, section: &SectionContext{}, fileIndexGlobal: 1}, nil); err != nil {
-		t.Fatal(err)
-	}
-	got := buf.String()
-
-	if !strings.Contains(got, "binary file skipped") {
-		t.Errorf("DOCX should be treated as binary when extraction is disabled, got:\n%s", got)
-	}
-}
-
-func TestStream_ExtractDocuments_PropagatesFromConfig(t *testing.T) {
-	cfg := NewConfig()
-	cfg.ExtractDocuments = false
-	stream, err := NewStream(cfg, RunnerConfig{Head: -1})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	data := makeTestDOCX(t, "Content")
-	stream.AddFile(NewBufferInputFile("doc.docx", data))
-
-	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
-		t.Fatal(err)
-	}
-
-	got := buf.String()
-	if strings.Contains(got, "Content") {
-		t.Error("extraction should be disabled when config.ExtractDocuments=false")
-	}
-}
-
-func TestStream_ExtractDocuments_EnabledByDefault(t *testing.T) {
-	cfg := NewConfig()
-	stream, err := NewStream(cfg, RunnerConfig{Head: -1})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	data := makeTestDOCX(t, "DefaultEnabled")
-	stream.AddFile(NewBufferInputFile("doc.docx", data))
-
-	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
-		t.Fatal(err)
-	}
-
-	got := buf.String()
-	if !strings.Contains(got, "DefaultEnabled") {
-		t.Errorf("extraction should be enabled by default, got:\n%s", got)
 	}
 }

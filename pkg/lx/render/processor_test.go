@@ -1,4 +1,4 @@
-package lx
+package render
 
 import (
 	"bytes"
@@ -7,24 +7,24 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/rasros/lx/pkg/lx/core"
+	"github.com/rasros/lx/pkg/lx/sources"
+	"github.com/rasros/lx/pkg/lx/templatex"
 )
 
 func TestProcessor_RenderFile_Slicing(t *testing.T) {
-	cfg := NewConfig()
-	engine, _ := CompileTemplates(cfg)
-	global := GlobalContext{TotalFiles: 1}
+	cfg := core.NewConfig()
+	engine, _ := templatex.Compile(cfg)
+	global := core.GlobalContext{TotalFiles: 1}
 
-	proc := newProcessor(engine, global, nil, "markdown", false)
+	proc := NewProcessor(engine, global, nil, "markdown", false)
 
-	file := NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
-	file.Config = RunnerConfig{Head: 1, Tail: 1}
+	file := sources.NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
+	file.Config = core.RunnerConfig{Head: 1, Tail: 1}
 
 	scratch := make([]byte, 1024)
-	item := preparedItem{
-		raw:             file,
-		section:         &SectionContext{},
-		fileIndexGlobal: 1,
-	}
+	item := PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, item, scratch); err != nil {
@@ -41,13 +41,13 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 }
 
 func TestProcessor_RenderFile_SkeletonSlicingUsesFilteredRows(t *testing.T) {
-	cfg := NewConfig()
-	engine, _ := CompileTemplates(cfg)
-	global := GlobalContext{TotalFiles: 1}
+	cfg := core.NewConfig()
+	engine, _ := templatex.Compile(cfg)
+	global := core.GlobalContext{TotalFiles: 1}
 
-	proc := newProcessor(engine, global, nil, "markdown", false)
+	proc := NewProcessor(engine, global, nil, "markdown", false)
 
-	file := NewBufferInputFile("skeleton.go", []byte(`package p
+	file := sources.NewBufferInputFile("skeleton.go", []byte(`package p
 
 func A() {
 	println(1)
@@ -61,13 +61,9 @@ func C() {
 	println(3)
 }
 `))
-	file.Config = RunnerConfig{Head: 1, Tail: 1, SkeletonFunctions: true}
+	file.Config = core.RunnerConfig{Head: 1, Tail: 1, SkeletonFunctions: true}
 
-	item := preparedItem{
-		raw:             file,
-		section:         &SectionContext{},
-		fileIndexGlobal: 1,
-	}
+	item := PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
@@ -92,23 +88,19 @@ func TestRender_DataURI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := NewConfig()
+	cfg := core.NewConfig()
 	cfg.OutputFormat = "html"
-	engine, _ := CompileTemplates(cfg)
+	engine, _ := templatex.Compile(cfg)
 
-	proc := newProcessor(engine, GlobalContext{}, nil, "html", false)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "html", false)
 
-	file, err := NewInputFileFromPath(os.DirFS(tmp), imgName)
+	file, err := sources.NewInputFileFromPath(os.DirFS(tmp), imgName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	file.AbsPath = imgPath
 
-	item := preparedItem{
-		raw:             file,
-		section:         &SectionContext{},
-		fileIndexGlobal: 1,
-	}
+	item := PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
@@ -116,24 +108,19 @@ func TestRender_DataURI(t *testing.T) {
 	}
 
 	got := buf.String()
-
 	if !strings.Contains(got, "<img src=\"data:image/png;base64,") {
 		t.Errorf("HTML output did not contain data URI. Got:\n%s", got)
 	}
 }
 
 func TestRender_ErrorHandling(t *testing.T) {
-	cfg := NewConfig()
-	engine, _ := CompileTemplates(cfg)
+	cfg := core.NewConfig()
+	engine, _ := templatex.Compile(cfg)
 
-	proc := newProcessor(engine, GlobalContext{}, nil, "markdown", false)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown", false)
 
-	file := InputFile{
-		Path: "ghost.txt",
-		Open: func() (io.ReadCloser, error) { return nil, os.ErrPermission },
-	}
-
-	item := preparedItem{raw: file, section: &SectionContext{}}
+	file := sources.InputFile{Path: "ghost.txt", Open: func() (io.ReadCloser, error) { return nil, os.ErrPermission }}
+	item := PreparedItem{Raw: file, Section: &core.SectionContext{}}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
@@ -147,16 +134,15 @@ func TestRender_ErrorHandling(t *testing.T) {
 }
 
 func TestRender_BinaryFile(t *testing.T) {
-	cfg := NewConfig()
-	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{}, nil, "markdown", false)
+	cfg := core.NewConfig()
+	engine, _ := templatex.Compile(cfg)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown", false)
 
-	// Null byte triggers binary detection.
 	binaryContent := append([]byte("ELF"), 0x00, 0x01, 0x02, 0x03)
-	file := NewBufferInputFile("program", binaryContent)
-	file.Config = RunnerConfig{Head: -1, Tail: -1}
+	file := sources.NewBufferInputFile("program", binaryContent)
+	file.Config = core.RunnerConfig{Head: -1, Tail: -1}
 
-	item := preparedItem{raw: file, section: &SectionContext{}, fileIndexGlobal: 1}
+	item := PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
@@ -170,14 +156,14 @@ func TestRender_BinaryFile(t *testing.T) {
 }
 
 func TestRender_CompactView(t *testing.T) {
-	cfg := NewConfig()
-	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{}, nil, "markdown", false)
+	cfg := core.NewConfig()
+	engine, _ := templatex.Compile(cfg)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown", false)
 
-	file := NewBufferInputFile("data.txt", []byte("lots of content\n"))
-	file.Config = RunnerConfig{Head: 0, Tail: 0} // triggers compact
+	file := sources.NewBufferInputFile("data.txt", []byte("lots of content\n"))
+	file.Config = core.RunnerConfig{Head: 0, Tail: 0}
 
-	item := preparedItem{raw: file, section: &SectionContext{}, fileIndexGlobal: 1}
+	item := PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
@@ -194,14 +180,14 @@ func TestRender_CompactView(t *testing.T) {
 }
 
 func TestRender_LineNumbers(t *testing.T) {
-	cfg := NewConfig()
-	engine, _ := CompileTemplates(cfg)
-	proc := newProcessor(engine, GlobalContext{TotalFiles: 1}, nil, "markdown", false)
+	cfg := core.NewConfig()
+	engine, _ := templatex.Compile(cfg)
+	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1}, nil, "markdown", false)
 
-	file := NewBufferInputFile("code.go", []byte("package main\nfunc main() {}\n"))
-	file.Config = RunnerConfig{Head: -1, Tail: -1, LineNumbers: true}
+	file := sources.NewBufferInputFile("code.go", []byte("package main\nfunc main() {}\n"))
+	file.Config = core.RunnerConfig{Head: -1, Tail: -1, LineNumbers: true}
 
-	item := preparedItem{raw: file, section: &SectionContext{}, fileIndexGlobal: 1}
+	item := PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
