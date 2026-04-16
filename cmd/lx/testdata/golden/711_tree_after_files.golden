@@ -17,5 +17,13 @@ package src
 package sub
 ```
 
+```
+src/
+├── sub/
+│   └── helper.go
+├── app.go
+└── app_test.go
+```
+
 
 --- STDERR ---
