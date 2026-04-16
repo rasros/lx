@@ -13,19 +13,14 @@ import (
 	"github.com/rasros/lx/pkg/lx/walker"
 )
 
-// multi-part extensions must appear before their shorter suffix (.tar.gz before .gz).
+// Multi-part suffixes must come before shorter suffixes.
 var archiveSuffixes = []string{
-	// ZIP-based (including document formats that are ZIP archives)
 	".zip", ".jar", ".war", ".ear", ".odt", ".ods", ".odp",
-	// TAR with compression (multi-part first)
 	".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst",
 	".tar.br", ".tar.lz4", ".tar.sz", ".tar.s2",
 	".tgz", ".tbz2", ".txz",
-	// Plain TAR
 	".tar",
-	// Other multi-file archives
 	".rar", ".7z",
-	// Single-file compression (library exposes one virtual entry)
 	".gz", ".bz2", ".xz", ".zst", ".br", ".lz4", ".sz", ".s2", ".lz",
 }
 
@@ -39,13 +34,10 @@ func IsArchivePath(path string) bool {
 	return false
 }
 
-// FileSink receives expanded archive files.
 type FileSink interface {
 	Add(InputFile)
 }
 
-// ExpandArchivePaths opens the archive at absPath and returns the display paths
-// of all matching entries without reading their content.
 func ExpandArchivePaths(ctx context.Context, absPath, displayPath string, w *walker.Walker, includes []string) ([]string, error) {
 	var paths []string
 	sink := &pathCollectorSink{out: &paths}
@@ -59,7 +51,6 @@ type pathCollectorSink struct{ out *[]string }
 
 func (s *pathCollectorSink) Add(f InputFile) { *s.out = append(*s.out, f.Path) }
 
-// ExpandArchive opens the archive at absPath and emits each file entry.
 func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, includes []string, outPath string, sink FileSink) error {
 	if !IsArchivePath(absPath) {
 		return nil

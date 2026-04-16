@@ -9,7 +9,6 @@ import (
 	"github.com/rasros/lx/pkg/lx/core"
 )
 
-// InputFile represents a file to be processed.
 type InputFile struct {
 	Path      string
 	AbsPath   string
@@ -22,8 +21,6 @@ type InputFile struct {
 	Open func() (io.ReadCloser, error)
 }
 
-// NewInputFile creates an InputFile from a generic fs.FS.
-// path must be a forward-slash separated path relative to the root of fsys.
 func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	return InputFile{
 		Path:    path,
@@ -36,7 +33,6 @@ func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	}
 }
 
-// NewInputFileFromPath is a helper that performs fs.Stat.
 func NewInputFileFromPath(fsys fs.FS, path string) (InputFile, error) {
 	info, err := fs.Stat(fsys, path)
 	if err != nil {
@@ -45,7 +41,6 @@ func NewInputFileFromPath(fsys fs.FS, path string) (InputFile, error) {
 	return NewInputFile(fsys, path, info), nil
 }
 
-// NewBufferInputFile creates an InputFile from an in-memory byte slice.
 func NewBufferInputFile(name string, data []byte) InputFile {
 	return InputFile{
 		Path:    name,

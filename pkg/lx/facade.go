@@ -86,7 +86,6 @@ func ExtractDocumentText(path string, r io.ReaderAt, size int64) ([]byte, error)
 	return sources.ExtractDocumentText(path, r, size)
 }
 
-// Stream is a compatibility facade over the streaming subpackage.
 type Stream struct {
 	inner *streamingpkg.Stream
 	items []interface{}
@@ -152,7 +151,6 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error { return s.inne
 func (s *Stream) GetEngine() *TemplateEngine { return s.inner.GetEngine() }
 
 func (s *Stream) setWorkDir(dir string) {
-	// Preserved for compatibility with package-internal callers.
 	_ = dir
 }
 
@@ -160,13 +158,10 @@ type streamSink struct{ s *Stream }
 
 func (ss streamSink) Add(f InputFile) { ss.s.AddFile(f) }
 
-// ExpandArchive opens the archive at absPath and adds each entry to stream.
 func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string, outPath string, stream *Stream) error {
 	return sources.ExpandArchive(ctx, absPath, displayPath, walker, includes, outPath, streamSink{s: stream})
 }
 
-// ExpandArchivePaths opens the archive at absPath and returns the display paths
-// of all matching entries without reading their content.
 func ExpandArchivePaths(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string) ([]string, error) {
 	return sources.ExpandArchivePaths(ctx, absPath, displayPath, walker, includes)
 }

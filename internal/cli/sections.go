@@ -7,23 +7,16 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-// Section holds all state and actions for one logical section of file operations.
-// A new section begins whenever a CmdInterleaved op appears after file actions,
-// resetting all interleaved state (RunCfg, Includes, Excludes) to defaults before
-// the new flag takes effect.
 type Section struct {
 	RunCfg   lx.RunnerConfig
 	Includes []string
 	Excludes []string
-	Ops      []Op // CmdAction ops in stream order
+	Ops      []Op
 
-	// Populated by precomputeTrees; keyed by index within Ops.
-	treeStrings map[int]string // tree/tree-only op index → ASCII tree string
-	skipFileOps map[int]bool   // FILE/file op index → suppress content (tree-only mode)
+	treeStrings map[int]string
+	skipFileOps map[int]bool
 }
 
-// parseSections splits a flat list of ops into sections.
-// reorderTrailingOps should be applied to ops before calling this.
 func parseSections(ops []Op, defaultRunCfg lx.RunnerConfig) []Section {
 	var sections []Section
 	current := Section{RunCfg: defaultRunCfg}
@@ -33,7 +26,6 @@ func parseSections(ops []Op, defaultRunCfg lx.RunnerConfig) []Section {
 		switch op.Type {
 		case CmdInterleaved:
 			if hasFiles {
-				// Section boundary: flush the current section and start a fresh one.
 				sections = append(sections, current)
 				current = Section{RunCfg: defaultRunCfg}
 				hasFiles = false
@@ -52,7 +44,6 @@ func parseSections(ops []Op, defaultRunCfg lx.RunnerConfig) []Section {
 	return sections
 }
 
-// applyInterleaved updates a section's settings from a single CmdInterleaved op.
 func applyInterleaved(op Op, s *Section) {
 	switch op.Action {
 	case "head":

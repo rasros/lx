@@ -204,7 +204,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 				if lx.IsHTTPURL(rawPath) {
 					if cfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
-						// Expandable archives bypass the include check: the filter applies to their contents.
 						if !isForced && !lx.IsKept(rawPath, nil, section.Excludes) {
 							slog.Debug("Skipping URL archive due to exclude filter", "url", rawPath)
 							continue
@@ -257,7 +256,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 				stat, err := os.Stat(absPath)
 				if err != nil {
-					// Prevent stat errors if the missing file (e.g., from git diff) is filtered out anyway
 					if !isForced && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
 						slog.Debug("Skipping missing path due to filters", "path", rawPath)
 						continue
@@ -267,8 +265,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				}
 
 				if !stat.IsDir() {
-					// Prevent processing an explicit file argument if it matches an exclude filter.
-					// Expandable archives bypass the include check: the filter applies to their contents.
 					isExpandableArchive := cfg.ExpandArchives && lx.IsArchivePath(rawPath)
 					if !isForced && !isExpandableArchive && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
 						slog.Debug("Skipping file due to filters", "path", rawPath)
@@ -334,7 +330,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						return nil
 					}
 
-					// Reconstruct display path relative to user input
 					var effectivePath string
 					if !stat.IsDir() {
 						if displayPrefix != "" {
@@ -350,7 +345,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						}
 					}
 
-					// Skip directory symlinks to avoid recursion issues and IO errors
 					if (d.Type() & fs.ModeSymlink) != 0 {
 						if cfg.IgnoreFileSymlinks {
 							return nil
@@ -362,7 +356,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						}
 					}
 
-					// Expand archives inline before include filtering
 					if cfg.ExpandArchives && lx.IsArchivePath(path) {
 						var archiveAbsPath string
 						if stat.IsDir() {
@@ -384,7 +377,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						return nil
 					}
 
-					// Post-walk filtering for includes (weak filter, respects .gitignore)
 					if !isForced && len(section.Includes) > 0 {
 						matched := false
 						for _, inc := range section.Includes {

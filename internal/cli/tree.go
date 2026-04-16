@@ -12,11 +12,6 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-// precomputeTrees walks each section that contains a tree or tree-only op,
-// collecting file paths and building ASCII tree strings. Within each group, section
-// ops act as sub-boundaries: each section-delimited run of ops gets its own tree.
-// Results are stored in the group's treeStrings and skipFileOps maps, keyed by the
-// op's index within the group's Ops slice.
 func precomputeTrees(ctx context.Context, groups []Section, cfg *lx.Config, globalIgnoreRules []string) {
 	for i := range groups {
 		computeSectionTrees(ctx, &groups[i], cfg, globalIgnoreRules)
@@ -62,9 +57,6 @@ func computeSectionTrees(ctx context.Context, g *Section, cfg *lx.Config, global
 		case "section":
 			flush()
 		case "tree":
-			// Flush any preceding file ops so they are rendered as content,
-			// not absorbed into this tree group.
-			flush()
 			subTreeIdxs = append(subTreeIdxs, oi)
 		case "tree-only":
 			// Flush any preceding file ops so they are rendered as content,
@@ -79,20 +71,16 @@ func computeSectionTrees(ctx context.Context, g *Section, cfg *lx.Config, global
 	flush()
 }
 
-// collectTreePaths walks a single FILE or file op and returns all file paths
-// that would be included, using the same logic as the main processing loop.
 func collectTreePaths(ctx context.Context, op Op, cfg *lx.Config, includes, excludes []string, globalIgnoreRules []string) []string {
 	var paths []string
 
 	rawPath := op.Value
 	isForced := op.Action == "file"
 
-	// Skip stdin — it can't be walked for tree purposes
 	if rawPath == "-" {
 		return paths
 	}
 
-	// For URLs: expand archive to collect paths when enabled; otherwise skip
 	if lx.IsHTTPURL(rawPath) {
 		if cfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
 			return collectURLArchiveTreePaths(ctx, rawPath, cfg, includes)
@@ -168,9 +156,6 @@ func collectTreePaths(ctx context.Context, op Op, cfg *lx.Config, includes, excl
 	return paths
 }
 
-// collectURLArchiveTreePaths downloads the archive at rawPath and walks its
-// contents to return the display paths that would be included. The temp file is
-// removed before returning, since only the path strings are needed.
 func collectURLArchiveTreePaths(ctx context.Context, rawPath string, cfg *lx.Config, includes []string) []string {
 	tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
 	if err != nil {
@@ -188,7 +173,6 @@ func collectURLArchiveTreePaths(ctx context.Context, rawPath string, cfg *lx.Con
 	return paths
 }
 
-// treeNode is an internal node in the path trie used to build the ASCII tree.
 type treeNode struct {
 	children   map[string]*treeNode
 	childOrder []string
@@ -198,7 +182,6 @@ func newTreeNode() *treeNode {
 	return &treeNode{children: make(map[string]*treeNode)}
 }
 
-// buildASCIITree converts a flat list of file paths into an ASCII directory tree.
 func buildASCIITree(paths []string) string {
 	root := newTreeNode()
 
@@ -228,9 +211,7 @@ func buildASCIITree(paths []string) string {
 
 	switch len(topLevel) {
 	case 0:
-		// nothing to render
 	case 1:
-		// Single root entry: print it as the root line, then its children
 		name := topLevel[0]
 		child := root.children[name]
 		displayName := name
@@ -240,7 +221,6 @@ func buildASCIITree(paths []string) string {
 		buf.WriteString(displayName + "\n")
 		renderTreeChildren(&buf, child, "")
 	default:
-		// Multiple root entries: use connector lines for all top-level entries
 		renderTreeChildren(&buf, root, "")
 	}
 
@@ -253,7 +233,7 @@ func sortTreeNode(node *treeNode) {
 		iIsDir := len(node.children[ni].children) > 0
 		jIsDir := len(node.children[nj].children) > 0
 		if iIsDir != jIsDir {
-			return iIsDir // directories before files
+			return iIsDir
 		}
 		return ni < nj
 	})
