@@ -165,16 +165,8 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Wal
 	return sources.ExpandArchive(ctx, absPath, displayPath, walker, includes, outPath, streamSink{s: stream})
 }
 
-type pathCollectorSink struct{ out *[]string }
-
-func (s *pathCollectorSink) Add(f sources.InputFile) { *s.out = append(*s.out, f.Path) }
-
 // ExpandArchivePaths opens the archive at absPath and returns the display paths
 // of all matching entries without reading their content.
 func ExpandArchivePaths(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string) ([]string, error) {
-	var paths []string
-	if err := sources.ExpandArchive(ctx, absPath, displayPath, walker, includes, "", &pathCollectorSink{out: &paths}); err != nil {
-		return nil, err
-	}
-	return paths, nil
+	return sources.ExpandArchivePaths(ctx, absPath, displayPath, walker, includes)
 }

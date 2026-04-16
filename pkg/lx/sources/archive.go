@@ -44,6 +44,21 @@ type FileSink interface {
 	Add(InputFile)
 }
 
+// ExpandArchivePaths opens the archive at absPath and returns the display paths
+// of all matching entries without reading their content.
+func ExpandArchivePaths(ctx context.Context, absPath, displayPath string, w *walker.Walker, includes []string) ([]string, error) {
+	var paths []string
+	sink := &pathCollectorSink{out: &paths}
+	if err := ExpandArchive(ctx, absPath, displayPath, w, includes, "", sink); err != nil {
+		return nil, err
+	}
+	return paths, nil
+}
+
+type pathCollectorSink struct{ out *[]string }
+
+func (s *pathCollectorSink) Add(f InputFile) { *s.out = append(*s.out, f.Path) }
+
 // ExpandArchive opens the archive at absPath and emits each file entry.
 func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, includes []string, outPath string, sink FileSink) error {
 	if !IsArchivePath(absPath) {
