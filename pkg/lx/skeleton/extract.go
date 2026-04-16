@@ -5,6 +5,7 @@ import (
 
 	"github.com/odvcencio/gotreesitter"
 	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/skeleton/langs"
 )
 
 // parseMu serializes all parser.Parse calls to work around a data race in
@@ -67,7 +68,7 @@ func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines 
 			if def.emitFunc != nil {
 				out = def.emitFunc(out, src, lines, node, lang)
 			} else {
-				out = emitFuncSig(out, lines, node, lang, def.indentBody, def.bodyChildType, def.singleLineSig)
+				out = langs.EmitFuncSig(out, lines, node, lang, def.indentBody, def.bodyChildType, def.singleLineSig)
 			}
 		}
 	case structs && containsStr(def.structTypes, nodeType):

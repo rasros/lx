@@ -98,6 +98,49 @@ func TestGo_Both(t *testing.T) {
 	}
 }
 
+func TestGo_GroupedTypeDeclNoDuplication(t *testing.T) {
+	src := []byte(`package p
+
+type (
+	Public struct {
+		X int
+		y int
+	}
+	alias int
+	Name string
+	API interface {
+		Call()
+		hidden()
+	}
+)
+`)
+	out := string(Extract("go", src, true, true))
+	if strings.Count(out, "type (") != 1 {
+		t.Errorf("expected grouped type header once, got:\n%s", out)
+	}
+	if strings.Count(out, "Public struct {") != 1 {
+		t.Errorf("expected Public struct once, got:\n%s", out)
+	}
+	if !strings.Contains(out, "X int") {
+		t.Errorf("expected exported field X, got:\n%s", out)
+	}
+	if strings.Contains(out, "y int") {
+		t.Errorf("unexported field y should not appear:\n%s", out)
+	}
+	if strings.Contains(out, "alias int") {
+		t.Errorf("unexported alias should not appear:\n%s", out)
+	}
+	if !strings.Contains(out, "Name string") {
+		t.Errorf("expected exported alias Name, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Call()") {
+		t.Errorf("expected exported interface method Call, got:\n%s", out)
+	}
+	if strings.Contains(out, "hidden()") {
+		t.Errorf("unexported interface method should not appear:\n%s", out)
+	}
+}
+
 var cSrc = `#include <stdio.h>
 
 typedef struct Point {
@@ -173,6 +216,18 @@ func TestC_ControlFlowExcluded(t *testing.T) {
 	}
 }
 
+func TestC_SingleLineBodyExcluded(t *testing.T) {
+	src := []byte(`int add(int a, int b) { return a + b; }
+`)
+	out := string(Extract("c", src, true, false))
+	if !strings.Contains(out, "int add(int a, int b)") {
+		t.Errorf("expected add() signature, got:\n%s", out)
+	}
+	if strings.Contains(out, "return a + b") {
+		t.Errorf("single-line function body should not appear:\n%s", out)
+	}
+}
+
 var javaSrc = `package com.example;
 
 import java.util.List;
@@ -241,6 +296,22 @@ func TestJava_Both(t *testing.T) {
 	}
 	if strings.Contains(out, "return value + x") {
 		t.Errorf("method body should not appear:\n%s", out)
+	}
+}
+
+func TestJava_AnnotatedPrivateMethodExcluded(t *testing.T) {
+	src := []byte(`class A {
+	@Deprecated
+	private int secret() { return 1; }
+	public int ok() { return 2; }
+}
+`)
+	out := string(Extract("java", src, true, true))
+	if strings.Contains(out, "secret(") {
+		t.Errorf("annotated private method should not appear:\n%s", out)
+	}
+	if !strings.Contains(out, "ok()") {
+		t.Errorf("expected public method ok(), got:\n%s", out)
 	}
 }
 
