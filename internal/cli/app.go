@@ -173,6 +173,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	ops := reorderTrailingOps(parsed.Ops)
 	slog.Debug("Processing operations", "total_ops", len(ops))
 
+	globalIgnoreRules := LoadGlobalIgnorePatterns()
+	treePrecomp := precomputeTreeStrings(ops, cfg, globalIgnoreRules)
+
 	for i, op := range ops {
 		slog.Debug("Processing op", "index", i, "action", op.Action, "value", op.Value)
 
@@ -229,6 +232,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			excludes = nil
 
 		case "FILE", "file":
+			if treePrecomp.skipFileOps[i] {
+				slog.Debug("Skipping file content (tree-only mode)", "path", op.Value)
+				continue
+			}
+
 			if op.Value == "-" {
 				slog.Info("Reading content from stdin")
 				data, err := io.ReadAll(os.Stdin)
@@ -340,7 +348,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			var overrideRules []string
 
 			if cfg.IgnoreEnabled {
-				baseRules = append(baseRules, LoadGlobalIgnorePatterns()...)
+				baseRules = append(baseRules, globalIgnoreRules...)
 			}
 
 			if cfg.IgnoreHidden && !isForced {
@@ -477,6 +485,13 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			}
 			slog.Debug("Walker finished", "root", rawPath, "files_found", count)
 
+		case "tree", "tree-only":
+			if body, ok := treePrecomp.strings[i]; ok {
+				slog.Debug("Adding tree", "lines", strings.Count(body, "\n")+1)
+				stream.AddTree(body)
+			} else {
+				slog.Debug("Skipping empty tree (no files in group)")
+			}
 		case "section":
 			slog.Debug("Adding section", "title", op.Value)
 			stream.AddSection(op.Value)

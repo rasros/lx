@@ -23,3 +23,4 @@ func setupSkeletonFixture(t *testing.T) string   { return gf.SetupSkeletonFixtur
 func setupRelativePathsFixture(t *testing.T) (string, string) {
 	return gf.SetupRelativePathsFixture(t)
 }
+func setupTreeFixture(t *testing.T) string { return gf.SetupTreeFixture(t) }

@@ -21,6 +21,7 @@ type CliConfig struct {
 	// Item-level Templates
 	SectionTemplate string `yaml:"section_template"`
 	PromptTemplate  string `yaml:"prompt_template"`
+	TreeTemplate    string `yaml:"tree_template"`
 
 	// Group/Wrapper Templates
 	SectionHeaderTemplate string `yaml:"section_header_template"`
@@ -95,6 +96,9 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		}
 		if loaded.PromptTemplate != "" {
 			lxCfg.PromptTemplate = loaded.PromptTemplate
+		}
+		if loaded.TreeTemplate != "" {
+			lxCfg.TreeTemplate = loaded.TreeTemplate
 		}
 
 		if loaded.SectionHeaderTemplate != "" {

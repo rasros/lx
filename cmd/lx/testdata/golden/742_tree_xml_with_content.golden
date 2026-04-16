@@ -1,0 +1,34 @@
+--- STDOUT ---
+<content>
+  <tree>
+src/
+├── sub/
+│   └── helper.go
+├── app.go
+└── app_test.go
+  </tree>
+
+  <document index="1" language="go" rows="1">
+    <source>src/app.go</source>
+    <document_content>
+package src
+    </document_content>
+  </document>
+
+  <document index="2" language="go" rows="1">
+    <source>src/app_test.go</source>
+    <document_content>
+package src
+    </document_content>
+  </document>
+
+  <document index="3" language="go" rows="1">
+    <source>src/sub/helper.go</source>
+    <document_content>
+package sub
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---

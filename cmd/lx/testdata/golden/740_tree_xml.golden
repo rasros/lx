@@ -1,0 +1,13 @@
+--- STDOUT ---
+<content>
+  <tree>
+src/
+├── sub/
+│   └── helper.go
+├── app.go
+└── app_test.go
+  </tree>
+</content>
+
+
+--- STDERR ---

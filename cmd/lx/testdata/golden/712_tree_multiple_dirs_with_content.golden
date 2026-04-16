@@ -1,0 +1,44 @@
+--- STDOUT ---
+```
+├── lib/
+│   ├── lib.go
+│   └── lib_test.go
+└── src/
+    ├── sub/
+    │   └── helper.go
+    ├── app.go
+    └── app_test.go
+```
+
+[1/5] src/app.go (1 rows)
+---
+```go
+package src
+```
+
+[2/5] src/app_test.go (1 rows)
+---
+```go
+package src
+```
+
+[3/5] src/sub/helper.go (1 rows)
+---
+```go
+package sub
+```
+
+[4/5] lib/lib.go (1 rows)
+---
+```go
+package lib
+```
+
+[5/5] lib/lib_test.go (1 rows)
+---
+```go
+package lib
+```
+
+
+--- STDERR ---
