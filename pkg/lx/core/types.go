@@ -34,6 +34,7 @@ type TemplateEngine struct {
 
 	Section *template.Template
 	Prompt  *template.Template
+	Tree    *template.Template
 
 	SectionHeader *template.Template
 	SectionFooter *template.Template
@@ -53,6 +54,7 @@ type Config struct {
 
 	SectionTemplate string
 	PromptTemplate  string
+	TreeTemplate    string
 
 	SectionHeaderTemplate string
 	SectionFooterTemplate string
@@ -106,6 +108,13 @@ type SectionContext struct {
 
 // PromptContext represents the data provided to custom text prompt templates.
 type PromptContext struct {
+	Body    string
+	Global  GlobalContext
+	Section SectionContext
+}
+
+// TreeContext represents the data provided to tree templates.
+type TreeContext struct {
 	Body    string
 	Global  GlobalContext
 	Section SectionContext

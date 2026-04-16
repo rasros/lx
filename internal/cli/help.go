@@ -44,10 +44,11 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
   token estimations.
 
   {{ "Stream Processing Model:" | bold }}
-  lx treats command-line arguments as a sequential stream. State modifiers (like
-  --lines or --include) are persistent: once a modifier is set, it applies to
-  all {{ "subsequent" | underline }} files and directories in the argument list
-  until it is explicitly changed or reset.
+  lx processes arguments as a stream of action groups: consecutive file and
+  directory arguments with no interleaved flags between them. Flags like
+  --lines or --include are scoped to the group they precede. When a flag
+  appears {{ "after" | underline }} files, it creates a group boundary —
+  all interleaved state resets to defaults before the new flag takes effect.
 
 {{ "Arguments:" | head }}
   {{ "[OPTIONS]" | bold }}
@@ -55,8 +56,9 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
           These can be placed anywhere in the command.
 
   {{ "[state modifiers]" | bold }}
-          Flags that alter the processing rules for subsequent files.
-          Example: "-n 50" limits the next files to 50 lines.
+          Flags that scope the processing rules for the next action group.
+          When placed after files, they reset all state before taking effect.
+          Example: "-n 50 src/" limits src/ to 50 lines per file.
 
   {{ "[actions]" | bold }}
           The inputs to process. These can be:
@@ -93,7 +95,9 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
 {{- end }}
 
 {{ "State modifiers:" | head }}
-  Flags that change the configuration for files appearing {{ "after" | underline }} them.
+  Flags scoped to the action group that follows. When placed after files, they
+  create a group boundary — resetting all state to defaults before the new flag
+  takes effect.
 
 {{- range .Interleaved }}
 {{ . | flagLine }}

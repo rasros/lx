@@ -296,23 +296,10 @@ containing spaces, newlines, or other special characters.`,
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
 		Usage:     "Enable line numbers for subsequent files",
-		Long: `Enable line numbers for all subsequent files in the stream.
+		Long: `Enable line numbers for the next action group.
 
-This adds a numbered prefix (e.g., " 1: ") to every line of code. This is
-extremely useful when asking an LLM to explain to reference exact locations 
-in follow-up prompts.`,
-	},
-	{
-		Category:  CatInterleaved,
-		Name:      "reset-line-numbers",
-		Short:     "L",
-		Type:      CmdInterleaved,
-		ValueType: ValueNone,
-		Usage:     "Disable line numbers for subsequent files (default)",
-		Long: `Disable line numbers for all subsequent files.
-
-Use this to turn off line numbering for a specific set of files after having
-enabled it previously with -l.`,
+This adds a numbered prefix (e.g., " 1: ") to every line of code. Extremely
+useful when asking an LLM to reference exact locations in follow-up prompts.`,
 	},
 	{
 		Category:  CatInterleaved,
@@ -330,17 +317,6 @@ Special Value:
   0: Enables 'compact' mode. The file content is skipped entirely, and only
      the filename and size are listed in the output. Useful for providing a
      file listing without consuming tokens.`,
-	},
-	{
-		Category:  CatInterleaved,
-		Name:      "reset-lines",
-		Short:     "N",
-		Type:      CmdInterleaved,
-		ValueType: ValueNone,
-		Usage:     "Reset slicing rules; print full content",
-		Long: `Reset any active line limits (head, tail, or lines).
-
-Subsequent files will be read and output in their entirety.`,
 	},
 	{
 		Category:  CatInterleaved,
@@ -399,30 +375,17 @@ Examples:
 	},
 	{
 		Category:  CatInterleaved,
-		Name:      "reset-filters",
-		Short:     "E",
-		Type:      CmdInterleaved,
-		ValueType: ValueNone,
-		Usage:     "Clear all active include/exclude filters",
-		Long: `Clear all active include (-i) and exclude (-e) filters.
-
-Subsequent directory traversals will include all files (subject to standard
-gitignore rules) until new filters are applied.`,
-	},
-	{
-		Category:  CatInterleaved,
 		Name:      "functions",
 		Short:     "u",
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
 		Usage:     "Show only function/method signatures for subsequent files",
-		Long: `Filter subsequent files to show only function and method signatures.
+		Long: `Filter files in the next action group to show only function and method signatures.
 
 Uses an AST-based parser to extract function definitions from source files.
 The filtered lines are then subject to normal head/tail slicing.
 
-Pairs with --types (-t) to show a full code skeleton.
-Use --reset-skeleton (-U) to turn off skeleton filtering.`,
+Pairs with --types (-Y) to show a full code skeleton.`,
 	},
 	{
 		Category:  CatInterleaved,
@@ -431,26 +394,13 @@ Use --reset-skeleton (-U) to turn off skeleton filtering.`,
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
 		Usage:     "Show only type/class definitions for subsequent files",
-		Long: `Filter subsequent files to show only type and class definitions,
+		Long: `Filter files in the next action group to show only type and class definitions,
 including their field/variable declarations.
 
 Uses an AST-based parser to extract type definitions from source files.
 The filtered lines are then subject to normal head/tail slicing.
 
-Pairs with --functions (-u) to show a full code skeleton.
-Use --reset-skeleton (-U) to turn off skeleton filtering.`,
-	},
-	{
-		Category:  CatInterleaved,
-		Name:      "reset-skeleton",
-		Short:     "U",
-		Type:      CmdInterleaved,
-		ValueType: ValueNone,
-		Usage:     "Disable all skeleton filters (functions and types)",
-		Long: `Disable all skeleton extraction filters for subsequent files.
-
-Subsequent files will be shown in full, as if --functions and --types
-had never been set.`,
+Pairs with --functions (-u) to show a full code skeleton.`,
 	},
 
 	{

@@ -62,14 +62,16 @@ func precomputeTreeStrings(ops []Op, cfg *lx.Config, globalIgnoreRules []string)
 
 	for i, op := range ops {
 		if op.Type == CmdInterleaved {
+			hasFilesInGroup := len(groupFileOpIdxs) > 0
 			flushGroup(simIncludes, simExcludes)
+			if hasFilesInGroup {
+				simIncludes, simExcludes = nil, nil
+			}
 			switch op.Action {
 			case "include":
 				simIncludes = append(simIncludes, op.Value)
 			case "exclude":
 				simExcludes = append(simExcludes, op.Value)
-			case "reset-filters":
-				simIncludes, simExcludes = nil, nil
 			}
 			continue
 		}

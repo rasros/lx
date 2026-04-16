@@ -147,11 +147,12 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		}
 	}
 
-	runCfg := lx.RunnerConfig{
+	defaultRunCfg := lx.RunnerConfig{
 		Head:        -1,
 		Tail:        0,
 		LineNumbers: false,
 	}
+	runCfg := defaultRunCfg
 
 	stream, err := lx.NewStream(cfg, runCfg)
 	if err != nil {
@@ -169,6 +170,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	}()
 
 	var includes, excludes []string
+	hasFileInGroup := false
 
 	ops := reorderTrailingOps(parsed.Ops)
 	slog.Debug("Processing operations", "total_ops", len(ops))
@@ -178,6 +180,17 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 	for i, op := range ops {
 		slog.Debug("Processing op", "index", i, "action", op.Action, "value", op.Value)
+
+		// Group boundary: when an interleaved flag follows file actions, reset all
+		// interleaved state to defaults before applying the new flag.
+		if op.Type == CmdInterleaved && hasFileInGroup {
+			runCfg = defaultRunCfg
+			includes = nil
+			excludes = nil
+			hasFileInGroup = false
+			stream.WithRunnerConfig(runCfg)
+			slog.Debug("Group boundary: resetting interleaved state")
+		}
 
 		switch op.Action {
 		case "head":
@@ -195,17 +208,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			slog.Debug("Setting lines limit", "value", val)
 			runCfg.Head, runCfg.Tail = (val+1)/2, val/2
 			stream.WithRunnerConfig(runCfg)
-		case "reset-lines":
-			slog.Debug("Resetting line limits")
-			runCfg.Head, runCfg.Tail = -1, 0
-			stream.WithRunnerConfig(runCfg)
 		case "line-numbers":
 			slog.Debug("Enabling line numbers")
 			runCfg.LineNumbers = true
-			stream.WithRunnerConfig(runCfg)
-		case "reset-line-numbers":
-			slog.Debug("Resetting line numbers")
-			runCfg.LineNumbers = false
 			stream.WithRunnerConfig(runCfg)
 		case "functions":
 			slog.Debug("Enabling function skeleton")
@@ -215,23 +220,14 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			slog.Debug("Enabling type skeleton")
 			runCfg.SkeletonTypes = true
 			stream.WithRunnerConfig(runCfg)
-		case "reset-skeleton":
-			slog.Debug("Resetting skeleton filters")
-			runCfg.SkeletonFunctions = false
-			runCfg.SkeletonTypes = false
-			stream.WithRunnerConfig(runCfg)
 		case "include":
 			slog.Debug("Adding include filter", "pattern", op.Value)
 			includes = append(includes, op.Value)
 		case "exclude":
 			slog.Debug("Adding exclude filter", "pattern", op.Value)
 			excludes = append(excludes, op.Value)
-		case "reset-filters":
-			slog.Debug("Resetting filters")
-			includes = nil
-			excludes = nil
-
 		case "FILE", "file":
+			hasFileInGroup = true
 			if treePrecomp.skipFileOps[i] {
 				slog.Debug("Skipping file content (tree-only mode)", "path", op.Value)
 				continue

@@ -25,16 +25,7 @@ main.go (2 rows)
 pkg/util.go (1 rows)
 ---
 ```go
-1: package pkg
-```
-
-## Reset
----
-
-src/script.py (1 rows)
----
-```python
-print('hello')
+package pkg
 ```
 
 

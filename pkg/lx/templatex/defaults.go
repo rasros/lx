@@ -21,6 +21,7 @@ type formatDefaults struct {
 	FileHeader    string
 	Section       string
 	Prompt        string
+	Tree          string
 	OutputHeader  string
 	OutputFooter  string
 	SectionHeader string
@@ -39,6 +40,7 @@ func getFormatDefaults(fmtType string) formatDefaults {
 			SectionHeader: defaultXMLSectionHeader,
 			SectionFooter: defaultXMLSectionFooter,
 			Prompt:        defaultXMLPrompt,
+			Tree:          defaultXMLTree,
 			OutputFooter:  defaultXMLOutputFooter,
 		}
 	case "html":
@@ -51,6 +53,7 @@ func getFormatDefaults(fmtType string) formatDefaults {
 			SectionHeader: defaultHTMLSectionHeader,
 			SectionFooter: defaultHTMLSectionFooter,
 			Prompt:        defaultHTMLPrompt,
+			Tree:          defaultHTMLTree,
 			OutputHeader:  defaultHTMLOutputHeader,
 			OutputFooter:  defaultHTMLOutputFooter,
 		}
@@ -63,6 +66,7 @@ func getFormatDefaults(fmtType string) formatDefaults {
 			FileHeader:   defaultMarkdownFileHeader,
 			Section:      defaultMarkdownSection,
 			Prompt:       defaultPrompt,
+			Tree:         defaultMarkdownTree,
 			OutputFooter: defaultMarkdownOutputFooter,
 		}
 	}
@@ -79,6 +83,7 @@ const defaultMarkdownBinary = `{{ template "file_header" . }} - binary file skip
 const defaultMarkdownCompact = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows{{ if .SkeletonMode }}, {{ .SkeletonMode }}{{ end }})`
 const defaultMarkdownSection = `## {{ .Body | endNewline }}---`
 const defaultPrompt = `{{ .Body | endNewline }}`
+const defaultMarkdownTree = "```\n" + `{{ .Body | endNewline -}}` + "```"
 const defaultMarkdownOutputFooter = "\n\n"
 
 const defaultXMLContent = `  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}"{{ if .SkeletonMode }} skeleton="{{ .SkeletonMode }}"{{ end }}>
@@ -107,6 +112,8 @@ const defaultXMLSectionFooter = `
 const defaultXMLPrompt = `  <instruction>` + "\n" +
 	`{{ .Body | endNewline }}` +
 	`  </instruction>`
+const defaultXMLTree = `  <tree>
+{{ .Body | endNewline }}  </tree>`
 const defaultXMLOutputFooter = "\n\n"
 
 const defaultHTMLOutputHeader = `<!DOCTYPE html>
@@ -212,6 +219,7 @@ const defaultHTMLSectionHeader = ``
 const defaultHTMLSection = `<section id="section-{{ .Index }}"><h2><a href="#section-{{ .Index }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>`
 const defaultHTMLSectionFooter = `</section>`
 const defaultHTMLPrompt = `<blockquote>{{ .Body | endNewline }}</blockquote>`
+const defaultHTMLTree = `<pre class="file-tree">{{ .Body | escape | endNewline }}</pre>`
 
 const defaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
 	`Size: {{ .Global.TotalWrittenBytes | humanize }}` + "\n" +

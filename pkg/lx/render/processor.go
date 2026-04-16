@@ -102,6 +102,12 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 		ctx = &v
 		templateToUse = p.engine.Prompt
 
+	case core.TreeContext:
+		v.Global = p.global
+		v.Section = *item.Section
+		ctx = &v
+		templateToUse = p.engine.Tree
+
 	default:
 		return nil
 	}

@@ -1,10 +1,10 @@
 --- STDOUT ---
-skeleton/main.py (31 rows)
+skeleton/main.py (8 rows, definitions)
 ---
 ```python
-# Animal hierarchy
-... (29 rows skipped)
-    return 0
+class Animal:
+... (6 rows skipped)
+) -> "Animal":
 ```
 
 

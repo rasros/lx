@@ -8,16 +8,16 @@ type Person struct {
 func (p Person) Greet() string {
 ```
 
-[2/3] skeleton/main.go (12 rows, definitions)
+[2/3] skeleton/main.go (32 rows)
 ---
 ```go
-type Person struct {
+package demo
 ```
 
-[3/3] skeleton/main.go (12 rows, definitions)
+[3/3] skeleton/main.go (32 rows)
 ---
 ```go
-func (p Person) Greet() string {
+func helper() {} // unexported helper
 ```
 
 

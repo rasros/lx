@@ -96,6 +96,11 @@ func (s *Stream) AddPrompt(text string) *Stream {
 	return s
 }
 
+func (s *Stream) AddTree(body string) *Stream {
+	s.items = append(s.items, core.TreeContext{Body: body})
+	return s
+}
+
 // Prepare calculates metadata and organizes items into sections before rendering.
 func (s *Stream) Prepare() core.GlobalContext {
 	if s.finalStats != nil {
