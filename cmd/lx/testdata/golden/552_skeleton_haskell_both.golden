@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.hs (20 rows, definitions)
+skeleton/main.hs (6 rows, definitions)
 ---
 ```haskell
 data Animal = Dog | Cat

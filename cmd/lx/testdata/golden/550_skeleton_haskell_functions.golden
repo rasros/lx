@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.hs (20 rows, function signatures)
+skeleton/main.hs (4 rows, function signatures)
 ---
 ```haskell
 greet :: String -> String

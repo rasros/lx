@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.go (32 rows, definitions)
+skeleton/main.go (12 rows, definitions)
 ---
 ```go
 ) Person {

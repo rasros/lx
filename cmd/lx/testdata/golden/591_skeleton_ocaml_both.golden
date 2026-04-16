@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.ml (36 rows, definitions)
+skeleton/main.ml (17 rows, definitions)
 ---
 ```ocaml
 type animal = Dog | Cat

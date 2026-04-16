@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.dart (30 rows, function signatures)
+skeleton/main.dart (5 rows, function signatures)
 ---
 ```dart
 String greet(String name) {

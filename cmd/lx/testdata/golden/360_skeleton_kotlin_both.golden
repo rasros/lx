@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.kt (47 rows, definitions)
+skeleton/main.kt (19 rows, definitions)
 ---
 ```kotlin
 data class Point(val x: Double, val y: Double)

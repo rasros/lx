@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.sh (16 rows, function signatures)
+skeleton/main.sh (3 rows, function signatures)
 ---
 ```bash
 greet() {

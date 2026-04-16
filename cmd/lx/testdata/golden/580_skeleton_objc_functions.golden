@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.m (20 rows, function signatures)
+skeleton/main.m (1 rows, function signatures)
 ---
 ```objectivec
 int standalone(int x) {

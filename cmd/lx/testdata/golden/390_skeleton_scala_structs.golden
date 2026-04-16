@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.scala (37 rows, type definitions)
+skeleton/main.scala (8 rows, type definitions)
 ---
 ```scala
 trait Shape {

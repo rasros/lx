@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.lua (15 rows, function signatures)
+skeleton/main.lua (4 rows, function signatures)
 ---
 ```lua
 function greet(

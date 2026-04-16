@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.zig (14 rows, function signatures)
+skeleton/main.zig (5 rows, function signatures)
 ---
 ```zig
 pub fn greet(name: []const u8) void {

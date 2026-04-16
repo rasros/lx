@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.c (21 rows, type definitions)
+skeleton/main.c (4 rows, type definitions)
 ---
 ```c
 typedef struct Point {
