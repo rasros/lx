@@ -1,51 +1,35 @@
 --- STDOUT ---
-README.md (2 rows)
+[1/5] README.md (2 rows)
 ---
 ```markdown
 # Project
 Documentation here.
 ```
 
-## All
----
-
-[1/6] README.md (2 rows)
----
-```markdown
-# Project
-Documentation here.
-```
-
-[2/6] ignore_test/foo.go (1 rows)
+[2/5] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[3/6] main.go (2 rows)
+[3/5] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[4/6] main_test.go (2 rows)
+[4/5] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[5/6] pkg/util.go (1 rows)
+[5/5] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
-```
-
-[6/6] src/script.py (1 rows)
----
-```python
-print('hello')
 ```
 
 

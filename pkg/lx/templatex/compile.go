@@ -67,6 +67,10 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("prompt template: %w", err)
 	}
+	tTree, err := parse("tree", pick(cfg.TreeTemplate, defaults.Tree))
+	if err != nil {
+		return nil, fmt.Errorf("tree template: %w", err)
+	}
 
 	tSecHeader, err := parse("section_header", pick(cfg.SectionHeaderTemplate, defaults.SectionHeader))
 	if err != nil {
@@ -97,6 +101,7 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		FileCompact:   tCompact,
 		Section:       tSection,
 		Prompt:        tPrompt,
+		Tree:          tTree,
 		SectionHeader: tSecHeader,
 		SectionFooter: tSecFooter,
 		OutputHeader:  tHeader,

@@ -36,6 +36,9 @@ func Merge(dst *Config, src *Config) {
 	if src.PromptTemplate != "" {
 		dst.PromptTemplate = src.PromptTemplate
 	}
+	if src.TreeTemplate != "" {
+		dst.TreeTemplate = src.TreeTemplate
+	}
 
 	if src.SectionHeaderTemplate != "" {
 		dst.SectionHeaderTemplate = src.SectionHeaderTemplate

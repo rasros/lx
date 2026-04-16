@@ -94,24 +94,22 @@ git diff --name-only main | lx -c
 
 ## Stream Processing Model
 
-`lx` reads arguments sequentially from left to right. Flags aren't global, they act as modifiers for whatever files come
-next, until you reset them.
+`lx` processes arguments left to right as a stream of **action groups** — consecutive file/directory arguments with
+no interleaved flags between them. Interleaved flags (like `-n`, `--tail`, `-l`, `-i`) are scoped to the group they
+precede. When a flag appears *after* files, it creates a **group boundary**: all interleaved state resets to defaults
+before the new flag takes effect.
 
-1. Modifiers: (`-n`, `--tail`, `-i`) Apply to subsequent files.
-2. Actions: (`file`, `dir/`) Capture the current state.
-3. Resets: (`-N`, `-E`) Clear active modifiers.
-
-Example: Grab the last 50 lines of a log file, then grab the entirety of `main.go` in one go.
+Example: Grab the last 50 lines of a log file, then `src/` with line numbers enabled:
 ```bash
-lx --tail 50 app.log -N src/main.go
+lx --tail 50 app.log -l src/
 ```
 
-| Argument      | Type     | Effect                                        |
-|---------------|----------|-----------------------------------------------|
-| `--tail 50`   | Modifier | Sets read strategy to the last 50 lines       |
-| `app.log`     | Action   | Gets processed using the tail strategy        |
-| `-N`          | Reset    | Clears the tail strategy back to full content |
-| `src/main.go` | Action   | Processed in full                             |
+| Argument    | Effect                                                              |
+|-------------|---------------------------------------------------------------------|
+| `--tail 50` | Sets tail for the next group                                        |
+| `app.log`   | Gets the last 50 lines                                              |
+| `-l`        | Group boundary: state resets to defaults, then line numbers enabled |
+| `src/`      | Gets full content with line numbers                                 |
 
 ## Output Formats
 

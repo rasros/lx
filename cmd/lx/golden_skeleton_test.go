@@ -50,8 +50,8 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "392_skeleton_php_structs", args: []string{"-Y", "skeleton/main.php"}},
 		{name: "393_skeleton_php_both", args: []string{"-u", "-Y", "skeleton/main.php"}},
 
-		{name: "394_skeleton_interleaved_reset", args: []string{"-u", "-Y", "skeleton/main.py", "--reset-skeleton", "skeleton/main.py"}},
-		{name: "395_skeleton_toggle_off", args: []string{"-u", "-Y", "skeleton/main.go", "--reset-skeleton", "skeleton/main.go"}},
+		{name: "394_skeleton_interleaved_reset", args: []string{"-u", "-Y", "skeleton/main.py", "-u", "skeleton/main.py"}},
+		{name: "395_skeleton_toggle_off", args: []string{"-u", "-Y", "skeleton/main.go", "-n", "2", "skeleton/main.go"}},
 
 		// 500-509: Dart
 		{name: "500_skeleton_dart_functions", args: []string{"-u", "skeleton/main.dart"}},
@@ -107,7 +107,7 @@ func TestGoldenSkeletonSlicing(t *testing.T) {
 		{name: "412_skeleton_tail_java_both", args: []string{"-u", "-Y", "--tail", "2", "skeleton/Main.java"}},
 
 		// 420-429: Interleaved state with slicing
-		{name: "420_skeleton_lines_after_reset", args: []string{"-u", "-Y", "--reset-skeleton", "--lines", "2", "skeleton/main.py"}},
+		{name: "420_skeleton_lines_after_reset", args: []string{"-u", "-Y", "--lines", "2", "skeleton/main.py"}},
 
 		// 430-439: New language slicing
 		{name: "430_skeleton_head_swift_both", args: []string{"-u", "-Y", "--head", "2", "skeleton/main.swift"}},
