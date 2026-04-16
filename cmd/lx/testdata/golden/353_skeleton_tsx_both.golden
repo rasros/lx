@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.tsx (13 rows)
+skeleton/main.tsx (38 rows, definitions)
 ---
 ```tsx
 export interface Props {

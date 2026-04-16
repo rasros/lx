@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.ts (16 rows)
+skeleton/main.ts (45 rows, definitions)
 ---
 ```typescript
 export interface Shape {

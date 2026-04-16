@@ -160,21 +160,37 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 	isImage := detect.IsImage(file.Path)
 	cfg := file.Config
 
-	if !isBinary && !isImage && (cfg.SkeletonFunctions || cfg.SkeletonStructs) && skeleton.Supported(lang) {
+	var skeletonMode string
+	var originalRows int
+	var originalExact bool
+	if !isBinary && !isImage && (cfg.SkeletonFunctions || cfg.SkeletonTypes) && skeleton.Supported(lang) {
 		allData := make([]byte, size)
 		if _, err := reader.ReadAt(allData, 0); err == nil {
-			filtered := skeleton.Extract(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonStructs)
+			originalRows, originalExact, _ = content.EstimateLineCount(reader, size, scratch)
+			filtered := skeleton.Extract(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes)
 			reader = bytes.NewReader(filtered)
 			size = int64(len(filtered))
 			if int64(headerLen) > size {
 				headerLen = int(size)
 			}
 			n, _ = reader.ReadAt(scratch[:headerLen], 0)
+			switch {
+			case cfg.SkeletonFunctions && cfg.SkeletonTypes:
+				skeletonMode = "definitions"
+			case cfg.SkeletonFunctions:
+				skeletonMode = "function signatures"
+			default:
+				skeletonMode = "type definitions"
+			}
 		}
 	}
 
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
 	totalRows, exact, _ := content.EstimateLineCount(reader, size, scratch)
+	if skeletonMode != "" {
+		totalRows = originalRows
+		exact = originalExact
+	}
 
 	var contentData interface{}
 	if !isBinary && !isCompact && size > 0 && !isImage {
@@ -214,6 +230,7 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 		IsCompactView: isCompact,
 		FileIndex:     index,
 		Global:        p.global,
+		SkeletonMode:  skeletonMode,
 	}, nil
 }
 

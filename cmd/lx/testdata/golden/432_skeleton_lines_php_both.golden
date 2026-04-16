@@ -1,10 +1,10 @@
 --- STDOUT ---
-skeleton/main.php (15 rows)
+skeleton/main.php (41 rows, definitions)
 ---
 ```php
 interface Shape {
     public function area(): float;
-... (12 rows skipped)
+... (38 rows skipped)
 ): int {
 ```
 

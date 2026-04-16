@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.rb (11 rows)
+skeleton/main.rb (37 rows, definitions)
 ---
 ```ruby
 class Animal

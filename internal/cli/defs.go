@@ -412,65 +412,44 @@ gitignore rules) until new filters are applied.`,
 	{
 		Category:  CatInterleaved,
 		Name:      "functions",
-		Short:     "F",
+		Short:     "u",
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
 		Usage:     "Show only function/method signatures for subsequent files",
 		Long: `Filter subsequent files to show only function and method signatures.
 
-Uses a simplified parser to extract function definitions from source files.
+Uses an AST-based parser to extract function definitions from source files.
 The filtered lines are then subject to normal head/tail slicing.
 
-Supported languages: C, C++, Java, Python.
-
-Pairs with --structs to show a full code skeleton.`,
+Pairs with --types (-t) to show a full code skeleton.
+Use --reset-skeleton (-U) to turn off skeleton filtering.`,
 	},
 	{
 		Category:  CatInterleaved,
-		Name:      "no-functions",
+		Name:      "types",
+		Short:     "t",
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
-		Usage:     "Disable function signature filtering for subsequent files",
-		Long: `Stop filtering function signatures for subsequent files.
-
-Use this to turn off function-only mode after having enabled it with -F.`,
-	},
-	{
-		Category:  CatInterleaved,
-		Name:      "structs",
-		Short:     "T",
-		Type:      CmdInterleaved,
-		ValueType: ValueNone,
-		Usage:     "Show only struct/class definitions for subsequent files",
-		Long: `Filter subsequent files to show only struct and class definitions,
+		Usage:     "Show only type/class definitions for subsequent files",
+		Long: `Filter subsequent files to show only type and class definitions,
 including their field/variable declarations.
 
-Uses a simplified parser to extract type definitions from source files.
+Uses an AST-based parser to extract type definitions from source files.
 The filtered lines are then subject to normal head/tail slicing.
 
-Supported languages: C, C++, Java, Python.
-
-Pairs with --functions to show a full code skeleton.`,
-	},
-	{
-		Category:  CatInterleaved,
-		Name:      "no-structs",
-		Type:      CmdInterleaved,
-		ValueType: ValueNone,
-		Usage:     "Disable struct/class filtering for subsequent files",
-		Long: `Stop filtering struct and class definitions for subsequent files.
-
-Use this to turn off struct-only mode after having enabled it with -T.`,
+Pairs with --functions (-u) to show a full code skeleton.
+Use --reset-skeleton (-U) to turn off skeleton filtering.`,
 	},
 	{
 		Category:  CatInterleaved,
 		Name:      "reset-skeleton",
+		Short:     "U",
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
-		Usage:     "Disable all skeleton filters (functions and structs)",
+		Usage:     "Disable all skeleton filters (functions and types)",
 		Long: `Disable all skeleton extraction filters for subsequent files.
 
-Subsequent files will be shown in full, as if --functions and --structs
+Subsequent files will be shown in full, as if --functions and --types
 had never been set.`,
 	},
 
