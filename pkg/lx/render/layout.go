@@ -1,23 +1,36 @@
-package lx
+package render
 
 import (
+	"bytes"
 	"io"
 	"text/template"
+
+	"github.com/rasros/lx/pkg/lx/core"
 )
 
-// layoutWriter acts as a middleman between the pipeline assembler and the output writer.
-type layoutWriter struct {
+// Result is one rendered item produced by the worker pipeline.
+type Result struct {
+	Index        int
+	Buffer       *bytes.Buffer
+	Stats        int64
+	IsCompact    bool
+	Err          error
+	SectionIndex int
+}
+
+// LayoutWriter acts as a middleman between the pipeline assembler and the output writer.
+type LayoutWriter struct {
 	w                io.Writer
-	engine           *TemplateEngine
-	sections         []*SectionContext
+	engine           *core.TemplateEngine
+	sections         []*core.SectionContext
 	enableSeparators bool
 	currentSecIdx    int
 	hasWritten       bool
 	lastIsCompact    bool
 }
 
-func newLayoutWriter(w io.Writer, engine *TemplateEngine, sections []*SectionContext, enableSeparators bool) *layoutWriter {
-	return &layoutWriter{
+func NewLayoutWriter(w io.Writer, engine *core.TemplateEngine, sections []*core.SectionContext, enableSeparators bool) *LayoutWriter {
+	return &LayoutWriter{
 		w:                w,
 		engine:           engine,
 		sections:         sections,
@@ -26,17 +39,17 @@ func newLayoutWriter(w io.Writer, engine *TemplateEngine, sections []*SectionCon
 	}
 }
 
-// WriteItem handles the logic for a single rendered item from the pipeline.
-func (lw *layoutWriter) WriteItem(res result) error {
-	if res.sectionIndex != lw.currentSecIdx {
-		if err := lw.handleSectionChange(res.sectionIndex); err != nil {
+// WriteItem handles a single rendered item from the pipeline.
+func (lw *LayoutWriter) WriteItem(res Result) error {
+	if res.SectionIndex != lw.currentSecIdx {
+		if err := lw.handleSectionChange(res.SectionIndex); err != nil {
 			return err
 		}
 	}
 
 	if lw.hasWritten && lw.enableSeparators {
 		sep := "\n\n"
-		if lw.lastIsCompact && res.isCompact {
+		if lw.lastIsCompact && res.IsCompact {
 			sep = "\n"
 		}
 		if _, err := lw.w.Write([]byte(sep)); err != nil {
@@ -44,16 +57,16 @@ func (lw *layoutWriter) WriteItem(res result) error {
 		}
 	}
 
-	if _, err := lw.w.Write(res.buffer.Bytes()); err != nil {
+	if _, err := lw.w.Write(res.Buffer.Bytes()); err != nil {
 		return err
 	}
 
 	lw.hasWritten = true
-	lw.lastIsCompact = res.isCompact
+	lw.lastIsCompact = res.IsCompact
 	return nil
 }
 
-func (lw *layoutWriter) handleSectionChange(newIdx int) error {
+func (lw *LayoutWriter) handleSectionChange(newIdx int) error {
 	if lw.currentSecIdx >= 0 {
 		if err := lw.renderTemplate(lw.engine.SectionFooter, lw.currentSecIdx); err != nil {
 			return err
@@ -77,15 +90,15 @@ func (lw *layoutWriter) handleSectionChange(newIdx int) error {
 }
 
 // Close ensures the final section is properly closed with a footer.
-func (lw *layoutWriter) Close() error {
+func (lw *LayoutWriter) Close() error {
 	if lw.currentSecIdx >= 0 {
 		return lw.renderTemplate(lw.engine.SectionFooter, lw.currentSecIdx)
 	}
 	return nil
 }
 
-func (lw *layoutWriter) renderTemplate(tmpl *template.Template, secIdx int) error {
-	var ctx SectionContext
+func (lw *LayoutWriter) renderTemplate(tmpl *template.Template, secIdx int) error {
+	var ctx core.SectionContext
 	found := false
 	for _, s := range lw.sections {
 		if s.Index == secIdx {

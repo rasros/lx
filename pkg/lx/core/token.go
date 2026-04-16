@@ -1,13 +1,8 @@
-package lx
+package core
 
 import "fmt"
 
-type TokenCounter func(size int64, content interface{}) int64
-
-type Tokenizer interface {
-	Estimate(size int64, content interface{}) int64
-}
-
+// DefaultTokenCounter returns rough estimate at ~4 bytes per token.
 func DefaultTokenCounter(size int64, content interface{}) int64 {
 	var targetSize int64 = size
 	switch v := content.(type) {

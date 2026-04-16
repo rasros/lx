@@ -1,10 +1,12 @@
-package lx
+package sources
 
 import (
 	"bytes"
 	"io"
 	"io/fs"
 	"time"
+
+	"github.com/rasros/lx/pkg/lx/core"
 )
 
 // InputFile represents a file to be processed.
@@ -15,7 +17,7 @@ type InputFile struct {
 	ModTime   time.Time
 	LoadError error
 
-	Config RunnerConfig
+	Config core.RunnerConfig
 
 	Open func() (io.ReadCloser, error)
 }
@@ -34,7 +36,7 @@ func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	}
 }
 
-// NewInputFileFromPath is a helper that performs fs.Stat
+// NewInputFileFromPath is a helper that performs fs.Stat.
 func NewInputFileFromPath(fsys fs.FS, path string) (InputFile, error) {
 	info, err := fs.Stat(fsys, path)
 	if err != nil {

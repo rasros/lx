@@ -1,4 +1,4 @@
-package lx
+package sources
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mholt/archives"
+	"github.com/rasros/lx/pkg/lx/walker"
 )
 
 // multi-part extensions must appear before their shorter suffix (.tar.gz before .gz).
@@ -38,8 +39,13 @@ func IsArchivePath(path string) bool {
 	return false
 }
 
-// ExpandArchive opens the archive at absPath and adds each entry to stream.
-func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string, outPath string, stream *Stream) error {
+// FileSink receives expanded archive files.
+type FileSink interface {
+	Add(InputFile)
+}
+
+// ExpandArchive opens the archive at absPath and emits each file entry.
+func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, includes []string, outPath string, sink FileSink) error {
 	if !IsArchivePath(absPath) {
 		return nil
 	}
@@ -51,7 +57,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Wal
 	archiveBase := filepath.ToSlash(filepath.Clean(displayPath))
 	count := 0
 
-	err = walker.Walk(fsys, ".", func(entryPath string, d fs.DirEntry, err error) error {
+	err = w.Walk(fsys, ".", func(entryPath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			slog.Warn("Error accessing archive entry", "archive", displayPath, "path", entryPath, "error", err)
 			return nil
@@ -65,7 +71,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Wal
 		if len(includes) > 0 {
 			matched := false
 			for _, inc := range includes {
-				if IsMatch(inc, entryPath) {
+				if walker.IsMatch(inc, entryPath) {
 					matched = true
 					break
 				}
@@ -113,7 +119,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Wal
 		}
 
 		slog.Debug("File accepted from archive", "path", f.Path, "size", f.Size)
-		stream.AddFile(f)
+		sink.Add(f)
 		count++
 		return nil
 	})

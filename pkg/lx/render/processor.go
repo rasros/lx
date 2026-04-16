@@ -1,4 +1,4 @@
-package lx
+package render
 
 import (
 	"bytes"
@@ -7,48 +7,70 @@ import (
 	"os"
 	"text/template"
 
+	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/internal"
 	"github.com/rasros/lx/pkg/lx/skeleton"
+	"github.com/rasros/lx/pkg/lx/sources"
 )
 
-type processor struct {
-	engine           *TemplateEngine
-	global           GlobalContext
-	tokenCounter     TokenCounter
+// FileErrorHandler handles per-file read errors.
+type FileErrorHandler func(f sources.InputFile, err error)
+
+// PreparedItem carries precomputed context for deterministic render order.
+type PreparedItem struct {
+	Raw              interface{}
+	Section          *core.SectionContext
+	FileIndexGlobal  int
+	FileIndexSection int
+	StreamIndex      int
+}
+
+// Processor renders prepared items into an output writer.
+type Processor struct {
+	engine           *core.TemplateEngine
+	global           core.GlobalContext
+	tokenCounter     core.TokenCounter
 	onFileError      FileErrorHandler
-	hasRenderedFirst bool
 	lastWasCompact   bool
 	format           string
 	extractDocuments bool
 }
 
-func newProcessor(engine *TemplateEngine, global GlobalContext, onError FileErrorHandler, format string, extractDocuments bool) *processor {
-	return &processor{
+func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext, onError FileErrorHandler, format string, extractDocuments bool) *Processor {
+	return &Processor{
 		engine:           engine,
 		global:           global,
 		onFileError:      onError,
-		tokenCounter:     DefaultTokenCounter,
+		tokenCounter:     core.DefaultTokenCounter,
 		format:           format,
 		extractDocuments: extractDocuments,
 	}
 }
 
-// RenderPrepared processes a preparedItem which contains pre-calculated context.
-func (p *processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []byte) error {
+func (p *Processor) SetTokenCounter(tc core.TokenCounter) {
+	if tc != nil {
+		p.tokenCounter = tc
+	}
+}
+
+func (p *Processor) LastWasCompact() bool { return p.lastWasCompact }
+
+// RenderPrepared processes one item containing pre-calculated section and indices.
+func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []byte) error {
 	var isCompact bool
 	var err error
 	var ctx interface{}
 	var templateToUse *template.Template
 
-	switch v := item.raw.(type) {
-	case InputFile:
-		var fCtx FileContext
-		fCtx, err = p.prepareFileContext(v, item.fileIndexGlobal, scratchBuf)
+	switch v := item.Raw.(type) {
+	case sources.InputFile:
+		var fCtx core.FileContext
+		fCtx, err = p.prepareFileContext(v, item.FileIndexGlobal, scratchBuf)
 		if err != nil {
 			return err
 		}
-		fCtx.Section = *item.section
-		fCtx.SectionFileIndex = item.fileIndexSection
+		fCtx.Section = *item.Section
+		fCtx.SectionFileIndex = item.FileIndexSection
 
 		isCompact = fCtx.IsCompactView
 		ctx = &fCtx
@@ -69,16 +91,14 @@ func (p *processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 			templateToUse = p.engine.FileContent
 		}
 
-	case SectionContext:
-		v = *item.section
-		isCompact = false
+	case core.SectionContext:
+		v = *item.Section
 		ctx = &v
 		templateToUse = p.engine.Section
 
-	case PromptContext:
+	case core.PromptContext:
 		v.Global = p.global
-		v.Section = *item.section
-		isCompact = false
+		v.Section = *item.Section
 		ctx = &v
 		templateToUse = p.engine.Prompt
 
@@ -90,18 +110,17 @@ func (p *processor) RenderPrepared(w io.Writer, item preparedItem, scratchBuf []
 		return err
 	}
 
-	p.hasRenderedFirst = true
 	p.lastWasCompact = isCompact
 	return nil
 }
 
-func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte) (FileContext, error) {
+func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratch []byte) (core.FileContext, error) {
 	rc, err := file.Open()
 	if err != nil {
 		if p.onFileError != nil {
 			p.onFileError(file, err)
 		}
-		return FileContext{
+		return core.FileContext{
 			Path:      file.Path,
 			AbsPath:   file.AbsPath,
 			Size:      file.Size,
@@ -116,7 +135,7 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 
 	if f, ok := rc.(*os.File); ok {
 		if stat, err := f.Stat(); err == nil && stat.IsDir() {
-			return FileContext{
+			return core.FileContext{
 				Path:      file.Path,
 				AbsPath:   file.AbsPath,
 				Size:      file.Size,
@@ -138,8 +157,8 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 		reader, size = bytes.NewReader(data), int64(len(data))
 	}
 
-	if p.extractDocuments && IsDocumentPath(file.Path) {
-		if text, err := ExtractDocumentText(file.Path, reader, size); err == nil {
+	if p.extractDocuments && sources.IsDocumentPath(file.Path) {
+		if text, err := sources.ExtractDocumentText(file.Path, reader, size); err == nil {
 			reader = bytes.NewReader(text)
 			size = int64(len(text))
 		}
@@ -194,7 +213,7 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 
 		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, effectiveCfg)
 		if err != nil {
-			return FileContext{
+			return core.FileContext{
 				Path:      file.Path,
 				AbsPath:   file.AbsPath,
 				Size:      file.Size,
@@ -208,7 +227,7 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 		contentData = p.formatContent(head, tail, gap, totalRows, effectiveCfg)
 	}
 
-	return FileContext{
+	return core.FileContext{
 		Path:          file.Path,
 		AbsPath:       file.AbsPath,
 		Size:          size,
@@ -226,7 +245,7 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 	}, nil
 }
 
-func (p *processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg RunnerConfig) (head, tail, gap []byte, err error) {
+func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg core.RunnerConfig) (head, tail, gap []byte, err error) {
 	if cfg.Head < 0 {
 		sr := io.NewSectionReader(reader, 0, size)
 		head, _, err = internal.ReadHead(sr, -1)
@@ -254,7 +273,7 @@ func (p *processor) readSlices(reader io.ReaderAt, size int64, totalRows int, is
 	return
 }
 
-func (p *processor) formatContent(head, tail, gap []byte, totalRows int, cfg RunnerConfig) interface{} {
+func (p *Processor) formatContent(head, tail, gap []byte, totalRows int, cfg core.RunnerConfig) interface{} {
 	if cfg.LineNumbers {
 		return internal.LineNumberFormatter{Head: head, Gap: gap, Tail: tail, TotalRows: totalRows}
 	}

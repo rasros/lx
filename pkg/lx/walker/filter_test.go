@@ -1,4 +1,4 @@
-package lx
+package walker
 
 import (
 	"path/filepath"
