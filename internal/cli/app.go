@@ -245,6 +245,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			if lx.IsHTTPURL(rawPath) {
 				if cfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
+					// Expandable archives bypass the include check: the filter applies to their contents.
 					if !isForced && !lx.IsKept(rawPath, nil, excludes) {
 						slog.Debug("Skipping URL archive due to exclude filter", "url", rawPath)
 						continue
