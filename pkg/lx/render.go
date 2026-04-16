@@ -161,12 +161,9 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 	cfg := file.Config
 
 	var skeletonMode string
-	var originalRows int
-	var originalExact bool
 	if !isBinary && !isImage && (cfg.SkeletonFunctions || cfg.SkeletonTypes) && skeleton.Supported(lang) {
 		allData := make([]byte, size)
 		if _, err := reader.ReadAt(allData, 0); err == nil {
-			originalRows, originalExact, _ = content.EstimateLineCount(reader, size, scratch)
 			filtered := skeleton.Extract(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes)
 			reader = bytes.NewReader(filtered)
 			size = int64(len(filtered))
@@ -187,10 +184,6 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
 	totalRows, exact, _ := content.EstimateLineCount(reader, size, scratch)
-	if skeletonMode != "" {
-		totalRows = originalRows
-		exact = originalExact
-	}
 
 	var contentData interface{}
 	if !isBinary && !isCompact && size > 0 && !isImage {
