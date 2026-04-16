@@ -427,7 +427,7 @@ Use --reset-skeleton (-U) to turn off skeleton filtering.`,
 	{
 		Category:  CatInterleaved,
 		Name:      "types",
-		Short:     "t",
+		Short:     "Y",
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
 		Usage:     "Show only type/class definitions for subsequent files",
@@ -453,6 +453,46 @@ Subsequent files will be shown in full, as if --functions and --types
 had never been set.`,
 	},
 
+	{
+		Category:  CatActions,
+		Name:      "tree",
+		Short:     "T",
+		Type:      CmdAction,
+		ValueType: ValueNone,
+		Usage:     "Print file tree for the action group (with content)",
+		Long: `Print a file tree for all files in the current action group, then also
+include the file contents in the output. Use -t to suppress file content.
+
+The tree uses the same walker settings (filters, ignore rules) as the file
+listing, so it always matches the actual output.
+
+The flag can appear before or after the files it applies to:
+  lx -T src       (tree before src content)
+  lx src -T       (tree after src content)
+  lx . -T         (tree for the whole directory)
+
+An "action group" is a set of consecutive file arguments with no interleaved
+options or section markers between them. Each group renders its own tree:
+  lx -T src -s "Tests" test    (tree only for src, not test)
+  lx -T src -i "*.go" lib      (two groups: tree for src, no tree for lib)
+  lx -T src -f extra -- file2  (one group: tree covers src, extra, file2)`,
+	},
+	{
+		Category:  CatActions,
+		Name:      "tree-only",
+		Short:     "t",
+		Type:      CmdAction,
+		ValueType: ValueNone,
+		Usage:     "Print a file tree for the action group (no content)",
+		Long: `Print a file tree for all files in the current action group without
+including the file contents. This is useful for getting a structural overview.
+
+Behaves identically to -T except file contents are suppressed:
+  lx -t src       (show tree of src, no file content)
+  lx -t .         (show tree of current directory)
+
+See --tree (-T) for full details on action group semantics.`,
+	},
 	{
 		Category:  CatActions,
 		Name:      "file",

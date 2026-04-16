@@ -1,0 +1,14 @@
+--- STDOUT ---
+```
+├── lib/
+│   ├── lib.go
+│   └── lib_test.go
+└── src/
+    ├── sub/
+    │   └── helper.go
+    ├── app.go
+    └── app_test.go
+```
+
+
+--- STDERR ---
