@@ -24,7 +24,7 @@ func JavaEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
-		if javaIsPrivate(child, src) {
+		if javaIsPrivate(child, src, lang) {
 			continue
 		}
 		switch child.Type(lang) {
@@ -44,6 +44,14 @@ func JavaEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 	return out
 }
 
-func javaIsPrivate(n *gotreesitter.Node, src []byte) bool {
+func javaIsPrivate(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
+	mods := findChildByType(n, "modifiers", lang)
+	if mods != nil {
+		for i := 0; i < mods.ChildCount(); i++ {
+			if mods.Child(i).Type(lang) == "private" {
+				return true
+			}
+		}
+	}
 	return strings.HasPrefix(strings.TrimSpace(n.Text(src)), "private ")
 }
