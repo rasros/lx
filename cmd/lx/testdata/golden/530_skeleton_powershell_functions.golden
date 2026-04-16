@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.ps1 (3 rows)
+skeleton/main.ps1 (22 rows, function signatures)
 ---
 ```powershell
 function Get-Greeting {

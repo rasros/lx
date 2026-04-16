@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.c (6 rows)
+skeleton/main.c (21 rows, function signatures)
 ---
 ```c
 int add(int a, int b) {

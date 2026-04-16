@@ -69,19 +69,19 @@ func getFormatDefaults(fmtType string) formatDefaults {
 }
 
 const defaultMarkdownFileHeader = `{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }}`
-const defaultMarkdownContent = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
+const defaultMarkdownContent = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows{{ if .SkeletonMode }}, {{ .SkeletonMode }}{{ end }})
 ---
 ` + "```{{ .Language }}" + `
 {{ .Content | endNewline -}}` + "```"
 
 const defaultMarkdownError = `{{ template "file_header" . }} - error: {{ .ReadError }}`
 const defaultMarkdownBinary = `{{ template "file_header" . }} - binary file skipped ({{ .Size | humanize }})`
-const defaultMarkdownCompact = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)`
+const defaultMarkdownCompact = `{{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows{{ if .SkeletonMode }}, {{ .SkeletonMode }}{{ end }})`
 const defaultMarkdownSection = `## {{ .Body | endNewline }}---`
 const defaultPrompt = `{{ .Body | endNewline }}`
 const defaultMarkdownOutputFooter = "\n\n"
 
-const defaultXMLContent = `  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
+const defaultXMLContent = `  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}"{{ if .SkeletonMode }} skeleton="{{ .SkeletonMode }}"{{ end }}>
     <source>{{ .Path }}</source>
     <document_content>
 {{ .Content | endNewline }}    </document_content>

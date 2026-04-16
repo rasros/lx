@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.rs (19 rows)
+skeleton/main.rs (44 rows, definitions)
 ---
 ```rust
 pub struct User {

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.groovy (9 rows)
+skeleton/main.groovy (27 rows, definitions)
 ---
 ```groovy
 class Animal {

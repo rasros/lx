@@ -1,5 +1,5 @@
 --- STDOUT ---
-[1/2] skeleton/main.go (12 rows)
+[1/2] skeleton/main.go (32 rows, definitions)
 ---
 ```go
 type Person struct {
@@ -16,9 +16,15 @@ func NewWorker(
 func (p Person) Greet() string {
 ```
 
-[2/2] skeleton/main.go (6 rows)
+[2/2] skeleton/main.go (32 rows, definitions)
 ---
 ```go
+type Person struct {
+	Name string
+}
+type Worker interface {
+	Work()
+}
 func NewPerson(name string) Person {
 func NewWorker(
 	name string,

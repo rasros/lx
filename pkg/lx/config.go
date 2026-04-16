@@ -23,7 +23,7 @@ type RunnerConfig struct {
 	Tail              int
 	LineNumbers       bool
 	SkeletonFunctions bool
-	SkeletonStructs   bool
+	SkeletonTypes     bool
 }
 
 // TemplateEngine holds the parsed text/template instances.
@@ -261,6 +261,7 @@ type FileContext struct {
 	SectionFileIndex int
 	Global           GlobalContext
 	Section          SectionContext
+	SkeletonMode     string // non-empty when skeleton extraction is active
 }
 
 // SectionContext represents the data provided to section templates.

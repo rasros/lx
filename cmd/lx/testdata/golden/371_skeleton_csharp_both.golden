@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.cs (14 rows)
+skeleton/main.cs (35 rows, definitions)
 ---
 ```csharp
 public interface IShape {

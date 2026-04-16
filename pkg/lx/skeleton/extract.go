@@ -1,24 +1,42 @@
 package skeleton
 
 import (
+	"sync"
+
 	"github.com/odvcencio/gotreesitter"
 	"github.com/rasros/lx/pkg/lx/internal/content"
 )
 
-func extract(langName string, src []byte, functions, structs bool) []byte {
+// parseMu serializes all parser.Parse calls to work around a data race in
+// gotreesitter's global dfaTokenSourcePool: a parser can release a token
+// source to the pool during recovery sub-parses and then call Reset() on it,
+// while a concurrent goroutine's parser picks up the same object from the
+// pool. Serializing Parse calls prevents concurrent pool access.
+var parseMu sync.Mutex
+
+func extract(langName string, src []byte, functions, structs bool) (out []byte) {
+	defer func() {
+		if r := recover(); r != nil {
+			out = src
+		}
+	}()
+
 	def, ok := langDefs[langName]
 	if !ok {
 		return src
 	}
 	lang := def.newLang()
 	parser := gotreesitter.NewParser(lang)
+
+	parseMu.Lock()
 	tree, err := parser.Parse(src)
+	parseMu.Unlock()
+
 	if err != nil {
 		return src
 	}
 	root := tree.RootNode()
 	lines := content.SplitLines(src)
-	var out []byte
 
 	for i := 0; i < root.ChildCount(); i++ {
 		out = def.processNode(root.Child(i), out, src, lines, lang, functions, structs)

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.m (10 rows)
+skeleton/main.m (20 rows, type definitions)
 ---
 ```objectivec
 @interface Animal : NSObject

@@ -1,5 +1,5 @@
 --- STDOUT ---
-[1/2] skeleton/main.py (8 rows)
+[1/2] skeleton/main.py (31 rows, definitions)
 ---
 ```python
 class Animal:
