@@ -67,6 +67,16 @@ func NewBufferInputFile(name string, data []byte) InputFile {
 	return sources.NewBufferInputFile(name, data)
 }
 
+func IsHTTPURL(raw string) bool { return sources.IsHTTPURL(raw) }
+
+func IsHTTPArchiveURL(raw string) bool { return sources.IsHTTPArchiveURL(raw) }
+
+func NewURLInputFile(raw string) (InputFile, error) { return sources.NewURLInputFile(raw) }
+
+func DownloadURLToTempFile(ctx context.Context, raw string) (path string, cleanup func(), err error) {
+	return sources.DownloadURLToTempFile(ctx, raw)
+}
+
 func IsArchivePath(path string) bool { return sources.IsArchivePath(path) }
 
 func IsDocumentPath(path string) bool { return sources.IsDocumentPath(path) }

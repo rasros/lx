@@ -161,6 +161,12 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	stream.WithOnFileError(func(f lx.InputFile, err error) {
 		slog.Error("Failed to read file", "path", f.Path, "error", err)
 	})
+	var tempCleanups []func()
+	defer func() {
+		for _, cleanup := range tempCleanups {
+			cleanup()
+		}
+	}()
 
 	var includes, excludes []string
 
@@ -236,6 +242,48 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 			rawPath := op.Value
 			isForced := op.Action == "file"
+
+			if lx.IsHTTPURL(rawPath) {
+				if cfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
+					if !isForced && !lx.IsKept(rawPath, nil, excludes) {
+						slog.Debug("Skipping URL archive due to exclude filter", "url", rawPath)
+						continue
+					}
+
+					tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
+					if err != nil {
+						slog.Error("Failed to download URL archive", "url", rawPath, "error", err)
+						continue
+					}
+					tempCleanups = append(tempCleanups, cleanup)
+
+					archiveWalker := newArchiveWalker(cfg, isForced)
+					archiveWalker.OnIgnore = func(p, reason string) {
+						slog.Debug("Ignored in URL archive", "path", rawPath+"/"+p, "reason", reason)
+					}
+					archiveIncludes := includes
+					if isForced {
+						archiveIncludes = nil
+					}
+					if err := lx.ExpandArchive(ctx, tempPath, rawPath, archiveWalker, archiveIncludes, outPath, stream); err != nil {
+						slog.Error("Failed to expand URL archive", "url", rawPath, "error", err)
+					}
+					continue
+				}
+
+				if !isForced && !lx.IsKept(rawPath, includes, excludes) {
+					slog.Debug("Skipping URL due to filters", "url", rawPath)
+					continue
+				}
+				urlFile, err := lx.NewURLInputFile(rawPath)
+				if err != nil {
+					slog.Error("Failed to create URL input", "url", rawPath, "error", err)
+					continue
+				}
+				slog.Debug("URL accepted", "url", urlFile.Path)
+				stream.AddFile(urlFile)
+				continue
+			}
 
 			var fsys fs.FS
 			var walkRoot string
