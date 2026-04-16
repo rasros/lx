@@ -1,8 +1,12 @@
 package cli
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,6 +79,68 @@ func TestRun_StickyFlags(t *testing.T) {
 
 	if strings.Contains(out, "line3") {
 		t.Errorf("Output should have been sliced. Got:\n%s", out)
+	}
+}
+
+func TestRun_HTTPURLInput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %s, want GET", r.Method)
+		}
+		_, _ = w.Write([]byte("hello from remote"))
+	}))
+	defer server.Close()
+
+	url := server.URL + "/sample.txt"
+	out, err := captureStdout(func() error {
+		return Run(context.Background(), []string{url})
+	})
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+	if !strings.Contains(out, url) {
+		t.Fatalf("output missing URL %q. Got:\n%s", url, out)
+	}
+	if !strings.Contains(out, "hello from remote") {
+		t.Fatalf("output missing remote body. Got:\n%s", out)
+	}
+}
+
+func TestRun_HTTPURLArchiveInput_Expand(t *testing.T) {
+	var zipBuf bytes.Buffer
+	zw := zip.NewWriter(&zipBuf)
+	w, err := zw.Create("repo-main/README.md")
+	if err != nil {
+		t.Fatalf("Create zip entry: %v", err)
+	}
+	if _, err := w.Write([]byte("hello archive")); err != nil {
+		t.Fatalf("Write zip entry: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("Close zip writer: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %s, want GET", r.Method)
+		}
+		w.Header().Set("Content-Type", "application/zip")
+		_, _ = w.Write(zipBuf.Bytes())
+	}))
+	defer server.Close()
+
+	url := server.URL + "/main.zip"
+	out, err := captureStdout(func() error {
+		return Run(context.Background(), []string{"-Z", url})
+	})
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+	if !strings.Contains(out, url+"/repo-main/README.md") {
+		t.Fatalf("output missing expanded archive entry. Got:\n%s", out)
+	}
+	if !strings.Contains(out, "hello archive") {
+		t.Fatalf("output missing expanded archive content. Got:\n%s", out)
 	}
 }
 
