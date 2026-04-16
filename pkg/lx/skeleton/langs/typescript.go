@@ -7,7 +7,7 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal/content"
 )
 
-// TSEmitClassOrInterface handles TypeScript/JavaScript class and interface declarations.
+// TSEmitClassOrInterface emits skeleton for TypeScript/JavaScript class and interface declarations.
 func TSEmitClassOrInterface(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
 	if n.Type(lang) == "interface_declaration" {
 		return tsEmitInterface(out, src, lines, n, lang)
@@ -80,7 +80,6 @@ func TSEmitFunc(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *got
 	if n.Type(lang) == "function_declaration" {
 		return emitFuncSig(out, lines, n, lang, false, "")
 	}
-	// lexical_declaration: emit only if it wraps an arrow_function or function_expression.
 	decl := findChildByType(n, "variable_declarator", lang)
 	if decl == nil {
 		return out

@@ -15,7 +15,6 @@ func RubyEmitClassOrModule(out, src []byte, lines [][]byte, n *gotreesitter.Node
 	if body == nil {
 		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
-	// Emit just the header line (class/module declaration)
 	headerLine := int(n.StartPoint().Row)
 	out = content.AppendLine(out, lines, headerLine)
 
@@ -34,19 +33,12 @@ func RubyEmitClassOrModule(out, src []byte, lines [][]byte, n *gotreesitter.Node
 			if !isPrivate && functions {
 				out = emitFuncSig(out, lines, child, lang, true, "")
 			}
-		case "call":
-			// attr_reader, attr_writer, attr_accessor, etc.
-			if !isPrivate {
-				out = content.AppendLine(out, lines, int(child.StartPoint().Row))
-			}
-		case "assignment":
-			// Class constants (e.g., MAX = 100)
+		case "call", "assignment":
 			if !isPrivate {
 				out = content.AppendLine(out, lines, int(child.StartPoint().Row))
 			}
 		}
 	}
-	// Emit closing "end"
 	endRow := int(n.EndPoint().Row)
 	if endRow > headerLine {
 		out = content.AppendLine(out, lines, endRow)

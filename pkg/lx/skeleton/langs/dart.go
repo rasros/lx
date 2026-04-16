@@ -36,9 +36,7 @@ func DartEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 	return out
 }
 
-// dartMemberIsPrivate returns true if the member's name starts with "_".
-// Dart uses the "_" prefix (library-private) rather than access modifiers.
-// We parse the first line of the member: the name is the last word before "(" or ";".
+// dartMemberIsPrivate reports library-private members via "_" prefix.
 func dartMemberIsPrivate(lines [][]byte, n *gotreesitter.Node) bool {
 	row := int(n.StartPoint().Row)
 	if row >= len(lines) {

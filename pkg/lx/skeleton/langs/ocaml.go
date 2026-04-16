@@ -44,13 +44,10 @@ func ocamlEmitModule(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 	if structure == nil {
 		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
-	// Header: "module Name = struct"
 	out = content.AppendLines(out, lines, int(n.StartPoint().Row), int(structure.StartPoint().Row))
-	// Members (value_definition, type_definition filtered via OCamlEmitDefinition)
 	for i := 0; i < structure.ChildCount(); i++ {
 		out = OCamlEmitDefinition(out, src, lines, structure.Child(i), lang, functions)
 	}
-	// Closing "end"
 	if endRow := int(structure.EndPoint().Row); endRow > int(structure.StartPoint().Row) {
 		out = content.AppendLine(out, lines, endRow)
 	}
