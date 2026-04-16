@@ -1,4 +1,4 @@
-package detect
+package internal
 
 import (
 	"bytes"

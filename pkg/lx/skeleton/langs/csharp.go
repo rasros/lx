@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func CSharpEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
@@ -13,11 +13,11 @@ func CSharpEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		body = findChildByType(n, "declaration_list", lang)
 	}
 	if body == nil {
-		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = content.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.AppendLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		if csIsPrivate(child, src, lang) {
@@ -25,7 +25,7 @@ func CSharpEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		}
 		switch child.Type(lang) {
 		case "field_declaration", "property_declaration":
-			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "method_declaration", "constructor_declaration":
 			if functions {
 				out = emitFuncSig(out, lines, child, lang, false, "")
@@ -35,7 +35,7 @@ func CSharpEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }

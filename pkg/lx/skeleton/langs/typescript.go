@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 // TSEmitClassOrInterface emits skeleton for TypeScript/JavaScript class and interface declarations.
@@ -18,11 +18,11 @@ func TSEmitClassOrInterface(out, src []byte, lines [][]byte, n *gotreesitter.Nod
 func tsEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
 	body := findChildByType(n, "class_body", lang)
 	if body == nil {
-		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = content.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.AppendLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		if tsIsPrivate(child, src, lang) {
@@ -30,7 +30,7 @@ func tsEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *go
 		}
 		switch child.Type(lang) {
 		case "public_field_definition", "field_definition":
-			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "method_definition":
 			if functions {
 				out = emitFuncSig(out, lines, child, lang, false, "")
@@ -38,7 +38,7 @@ func tsEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *go
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }
@@ -49,20 +49,20 @@ func tsEmitInterface(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		body = findChildByType(n, "interface_body", lang)
 	}
 	if body == nil {
-		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = content.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.AppendLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		switch child.Type(lang) {
 		case "method_signature", "property_signature", "call_signature", "construct_signature", "index_signature":
-			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }
@@ -95,7 +95,7 @@ func TSEmitFunc(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *got
 	body := val.ChildByFieldName("body", lang)
 	startRow := int(n.StartPoint().Row)
 	if body != nil && body.Type(lang) == "statement_block" {
-		return content.AppendLines(out, lines, startRow, int(body.StartPoint().Row))
+		return internal.AppendLines(out, lines, startRow, int(body.StartPoint().Row))
 	}
-	return content.AppendLines(out, lines, startRow, int(n.EndPoint().Row))
+	return internal.AppendLines(out, lines, startRow, int(n.EndPoint().Row))
 }

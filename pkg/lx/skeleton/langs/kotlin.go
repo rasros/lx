@@ -2,7 +2,7 @@ package langs
 
 import (
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func KtFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
@@ -21,11 +21,11 @@ func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 
 	body := findChildByType(n, "class_body", lang)
 	if body == nil {
-		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = content.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.AppendLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		if ktIsPrivate(child, src, lang) {
@@ -33,7 +33,7 @@ func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		}
 		switch child.Type(lang) {
 		case "property_declaration":
-			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "function_declaration":
 			if functions {
 				out = emitFuncSig(out, lines, child, lang, false, "function_body")
@@ -43,7 +43,7 @@ func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }
@@ -51,10 +51,10 @@ func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 func kotlinEmitObject(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
 	body := findChildByType(n, "lambda_literal", lang)
 	if body == nil {
-		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerEnd := int(body.StartPoint().Row)
-	out = content.AppendLines(out, lines, int(n.StartPoint().Row), headerEnd)
+	out = internal.AppendLines(out, lines, int(n.StartPoint().Row), headerEnd)
 
 	stmts := findChildByType(body, "statements", lang)
 	if stmts != nil {
@@ -65,7 +65,7 @@ func kotlinEmitObject(out, src []byte, lines [][]byte, n *gotreesitter.Node, lan
 			}
 			switch child.Type(lang) {
 			case "property_declaration":
-				out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+				out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 			case "function_declaration":
 				if functions {
 					out = emitFuncSig(out, lines, child, lang, false, "function_body")
@@ -75,7 +75,7 @@ func kotlinEmitObject(out, src []byte, lines [][]byte, n *gotreesitter.Node, lan
 	}
 
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }

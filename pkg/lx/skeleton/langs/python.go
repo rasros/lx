@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func PyFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
@@ -19,9 +19,9 @@ func PyEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *go
 	}
 	bodyNode := n.ChildByFieldName("body", lang)
 	if bodyNode == nil {
-		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
-	out = content.AppendLines(out, lines, int(n.StartPoint().Row), int(bodyNode.StartPoint().Row)-1)
+	out = internal.AppendLines(out, lines, int(n.StartPoint().Row), int(bodyNode.StartPoint().Row)-1)
 	for i := 0; i < bodyNode.ChildCount(); i++ {
 		out = pyProcessMember(out, src, lines, bodyNode.Child(i), lang, functions)
 	}
@@ -51,7 +51,7 @@ func pyProcessMember(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		if pyIsClassVar(n, lang) {
 			name := pyVarName(n, lines)
 			if name != "" && !isPrivateName(name) {
-				return content.AppendLine(out, lines, int(n.StartPoint().Row))
+				return internal.AppendLine(out, lines, int(n.StartPoint().Row))
 			}
 		}
 	}

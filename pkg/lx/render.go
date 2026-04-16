@@ -7,8 +7,7 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/rasros/lx/pkg/lx/internal/content"
-	"github.com/rasros/lx/pkg/lx/internal/detect"
+	"github.com/rasros/lx/pkg/lx/internal"
 	"github.com/rasros/lx/pkg/lx/skeleton"
 )
 
@@ -155,9 +154,9 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 	}
 
 	n, _ := reader.ReadAt(scratch[:headerLen], 0)
-	isBinary := detect.IsBinary(scratch[:n])
-	lang := detect.DetectLanguage(file.Path, scratch[:n])
-	isImage := detect.IsImage(file.Path)
+	isBinary := internal.IsBinary(scratch[:n])
+	lang := internal.DetectLanguage(file.Path, scratch[:n])
+	isImage := internal.IsImage(file.Path)
 	cfg := file.Config
 
 	var skeletonMode string
@@ -183,7 +182,7 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 	}
 
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
-	totalRows, exact, _ := content.EstimateLineCount(reader, size, scratch)
+	totalRows, exact, _ := internal.EstimateLineCount(reader, size, scratch)
 
 	var contentData interface{}
 	if !isBinary && !isCompact && size > 0 && !isImage {
@@ -230,12 +229,12 @@ func (p *processor) prepareFileContext(file InputFile, index int, scratch []byte
 func (p *processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg RunnerConfig) (head, tail, gap []byte, err error) {
 	if cfg.Head < 0 {
 		sr := io.NewSectionReader(reader, 0, size)
-		head, _, err = content.ReadHead(sr, -1)
+		head, _, err = internal.ReadHead(sr, -1)
 		return head, nil, nil, err
 	}
 	if cfg.Head > 0 {
 		sr := io.NewSectionReader(reader, 0, size)
-		head, _, err = content.ReadHead(sr, cfg.Head)
+		head, _, err = internal.ReadHead(sr, cfg.Head)
 	}
 	if cfg.Tail > 0 {
 		skipped := totalRows - cfg.Head - cfg.Tail
@@ -247,7 +246,7 @@ func (p *processor) readSlices(reader io.ReaderAt, size int64, totalRows int, is
 			gap = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
 		}
 		if f, ok := reader.(*os.File); ok {
-			tail, _ = content.ReadTailSeek(f, cfg.Tail)
+			tail, _ = internal.ReadTailSeek(f, cfg.Tail)
 		} else if br, ok := reader.(*bytes.Reader); ok {
 			tail, _ = tailFromBuffer(br, cfg.Tail)
 		}
@@ -257,7 +256,7 @@ func (p *processor) readSlices(reader io.ReaderAt, size int64, totalRows int, is
 
 func (p *processor) formatContent(head, tail, gap []byte, totalRows int, cfg RunnerConfig) interface{} {
 	if cfg.LineNumbers {
-		return content.LineNumberFormatter{Head: head, Gap: gap, Tail: tail, TotalRows: totalRows}
+		return internal.LineNumberFormatter{Head: head, Gap: gap, Tail: tail, TotalRows: totalRows}
 	}
 	var res bytes.Buffer
 	res.Write(head)

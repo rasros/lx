@@ -2,7 +2,7 @@ package langs
 
 import (
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func isUppercase(name string) bool {
@@ -39,7 +39,7 @@ func hasDescendantOfType(n *gotreesitter.Node, typ string, lang *gotreesitter.La
 func EmitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string, singleLineSig bool) []byte {
 	startRow := int(n.StartPoint().Row)
 	if singleLineSig {
-		return content.AppendLine(out, lines, startRow)
+		return internal.AppendLine(out, lines, startRow)
 	}
 
 	body := n.ChildByFieldName("body", lang)
@@ -47,7 +47,7 @@ func EmitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotrees
 		body = findChildByType(n, bodyChildType, lang)
 	}
 	if body == nil {
-		return content.AppendLines(out, lines, startRow, int(n.EndPoint().Row))
+		return internal.AppendLines(out, lines, startRow, int(n.EndPoint().Row))
 	}
 
 	bodyStartRow := int(body.StartPoint().Row)
@@ -74,7 +74,7 @@ func EmitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotrees
 	if indentBody {
 		endRow--
 	}
-	return content.AppendLines(out, lines, startRow, endRow)
+	return internal.AppendLines(out, lines, startRow, endRow)
 }
 
 func emitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string) []byte {
@@ -82,5 +82,5 @@ func emitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotrees
 }
 
 func emitAllLines(out []byte, lines [][]byte, n *gotreesitter.Node) []byte {
-	return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+	return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 }

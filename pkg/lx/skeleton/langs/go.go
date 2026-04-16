@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func GoFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
@@ -30,9 +30,9 @@ func GoEmitTypeDecl(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang 
 	}
 
 	if grouped && len(groupMembers) > 0 {
-		out = content.AppendLine(out, lines, int(n.StartPoint().Row))
+		out = internal.AppendLine(out, lines, int(n.StartPoint().Row))
 		out = append(out, groupMembers...)
-		out = content.AppendLine(out, lines, int(n.EndPoint().Row))
+		out = internal.AppendLine(out, lines, int(n.EndPoint().Row))
 	}
 	return out
 }
@@ -54,34 +54,34 @@ func goEmitTypeSpec(out, src []byte, lines [][]byte, spec *gotreesitter.Node, la
 	case "interface_type":
 		return goEmitInterface(out, src, lines, spec, typeNode, lang, functions)
 	default:
-		return content.AppendLines(out, lines, int(spec.StartPoint().Row), int(spec.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(spec.StartPoint().Row), int(spec.EndPoint().Row))
 	}
 }
 
 func goEmitStruct(out, src []byte, lines [][]byte, specNode, structNode *gotreesitter.Node, lang *gotreesitter.Language) []byte {
 	fieldList := findChildByType(structNode, "field_declaration_list", lang)
 	if fieldList == nil {
-		return content.AppendLines(out, lines, int(specNode.StartPoint().Row), int(specNode.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(specNode.StartPoint().Row), int(specNode.EndPoint().Row))
 	}
 	headerStart := int(specNode.StartPoint().Row)
-	out = content.AppendLine(out, lines, headerStart)
+	out = internal.AppendLine(out, lines, headerStart)
 
 	for i := 0; i < fieldList.ChildCount(); i++ {
 		child := fieldList.Child(i)
 		if child.Type(lang) == "field_declaration" && goFieldIsExported(child, src, lang) && int(child.StartPoint().Row) != headerStart {
-			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 
 	if closingRow := int(fieldList.EndPoint().Row); closingRow > headerStart {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }
 
 func goEmitInterface(out, src []byte, lines [][]byte, specNode, ifaceNode *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
 	headerStart := int(specNode.StartPoint().Row)
-	out = content.AppendLine(out, lines, headerStart)
+	out = internal.AppendLine(out, lines, headerStart)
 
 	if functions {
 		for i := 0; i < ifaceNode.ChildCount(); i++ {
@@ -92,13 +92,13 @@ func goEmitInterface(out, src []byte, lines [][]byte, specNode, ifaceNode *gotre
 			}
 			nameNode := findChildByType(child, "field_identifier", lang)
 			if nameNode != nil && isUppercase(nameNode.Text(src)) && int(child.StartPoint().Row) != headerStart {
-				out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+				out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 			}
 		}
 	}
 
 	if closingRow := int(ifaceNode.EndPoint().Row); closingRow > headerStart {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }

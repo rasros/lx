@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 	"github.com/rasros/lx/pkg/lx/skeleton/langs"
 )
 
@@ -33,7 +33,7 @@ func extract(langName string, src []byte, functions, structs bool) (out []byte) 
 		return src
 	}
 	root := tree.RootNode()
-	lines := content.SplitLines(src)
+	lines := internal.SplitLines(src)
 
 	for i := 0; i < root.ChildCount(); i++ {
 		out = def.processNode(root.Child(i), out, src, lines, lang, functions, structs)

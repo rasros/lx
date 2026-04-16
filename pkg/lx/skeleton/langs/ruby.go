@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func RubyEmitClassOrModule(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
@@ -13,10 +13,10 @@ func RubyEmitClassOrModule(out, src []byte, lines [][]byte, n *gotreesitter.Node
 		body = findChildByType(n, "body_statement", lang)
 	}
 	if body == nil {
-		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerLine := int(n.StartPoint().Row)
-	out = content.AppendLine(out, lines, headerLine)
+	out = internal.AppendLine(out, lines, headerLine)
 
 	isPrivate := false
 	for i := 0; i < body.ChildCount(); i++ {
@@ -35,13 +35,13 @@ func RubyEmitClassOrModule(out, src []byte, lines [][]byte, n *gotreesitter.Node
 			}
 		case "call", "assignment":
 			if !isPrivate {
-				out = content.AppendLine(out, lines, int(child.StartPoint().Row))
+				out = internal.AppendLine(out, lines, int(child.StartPoint().Row))
 			}
 		}
 	}
 	endRow := int(n.EndPoint().Row)
 	if endRow > headerLine {
-		out = content.AppendLine(out, lines, endRow)
+		out = internal.AppendLine(out, lines, endRow)
 	}
 	return out
 }

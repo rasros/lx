@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func SwiftFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
@@ -19,11 +19,11 @@ func SwiftEmitType(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		body = findChildByType(n, "class_body", lang)
 	}
 	if body == nil {
-		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = content.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.AppendLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		if swiftIsPrivate(child, src, lang) {
@@ -31,7 +31,7 @@ func SwiftEmitType(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		}
 		switch child.Type(lang) {
 		case "property_declaration":
-			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "function_declaration", "init_declaration":
 			if functions {
 				out = emitFuncSig(out, lines, child, lang, false, "")
@@ -39,11 +39,11 @@ func SwiftEmitType(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		case "class_declaration":
 			out = SwiftEmitType(out, src, lines, child, lang, functions)
 		case "protocol_function_declaration", "protocol_property_declaration":
-			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }

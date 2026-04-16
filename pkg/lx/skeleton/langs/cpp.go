@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func CppFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
@@ -25,7 +25,7 @@ func CppEmitClassOrStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node,
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(fieldList.StartPoint().Row)
-	out = content.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.AppendLines(out, lines, headerStart, headerEnd)
 
 	isPrivateSection := n.Type(lang) == "class_specifier"
 
@@ -41,7 +41,7 @@ func CppEmitClassOrStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node,
 		switch child.Type(lang) {
 		case "field_declaration":
 			if !hasDescendantOfType(child, "function_declarator", lang) {
-				out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+				out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 			}
 		case "function_definition":
 			if functions {
@@ -50,15 +50,15 @@ func CppEmitClassOrStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node,
 		case "declaration":
 			if hasDescendantOfType(child, "function_declarator", lang) {
 				if functions {
-					out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+					out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 				}
 			} else {
-				out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+				out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 			}
 		}
 	}
 	if closingRow := int(fieldList.EndPoint().Row); closingRow > headerEnd {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }

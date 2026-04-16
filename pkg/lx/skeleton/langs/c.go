@@ -2,7 +2,7 @@ package langs
 
 import (
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal/content"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func CFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
@@ -31,15 +31,15 @@ func CEmitTypedef(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *g
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(fieldList.StartPoint().Row)
-	out = content.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.AppendLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < fieldList.ChildCount(); i++ {
 		child := fieldList.Child(i)
 		if child.Type(lang) == "field_declaration" {
-			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 	if closingRow := int(n.EndPoint().Row); closingRow > headerEnd {
-		out = content.AppendLine(out, lines, closingRow)
+		out = internal.AppendLine(out, lines, closingRow)
 	}
 	return out
 }
