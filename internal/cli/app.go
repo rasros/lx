@@ -152,9 +152,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		Tail:        0,
 		LineNumbers: false,
 	}
-	runCfg := defaultRunCfg
-
-	stream, err := lx.NewStream(cfg, runCfg)
+	stream, err := lx.NewStream(cfg, defaultRunCfg)
 	if err != nil {
 		return err
 	}
@@ -169,331 +167,289 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		}
 	}()
 
-	var includes, excludes []string
-	hasFileInGroup := false
-
 	ops := reorderTrailingOps(parsed.Ops)
 	slog.Debug("Processing operations", "total_ops", len(ops))
 
 	globalIgnoreRules := LoadGlobalIgnorePatterns()
-	treePrecomp := precomputeTreeStrings(ops, cfg, globalIgnoreRules)
+	sections := parseSections(ops, defaultRunCfg)
+	precomputeTrees(sections, cfg, globalIgnoreRules)
 
-	for i, op := range ops {
-		slog.Debug("Processing op", "index", i, "action", op.Action, "value", op.Value)
+	for si, section := range sections {
+		slog.Debug("Processing section", "index", si, "ops", len(section.Ops))
+		stream.WithRunnerConfig(section.RunCfg)
 
-		// Group boundary: when an interleaved flag follows file actions, reset all
-		// interleaved state to defaults before applying the new flag.
-		if op.Type == CmdInterleaved && hasFileInGroup {
-			runCfg = defaultRunCfg
-			includes = nil
-			excludes = nil
-			hasFileInGroup = false
-			stream.WithRunnerConfig(runCfg)
-			slog.Debug("Group boundary: resetting interleaved state")
-		}
+		for oi, op := range section.Ops {
+			slog.Debug("Processing op", "action", op.Action, "value", op.Value)
 
-		switch op.Action {
-		case "head":
-			val, _ := strconv.Atoi(op.Value)
-			slog.Debug("Setting head limit", "value", val)
-			runCfg.Head, runCfg.Tail = val, 0
-			stream.WithRunnerConfig(runCfg)
-		case "tail":
-			val, _ := strconv.Atoi(op.Value)
-			slog.Debug("Setting tail limit", "value", val)
-			runCfg.Tail, runCfg.Head = val, 0
-			stream.WithRunnerConfig(runCfg)
-		case "lines":
-			val, _ := strconv.Atoi(op.Value)
-			slog.Debug("Setting lines limit", "value", val)
-			runCfg.Head, runCfg.Tail = (val+1)/2, val/2
-			stream.WithRunnerConfig(runCfg)
-		case "line-numbers":
-			slog.Debug("Enabling line numbers")
-			runCfg.LineNumbers = true
-			stream.WithRunnerConfig(runCfg)
-		case "functions":
-			slog.Debug("Enabling function skeleton")
-			runCfg.SkeletonFunctions = true
-			stream.WithRunnerConfig(runCfg)
-		case "types":
-			slog.Debug("Enabling type skeleton")
-			runCfg.SkeletonTypes = true
-			stream.WithRunnerConfig(runCfg)
-		case "include":
-			slog.Debug("Adding include filter", "pattern", op.Value)
-			includes = append(includes, op.Value)
-		case "exclude":
-			slog.Debug("Adding exclude filter", "pattern", op.Value)
-			excludes = append(excludes, op.Value)
-		case "FILE", "file":
-			hasFileInGroup = true
-			if treePrecomp.skipFileOps[i] {
-				slog.Debug("Skipping file content (tree-only mode)", "path", op.Value)
-				continue
-			}
-
-			if op.Value == "-" {
-				slog.Info("Reading content from stdin")
-				data, err := io.ReadAll(os.Stdin)
-				if err != nil {
-					slog.Error("Failed to read from stdin", "error", err)
+			switch op.Action {
+			case "FILE", "file":
+				if section.skipFileOps[oi] {
+					slog.Debug("Skipping file content (tree-only mode)", "path", op.Value)
 					continue
 				}
-				stream.AddFile(lx.NewBufferInputFile("stdin", data))
-				continue
-			}
 
-			rawPath := op.Value
-			isForced := op.Action == "file"
-
-			if lx.IsHTTPURL(rawPath) {
-				if cfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
-					// Expandable archives bypass the include check: the filter applies to their contents.
-					if !isForced && !lx.IsKept(rawPath, nil, excludes) {
-						slog.Debug("Skipping URL archive due to exclude filter", "url", rawPath)
-						continue
-					}
-
-					tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
+				if op.Value == "-" {
+					slog.Info("Reading content from stdin")
+					data, err := io.ReadAll(os.Stdin)
 					if err != nil {
-						slog.Error("Failed to download URL archive", "url", rawPath, "error", err)
+						slog.Error("Failed to read from stdin", "error", err)
 						continue
 					}
-					tempCleanups = append(tempCleanups, cleanup)
-
-					archiveWalker := newArchiveWalker(cfg, isForced)
-					archiveWalker.OnIgnore = func(p, reason string) {
-						slog.Debug("Ignored in URL archive", "path", rawPath+"/"+p, "reason", reason)
-					}
-					archiveIncludes := includes
-					if isForced {
-						archiveIncludes = nil
-					}
-					if err := lx.ExpandArchive(ctx, tempPath, rawPath, archiveWalker, archiveIncludes, outPath, stream); err != nil {
-						slog.Error("Failed to expand URL archive", "url", rawPath, "error", err)
-					}
+					stream.AddFile(lx.NewBufferInputFile("stdin", data))
 					continue
 				}
 
-				if !isForced && !lx.IsKept(rawPath, includes, excludes) {
-					slog.Debug("Skipping URL due to filters", "url", rawPath)
+				rawPath := op.Value
+				isForced := op.Action == "file"
+
+				if lx.IsHTTPURL(rawPath) {
+					if cfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
+						// Expandable archives bypass the include check: the filter applies to their contents.
+						if !isForced && !lx.IsKept(rawPath, nil, section.Excludes) {
+							slog.Debug("Skipping URL archive due to exclude filter", "url", rawPath)
+							continue
+						}
+
+						tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
+						if err != nil {
+							slog.Error("Failed to download URL archive", "url", rawPath, "error", err)
+							continue
+						}
+						tempCleanups = append(tempCleanups, cleanup)
+
+						archiveWalker := newArchiveWalker(cfg, isForced)
+						archiveWalker.OnIgnore = func(p, reason string) {
+							slog.Debug("Ignored in URL archive", "path", rawPath+"/"+p, "reason", reason)
+						}
+						archiveIncludes := section.Includes
+						if isForced {
+							archiveIncludes = nil
+						}
+						if err := lx.ExpandArchive(ctx, tempPath, rawPath, archiveWalker, archiveIncludes, outPath, stream); err != nil {
+							slog.Error("Failed to expand URL archive", "url", rawPath, "error", err)
+						}
+						continue
+					}
+
+					if !isForced && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
+						slog.Debug("Skipping URL due to filters", "url", rawPath)
+						continue
+					}
+					urlFile, err := lx.NewURLInputFile(rawPath)
+					if err != nil {
+						slog.Error("Failed to create URL input", "url", rawPath, "error", err)
+						continue
+					}
+					slog.Debug("URL accepted", "url", urlFile.Path)
+					stream.AddFile(urlFile)
 					continue
 				}
-				urlFile, err := lx.NewURLInputFile(rawPath)
+
+				var fsys fs.FS
+				var walkRoot string
+				var displayPrefix string
+
+				absPath, err := filepath.Abs(rawPath)
 				if err != nil {
-					slog.Error("Failed to create URL input", "url", rawPath, "error", err)
-					continue
-				}
-				slog.Debug("URL accepted", "url", urlFile.Path)
-				stream.AddFile(urlFile)
-				continue
-			}
-
-			var fsys fs.FS
-			var walkRoot string
-			var displayPrefix string
-
-			absPath, err := filepath.Abs(rawPath)
-			if err != nil {
-				slog.Error("Failed to resolve absolute path", "path", rawPath, "error", err)
-				continue
-			}
-
-			stat, err := os.Stat(absPath)
-			if err != nil {
-				// Prevent stat errors if the missing file (e.g., from git diff) is filtered out anyway
-				if !isForced && !lx.IsKept(rawPath, includes, excludes) {
-					slog.Debug("Skipping missing path due to filters", "path", rawPath)
-					continue
-				}
-				slog.Error("Failed to stat path", "path", absPath, "error", err)
-				continue
-			}
-
-			if !stat.IsDir() {
-				// Prevent processing an explicit file argument if it matches an exclude filter.
-				// Expandable archives bypass the include check: the filter applies to their contents.
-				isExpandableArchive := cfg.ExpandArchives && lx.IsArchivePath(rawPath)
-				if !isForced && !isExpandableArchive && !lx.IsKept(rawPath, includes, excludes) {
-					slog.Debug("Skipping file due to filters", "path", rawPath)
-					continue
-				}
-				if !isForced && isExpandableArchive && !lx.IsKept(rawPath, nil, excludes) {
-					slog.Debug("Skipping archive due to exclude filter", "path", rawPath)
+					slog.Error("Failed to resolve absolute path", "path", rawPath, "error", err)
 					continue
 				}
 
-				rawPathClean := filepath.Clean(rawPath)
-
-				if !filepath.IsAbs(rawPathClean) && !strings.HasPrefix(rawPathClean, "..") {
-					fsys = os.DirFS(".")
-					walkRoot = filepath.ToSlash(rawPathClean)
-				} else {
-					fsys = os.DirFS(filepath.Dir(absPath))
-					walkRoot = filepath.Base(absPath)
-					displayPrefix = filepath.Dir(rawPathClean)
-				}
-			} else {
-				fsys = os.DirFS(absPath)
-				walkRoot = "."
-				displayPrefix = filepath.Clean(rawPath)
-			}
-
-			var baseRules []string
-			var overrideRules []string
-
-			if cfg.IgnoreEnabled {
-				baseRules = append(baseRules, globalIgnoreRules...)
-			}
-
-			if cfg.IgnoreHidden && !isForced {
-				overrideRules = append(overrideRules, ".*")
-			}
-
-			if !isForced {
-				overrideRules = append(overrideRules, excludes...)
-			}
-
-			slog.Debug("Initializing Walker",
-				"walk_root", walkRoot,
-				"base_rules_count", len(baseRules),
-				"override_rules_count", len(overrideRules),
-				"is_forced", isForced,
-			)
-
-			walker := lx.NewWalker(baseRules, overrideRules)
-			walker.IgnoreEnabled = cfg.IgnoreEnabled
-			walker.OnIgnore = func(p, reason string) {
-				slog.Debug("Ignored", "path", p, "reason", reason)
-			}
-
-			count := 0
-
-			err = walker.Walk(fsys, walkRoot, func(path string, d fs.DirEntry, err error) error {
+				stat, err := os.Stat(absPath)
 				if err != nil {
-					slog.Warn("Error accessing path during walk", "path", path, "error", err)
-					return nil
-				}
-				if d.IsDir() {
-					return nil
+					// Prevent stat errors if the missing file (e.g., from git diff) is filtered out anyway
+					if !isForced && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
+						slog.Debug("Skipping missing path due to filters", "path", rawPath)
+						continue
+					}
+					slog.Error("Failed to stat path", "path", absPath, "error", err)
+					continue
 				}
 
-				// Reconstruct display path relative to user input
-				var effectivePath string
 				if !stat.IsDir() {
-					if displayPrefix != "" {
-						effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
+					// Prevent processing an explicit file argument if it matches an exclude filter.
+					// Expandable archives bypass the include check: the filter applies to their contents.
+					isExpandableArchive := cfg.ExpandArchives && lx.IsArchivePath(rawPath)
+					if !isForced && !isExpandableArchive && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
+						slog.Debug("Skipping file due to filters", "path", rawPath)
+						continue
+					}
+					if !isForced && isExpandableArchive && !lx.IsKept(rawPath, nil, section.Excludes) {
+						slog.Debug("Skipping archive due to exclude filter", "path", rawPath)
+						continue
+					}
+
+					rawPathClean := filepath.Clean(rawPath)
+
+					if !filepath.IsAbs(rawPathClean) && !strings.HasPrefix(rawPathClean, "..") {
+						fsys = os.DirFS(".")
+						walkRoot = filepath.ToSlash(rawPathClean)
 					} else {
-						effectivePath = filepath.FromSlash(path)
+						fsys = os.DirFS(filepath.Dir(absPath))
+						walkRoot = filepath.Base(absPath)
+						displayPrefix = filepath.Dir(rawPathClean)
 					}
 				} else {
-					if path == "." {
-						effectivePath = displayPrefix
-					} else {
-						effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
-					}
+					fsys = os.DirFS(absPath)
+					walkRoot = "."
+					displayPrefix = filepath.Clean(rawPath)
 				}
 
-				// Skip directory symlinks to avoid recursion issues and IO errors
-				if (d.Type() & fs.ModeSymlink) != 0 {
-					if cfg.IgnoreFileSymlinks {
+				var baseRules []string
+				var overrideRules []string
+
+				if cfg.IgnoreEnabled {
+					baseRules = append(baseRules, globalIgnoreRules...)
+				}
+
+				if cfg.IgnoreHidden && !isForced {
+					overrideRules = append(overrideRules, ".*")
+				}
+
+				if !isForced {
+					overrideRules = append(overrideRules, section.Excludes...)
+				}
+
+				slog.Debug("Initializing Walker",
+					"walk_root", walkRoot,
+					"base_rules_count", len(baseRules),
+					"override_rules_count", len(overrideRules),
+					"is_forced", isForced,
+				)
+
+				walker := lx.NewWalker(baseRules, overrideRules)
+				walker.IgnoreEnabled = cfg.IgnoreEnabled
+				walker.OnIgnore = func(p, reason string) {
+					slog.Debug("Ignored", "path", p, "reason", reason)
+				}
+
+				count := 0
+
+				err = walker.Walk(fsys, walkRoot, func(path string, d fs.DirEntry, err error) error {
+					if err != nil {
+						slog.Warn("Error accessing path during walk", "path", path, "error", err)
 						return nil
 					}
-					targetInfo, err := fs.Stat(fsys, path)
-					if err == nil && targetInfo.IsDir() {
-						slog.Debug("Skipping directory symlink", "path", effectivePath)
+					if d.IsDir() {
 						return nil
 					}
-				}
 
-				// Expand archives inline before include filtering
-				if cfg.ExpandArchives && lx.IsArchivePath(path) {
-					var archiveAbsPath string
-					if stat.IsDir() {
-						archiveAbsPath = filepath.Join(absPath, filepath.FromSlash(path))
+					// Reconstruct display path relative to user input
+					var effectivePath string
+					if !stat.IsDir() {
+						if displayPrefix != "" {
+							effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
+						} else {
+							effectivePath = filepath.FromSlash(path)
+						}
 					} else {
-						archiveAbsPath = absPath
-					}
-					archiveWalker := newArchiveWalker(cfg, isForced)
-					archiveWalker.OnIgnore = func(p, reason string) {
-						slog.Debug("Ignored in archive", "path", effectivePath+"/"+p, "reason", reason)
-					}
-					archiveIncludes := includes
-					if isForced {
-						archiveIncludes = nil
-					}
-					if err := lx.ExpandArchive(ctx, archiveAbsPath, effectivePath, archiveWalker, archiveIncludes, outPath, stream); err != nil {
-						slog.Error("Failed to expand archive", "path", effectivePath, "error", err)
-					}
-					return nil
-				}
-
-				// Post-walk filtering for includes (weak filter, respects .gitignore)
-				if !isForced && len(includes) > 0 {
-					matched := false
-					for _, inc := range includes {
-						if lx.IsMatch(inc, path) {
-							matched = true
-							break
+						if path == "." {
+							effectivePath = displayPrefix
+						} else {
+							effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
 						}
 					}
-					if !matched {
-						slog.Debug("Ignored by include filter (-i)", "path", effectivePath)
+
+					// Skip directory symlinks to avoid recursion issues and IO errors
+					if (d.Type() & fs.ModeSymlink) != 0 {
+						if cfg.IgnoreFileSymlinks {
+							return nil
+						}
+						targetInfo, err := fs.Stat(fsys, path)
+						if err == nil && targetInfo.IsDir() {
+							slog.Debug("Skipping directory symlink", "path", effectivePath)
+							return nil
+						}
+					}
+
+					// Expand archives inline before include filtering
+					if cfg.ExpandArchives && lx.IsArchivePath(path) {
+						var archiveAbsPath string
+						if stat.IsDir() {
+							archiveAbsPath = filepath.Join(absPath, filepath.FromSlash(path))
+						} else {
+							archiveAbsPath = absPath
+						}
+						archiveWalker := newArchiveWalker(cfg, isForced)
+						archiveWalker.OnIgnore = func(p, reason string) {
+							slog.Debug("Ignored in archive", "path", effectivePath+"/"+p, "reason", reason)
+						}
+						archiveIncludes := section.Includes
+						if isForced {
+							archiveIncludes = nil
+						}
+						if err := lx.ExpandArchive(ctx, archiveAbsPath, effectivePath, archiveWalker, archiveIncludes, outPath, stream); err != nil {
+							slog.Error("Failed to expand archive", "path", effectivePath, "error", err)
+						}
 						return nil
 					}
-				}
 
-				if outPath != "" {
-					if abs, _ := filepath.Abs(effectivePath); abs == outPath {
-						slog.Warn("Skipping output file to avoid infinite recursion", "path", effectivePath)
+					// Post-walk filtering for includes (weak filter, respects .gitignore)
+					if !isForced && len(section.Includes) > 0 {
+						matched := false
+						for _, inc := range section.Includes {
+							if lx.IsMatch(inc, path) {
+								matched = true
+								break
+							}
+						}
+						if !matched {
+							slog.Debug("Ignored by include filter (-i)", "path", effectivePath)
+							return nil
+						}
+					}
+
+					if outPath != "" {
+						if abs, _ := filepath.Abs(effectivePath); abs == outPath {
+							slog.Warn("Skipping output file to avoid infinite recursion", "path", effectivePath)
+							return nil
+						}
+					}
+
+					info, err := d.Info()
+					if err != nil {
+						slog.Error("Failed to stat file in walk", "path", path, "error", err)
 						return nil
 					}
-				}
 
-				info, err := d.Info()
-				if err != nil {
-					slog.Error("Failed to stat file in walk", "path", path, "error", err)
-					return nil
-				}
+					f := lx.NewInputFile(fsys, path, info)
+					f.Path = effectivePath
 
-				f := lx.NewInputFile(fsys, path, info)
-				f.Path = effectivePath
-
-				if !stat.IsDir() {
-					if displayPrefix != "" {
-						f.AbsPath = filepath.Join(filepath.Dir(absPath), path)
+					if !stat.IsDir() {
+						if displayPrefix != "" {
+							f.AbsPath = filepath.Join(filepath.Dir(absPath), path)
+						} else {
+							f.AbsPath = absPath
+						}
 					} else {
-						f.AbsPath = absPath
+						f.AbsPath = filepath.Join(absPath, path)
 					}
-				} else {
-					f.AbsPath = filepath.Join(absPath, path)
+
+					slog.Debug("File accepted by walker", "path", f.Path, "size", f.Size)
+					stream.AddFile(f)
+					count++
+					return nil
+				})
+
+				if err != nil {
+					slog.Error("Walker traversal failed", "error", err)
 				}
+				slog.Debug("Walker finished", "root", rawPath, "files_found", count)
 
-				slog.Debug("File accepted by walker", "path", f.Path, "size", f.Size)
-				stream.AddFile(f)
-				count++
-				return nil
-			})
-
-			if err != nil {
-				slog.Error("Walker traversal failed", "error", err)
+			case "tree", "tree-only":
+				if ts, ok := group.treeStrings[oi]; ok {
+					slog.Debug("Adding tree", "lines", strings.Count(ts, "\n")+1)
+					stream.AddTree(ts)
+				} else {
+					slog.Debug("Skipping empty tree (no files in group)")
+				}
+			case "section":
+				slog.Debug("Adding section", "title", op.Value)
+				stream.AddSection(op.Value)
+			case "prompt":
+				slog.Debug("Adding prompt", "length", len(op.Value))
+				stream.AddPrompt(op.Value)
 			}
-			slog.Debug("Walker finished", "root", rawPath, "files_found", count)
-
-		case "tree", "tree-only":
-			if body, ok := treePrecomp.strings[i]; ok {
-				slog.Debug("Adding tree", "lines", strings.Count(body, "\n")+1)
-				stream.AddTree(body)
-			} else {
-				slog.Debug("Skipping empty tree (no files in group)")
-			}
-		case "section":
-			slog.Debug("Adding section", "title", op.Value)
-			stream.AddSection(op.Value)
-		case "prompt":
-			slog.Debug("Adding prompt", "length", len(op.Value))
-			stream.AddPrompt(op.Value)
 		}
 	}
 
