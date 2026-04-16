@@ -172,7 +172,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 	globalIgnoreRules := LoadGlobalIgnorePatterns()
 	sections := parseSections(ops, defaultRunCfg)
-	precomputeTrees(sections, cfg, globalIgnoreRules)
+	precomputeTrees(ctx, sections, cfg, globalIgnoreRules)
 
 	for si, section := range sections {
 		slog.Debug("Processing section", "index", si, "ops", len(section.Ops))

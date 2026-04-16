@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"context"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,13 +17,13 @@ import (
 // ops act as sub-boundaries: each section-delimited run of ops gets its own tree.
 // Results are stored in the group's treeStrings and skipFileOps maps, keyed by the
 // op's index within the group's Ops slice.
-func precomputeTrees(groups []Section, cfg *lx.Config, globalIgnoreRules []string) {
+func precomputeTrees(ctx context.Context, groups []Section, cfg *lx.Config, globalIgnoreRules []string) {
 	for i := range groups {
-		computeSectionTrees(&groups[i], cfg, globalIgnoreRules)
+		computeSectionTrees(ctx, &groups[i], cfg, globalIgnoreRules)
 	}
 }
 
-func computeSectionTrees(g *Section, cfg *lx.Config, globalIgnoreRules []string) {
+func computeSectionTrees(ctx context.Context, g *Section, cfg *lx.Config, globalIgnoreRules []string) {
 	var subFileIdxs []int
 	var subTreeIdxs []int
 	subTreeOnly := false
@@ -30,7 +32,7 @@ func computeSectionTrees(g *Section, cfg *lx.Config, globalIgnoreRules []string)
 		if len(subTreeIdxs) > 0 && len(subFileIdxs) > 0 {
 			var paths []string
 			for _, idx := range subFileIdxs {
-				paths = append(paths, collectTreePaths(g.Ops[idx], cfg, g.Includes, g.Excludes, globalIgnoreRules)...)
+				paths = append(paths, collectTreePaths(ctx, g.Ops[idx], cfg, g.Includes, g.Excludes, globalIgnoreRules)...)
 			}
 			if len(paths) > 0 {
 				ts := buildASCIITree(paths)
@@ -60,8 +62,14 @@ func computeSectionTrees(g *Section, cfg *lx.Config, globalIgnoreRules []string)
 		case "section":
 			flush()
 		case "tree":
+			// Flush any preceding file ops so they are rendered as content,
+			// not absorbed into this tree group.
+			flush()
 			subTreeIdxs = append(subTreeIdxs, oi)
 		case "tree-only":
+			// Flush any preceding file ops so they are rendered as content,
+			// not silently dropped by tree-only mode.
+			flush()
 			subTreeIdxs = append(subTreeIdxs, oi)
 			subTreeOnly = true
 		case "FILE", "file":
@@ -73,14 +81,22 @@ func computeSectionTrees(g *Section, cfg *lx.Config, globalIgnoreRules []string)
 
 // collectTreePaths walks a single FILE or file op and returns all file paths
 // that would be included, using the same logic as the main processing loop.
-func collectTreePaths(op Op, cfg *lx.Config, includes, excludes []string, globalIgnoreRules []string) []string {
+func collectTreePaths(ctx context.Context, op Op, cfg *lx.Config, includes, excludes []string, globalIgnoreRules []string) []string {
 	var paths []string
 
 	rawPath := op.Value
 	isForced := op.Action == "file"
 
-	// Skip stdin and URLs — they can't be walked for tree purposes
-	if rawPath == "-" || lx.IsHTTPURL(rawPath) {
+	// Skip stdin — it can't be walked for tree purposes
+	if rawPath == "-" {
+		return paths
+	}
+
+	// For URLs: expand archive to collect paths when enabled; otherwise skip
+	if lx.IsHTTPURL(rawPath) {
+		if cfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
+			return collectURLArchiveTreePaths(ctx, rawPath, cfg, includes)
+		}
 		return paths
 	}
 
@@ -149,6 +165,26 @@ func collectTreePaths(op Op, cfg *lx.Config, includes, excludes []string, global
 		return nil
 	})
 
+	return paths
+}
+
+// collectURLArchiveTreePaths downloads the archive at rawPath and walks its
+// contents to return the display paths that would be included. The temp file is
+// removed before returning, since only the path strings are needed.
+func collectURLArchiveTreePaths(ctx context.Context, rawPath string, cfg *lx.Config, includes []string) []string {
+	tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
+	if err != nil {
+		slog.Debug("Failed to download URL archive for tree", "url", rawPath, "error", err)
+		return nil
+	}
+	defer cleanup()
+
+	archiveWalker := newArchiveWalker(cfg, false)
+	paths, err := lx.ExpandArchivePaths(ctx, tempPath, rawPath, archiveWalker, includes)
+	if err != nil {
+		slog.Debug("Failed to expand URL archive for tree", "url", rawPath, "error", err)
+		return nil
+	}
 	return paths
 }
 
