@@ -261,7 +261,7 @@ type FileContext struct {
 	SectionFileIndex int
 	Global           GlobalContext
 	Section          SectionContext
-	SkeletonMode     string // non-empty when skeleton extraction is active
+	SkeletonMode     string
 }
 
 // SectionContext represents the data provided to section templates.
