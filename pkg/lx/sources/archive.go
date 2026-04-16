@@ -55,6 +55,9 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 	}
 
 	archiveBase := filepath.ToSlash(filepath.Clean(displayPath))
+	if IsHTTPURL(displayPath) {
+		archiveBase = strings.TrimSuffix(displayPath, "/")
+	}
 	count := 0
 
 	err = w.Walk(fsys, ".", func(entryPath string, d fs.DirEntry, err error) error {
