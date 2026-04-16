@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.swift (41 rows, definitions)
+skeleton/main.swift (15 rows, definitions)
 ---
 ```swift
 public protocol Shape {

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.go (32 rows, function signatures)
+skeleton/main.go (6 rows, function signatures)
 ---
 ```go
 func NewPerson(name string) Person {

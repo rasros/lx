@@ -1,5 +1,5 @@
 --- STDOUT ---
-[1/2] skeleton/main.go (32 rows, definitions)
+[1/2] skeleton/main.go (12 rows, definitions)
 ---
 ```go
 type Person struct {

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.dart (30 rows, type definitions)
+skeleton/main.dart (5 rows, type definitions)
 ---
 ```dart
 class Animal {

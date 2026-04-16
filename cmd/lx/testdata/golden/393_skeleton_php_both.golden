@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.php (41 rows, definitions)
+skeleton/main.php (15 rows, definitions)
 ---
 ```php
 interface Shape {

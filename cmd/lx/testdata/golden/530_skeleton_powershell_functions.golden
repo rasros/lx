@@ -1,10 +1,10 @@
 --- STDOUT ---
-skeleton/main.ps1 (22 rows, function signatures)
+skeleton/main.ps1 (3 rows, function signatures)
 ---
 ```powershell
 function Get-Greeting {
 function Add-Numbers {
-function helper { # internal
+function helper {
 ```
 
 

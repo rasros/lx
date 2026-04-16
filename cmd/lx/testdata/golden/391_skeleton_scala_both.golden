@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.scala (37 rows, definitions)
+skeleton/main.scala (17 rows, definitions)
 ---
 ```scala
 trait Shape {
@@ -8,13 +8,13 @@ trait Shape {
 }
 case class Point(x: Double, y: Double) {
     val label: String = "" // display label
-    def scale(factor: Double): Point = Point(x * factor, y * factor)
+    def scale(factor: Double): Point = 
 }
 object Calculator {
     val Max: Int = 100
-    def add(x: Int): Int = x + Max
+    def add(x: Int): Int = 
 }
-def topLevel(x: Int): Int = x + 1 // simple increment
+def topLevel(x: Int): Int = 
 def combine(
     x: Int,
     y: Int,

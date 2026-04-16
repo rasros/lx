@@ -1,9 +1,9 @@
 --- STDOUT ---
-skeleton/main.jsx (24 rows, definitions)
+skeleton/main.jsx (9 rows, definitions)
 ---
 ```jsx
 export class Card extends React.Component {
-... (22 rows skipped)
+... (7 rows skipped)
 ) {
 ```
 
