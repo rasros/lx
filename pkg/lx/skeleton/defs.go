@@ -189,7 +189,6 @@ var langDefs = map[string]langDef{
 		bodyChildType: "end",
 	},
 
-
 	"zig": {
 		newLang:       grammars.ZigLanguage,
 		funcTypes:     []string{"Decl"},
@@ -228,5 +227,4 @@ var langDefs = map[string]langDef{
 		structTypes: []string{"value_definition", "type_definition", "module_definition", "module_type_definition"},
 		emitStruct:  langs.OCamlEmitDefinition,
 	},
-
 }

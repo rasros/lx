@@ -88,7 +88,6 @@ func TestGoldenSkeleton(t *testing.T) {
 		// 590-599: OCaml
 		{name: "590_skeleton_ocaml_structs", args: []string{"-t", "skeleton/main.ml"}},
 		{name: "591_skeleton_ocaml_both", args: []string{"-u", "-t", "skeleton/main.ml"}},
-
 	})
 }
 
