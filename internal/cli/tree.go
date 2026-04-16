@@ -10,89 +10,65 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-// treePrecomp holds the results of tree pre-computation.
-type treePrecomp struct {
-	// strings maps each tree/tree-only op index to its rendered ASCII tree.
-	strings map[int]string
-	// skipFileOps contains file op indices whose content should be suppressed
-	// because they belong to a tree-only group.
-	skipFileOps map[int]bool
+// precomputeTrees walks each section that contains a tree or tree-only op,
+// collecting file paths and building ASCII tree strings. Within each group, section
+// ops act as sub-boundaries: each section-delimited run of ops gets its own tree.
+// Results are stored in the group's treeStrings and skipFileOps maps, keyed by the
+// op's index within the group's Ops slice.
+func precomputeTrees(groups []Section, cfg *lx.Config, globalIgnoreRules []string) {
+	for i := range groups {
+		computeSectionTrees(&groups[i], cfg, globalIgnoreRules)
+	}
 }
 
-// precomputeTreeStrings scans ops for tree groups and pre-walks their files,
-// returning precomputed tree strings and the set of file ops to suppress.
-//
-// A tree group is a maximal run of CmdAction ops with no CmdInterleaved ops or
-// section ops between them. If a group contains a "tree" or "tree-only" op,
-// all FILE/file ops in that group are walked to collect paths for the tree.
-// Groups containing a "tree-only" op suppress their files from the stream.
-func precomputeTreeStrings(ops []Op, cfg *lx.Config, globalIgnoreRules []string) treePrecomp {
-	result := treePrecomp{
-		strings:     make(map[int]string),
-		skipFileOps: make(map[int]bool),
-	}
+func computeSectionTrees(g *Section, cfg *lx.Config, globalIgnoreRules []string) {
+	var subFileIdxs []int
+	var subTreeIdxs []int
+	subTreeOnly := false
 
-	var simIncludes, simExcludes []string
-	var groupFileOpIdxs []int
-	var groupTreeOpIdxs []int
-	groupHasTreeOnly := false
-
-	flushGroup := func(includes, excludes []string) {
-		if len(groupTreeOpIdxs) > 0 && len(groupFileOpIdxs) > 0 {
-			var allPaths []string
-			for _, idx := range groupFileOpIdxs {
-				allPaths = append(allPaths, collectTreePaths(ops[idx], cfg, includes, excludes, globalIgnoreRules)...)
+	flush := func() {
+		if len(subTreeIdxs) > 0 && len(subFileIdxs) > 0 {
+			var paths []string
+			for _, idx := range subFileIdxs {
+				paths = append(paths, collectTreePaths(g.Ops[idx], cfg, g.Includes, g.Excludes, globalIgnoreRules)...)
 			}
-			if len(allPaths) > 0 {
-				treeStr := buildASCIITree(allPaths)
-				for _, treeIdx := range groupTreeOpIdxs {
-					result.strings[treeIdx] = treeStr
+			if len(paths) > 0 {
+				ts := buildASCIITree(paths)
+				if g.treeStrings == nil {
+					g.treeStrings = make(map[int]string)
+				}
+				for _, ti := range subTreeIdxs {
+					g.treeStrings[ti] = ts
 				}
 			}
 		}
-		if groupHasTreeOnly {
-			for _, fileIdx := range groupFileOpIdxs {
-				result.skipFileOps[fileIdx] = true
+		if subTreeOnly {
+			if g.skipFileOps == nil {
+				g.skipFileOps = make(map[int]bool)
+			}
+			for _, fi := range subFileIdxs {
+				g.skipFileOps[fi] = true
 			}
 		}
-		groupFileOpIdxs = nil
-		groupTreeOpIdxs = nil
-		groupHasTreeOnly = false
+		subFileIdxs = nil
+		subTreeIdxs = nil
+		subTreeOnly = false
 	}
 
-	for i, op := range ops {
-		if op.Type == CmdInterleaved {
-			hasFilesInGroup := len(groupFileOpIdxs) > 0
-			flushGroup(simIncludes, simExcludes)
-			if hasFilesInGroup {
-				simIncludes, simExcludes = nil, nil
-			}
-			switch op.Action {
-			case "include":
-				simIncludes = append(simIncludes, op.Value)
-			case "exclude":
-				simExcludes = append(simExcludes, op.Value)
-			}
-			continue
-		}
-		if op.Type != CmdAction {
-			continue
-		}
+	for oi, op := range g.Ops {
 		switch op.Action {
 		case "section":
-			flushGroup(simIncludes, simExcludes)
+			flush()
 		case "tree":
-			groupTreeOpIdxs = append(groupTreeOpIdxs, i)
+			subTreeIdxs = append(subTreeIdxs, oi)
 		case "tree-only":
-			groupTreeOpIdxs = append(groupTreeOpIdxs, i)
-			groupHasTreeOnly = true
+			subTreeIdxs = append(subTreeIdxs, oi)
+			subTreeOnly = true
 		case "FILE", "file":
-			groupFileOpIdxs = append(groupFileOpIdxs, i)
+			subFileIdxs = append(subFileIdxs, oi)
 		}
 	}
-	flushGroup(simIncludes, simExcludes)
-
-	return result
+	flush()
 }
 
 // collectTreePaths walks a single FILE or file op and returns all file paths
