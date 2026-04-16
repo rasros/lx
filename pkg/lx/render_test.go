@@ -40,6 +40,49 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 	}
 }
 
+func TestProcessor_RenderFile_SkeletonSlicingUsesFilteredRows(t *testing.T) {
+	cfg := NewConfig()
+	engine, _ := CompileTemplates(cfg)
+	global := GlobalContext{TotalFiles: 1}
+
+	proc := newProcessor(engine, global, nil, "markdown", false)
+
+	file := NewBufferInputFile("skeleton.go", []byte(`package p
+
+func A() {
+	println(1)
+}
+
+func B() {
+	println(2)
+}
+
+func C() {
+	println(3)
+}
+`))
+	file.Config = RunnerConfig{Head: 1, Tail: 1, SkeletonFunctions: true}
+
+	item := preparedItem{
+		raw:             file,
+		section:         &SectionContext{},
+		fileIndexGlobal: 1,
+	}
+
+	var buf bytes.Buffer
+	if err := proc.RenderPrepared(&buf, item, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "(3 rows, function signatures)") {
+		t.Fatalf("expected filtered row count in header, got:\n%s", got)
+	}
+	if !strings.Contains(got, "... (1 rows skipped)") {
+		t.Fatalf("expected gap based on filtered rows, got:\n%s", got)
+	}
+}
+
 func TestRender_DataURI(t *testing.T) {
 	tmp := t.TempDir()
 	imgName := "test.png"
