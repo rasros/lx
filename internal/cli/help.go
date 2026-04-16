@@ -44,11 +44,17 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
   token estimations.
 
   {{ "Stream Processing Model:" | bold }}
-  lx processes arguments as a stream of action groups: consecutive file and
-  directory arguments with no interleaved flags between them. Flags like
-  --lines or --include are scoped to the group they precede. When a flag
-  appears {{ "after" | underline }} files, it creates a group boundary —
-  all interleaved state resets to defaults before the new flag takes effect.
+  lx processes arguments as a stream of sections. A section is a run of file
+  and directory arguments that share the same processing settings. State
+  modifiers (like --lines or --include) are scoped to the section that
+  follows them. When a modifier appears {{ "after" | underline }} files, it
+  creates a new section boundary: all interleaved state resets to defaults
+  before the new modifier takes effect.
+
+  Example: last 50 lines of app.log, then src/ with line numbers:
+    lx --tail 50 app.log -l src/
+  The -l after app.log triggers a boundary — src/ gets a fresh default state
+  with only line numbers enabled.
 
 {{ "Arguments:" | head }}
   {{ "[OPTIONS]" | bold }}
@@ -56,7 +62,7 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
           These can be placed anywhere in the command.
 
   {{ "[state modifiers]" | bold }}
-          Flags that scope the processing rules for the next action group.
+          Flags that scope the processing rules for the next section.
           When placed after files, they reset all state before taking effect.
           Example: "-n 50 src/" limits src/ to 50 lines per file.
 
@@ -95,9 +101,10 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
 {{- end }}
 
 {{ "State modifiers:" | head }}
-  Flags scoped to the action group that follows. When placed after files, they
-  create a group boundary — resetting all state to defaults before the new flag
-  takes effect.
+  Flags that configure the section which follows them. When placed before any
+  files, they accumulate into the first section's settings. When placed after
+  files, they trigger a section boundary: all state resets to defaults, then
+  the new flag applies to the next section.
 
 {{- range .Interleaved }}
 {{ . | flagLine }}

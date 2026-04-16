@@ -437,7 +437,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				slog.Debug("Walker finished", "root", rawPath, "files_found", count)
 
 			case "tree", "tree-only":
-				if ts, ok := group.treeStrings[oi]; ok {
+				if ts, ok := section.treeStrings[oi]; ok {
 					slog.Debug("Adding tree", "lines", strings.Count(ts, "\n")+1)
 					stream.AddTree(ts)
 				} else {

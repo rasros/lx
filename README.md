@@ -94,9 +94,9 @@ git diff --name-only main | lx -c
 
 ## Stream Processing Model
 
-`lx` processes arguments left to right as a stream of **action groups** — consecutive file/directory arguments with
-no interleaved flags between them. Interleaved flags (like `-n`, `--tail`, `-l`, `-i`) are scoped to the group they
-precede. When a flag appears *after* files, it creates a **group boundary**: all interleaved state resets to defaults
+`lx` processes arguments left to right as a stream of **sections** — consecutive file/directory arguments with
+no interleaved flags between them. Interleaved flags (like `-n`, `--tail`, `-l`, `-i`) are scoped to the section they
+precede. When a flag appears *after* files, it creates a **section boundary**: all interleaved state resets to defaults
 before the new flag takes effect.
 
 Example: Grab the last 50 lines of a log file, then `src/` with line numbers enabled:
@@ -104,12 +104,12 @@ Example: Grab the last 50 lines of a log file, then `src/` with line numbers ena
 lx --tail 50 app.log -l src/
 ```
 
-| Argument    | Effect                                                              |
-|-------------|---------------------------------------------------------------------|
-| `--tail 50` | Sets tail for the next group                                        |
-| `app.log`   | Gets the last 50 lines                                              |
-| `-l`        | Group boundary: state resets to defaults, then line numbers enabled |
-| `src/`      | Gets full content with line numbers                                 |
+| Argument    | Effect                                                                  |
+|-------------|-------------------------------------------------------------------------|
+| `--tail 50` | Sets tail for the next section                                          |
+| `app.log`   | Gets the last 50 lines                                                  |
+| `-l`        | Section boundary: state resets to defaults, then line numbers enabled   |
+| `src/`      | Gets full content with line numbers                                     |
 
 ## Output Formats
 
