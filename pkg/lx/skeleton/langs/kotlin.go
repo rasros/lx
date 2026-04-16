@@ -10,7 +10,7 @@ func KtFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language
 }
 
 func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
-	// Kotlin object declarations parse as infix_expression with object_literal first child.
+	// "object : ..." parses as infix_expression with object_literal first child.
 	if n.Type(lang) == "infix_expression" {
 		first := n.Child(0)
 		if first == nil || first.Type(lang) != "object_literal" {
@@ -21,7 +21,6 @@ func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 
 	body := findChildByType(n, "class_body", lang)
 	if body == nil {
-		// Compact declaration (e.g., data class with only primary constructor)
 		return content.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)

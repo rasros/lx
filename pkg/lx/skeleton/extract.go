@@ -8,11 +8,7 @@ import (
 	"github.com/rasros/lx/pkg/lx/skeleton/langs"
 )
 
-// parseMu serializes all parser.Parse calls to work around a data race in
-// gotreesitter's global dfaTokenSourcePool: a parser can release a token
-// source to the pool during recovery sub-parses and then call Reset() on it,
-// while a concurrent goroutine's parser picks up the same object from the
-// pool. Serializing Parse calls prevents concurrent pool access.
+// parseMu serializes gotreesitter Parse calls to avoid a data race in its global token pool.
 var parseMu sync.Mutex
 
 func extract(langName string, src []byte, functions, structs bool) (out []byte) {

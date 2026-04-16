@@ -24,8 +24,6 @@ type goldenTestCase struct {
 	stdin string
 }
 
-// setupMockConfig installs an empty global lx ignore file so real user config
-// does not interfere with tests.
 func setupMockConfig(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
@@ -121,7 +119,7 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, pkgDir string, scrubPa
 				}
 			}()
 
-			// Ensure stable output for golden files
+			// Force deterministic output unless explicitly requested otherwise.
 			runArgs := append([]string{}, tc.args...)
 			hasStatsControl := false
 			for _, a := range runArgs {

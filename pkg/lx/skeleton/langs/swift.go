@@ -38,7 +38,6 @@ func SwiftEmitType(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 			}
 		case "class_declaration":
 			out = SwiftEmitType(out, src, lines, child, lang, functions)
-		// Protocol members (all implicitly public)
 		case "protocol_function_declaration", "protocol_property_declaration":
 			out = content.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
