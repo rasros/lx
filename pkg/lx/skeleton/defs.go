@@ -162,12 +162,6 @@ var langDefs = map[string]langDef{
 		emitStruct:  langs.PHPEmitClass,
 	},
 
-	"bash": {
-		newLang:       grammars.BashLanguage,
-		funcTypes:     []string{"function_definition"},
-		bodyChildType: "compound_statement",
-	},
-
 	"powershell": {
 		newLang:         grammars.PowershellLanguage,
 		funcTypes:       []string{"function_statement"},
