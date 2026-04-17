@@ -1,15 +1,10 @@
 package skeleton
 
 import (
-	"sync"
-
 	"github.com/odvcencio/gotreesitter"
 	"github.com/rasros/lx/pkg/lx/internal"
 	"github.com/rasros/lx/pkg/lx/skeleton/langs"
 )
-
-// parseMu serializes gotreesitter Parse calls to avoid a data race in its global token pool.
-var parseMu sync.Mutex
 
 func extract(langName string, src []byte, functions, structs bool) (out []byte) {
 	defer func() {
@@ -25,9 +20,7 @@ func extract(langName string, src []byte, functions, structs bool) (out []byte) 
 	lang := def.newLang()
 	parser := gotreesitter.NewParser(lang)
 
-	parseMu.Lock()
 	tree, err := parser.Parse(src)
-	parseMu.Unlock()
 
 	if err != nil {
 		return src
