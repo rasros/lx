@@ -1,3 +1,9 @@
+/// A simple 2-D point type.
+const Point = struct {
+    x: i32,
+    y: i32,
+};
+
 /// Greet by printing a name.
 pub fn greet(name: []const u8) void {
     _ = name;
