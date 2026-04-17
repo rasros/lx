@@ -85,6 +85,8 @@ func TestGoldenSymlinks(t *testing.T) {
 		{name: "055_no_file_links", args: []string{"--no-links", "links"}},
 		{name: "056_follow_dirs_no_file_links", args: []string{"--follow", "--no-links", "links"}},
 		{name: "057_broken_symlink", args: []string{"links/broken_link"}},
+		{name: "058_symlinks_follow_include_go", args: []string{"--follow", "-i", "*.go", "links"}},
+		{name: "059_symlinks_follow_hidden", args: []string{"--follow", "-H", "links"}},
 	})
 }
 
@@ -163,7 +165,11 @@ func TestGoldenArchive(t *testing.T) {
 		{name: "110_expand_archive_zip", args: []string{"-Z", "archive.zip"}},
 		{name: "111_expand_archive_no_flag", args: []string{"archive.zip"}},
 		{name: "112_expand_archive_filter", args: []string{"-Z", "-i", "*.go", "archive.zip"}},
+		{name: "113_expand_archive_hidden", args: []string{"-Z", "-H", "archive.zip"}},
+		{name: "114_expand_archive_line_numbers", args: []string{"-Z", "-l", "archive.zip"}},
 		{name: "115_expand_archive_tar_gz", args: []string{"-Z", "archive.tar.gz"}},
+		{name: "116_expand_archive_xml", args: []string{"--xml", "-Z", "archive.zip"}},
+		{name: "117_expand_archive_hidden_filter_go", args: []string{"-Z", "-H", "-i", "*.go", "archive.zip"}},
 	})
 }
 
@@ -181,5 +187,9 @@ func TestGoldenDocuments(t *testing.T) {
 		{name: "128_docs_odp_expanded", args: []string{"-Z", "sample.odp"}},
 		{name: "129_docs_ods_binary", args: []string{"sample.ods"}},
 		{name: "130_docs_odp_binary", args: []string{"sample.odp"}},
+		{name: "131_docs_docx_numbered", args: []string{"-D", "-l", "sample.docx"}},
+		{name: "132_docs_xlsx_head", args: []string{"-D", "--head", "2", "sample.xlsx"}},
+		{name: "133_docs_pptx_lines", args: []string{"-D", "--lines", "3", "sample.pptx"}},
+		{name: "134_docs_pdf_xml", args: []string{"--xml", "-D", "sample.pdf"}},
 	})
 }

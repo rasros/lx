@@ -1,0 +1,15 @@
+--- STDOUT ---
+```
+src/
+├── sub/
+│   └── helper.go
+├── app.go
+└── app_test.go
+```
+
+[1/3] src/app.go (0 rows, function signatures)
+[2/3] src/app_test.go (0 rows, function signatures)
+[3/3] src/sub/helper.go (0 rows, function signatures)
+
+
+--- STDERR ---

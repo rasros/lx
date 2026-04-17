@@ -35,5 +35,7 @@ func TestGoldenTree(t *testing.T) {
 		{name: "740_tree_xml", args: []string{"--xml", "-t", "src"}},
 		{name: "741_tree_html", args: []string{"--html", "-t", "src"}},
 		{name: "742_tree_xml_with_content", args: []string{"--xml", "-T", "src"}},
+		{name: "743_tree_content_line_numbers", args: []string{"-l", "-T", "src"}},
+		{name: "744_tree_content_skeleton_functions", args: []string{"-u", "-T", "src"}},
 	})
 }

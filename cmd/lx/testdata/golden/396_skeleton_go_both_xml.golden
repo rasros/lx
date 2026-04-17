@@ -1,0 +1,23 @@
+--- STDOUT ---
+<content>
+  <document index="1" language="go" rows="12" skeleton="definitions">
+    <source>skeleton/main.go</source>
+    <document_content>
+type Person struct {
+	Name string
+}
+type Worker interface {
+	Work()
+}
+func NewPerson(name string) Person {
+func NewWorker(
+	name string,
+	role string,
+) Person {
+func (p Person) Greet() string {
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---
