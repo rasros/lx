@@ -58,12 +58,6 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "501_skeleton_dart_structs", args: []string{"-Y", "skeleton/main.dart"}},
 		{name: "502_skeleton_dart_both", args: []string{"-u", "-Y", "skeleton/main.dart"}},
 
-		// 510-519: Lua
-		{name: "510_skeleton_lua_functions", args: []string{"-u", "skeleton/main.lua"}},
-
-		// 530-539: PowerShell
-		{name: "530_skeleton_powershell_functions", args: []string{"-u", "skeleton/main.ps1"}},
-
 		// 540-549: Zig
 		{name: "540_skeleton_zig_functions", args: []string{"-u", "skeleton/main.zig"}},
 

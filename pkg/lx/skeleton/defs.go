@@ -162,25 +162,11 @@ var langDefs = map[string]langDef{
 		emitStruct:  langs.PHPEmitClass,
 	},
 
-	"powershell": {
-		newLang:         grammars.PowershellLanguage,
-		funcTypes:       []string{"function_statement"},
-		bodyChildType:   "{",
-		iterateChildren: []string{"statement_list"},
-	},
-
 	"dart": {
 		newLang:     grammars.DartLanguage,
 		funcTypes:   []string{"function_signature"},
 		structTypes: []string{"class_definition"},
 		emitStruct:  langs.DartEmitClass,
-	},
-
-	"lua": {
-		newLang:       grammars.LuaLanguage,
-		funcTypes:     []string{"function_declaration"},
-		indentBody:    true,
-		bodyChildType: "end",
 	},
 
 	"zig": {
