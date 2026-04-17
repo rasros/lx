@@ -21,18 +21,22 @@ const shortHelpTmpl = `A program to discover and format files for LLM prompting
 
 {{ "Arguments:" | head }}
   [path]...   the file or directory to process (defaults to current dir)
-  [action]... the state modifiers (flags) or prompt generators (-s, -p, -f)
+  [action]... interleaved options and action flags (-s, -p, -f, -D, -Z, ...)
 
 {{ "Options:" | head }}
-{{- range . }}
+{{ range $i, $g := . }}{{ if $i }}
+
+{{ end }}  {{ $g | groupHead }}
+{{- range $g.Flags }}
 {{ . | compactFlag }}
+{{- end }}
 {{- end }}
 `
 
 const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting tool for LLM prompting.
 
 {{ "Usage:" | head }}
-  {{ "lx" | bold }} [OPTIONS] [state modifiers] <actions>...
+  {{ "lx" | bold }} [OPTIONS] [interleaved options] <actions>...
   {{ "lx" | bold }} [OPTIONS] -- <files...>
 
 {{ "Description:" | head }}
@@ -45,33 +49,44 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
 
   {{ "Stream Processing Model:" | bold }}
   lx processes arguments as a stream of sections. A section is a run of file
-  and directory arguments that share the same processing settings. State
-  modifiers (like --lines or --include) are scoped to the section that
-  follows them. When a modifier appears {{ "after" | underline }} files, it
-  creates a new section boundary: all interleaved state resets to defaults
-  before the new modifier takes effect.
+  and directory arguments that share the same processing settings. Interleaved
+  options (like --lines or --include) are scoped to the section that follows
+  them.
+
+  Section boundaries are created in two ways:
+    1. An interleaved option appears {{ "after" | underline }} files: all interleaved options
+       reset to defaults before the new option takes effect.
+    2. A {{ "-s" | bold }} (section) action is used: this also resets all interleaved
+       options to defaults for the files that follow.
 
   Example: last 50 lines of app.log, then src/ with line numbers:
     lx --tail 50 app.log -l src/
-  The -l after app.log triggers a boundary — src/ gets a fresh default state
+  The -l after app.log triggers a boundary; src/ gets a fresh default state
   with only line numbers enabled.
+
+  Example: two named sections with different settings:
+    lx -s "Backend" -l src/ -s "Frontend" -i "*.ts" web/
+  Each -s resets interleaved options; web/ gets only the -i filter.
 
 {{ "Arguments:" | head }}
   {{ "[OPTIONS]" | bold }}
-          Global flags that affect the entire execution (e.g., --copy, --xml).
+          Global options that affect the entire execution (e.g., --copy, --xml).
           These can be placed anywhere in the command.
 
-  {{ "[state modifiers]" | bold }}
-          Flags that scope the processing rules for the next section.
-          When placed after files, they reset all state before taking effect.
+  {{ "[interleaved options]" | bold }}
+          Options that scope the processing rules for the next section.
+          When placed after files, they reset all options before taking effect.
           Example: "-n 50 src/" limits src/ to 50 lines per file.
 
   {{ "[actions]" | bold }}
           The inputs to process. These can be:
             1. A file path (added directly).
             2. A directory path (walked recursively).
-            3. An explicit action flag (-f, -p, -s).
-            4. "-" to read file paths from stdin.
+            3. An http/https URL (fetched and added as a file).
+            4. An explicit action flag (-f, -p, -s).
+            5. "-" to read file paths from stdin.
+
+          Archive URLs (.zip, .tar.gz, etc.) are expanded when -Z is active.
 
           If no actions are provided, lx walks the current directory ".".
 
@@ -79,42 +94,30 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
           Separator that disables flag parsing for subsequent arguments.
           Useful for filenames that start with a dash.
 
-{{ "Global options:" | head }}
+{{ "Global option:" | head }}
   Settings that apply to the whole operation, regardless of position.
-
-{{- range .Formatting }}
+{{ range .Formatting }}
+{{ . | flagLine }}
+{{ .Long | wrapIndent "          " 80 }}
+{{- end }}
+{{ range .Config }}
 {{ . | flagLine }}
 {{ .Long | wrapIndent "          " 80 }}
 {{- end }}
 
-{{- range .Config }}
-{{ . | flagLine }}
-{{ .Long | wrapIndent "          " 80 }}
-{{- end }}
-
-{{ "Discovery options:" | head }}
-  Settings that control how files are found when walking directories.
-
-{{- range .Discovery }}
-{{ . | flagLine }}
-{{ .Long | wrapIndent "          " 80 }}
-{{- end }}
-
-{{ "State modifiers:" | head }}
-  Flags that configure the section which follows them. When placed before any
+{{ "Interleaved option:" | head }}
+  Options that configure the section which follows them. When placed before any
   files, they accumulate into the first section's settings. When placed after
-  files, they trigger a section boundary: all state resets to defaults, then
-  the new flag applies to the next section.
-
-{{- range .Interleaved }}
+  files, they trigger a section boundary: all interleaved options reset to
+  defaults, then the new option applies to the next section.
+{{ range .Interleaved }}
 {{ . | flagLine }}
 {{ .Long | wrapIndent "          " 80 }}
 {{- end }}
 
-{{ "Actions:" | head }}
+{{ "Action:" | head }}
   Explicit content generators that insert data into the stream immediately.
-
-{{- range .Actions }}
+{{ range .Actions }}
 {{ . | flagLine }}
 {{ .Long | wrapIndent "          " 80 }}
 {{- end }}
@@ -142,14 +145,30 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
      Use 'grep' to find files with TODOs and pipe them to lx:
        $ grep -Rl TODO | lx -c
 
+  6. {{ "URL Input" | underline }}
+     Fetch a remote file directly (no download step needed):
+       $ lx https://example.com/config.yaml src/
+
+     Expand a GitHub archive and filter to Go files only:
+       $ lx -Z -i "*.go" https://github.com/owner/repo/archive/refs/heads/main.zip
+
 Bugs can be reported on GitHub: https://github.com/rasros/lx/issues
 `
+
+type flagGroup struct {
+	TypeName string
+	Flags    []CommandDef
+}
 
 func makeFuncs() template.FuncMap {
 	return template.FuncMap{
 		"bold":      func(s string) string { return cBold + s + cResetIntensity },
 		"underline": func(s string) string { return cUnderline + s + cResetUnderline },
 		"head":      func(s string) string { return cBold + cUnderline + s + cResetUnderline + cResetIntensity },
+		"dim":       func(s string) string { return cDim + s + cResetIntensity },
+		"groupHead": func(g flagGroup) string {
+			return cUnderline + g.TypeName + cResetUnderline
+		},
 
 		"wrapIndent": func(indent string, width int, s string) string {
 			if s == "" {
@@ -164,8 +183,47 @@ func makeFuncs() template.FuncMap {
 					out.WriteString(indent)
 					out.WriteString("\n")
 				}
-				cleanPara := strings.Join(strings.Fields(para), " ")
-				out.WriteString(wordWrap(cleanPara, indent, width))
+				lines := strings.Split(strings.TrimRight(para, "\n"), "\n")
+				firstBlock := true
+				j := 0
+				for j < len(lines) {
+					line := lines[j]
+					trimmed := strings.TrimLeft(line, " \t")
+					relIndent := line[:len(line)-len(trimmed)]
+					if relIndent != "" {
+						// Indented line: render individually preserving its indent.
+						if !firstBlock {
+							out.WriteString("\n")
+						}
+						if trimmed == "" {
+							out.WriteString(indent)
+						} else {
+							out.WriteString(wordWrap(trimmed, indent+relIndent, width))
+						}
+						firstBlock = false
+						j++
+					} else {
+						// Non-indented: collect a run of consecutive non-indented
+						// lines and reflow them as one prose block.
+						var words []string
+						for j < len(lines) {
+							l := lines[j]
+							t := strings.TrimLeft(l, " \t")
+							if l[:len(l)-len(t)] != "" {
+								break
+							}
+							words = append(words, strings.Fields(t)...)
+							j++
+						}
+						if len(words) > 0 {
+							if !firstBlock {
+								out.WriteString("\n")
+							}
+							out.WriteString(wordWrap(strings.Join(words, " "), indent, width))
+							firstBlock = false
+						}
+					}
+				}
 			}
 			return out.String()
 		},
@@ -178,8 +236,6 @@ func makeFuncs() template.FuncMap {
 				sb.WriteString("-")
 				sb.WriteString(d.Short)
 				sb.WriteString(", ")
-			} else {
-				sb.WriteString("    ")
 			}
 			sb.WriteString("--")
 			sb.WriteString(d.Name)
@@ -228,21 +284,35 @@ func makeFuncs() template.FuncMap {
 }
 
 func printShortHelp() {
-	var all []CommandDef
+	groupOrder := []struct {
+		cmdType  CmdType
+		typeName string
+	}{
+		{CmdGlobal, "Global option:"},
+		{CmdInterleaved, "Interleaved option:"},
+		{CmdAction, "Action:"},
+	}
+	byType := make(map[CmdType][]CommandDef)
 	for _, d := range definitions {
 		if !d.Internal {
-			all = append(all, d)
+			byType[d.Type] = append(byType[d.Type], d)
+		}
+	}
+	var groups []flagGroup
+	for _, g := range groupOrder {
+		if flags := byType[g.cmdType]; len(flags) > 0 {
+			groups = append(groups, flagGroup{TypeName: g.typeName, Flags: flags})
 		}
 	}
 
 	t := template.Must(template.New("short-help").Funcs(makeFuncs()).Parse(shortHelpTmpl))
-	if err := t.Execute(os.Stdout, all); err != nil {
+	if err := t.Execute(os.Stdout, groups); err != nil {
 		fmt.Fprintf(os.Stderr, "template error: %v\n", err)
 	}
 }
 
 func printLongHelp() {
-	var formatting, discovery, interleaved, actions, config []CommandDef
+	var formatting, interleaved, actions, config []CommandDef
 
 	for _, d := range definitions {
 		if d.Internal {
@@ -251,8 +321,6 @@ func printLongHelp() {
 		switch d.Category {
 		case CatFormatting:
 			formatting = append(formatting, d)
-		case CatDiscovery:
-			discovery = append(discovery, d)
 		case CatInterleaved:
 			interleaved = append(interleaved, d)
 		case CatActions:
@@ -264,11 +332,10 @@ func printLongHelp() {
 
 	data := struct {
 		Formatting  []CommandDef
-		Discovery   []CommandDef
 		Interleaved []CommandDef
 		Actions     []CommandDef
 		Config      []CommandDef
-	}{formatting, discovery, interleaved, actions, config}
+	}{formatting, interleaved, actions, config}
 
 	t := template.Must(template.New("long-help").Funcs(makeFuncs()).Parse(longHelpTmpl))
 	if err := t.Execute(os.Stdout, data); err != nil {

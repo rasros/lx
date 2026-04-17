@@ -34,14 +34,6 @@ type CliConfig struct {
 
 	OutputFormat string `yaml:"output_format"`
 
-	FollowSymlinks *bool `yaml:"follow_symlinks"`
-	NoFileSymlinks *bool `yaml:"no_file_links"`
-
-	ShowHidden       *bool `yaml:"show_hidden"`
-	Ignore           *bool `yaml:"ignore"`
-	ExpandArchives   *bool `yaml:"expand_archives"`
-	ExtractDocuments *bool `yaml:"extract_documents"`
-
 	OutputMode string `yaml:"output_mode"`
 	ShowStats  string `yaml:"show_stats"`
 	Verbosity  string `yaml:"verbosity"`
@@ -120,25 +112,6 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 
 		if loaded.OutputFormat != "" {
 			lxCfg.OutputFormat = loaded.OutputFormat
-		}
-
-		if loaded.FollowSymlinks != nil {
-			lxCfg.IgnoreDirSymlinks = !(*loaded.FollowSymlinks)
-		}
-		if loaded.NoFileSymlinks != nil {
-			lxCfg.IgnoreFileSymlinks = *loaded.NoFileSymlinks
-		}
-		if loaded.ShowHidden != nil {
-			lxCfg.IgnoreHidden = !(*loaded.ShowHidden)
-		}
-		if loaded.Ignore != nil {
-			lxCfg.IgnoreEnabled = *loaded.Ignore
-		}
-		if loaded.ExpandArchives != nil {
-			lxCfg.ExpandArchives = *loaded.ExpandArchives
-		}
-		if loaded.ExtractDocuments != nil {
-			lxCfg.ExtractDocuments = *loaded.ExtractDocuments
 		}
 
 		if loaded.OutputMode != "" {

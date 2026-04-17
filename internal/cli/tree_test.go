@@ -57,15 +57,15 @@ func TestBuildASCIITree_Empty(t *testing.T) {
 
 func TestCollectTreePaths_SkipsStdinAndURL(t *testing.T) {
 	ctx := context.Background()
-	cfg := lx.NewConfig()
+	runCfg := lx.RunnerConfig{}
 
-	stdinPaths := collectTreePaths(ctx, Op{Action: "FILE", Value: "-", Type: CmdAction}, cfg, nil, nil, nil)
+	stdinPaths := collectTreePaths(ctx, Op{Action: "FILE", Value: "-", Type: CmdAction}, runCfg, nil, nil, nil)
 	if len(stdinPaths) != 0 {
 		t.Fatalf("stdin should not contribute paths, got: %v", stdinPaths)
 	}
 
 	// URL with ExpandArchives=false (default) should return no paths
-	urlPaths := collectTreePaths(ctx, Op{Action: "FILE", Value: "https://example.com/repo.zip", Type: CmdAction}, cfg, nil, nil, nil)
+	urlPaths := collectTreePaths(ctx, Op{Action: "FILE", Value: "https://example.com/repo.zip", Type: CmdAction}, runCfg, nil, nil, nil)
 	if len(urlPaths) != 0 {
 		t.Fatalf("url should not contribute paths when ExpandArchives=false, got: %v", urlPaths)
 	}
@@ -73,7 +73,6 @@ func TestCollectTreePaths_SkipsStdinAndURL(t *testing.T) {
 
 func TestPrecomputeTrees_TreeOnlyMarksFileOps(t *testing.T) {
 	ctx := context.Background()
-	cfg := lx.NewConfig()
 	groups := []Section{
 		{
 			Ops: []Op{
@@ -83,7 +82,7 @@ func TestPrecomputeTrees_TreeOnlyMarksFileOps(t *testing.T) {
 		},
 	}
 
-	precomputeTrees(ctx, groups, cfg, nil)
+	precomputeTrees(ctx, groups, nil)
 	if !groups[0].skipFileOps[1] {
 		t.Fatalf("expected file op at index 1 to be skipped in tree-only section")
 	}

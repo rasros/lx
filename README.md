@@ -20,7 +20,7 @@ different rules (like line limits or filters) to specific files on the fly withi
 
 * Token estimation for individual files and the final output.
 * Smart traversal that respects `.gitignore`, `.ignore`, and `.lxignore`.
-* Stream processing to apply modifiers (like `--tail 50`) mid-command.
+* Stream processing to apply interleaved options (like `--tail 50`) mid-command.
 * Outputs standard Markdown, XML (ideal for Claude), or HTML.
 * Copies directly to your system clipboard on Linux, macOS, and Windows.
 * Plays nice with Unix pipelines (`find`, `fd`, `git`, etc.).
@@ -94,10 +94,10 @@ git diff --name-only main | lx -c
 
 ## Stream Processing Model
 
-`lx` processes arguments left to right as a stream of **sections** — consecutive file/directory arguments with
-no interleaved flags between them. Interleaved flags (like `-n`, `--tail`, `-l`, `-i`) are scoped to the section they
-precede. When a flag appears *after* files, it creates a **section boundary**: all interleaved state resets to defaults
-before the new flag takes effect.
+`lx` processes arguments left to right as a stream of **sections** - consecutive file/directory arguments with
+no interleaved options between them. Interleaved options (like `-n`, `--tail`, `-l`, `-i`) are scoped to the section
+they precede. When an interleaved option appears *after* files, it creates a **section boundary**: all interleaved
+options reset to defaults before the new option takes effect.
 
 Example: Grab the last 50 lines of a log file, then `src/` with line numbers enabled:
 ```bash
@@ -125,9 +125,6 @@ You can set your defaults in `~/.config/lx/config.yaml`:
 ```yaml
 output_mode: "stdout"    # stdout, copy
 output_format: "xml"     # markdown, xml, html
-show_hidden: false
-follow_symlinks: false
-ignore: true             # respects .gitignore
 ```
 
 ## Comparison

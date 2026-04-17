@@ -1,97 +1,103 @@
 --- STDOUT ---
-[1/17] .gitignore (2 rows)
+[1/18] .gitignore (2 rows)
 ---
 ```gitignore
 bin/
 *.tmp
 ```
 
-[2/17] .hidden (1 rows)
+[2/18] .hidden (1 rows)
 ---
 ```
 i am hidden
 ```
 
-[3/17] configs/custom_sections.yaml (1 rows)
+[3/18] configs/custom_sections.yaml (1 rows)
 ---
 ```yaml
 section_header_template: "*** {{ .Body }} ***\n"
 ```
 
-[4/17] configs/custom_template.yaml (1 rows)
+[4/18] configs/custom_template.yaml (1 rows)
 ---
 ```yaml
 file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
 ```
 
-[5/17] configs/follow.yaml (1 rows)
+[5/18] configs/follow.yaml (1 rows)
 ---
 ```yaml
 follow_symlinks: true
 ```
 
-[6/17] configs/hidden.yaml (1 rows)
+[6/18] configs/hidden.yaml (1 rows)
 ---
 ```yaml
 show_hidden: true
 ```
 
-[7/17] direct_ignore_test/.gitignore (1 rows)
+[7/18] direct_ignore_test/.gitignore (1 rows)
 ---
 ```gitignore
 *.ignored
 ```
 
-[8/17] direct_ignore_test/test.kept (1 rows)
+[8/18] direct_ignore_test/test.kept (1 rows)
 ---
 ```
 should appear
 ```
 
-[9/17] links/broken_link - error: open links/broken_link: FILE_NOT_FOUND
+[9/18] links/.hidden_link.txt (1 rows)
+---
+```text
+i am hidden in links
+```
 
-[10/17] links/cycle_a/visible.txt (1 rows)
+[10/18] links/broken_link - error: open links/broken_link: FILE_NOT_FOUND
+
+[11/18] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[11/17] links/cycle_b/visible.txt (1 rows)
+[12/18] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[12/17] links/link_to_main.go (~1 rows)
+[13/18] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[13/17] links/link_to_pkg - error: open links/link_to_pkg: FILE_NOT_FOUND
+[14/18] links/link_to_pkg - error: open links/link_to_pkg: FILE_NOT_FOUND
 
-[14/17] links/safe_target/recursion.txt (1 rows)
+[15/18] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
 ```
 
-[15/17] main.go (2 rows)
+[16/18] main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[16/17] main_test.go (2 rows)
+[17/18] main_test.go (2 rows)
 ---
 ```go
 package main
 import "testing"
 ```
 
-[17/17] parent_ignore_test/level1/level2/keep_me.go (1 rows)
+[18/18] parent_ignore_test/level1/level2/keep_me.go (1 rows)
 ---
 ```go
 package level2

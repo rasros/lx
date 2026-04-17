@@ -4,10 +4,10 @@ import "github.com/rasros/lx/pkg/lx"
 
 // newArchiveWalker builds a Walker for archive contents.
 // Gitignore processing is disabled (archives are pre-packaged), but hidden-file
-// filtering is applied based on the config and whether the path is forced.
-func newArchiveWalker(cfg *lx.Config, isForced bool) *lx.Walker {
+// filtering is applied based on showHidden and whether the path is forced.
+func newArchiveWalker(showHidden bool, isForced bool) *lx.Walker {
 	var overrideRules []string
-	if cfg.IgnoreHidden && !isForced {
+	if !showHidden && !isForced {
 		overrideRules = append(overrideRules, ".*")
 	}
 	w := lx.NewWalker(nil, overrideRules)

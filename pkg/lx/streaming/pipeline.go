@@ -40,7 +40,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					return
 				}
 
-				proc := render.NewProcessor(s.engine, global, s.onFileError, s.format, s.extractDocuments)
+				proc := render.NewProcessor(s.engine, global, s.onFileError, s.format)
 				proc.SetTokenCounter(s.tokenizer.Estimate)
 
 				readBufPtr := readPool.Get().(*[]byte)

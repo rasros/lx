@@ -1,0 +1,46 @@
+--- STDOUT ---
+[1/10] links/.hidden_link.txt (1 rows)
+---
+```text
+i am hidden in links
+```
+
+[2/10] links/broken_link - error: open broken_link: FILE_NOT_FOUND
+
+[3/10] links/cycle_a/to_b - error: is a directory
+
+[4/10] links/cycle_a/visible.txt (1 rows)
+---
+```text
+a
+```
+
+[5/10] links/cycle_b/to_a - error: is a directory
+
+[6/10] links/cycle_b/visible.txt (1 rows)
+---
+```text
+b
+```
+
+[7/10] links/link_to_main.go (~1 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[8/10] links/link_to_pkg - error: open link_to_pkg: FILE_NOT_FOUND
+
+[9/10] links/loop - error: is a directory
+
+[10/10] links/safe_target/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+
+--- STDERR ---
+[1;31mError:[0m Failed to read file: open broken_link: FILE_NOT_FOUND (path=links/broken_link)
+[1;31mError:[0m Failed to read file: open link_to_pkg: FILE_NOT_FOUND (path=links/link_to_pkg)

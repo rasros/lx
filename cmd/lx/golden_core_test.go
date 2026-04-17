@@ -81,7 +81,7 @@ func TestGoldenSymlinks(t *testing.T) {
 		{name: "051_symlinks_follow", args: []string{"--follow", "links"}},
 		{name: "052_symlinks_dag", args: []string{"--follow", "links/loop"}},
 		{name: "053_symlinks_infinite_cycle", args: []string{"--follow", "links/cycle_a"}},
-		{name: "054_file_links_explicit", args: []string{"--links", "links"}},
+		{name: "054_hidden_flag", args: []string{"-H", "links"}},
 		{name: "055_no_file_links", args: []string{"--no-links", "links"}},
 		{name: "056_follow_dirs_no_file_links", args: []string{"--follow", "--no-links", "links"}},
 		{name: "057_broken_symlink", args: []string{"links/broken_link"}},
@@ -131,9 +131,9 @@ func TestGoldenDetection(t *testing.T) {
 func TestGoldenConfig(t *testing.T) {
 	dir := setupConfigFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
-		{name: "090_config_hidden", args: []string{"-y", "configs/hidden.yaml", "."}},
-		{name: "091_config_follow", args: []string{"-y", "configs/follow.yaml", "links"}},
-		{name: "092_config_override", args: []string{"-y", "configs/follow.yaml", "--no-follow", "links"}},
+		{name: "090_config_hidden", args: []string{"-H", "."}},
+		{name: "091_config_follow", args: []string{"--follow", "links"}},
+		{name: "092_config_combined", args: []string{"-H", "--follow", "links"}},
 		{name: "093_force_file_flag", args: []string{"-f", ".gitignore"}},
 		{name: "094_force_file_flag_excludes", args: []string{"-e", "*.go", "-f", "main.go"}},
 		{name: "095_config_custom_sections", args: []string{"-y", "configs/custom_sections.yaml", "-s", "Head", "main.go"}},
@@ -163,8 +163,6 @@ func TestGoldenArchive(t *testing.T) {
 		{name: "110_expand_archive_zip", args: []string{"-Z", "archive.zip"}},
 		{name: "111_expand_archive_no_flag", args: []string{"archive.zip"}},
 		{name: "112_expand_archive_filter", args: []string{"-Z", "-i", "*.go", "archive.zip"}},
-		{name: "113_expand_archive_config", args: []string{"-y", "configs/expand.yaml", "archive.zip"}},
-		{name: "114_expand_archive_no_expand_override", args: []string{"-y", "configs/expand.yaml", "--no-expand", "archive.zip"}},
 		{name: "115_expand_archive_tar_gz", args: []string{"-Z", "archive.tar.gz"}},
 	})
 }
@@ -172,13 +170,13 @@ func TestGoldenArchive(t *testing.T) {
 func TestGoldenDocuments(t *testing.T) {
 	dir := setupDocumentsFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
-		{name: "120_docs_pdf_extracted", args: []string{"sample.pdf"}},
-		{name: "121_docs_docx_extracted", args: []string{"sample.docx"}},
-		{name: "122_docs_xlsx_extracted", args: []string{"sample.xlsx"}},
-		{name: "123_docs_no_extract_flag", args: []string{"-D", "sample.pdf", "sample.docx", "sample.xlsx"}},
+		{name: "120_docs_pdf_extracted", args: []string{"-D", "sample.pdf"}},
+		{name: "121_docs_docx_extracted", args: []string{"-D", "sample.docx"}},
+		{name: "122_docs_xlsx_extracted", args: []string{"-D", "sample.xlsx"}},
+		{name: "123_docs_no_extract_flag", args: []string{"sample.pdf", "sample.docx", "sample.xlsx"}},
 		{name: "124_docs_odt_expanded", args: []string{"-Z", "sample.odt"}},
 		{name: "125_docs_odt_binary", args: []string{"sample.odt"}},
-		{name: "126_docs_pptx_extracted", args: []string{"sample.pptx"}},
+		{name: "126_docs_pptx_extracted", args: []string{"-D", "sample.pptx"}},
 		{name: "127_docs_ods_expanded", args: []string{"-Z", "sample.ods"}},
 		{name: "128_docs_odp_expanded", args: []string{"-Z", "sample.odp"}},
 		{name: "129_docs_ods_binary", args: []string{"sample.ods"}},

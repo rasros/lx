@@ -40,7 +40,7 @@ func TestRun_Basic(t *testing.T) {
 		},
 		{
 			name:        "new flags check",
-			args:        []string{"--no-links", "--no-follow", f1},
+			args:        []string{"--no-links", "--no-ignore", f1},
 			wantContain: []string{"hello.txt"},
 		},
 	}

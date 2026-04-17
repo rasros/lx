@@ -23,7 +23,6 @@ func SetupArchiveFixture(t *testing.T) string {
 		{"hello.txt", "Hello from tar!\n"},
 		{"nested/world.go", "package nested\n"},
 	})
-	writeFile(t, dir, "configs/expand.yaml", "expand_archives: true\n", 0644)
 
 	return dir
 }

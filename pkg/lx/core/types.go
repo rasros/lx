@@ -23,6 +23,12 @@ type RunnerConfig struct {
 	LineNumbers       bool
 	SkeletonFunctions bool
 	SkeletonTypes     bool
+	ExpandArchives    bool
+	ExtractDocuments  bool
+	ShowHidden        bool
+	FollowDirSymlinks bool
+	SkipFileSymlinks  bool
+	NoIgnore          bool
 }
 
 // TemplateEngine holds the parsed text/template instances.
@@ -64,13 +70,6 @@ type Config struct {
 	StatsTemplate        string
 
 	OutputFormat string
-
-	IgnoreFileSymlinks bool
-	IgnoreDirSymlinks  bool
-	IgnoreHidden       bool
-	IgnoreEnabled      bool
-	ExpandArchives     bool
-	ExtractDocuments   bool
 }
 
 // FileContext represents the data provided to file-level templates.

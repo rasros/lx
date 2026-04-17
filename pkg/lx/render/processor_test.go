@@ -18,7 +18,7 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 	engine, _ := templatex.Compile(cfg)
 	global := core.GlobalContext{TotalFiles: 1}
 
-	proc := NewProcessor(engine, global, nil, "markdown", false)
+	proc := NewProcessor(engine, global, nil, "markdown")
 
 	file := sources.NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
 	file.Config = core.RunnerConfig{Head: 1, Tail: 1}
@@ -45,7 +45,7 @@ func TestProcessor_RenderFile_SkeletonSlicingUsesFilteredRows(t *testing.T) {
 	engine, _ := templatex.Compile(cfg)
 	global := core.GlobalContext{TotalFiles: 1}
 
-	proc := NewProcessor(engine, global, nil, "markdown", false)
+	proc := NewProcessor(engine, global, nil, "markdown")
 
 	file := sources.NewBufferInputFile("skeleton.go", []byte(`package p
 
@@ -92,7 +92,7 @@ func TestRender_DataURI(t *testing.T) {
 	cfg.OutputFormat = "html"
 	engine, _ := templatex.Compile(cfg)
 
-	proc := NewProcessor(engine, core.GlobalContext{}, nil, "html", false)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "html")
 
 	file, err := sources.NewInputFileFromPath(os.DirFS(tmp), imgName)
 	if err != nil {
@@ -117,7 +117,7 @@ func TestRender_ErrorHandling(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
 
-	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown", false)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown")
 
 	file := sources.InputFile{Path: "ghost.txt", Open: func() (io.ReadCloser, error) { return nil, os.ErrPermission }}
 	item := PreparedItem{Raw: file, Section: &core.SectionContext{}}
@@ -136,7 +136,7 @@ func TestRender_ErrorHandling(t *testing.T) {
 func TestRender_BinaryFile(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown", false)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown")
 
 	binaryContent := append([]byte("ELF"), 0x00, 0x01, 0x02, 0x03)
 	file := sources.NewBufferInputFile("program", binaryContent)
@@ -158,7 +158,7 @@ func TestRender_BinaryFile(t *testing.T) {
 func TestRender_CompactView(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown", false)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown")
 
 	file := sources.NewBufferInputFile("data.txt", []byte("lots of content\n"))
 	file.Config = core.RunnerConfig{Head: 0, Tail: 0}
@@ -182,7 +182,7 @@ func TestRender_CompactView(t *testing.T) {
 func TestRender_LineNumbers(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1}, nil, "markdown", false)
+	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1}, nil, "markdown")
 
 	file := sources.NewBufferInputFile("code.go", []byte("package main\nfunc main() {}\n"))
 	file.Config = core.RunnerConfig{Head: -1, Tail: -1, LineNumbers: true}

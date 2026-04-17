@@ -1,26 +1,34 @@
 --- STDOUT ---
-[1/5] links/broken_link - error: open broken_link: FILE_NOT_FOUND
+[1/9] links/broken_link - error: open broken_link: FILE_NOT_FOUND
 
-[2/5] links/cycle_a/visible.txt (1 rows)
+[2/9] links/cycle_a/to_b - error: is a directory
+
+[3/9] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
 ```
 
-[3/5] links/cycle_b/visible.txt (1 rows)
+[4/9] links/cycle_b/to_a - error: is a directory
+
+[5/9] links/cycle_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[4/5] links/link_to_main.go (~1 rows)
+[6/9] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
 ```
 
-[5/5] links/safe_target/recursion.txt (1 rows)
+[7/9] links/link_to_pkg - error: is a directory
+
+[8/9] links/loop - error: is a directory
+
+[9/9] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe

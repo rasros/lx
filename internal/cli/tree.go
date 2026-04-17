@@ -12,13 +12,13 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-func precomputeTrees(ctx context.Context, groups []Section, cfg *lx.Config, globalIgnoreRules []string) {
+func precomputeTrees(ctx context.Context, groups []Section, globalIgnoreRules []string) {
 	for i := range groups {
-		computeSectionTrees(ctx, &groups[i], cfg, globalIgnoreRules)
+		computeSectionTrees(ctx, &groups[i], globalIgnoreRules)
 	}
 }
 
-func computeSectionTrees(ctx context.Context, g *Section, cfg *lx.Config, globalIgnoreRules []string) {
+func computeSectionTrees(ctx context.Context, g *Section, globalIgnoreRules []string) {
 	var subFileIdxs []int
 	var subTreeIdxs []int
 	subTreeOnly := false
@@ -27,7 +27,7 @@ func computeSectionTrees(ctx context.Context, g *Section, cfg *lx.Config, global
 		if len(subTreeIdxs) > 0 && len(subFileIdxs) > 0 {
 			var paths []string
 			for _, idx := range subFileIdxs {
-				paths = append(paths, collectTreePaths(ctx, g.Ops[idx], cfg, g.Includes, g.Excludes, globalIgnoreRules)...)
+				paths = append(paths, collectTreePaths(ctx, g.Ops[idx], g.RunCfg, g.Includes, g.Excludes, globalIgnoreRules)...)
 			}
 			if len(paths) > 0 {
 				ts := buildASCIITree(paths)
@@ -71,7 +71,7 @@ func computeSectionTrees(ctx context.Context, g *Section, cfg *lx.Config, global
 	flush()
 }
 
-func collectTreePaths(ctx context.Context, op Op, cfg *lx.Config, includes, excludes []string, globalIgnoreRules []string) []string {
+func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includes, excludes []string, globalIgnoreRules []string) []string {
 	var paths []string
 
 	rawPath := op.Value
@@ -82,8 +82,8 @@ func collectTreePaths(ctx context.Context, op Op, cfg *lx.Config, includes, excl
 	}
 
 	if lx.IsHTTPURL(rawPath) {
-		if cfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
-			return collectURLArchiveTreePaths(ctx, rawPath, cfg, includes)
+		if runCfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
+			return collectURLArchiveTreePaths(ctx, rawPath, runCfg.ShowHidden, includes)
 		}
 		return paths
 	}
@@ -109,10 +109,10 @@ func collectTreePaths(ctx context.Context, op Op, cfg *lx.Config, includes, excl
 	displayPrefix := filepath.Clean(rawPath)
 
 	var baseRules, overrideRules []string
-	if cfg.IgnoreEnabled {
+	if !runCfg.NoIgnore {
 		baseRules = append(baseRules, globalIgnoreRules...)
 	}
-	if cfg.IgnoreHidden && !isForced {
+	if !runCfg.ShowHidden && !isForced {
 		overrideRules = append(overrideRules, ".*")
 	}
 	if !isForced {
@@ -120,7 +120,7 @@ func collectTreePaths(ctx context.Context, op Op, cfg *lx.Config, includes, excl
 	}
 
 	w := lx.NewWalker(baseRules, overrideRules)
-	w.IgnoreEnabled = cfg.IgnoreEnabled
+	w.IgnoreEnabled = !runCfg.NoIgnore
 
 	_ = w.Walk(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -156,7 +156,7 @@ func collectTreePaths(ctx context.Context, op Op, cfg *lx.Config, includes, excl
 	return paths
 }
 
-func collectURLArchiveTreePaths(ctx context.Context, rawPath string, cfg *lx.Config, includes []string) []string {
+func collectURLArchiveTreePaths(ctx context.Context, rawPath string, showHidden bool, includes []string) []string {
 	tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
 	if err != nil {
 		slog.Debug("Failed to download URL archive for tree", "url", rawPath, "error", err)
@@ -164,7 +164,7 @@ func collectURLArchiveTreePaths(ctx context.Context, rawPath string, cfg *lx.Con
 	}
 	defer cleanup()
 
-	archiveWalker := newArchiveWalker(cfg, false)
+	archiveWalker := newArchiveWalker(showHidden, false)
 	paths, err := lx.ExpandArchivePaths(ctx, tempPath, rawPath, archiveWalker, includes)
 	if err != nil {
 		slog.Debug("Failed to expand URL archive for tree", "url", rawPath, "error", err)

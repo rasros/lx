@@ -11,16 +11,18 @@
 // Main configuration:
 //
 //   - Config.OutputFormat controls rendering format: "markdown", "xml", or "html".
-//   - Config.ExtractDocuments enables text extraction for .pdf/.docx/.xlsx/.pptx.
-//   - Config.IgnoreEnabled and ignore/symlink flags control discovery behavior.
 //   - Config template fields (FileContentTemplate, SectionTemplate, etc.) allow
 //     custom output structure.
 //
-// RunnerConfig controls per-file slicing and filtering:
+// RunnerConfig controls per-file slicing, filtering, and discovery:
 //
 //   - Head / Tail choose how many lines to include from start/end.
 //   - LineNumbers enables numbered output.
 //   - SkeletonFunctions / SkeletonTypes reduce source files to signatures/defs.
+//   - ExpandArchives opens compressed files and directories for .zip/.tar.gz, etc..
+//   - ExtractDocuments enables text extraction for .pdf/.docx/.xlsx/.pptx.
+//   - ShowHidden, FollowDirSymlinks, SkipFileSymlinks control discovery options.
+//   - NoIgnore disables adhering to .ignore files.
 //
 // Stream methods:
 //

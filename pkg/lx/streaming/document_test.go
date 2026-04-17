@@ -47,10 +47,9 @@ func makeTestDOCX(t *testing.T, paragraphs ...string) []byte {
 	return buf.Bytes()
 }
 
-func TestStream_ExtractDocuments_PropagatesFromConfig(t *testing.T) {
+func TestStream_ExtractDocuments_PropagatesFromRunnerConfig(t *testing.T) {
 	cfg := core.NewConfig()
-	cfg.ExtractDocuments = false
-	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1})
+	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1, ExtractDocuments: false})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,9 +68,9 @@ func TestStream_ExtractDocuments_PropagatesFromConfig(t *testing.T) {
 	}
 }
 
-func TestStream_ExtractDocuments_EnabledByDefault(t *testing.T) {
+func TestStream_ExtractDocuments_EnabledViaRunnerConfig(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1})
+	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1, ExtractDocuments: true})
 	if err != nil {
 		t.Fatal(err)
 	}

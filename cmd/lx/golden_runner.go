@@ -150,8 +150,12 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, pkgDir string, scrubPa
 
 			goldenPath := filepath.Join(pkgDir, "testdata", "golden", tc.name+".golden")
 			if *update {
-				os.MkdirAll(filepath.Dir(goldenPath), 0755)
-				os.WriteFile(goldenPath, []byte(fullOutput), 0644)
+				if err := os.MkdirAll(filepath.Dir(goldenPath), 0755); err != nil {
+					t.Fatalf("create golden dir: %v", err)
+				}
+				if err := os.WriteFile(goldenPath, []byte(fullOutput), 0644); err != nil {
+					t.Fatalf("write golden file: %v", err)
+				}
 			}
 
 			wantBytes, err := os.ReadFile(goldenPath)
@@ -162,13 +166,32 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, pkgDir string, scrubPa
 				t.Fatalf("Golden file missing: %v. Run with -update", err)
 			}
 
-			if string(wantBytes) != fullOutput {
-				t.Errorf("Mismatch for %s.\nExpected len: %d\nGot len: %d\nCheck testdata/golden/%s.golden",
-					tc.name, len(wantBytes), len(fullOutput), tc.name)
-				_ = os.WriteFile(goldenPath+".actual", []byte(fullOutput), 0644)
+			want := string(wantBytes)
+			if want != fullOutput {
+				diffAt := firstDiffIndex(want, fullOutput)
+				t.Errorf(
+					"Mismatch for %s.\nExpected len: %d\nGot len: %d\nFirst difference at byte: %d\nGolden: testdata/golden/%s.golden\nTo accept current output: go test ./cmd/lx -run %s -update",
+					tc.name, len(want), len(fullOutput), diffAt, tc.name, tc.name,
+				)
 			}
 		})
 	}
+}
+
+func firstDiffIndex(a, b string) int {
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+	for i := range n {
+		if a[i] != b[i] {
+			return i
+		}
+	}
+	if len(a) != len(b) {
+		return n
+	}
+	return -1
 }
 
 func normalizeOutput(stdout, stderr string, roots ...string) string {

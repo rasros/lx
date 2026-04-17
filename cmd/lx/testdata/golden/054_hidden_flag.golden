@@ -1,0 +1,37 @@
+--- STDOUT ---
+[1/6] links/.hidden_link.txt (1 rows)
+---
+```text
+i am hidden in links
+```
+
+[2/6] links/broken_link - error: open broken_link: FILE_NOT_FOUND
+
+[3/6] links/cycle_a/visible.txt (1 rows)
+---
+```text
+a
+```
+
+[4/6] links/cycle_b/visible.txt (1 rows)
+---
+```text
+b
+```
+
+[5/6] links/link_to_main.go (~1 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[6/6] links/safe_target/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+
+--- STDERR ---
+[1;31mError:[0m Failed to read file: open broken_link: FILE_NOT_FOUND (path=links/broken_link)
