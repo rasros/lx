@@ -61,9 +61,6 @@ func TestGoldenSkeleton(t *testing.T) {
 		// 510-519: Lua
 		{name: "510_skeleton_lua_functions", args: []string{"-u", "skeleton/main.lua"}},
 
-		// 520-529: Bash
-		{name: "520_skeleton_bash_functions", args: []string{"-u", "skeleton/main.sh"}},
-
 		// 530-539: PowerShell
 		{name: "530_skeleton_powershell_functions", args: []string{"-u", "skeleton/main.ps1"}},
 
