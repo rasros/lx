@@ -1,0 +1,10 @@
+--- STDOUT ---
+sample.xlsx (3 rows)
+---
+```
+Sheet1:
+Name	Score
+```
+
+
+--- STDERR ---

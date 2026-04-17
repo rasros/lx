@@ -1,0 +1,15 @@
+--- STDOUT ---
+<content>
+  <document index="1" rows="4">
+    <source>sample.pdf</source>
+    <document_content>
+
+
+Hello PDF World
+Second line of text
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---

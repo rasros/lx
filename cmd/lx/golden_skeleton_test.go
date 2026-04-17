@@ -52,6 +52,8 @@ func TestGoldenSkeleton(t *testing.T) {
 
 		{name: "394_skeleton_interleaved_reset", args: []string{"-u", "-Y", "skeleton/main.py", "-u", "skeleton/main.py"}},
 		{name: "395_skeleton_toggle_off", args: []string{"-u", "-Y", "skeleton/main.go", "-n", "2", "skeleton/main.go"}},
+		{name: "396_skeleton_go_both_xml", args: []string{"--xml", "-u", "-Y", "skeleton/main.go"}},
+		{name: "397_skeleton_go_both_html", args: []string{"--html", "-u", "-Y", "skeleton/main.go"}},
 
 		// 500-509: Dart
 		{name: "500_skeleton_dart_functions", args: []string{"-u", "skeleton/main.dart"}},
@@ -106,5 +108,7 @@ func TestGoldenSkeletonSlicing(t *testing.T) {
 		{name: "432_skeleton_lines_php_both", args: []string{"-u", "-Y", "--lines", "3", "skeleton/main.php"}},
 		{name: "433_skeleton_lines_jsx_both", args: []string{"-u", "-Y", "--lines", "2", "skeleton/main.jsx"}},
 		{name: "434_skeleton_head_tsx_both", args: []string{"-u", "-Y", "--head", "3", "skeleton/main.tsx"}},
+		{name: "435_skeleton_lines_numbered_go_both", args: []string{"-u", "-Y", "-l", "--lines", "4", "skeleton/main.go"}},
+		{name: "436_skeleton_head_numbered_swift_both", args: []string{"-u", "-Y", "-l", "--head", "3", "skeleton/main.swift"}},
 	})
 }

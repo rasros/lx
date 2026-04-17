@@ -1,0 +1,12 @@
+--- STDOUT ---
+sample.pptx (6 rows)
+---
+```
+
+Hello PPTX World
+... (3 rows skipped)
+Second slide content
+```
+
+
+--- STDERR ---

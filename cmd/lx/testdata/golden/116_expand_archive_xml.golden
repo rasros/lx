@@ -1,0 +1,19 @@
+--- STDOUT ---
+<content>
+  <document index="1" language="text" rows="1">
+    <source>archive.zip/hello.txt</source>
+    <document_content>
+Hello from archive!
+    </document_content>
+  </document>
+
+  <document index="2" language="go" rows="1">
+    <source>archive.zip/nested/world.go</source>
+    <document_content>
+package nested
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---
