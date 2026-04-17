@@ -71,11 +71,11 @@ func makeTestXLSX(t *testing.T, sheet string, cells map[string]interface{}) []by
 func TestProcessor_ExtractDocuments_DOCX(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown", true)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown")
 
 	data := makeTestDOCX(t, "Important document content")
 	file := sources.NewBufferInputFile("report.docx", data)
-	file.Config = core.RunnerConfig{Head: -1}
+	file.Config = core.RunnerConfig{Head: -1, ExtractDocuments: true}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}, nil); err != nil {
@@ -94,11 +94,11 @@ func TestProcessor_ExtractDocuments_DOCX(t *testing.T) {
 func TestProcessor_ExtractDocuments_XLSX(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown", true)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown")
 
 	data := makeTestXLSX(t, "Sheet1", map[string]interface{}{"A1": "Revenue", "B1": "12345"})
 	file := sources.NewBufferInputFile("budget.xlsx", data)
-	file.Config = core.RunnerConfig{Head: -1}
+	file.Config = core.RunnerConfig{Head: -1, ExtractDocuments: true}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}, nil); err != nil {
@@ -117,11 +117,11 @@ func TestProcessor_ExtractDocuments_XLSX(t *testing.T) {
 func TestProcessor_NoExtractDocuments_DOCX(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown", false)
+	proc := NewProcessor(engine, core.GlobalContext{}, nil, "markdown")
 
 	data := makeTestDOCX(t, "Should not appear")
 	file := sources.NewBufferInputFile("report.docx", data)
-	file.Config = core.RunnerConfig{Head: -1}
+	file.Config = core.RunnerConfig{Head: -1, ExtractDocuments: false}
 
 	var buf bytes.Buffer
 	if err := proc.RenderPrepared(&buf, PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}, nil); err != nil {

@@ -20,7 +20,6 @@ func init() {
 
 const (
 	CatFormatting  = "Formatting"
-	CatDiscovery   = "Discovery"
 	CatInterleaved = "Interleaved"
 	CatActions     = "Actions"
 	CatConfig      = "Config"
@@ -107,176 +106,7 @@ when you specifically want to pipe the output to another tool.`,
 	},
 
 	{
-		Category:  CatDiscovery,
-		Name:      "hidden",
-		Short:     "H",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Include hidden files and directories",
-		Long: `Include hidden files and directories (those starting with '.') in the traversal.
-
-By default, lx ignores hidden files to avoid cluttering the context with git
-internals (.git), IDE configurations (.vscode, .idea), or cache folders.
-Use this flag if you need to include dotfiles like .env, .github, or .gitignore.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "follow",
-		Short:     "S",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Follow symbolic links to directories",
-		Long: `Follow symbolic links that point to directories and traverse them recursively.
-
-Be cautious with this flag in projects containing links to very large directories.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "no-follow",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Do not follow directory symlinks (default)",
-		Long: `Do not follow symbolic links that point to directories.
-
-This is the default behavior to ensure predictable traversal within the
-project root. This flag exists primarily to override a 'follow_symlinks: true'
-setting in your configuration file.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "links",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Include symbolic links to files (default)",
-		Long: `Include symbolic links that point to files.
-
-When encountered, lx will read the content of the target file. This is the
-default behavior.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "no-links",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Ignore symbolic links to files",
-		Long: `Skip symbolic links that point to files.
-
-Use this if your project contains many symlinks to large artifacts that you
-do not want to include in the context.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "ignore",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Respect ignore files (default)",
-		Long: `Respect .gitignore, .ignore, and .lxignore files during traversal.
-
-lx looks for ignore files in every directory it visits. The precedence order is:
-  1. .lxignore (specific to this tool)
-  2. .ignore (universal ignore file)
-  3. .gitignore (git standard)
-  4. Global ignore files (~/.config/lx/ignore or ~/.config/git/ignore)
-
-Use this flag to override a previous --no-ignore setting.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "no-ignore",
-		Short:     "I",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Disregard all ignore files (traverse everything)",
-		Long: `Disregard all ignore files and traverse everything.
-
-When set, lx will NOT check .gitignore or any other ignore files. This is
-useful when you explicitly need to include build artifacts, vendor directories,
-or node_modules that are usually ignored.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "no-hidden",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Skip hidden files (default)",
-		Long: `Skip hidden files (files starting with '.').
-
-This is the default behavior. Use this flag to override a 'show_hidden: true'
-configuration setting.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "expand",
-		Short:     "Z",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Expand zip and other archive files inline",
-		Long: `Expand archive files inline during traversal.
-
-When enabled, archive files are opened and their contents are processed as if
-they were regular files in the directory tree. The archive path is used as a
-prefix for entries inside it (e.g. archive.zip/hello.txt).
-
-Active include (-i) and exclude (-e) filters apply to entries inside the archive.
-Hidden entry filtering (leading dot) is also respected.
-
-Supported formats:
-  ZIP-based:
-    .zip, .jar, .war, .ear, .odt
-  TAR (plain and compressed):
-    .tar, .tar.gz, .tar.bz2, .tar.xz, .tar.zst,
-    .tar.br, .tar.lz4, .tar.sz, .tar.s2,
-    .tgz, .tbz2, .txz
-  Other multi-file archives:
-    .rar, .7z
-  Single-file compression (exposed as one virtual entry):
-    .gz, .bz2, .xz, .zst, .br, .lz4, .sz, .s2, .lz`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "no-expand",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Do not expand archive files (default)",
-		Long: `Do not expand archive files; treat them as regular binary files.
-
-This is the default behavior. Use this flag to override an
-'expand_archives: true' setting in your configuration file.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "documents",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Extract text from document files (default)",
-		Long: `Extract plain text from document files during processing (default).
-
-When enabled, document files are converted to plain text instead of being
-treated as binary:
-  - .pdf  — via PDF text extraction
-  - .docx — via Word document parsing
-  - .xlsx — via spreadsheet cell values (one sheet per section)
-
-Note: .odt files are ZIP-based and are handled separately by the archive
-expansion flag (--expand / -Z).
-
-Use this flag to override a 'extract_documents: false' setting in your
-configuration file.`,
-	},
-	{
-		Category:  CatDiscovery,
-		Name:      "no-documents",
-		Short:     "D",
-		Type:      CmdGlobal,
-		ValueType: ValueNone,
-		Usage:     "Do not extract document content (treat as binary)",
-		Long: `Do not extract text from document files; treat them as binary.
-
-Applies to .pdf, .docx, and .xlsx. Use this to override the default
-'extract_documents: true' setting or a matching entry in your config file.`,
-	},
-	{
-		Category:  CatDiscovery,
+		Category:  CatConfig,
 		Name:      "null",
 		Short:     "0",
 		Type:      CmdGlobal,
@@ -313,10 +143,8 @@ useful when asking an LLM to reference exact locations in follow-up prompts.`,
 If a file is larger than N lines, lx will output the first N/2 lines and the
 last N/2 lines, separated by a visual gap indicator.
 
-Special Value:
-  0: Enables 'compact' mode. The file content is skipped entirely, and only
-     the filename and size are listed in the output. Useful for providing a
-     file listing without consuming tokens.`,
+Use 0 to enable compact mode: file content is skipped and only the filename
+and size are shown.`,
 	},
 	{
 		Category:  CatInterleaved,
@@ -373,6 +201,98 @@ Examples:
   -e "*_test.go"  (Skip Go test files)
   -e "vendor/"    (Skip vendor directory)`,
 	},
+	{
+		Category:  CatInterleaved,
+		Name:      "documents",
+		Short:     "D",
+		Type:      CmdInterleaved,
+		ValueType: ValueNone,
+		Usage:     "Extract text from document files for subsequent paths",
+		Long: `Extract plain text from document files for the next section.
+
+By default, document files are treated as binary. When set, the following
+formats are converted to plain text instead:
+  - .pdf  - via PDF text extraction
+  - .docx - via Word document parsing
+  - .xlsx - via spreadsheet cell values (one sheet per section)
+  - .pptx - via presentation text extraction`,
+	},
+	{
+		Category:  CatInterleaved,
+		Name:      "expand",
+		Short:     "Z",
+		Type:      CmdInterleaved,
+		ValueType: ValueNone,
+		Usage:     "Expand archive files inline for subsequent paths",
+		Long: `Expand archive files inline for subsequent file arguments.
+
+When set, archive files are opened and their contents processed as if they
+were regular files in the directory tree. The archive path is used as a
+prefix for entries inside it (e.g. archive.zip/hello.txt).
+
+Active include (-i) and exclude (-e) filters apply to entries inside the archive.
+Hidden entry filtering (leading dot) is also respected.
+
+Supported formats:
+  ZIP-based:
+    .zip, .jar, .war, .ear, .odt
+  TAR (plain and compressed):
+    .tar, .tar.gz, .tar.bz2, .tar.xz, .tar.zst,
+    .tar.br, .tar.lz4, .tar.sz, .tar.s2,
+    .tgz, .tbz2, .txz
+  Other multi-file archives:
+    .rar, .7z
+  Single-file compression (exposed as one virtual entry):
+    .gz, .bz2, .xz, .zst, .br, .lz4, .sz, .s2, .lz`,
+	},
+	{
+		Category:  CatInterleaved,
+		Name:      "hidden",
+		Short:     "H",
+		Type:      CmdInterleaved,
+		ValueType: ValueNone,
+		Usage:     "Include hidden files (dotfiles) for subsequent paths",
+		Long: `Include hidden files and directories (starting with '.') for subsequent paths.
+
+By default, dotfiles and dot-directories are excluded from directory walks.
+This flag overrides that behaviour for the next section.`,
+	},
+	{
+		Category:  CatInterleaved,
+		Name:      "follow",
+		Short:     "S",
+		Type:      CmdInterleaved,
+		ValueType: ValueNone,
+		Usage:     "Follow directory symlinks for subsequent paths",
+		Long: `Follow symbolic links that point to directories when walking.
+
+By default, directory symlinks are skipped to avoid cycles. This flag enables
+traversal into symlinked directories for the next section.`,
+	},
+	{
+		Category:  CatInterleaved,
+		Name:      "no-links",
+		Type:      CmdInterleaved,
+		ValueType: ValueNone,
+		Usage:     "Skip symbolic links to files for subsequent paths",
+		Long: `Skip symbolic links to files when walking directories.
+
+By default, symlinks pointing to files are followed and their target content
+included. This flag suppresses them for the next section.`,
+	},
+	{
+		Category:  CatInterleaved,
+		Name:      "no-ignore",
+		Short:     "I",
+		Type:      CmdInterleaved,
+		ValueType: ValueNone,
+		Usage:     "Disable .gitignore filtering for subsequent paths",
+		Long: `Disable .gitignore-based file filtering for subsequent paths.
+
+By default, lx respects .gitignore files (and the global git ignore file).
+This flag disables that filtering so ignored files are included.`,
+	},
+
 	{
 		Category:  CatInterleaved,
 		Name:      "functions",
@@ -471,11 +391,16 @@ recursive walk, but hidden/.gitignore checks are still disabled.`,
 		Usage:     "Insert a logical separator with a header",
 		Long: `Insert a logical section separator with a custom header.
 
-This helps organize the output for the LLM. For example, you can group all
-backend files under one section and frontend files under another.
-In Markdown mode, this renders as a "## Header" block. In XML mode this wraps
-succeeding content.
-`,
+This helps organize the output for the LLM by grouping related files. In
+Markdown mode this renders as a "## Header" block; in XML mode it wraps
+succeeding content in a named element.
+
+-s also acts as a section boundary: all interleaved options (like -l, -n,
+-i, -e) reset to their defaults for the files that follow.
+
+Example:
+  lx -s "Backend" -l src/ -s "Frontend" -i "*.ts" web/
+The second -s resets -l so web/ gets full content, with only -i active.`,
 	},
 	{
 		Category:  CatActions,

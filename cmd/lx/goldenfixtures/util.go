@@ -42,6 +42,7 @@ func makeSymlinkRaw(dir, target, name string) {
 func buildSymlinksDir(t *testing.T, dir string) {
 	t.Helper()
 	writeFile(t, dir, "links/safe_target/recursion.txt", "I am safe", 0644)
+	writeFile(t, dir, "links/.hidden_link.txt", "i am hidden in links", 0644)
 	makeSymlink(dir, "main.go", "links/link_to_main.go")
 	makeSymlink(dir, "pkg", "links/link_to_pkg")
 	makeSymlinkRaw(dir, "does_not_exist", "links/broken_link")

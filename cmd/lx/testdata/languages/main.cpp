@@ -10,7 +10,7 @@ private:
     void hide();
 };
 
-/* Free function — no class needed. */
+/* Free function - no class needed. */
 int FreeFn(int v) {
     return v;
 }

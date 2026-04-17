@@ -28,10 +28,9 @@ type Stream struct {
 	format           string
 	finalStats       *core.GlobalContext
 	sections         []*core.SectionContext
-	onFileError      FileErrorHandler
-	concurrency      int
-	prepared         []render.PreparedItem
-	extractDocuments bool
+	onFileError FileErrorHandler
+	concurrency int
+	prepared    []render.PreparedItem
 }
 
 func NewStream(cfg *core.Config, runnerCfg core.RunnerConfig) (*Stream, error) {
@@ -46,13 +45,12 @@ func NewStream(cfg *core.Config, runnerCfg core.RunnerConfig) (*Stream, error) {
 	}
 
 	return &Stream{
-		engine:           engine,
-		renderCfg:        runnerCfg,
-		tokenizer:        defaultTokenizer{},
-		workDir:          ".",
-		format:           fmtType,
-		concurrency:      runtime.NumCPU(),
-		extractDocuments: cfg.ExtractDocuments,
+		engine:      engine,
+		renderCfg:   runnerCfg,
+		tokenizer:   defaultTokenizer{},
+		workDir:     ".",
+		format:      fmtType,
+		concurrency: runtime.NumCPU(),
 	}, nil
 }
 

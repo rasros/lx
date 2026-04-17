@@ -8,7 +8,7 @@ func main() {}
 
 
 --- STDERR ---
-time=FIXED level=DEBUG msg="Configuration loaded" format=markdown ignore_enabled=true ignore_hidden=true ignore_dir_symlinks=true ignore_file_symlinks=false
+time=FIXED level=DEBUG msg="Configuration loaded" format=markdown
 time=FIXED level=DEBUG msg="File accepted by walker" path=main.go size=27
 time=FIXED level=DEBUG msg="Initializing Walker" walk_root=main.go base_rules_count=0 override_rules_count=1 is_forced=false
 time=FIXED level=DEBUG msg="Loaded global ignore file" path=GLOBAL_IGNORE

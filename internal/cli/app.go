@@ -119,15 +119,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		slog.Debug("Logger level updated from config", "new_level", finalLevel.String())
 	}
 
-	slog.Debug("Configuration loaded",
-		"format", cfg.OutputFormat,
-		"ignore_enabled", cfg.IgnoreEnabled,
-		"ignore_hidden", cfg.IgnoreHidden,
-		"ignore_dir_symlinks", cfg.IgnoreDirSymlinks,
-		"ignore_file_symlinks", cfg.IgnoreFileSymlinks,
-	)
+	slog.Debug("Configuration loaded", "format", cfg.OutputFormat)
 
-	applyGlobalsToConfig(cfg, parsed.Globals)
 	if _, ok := parsed.Globals["xml"]; ok {
 		cfg.OutputFormat = "xml"
 	} else if _, ok := parsed.Globals["html"]; ok {
@@ -148,9 +141,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	}
 
 	defaultRunCfg := lx.RunnerConfig{
-		Head:        -1,
-		Tail:        0,
-		LineNumbers: false,
+		Head: -1,
+		Tail: 0,
 	}
 	stream, err := lx.NewStream(cfg, defaultRunCfg)
 	if err != nil {
@@ -167,12 +159,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 		}
 	}()
 
-	ops := reorderTrailingOps(parsed.Ops)
-	slog.Debug("Processing operations", "total_ops", len(ops))
+	slog.Debug("Processing operations", "total_ops", len(parsed.Ops))
 
 	globalIgnoreRules := LoadGlobalIgnorePatterns()
-	sections := parseSections(ops, defaultRunCfg)
-	precomputeTrees(ctx, sections, cfg, globalIgnoreRules)
+	sections := parseSections(parsed.Ops, defaultRunCfg)
+	precomputeTrees(ctx, sections, globalIgnoreRules)
 
 	for si, section := range sections {
 		slog.Debug("Processing section", "index", si, "ops", len(section.Ops))
@@ -203,7 +194,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				isForced := op.Action == "file"
 
 				if lx.IsHTTPURL(rawPath) {
-					if cfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
+					if section.RunCfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
 						if !isForced && !lx.IsKept(rawPath, nil, section.Excludes) {
 							slog.Debug("Skipping URL archive due to exclude filter", "url", rawPath)
 							continue
@@ -216,7 +207,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						}
 						tempCleanups = append(tempCleanups, cleanup)
 
-						archiveWalker := newArchiveWalker(cfg, isForced)
+						archiveWalker := newArchiveWalker(section.RunCfg.ShowHidden, isForced)
 						archiveWalker.OnIgnore = func(p, reason string) {
 							slog.Debug("Ignored in URL archive", "path", rawPath+"/"+p, "reason", reason)
 						}
@@ -265,7 +256,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				}
 
 				if !stat.IsDir() {
-					isExpandableArchive := cfg.ExpandArchives && lx.IsArchivePath(rawPath)
+					isExpandableArchive := section.RunCfg.ExpandArchives && lx.IsArchivePath(rawPath)
 					if !isForced && !isExpandableArchive && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
 						slog.Debug("Skipping file due to filters", "path", rawPath)
 						continue
@@ -294,11 +285,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				var baseRules []string
 				var overrideRules []string
 
-				if cfg.IgnoreEnabled {
+				if !section.RunCfg.NoIgnore {
 					baseRules = append(baseRules, globalIgnoreRules...)
 				}
 
-				if cfg.IgnoreHidden && !isForced {
+				if !section.RunCfg.ShowHidden && !isForced {
 					overrideRules = append(overrideRules, ".*")
 				}
 
@@ -314,7 +305,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				)
 
 				walker := lx.NewWalker(baseRules, overrideRules)
-				walker.IgnoreEnabled = cfg.IgnoreEnabled
+				walker.IgnoreEnabled = !section.RunCfg.NoIgnore
 				walker.OnIgnore = func(p, reason string) {
 					slog.Debug("Ignored", "path", p, "reason", reason)
 				}
@@ -346,24 +337,26 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 					}
 
 					if (d.Type() & fs.ModeSymlink) != 0 {
-						if cfg.IgnoreFileSymlinks {
+						if section.RunCfg.SkipFileSymlinks {
 							return nil
 						}
 						targetInfo, err := fs.Stat(fsys, path)
 						if err == nil && targetInfo.IsDir() {
-							slog.Debug("Skipping directory symlink", "path", effectivePath)
-							return nil
+							if !section.RunCfg.FollowDirSymlinks {
+								slog.Debug("Skipping directory symlink", "path", effectivePath)
+								return nil
+							}
 						}
 					}
 
-					if cfg.ExpandArchives && lx.IsArchivePath(path) {
+					if section.RunCfg.ExpandArchives && lx.IsArchivePath(path) {
 						var archiveAbsPath string
 						if stat.IsDir() {
 							archiveAbsPath = filepath.Join(absPath, filepath.FromSlash(path))
 						} else {
 							archiveAbsPath = absPath
 						}
-						archiveWalker := newArchiveWalker(cfg, isForced)
+						archiveWalker := newArchiveWalker(section.RunCfg.ShowHidden, isForced)
 						archiveWalker.OnIgnore = func(p, reason string) {
 							slog.Debug("Ignored in archive", "path", effectivePath+"/"+p, "reason", reason)
 						}
@@ -518,62 +511,6 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 	}
 }
 
-func applyGlobalsToConfig(c *lx.Config, globals map[string]string) {
-	if _, ok := globals["follow"]; ok {
-		slog.Debug("Override: Follow directory symlinks enabled via flag")
-		c.IgnoreDirSymlinks = false
-	}
-	if _, ok := globals["no-follow"]; ok {
-		slog.Debug("Override: Follow directory symlinks disabled via flag")
-		c.IgnoreDirSymlinks = true
-	}
-
-	if _, ok := globals["no-links"]; ok {
-		slog.Debug("Override: Hide file symlinks enabled via flag")
-		c.IgnoreFileSymlinks = true
-	}
-	if _, ok := globals["links"]; ok {
-		slog.Debug("Override: Show file symlinks enabled via flag")
-		c.IgnoreFileSymlinks = false
-	}
-
-	if _, ok := globals["hidden"]; ok {
-		slog.Debug("Override: Show hidden files enabled via flag")
-		c.IgnoreHidden = false
-	}
-	if _, ok := globals["no-hidden"]; ok {
-		slog.Debug("Override: Show hidden files disabled via flag")
-		c.IgnoreHidden = true
-	}
-
-	if _, ok := globals["no-ignore"]; ok {
-		slog.Debug("Override: Ignore files disabled via flag")
-		c.IgnoreEnabled = false
-	}
-	if _, ok := globals["ignore"]; ok {
-		slog.Debug("Override: Ignore files enabled via flag")
-		c.IgnoreEnabled = true
-	}
-
-	if _, ok := globals["expand"]; ok {
-		slog.Debug("Override: Archive expansion enabled via flag")
-		c.ExpandArchives = true
-	}
-	if _, ok := globals["no-expand"]; ok {
-		slog.Debug("Override: Archive expansion disabled via flag")
-		c.ExpandArchives = false
-	}
-
-	if _, ok := globals["documents"]; ok {
-		slog.Debug("Override: Document extraction enabled via flag")
-		c.ExtractDocuments = true
-	}
-	if _, ok := globals["no-documents"]; ok {
-		slog.Debug("Override: Document extraction disabled via flag")
-		c.ExtractDocuments = false
-	}
-}
-
 func determineLogLevel(parsed *ParsedArgs, configVerbosity string) (slog.Level, error) {
 	if _, ok := parsed.Globals["quiet"]; ok {
 		return slog.LevelError + 1, nil
@@ -671,54 +608,3 @@ func determineOutput(globals map[string]string, defaultMode string) (io.Writer, 
 	return out, clipBuf, debugOut, nil
 }
 
-func reorderTrailingOps(ops []Op) []Op {
-	lastActionIdx := -1
-	for i := len(ops) - 1; i >= 0; i-- {
-		if ops[i].Type == CmdAction {
-			lastActionIdx = i
-			break
-		}
-	}
-	if lastActionIdx == -1 || lastActionIdx == len(ops)-1 {
-		return ops
-	}
-	modifiers := make([]Op, 0)
-	others := make([]Op, 0)
-	for _, op := range ops[lastActionIdx+1:] {
-		if op.Type == CmdInterleaved {
-			modifiers = append(modifiers, op)
-		} else {
-			others = append(others, op)
-		}
-	}
-	if len(modifiers) == 0 {
-		return ops
-	}
-
-	movedDetails := make([]string, 0, len(modifiers))
-	for _, m := range modifiers {
-		desc := "--" + m.Action
-		if m.Value != "" && m.Value != "true" {
-			desc += fmt.Sprintf("=%q", m.Value)
-		}
-		movedDetails = append(movedDetails, desc)
-	}
-
-	slog.Warn("Trailing state modifiers detected; reordering them to apply to preceding files",
-		"moved_flags", strings.Join(movedDetails, ", "))
-
-	firstActionIdx := lastActionIdx
-	for i := lastActionIdx - 1; i >= 0; i-- {
-		if ops[i].Type == CmdAction {
-			firstActionIdx = i
-		} else {
-			break
-		}
-	}
-	newOps := make([]Op, 0, len(ops))
-	newOps = append(newOps, ops[:firstActionIdx]...)
-	newOps = append(newOps, modifiers...)
-	newOps = append(newOps, ops[firstActionIdx:lastActionIdx+1]...)
-	newOps = append(newOps, others...)
-	return newOps
-}

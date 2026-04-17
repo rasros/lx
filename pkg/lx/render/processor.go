@@ -27,23 +27,21 @@ type PreparedItem struct {
 
 // Processor renders prepared items into an output writer.
 type Processor struct {
-	engine           *core.TemplateEngine
-	global           core.GlobalContext
-	tokenCounter     core.TokenCounter
-	onFileError      FileErrorHandler
-	lastWasCompact   bool
-	format           string
-	extractDocuments bool
+	engine         *core.TemplateEngine
+	global         core.GlobalContext
+	tokenCounter   core.TokenCounter
+	onFileError    FileErrorHandler
+	lastWasCompact bool
+	format         string
 }
 
-func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext, onError FileErrorHandler, format string, extractDocuments bool) *Processor {
+func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext, onError FileErrorHandler, format string) *Processor {
 	return &Processor{
-		engine:           engine,
-		global:           global,
-		onFileError:      onError,
-		tokenCounter:     core.DefaultTokenCounter,
-		format:           format,
-		extractDocuments: extractDocuments,
+		engine:       engine,
+		global:       global,
+		onFileError:  onError,
+		tokenCounter: core.DefaultTokenCounter,
+		format:       format,
 	}
 }
 
@@ -163,7 +161,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		reader, size = bytes.NewReader(data), int64(len(data))
 	}
 
-	if p.extractDocuments && sources.IsDocumentPath(file.Path) {
+	if file.Config.ExtractDocuments && sources.IsDocumentPath(file.Path) {
 		if text, err := sources.ExtractDocumentText(file.Path, reader, size); err == nil {
 			reader = bytes.NewReader(text)
 			size = int64(len(text))

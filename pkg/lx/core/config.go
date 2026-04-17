@@ -3,12 +3,7 @@ package core
 // NewConfig returns a default configuration.
 func NewConfig() *Config {
 	return &Config{
-		OutputFormat:       "markdown",
-		IgnoreEnabled:      true,
-		IgnoreHidden:       true,
-		IgnoreFileSymlinks: false,
-		IgnoreDirSymlinks:  true,
-		ExtractDocuments:   true,
+		OutputFormat: "markdown",
 	}
 }
 
@@ -59,14 +54,5 @@ func Merge(dst *Config, src *Config) {
 
 	if src.OutputFormat != "" {
 		dst.OutputFormat = src.OutputFormat
-	}
-	if !src.IgnoreDirSymlinks {
-		dst.IgnoreDirSymlinks = false
-	}
-	if src.IgnoreFileSymlinks {
-		dst.IgnoreFileSymlinks = true
-	}
-	if !src.IgnoreHidden {
-		dst.IgnoreHidden = false
 	}
 }

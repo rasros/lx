@@ -1,5 +1,7 @@
 --- STDOUT ---
-links/cycle_a/visible.txt (1 rows)
+[1/2] links/cycle_a/to_b - error: is a directory
+
+[2/2] links/cycle_a/visible.txt (1 rows)
 ---
 ```text
 a
