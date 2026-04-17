@@ -21,7 +21,8 @@ const shortHelpTmpl = `A program to discover and format files for LLM prompting
 
 {{ "Arguments:" | head }}
   [path]...   the file or directory to process (defaults to current dir)
-  [action]... interleaved options and action flags (-s, -p, -f, -D, -Z, ...)
+  [action]... interleaved options and action flags; only -s starts a new section,
+              resetting interleaved options to their defaults
 
 {{ "Options:" | head }}
 {{ range $i, $g := . }}{{ if $i }}
