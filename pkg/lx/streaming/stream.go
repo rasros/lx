@@ -20,14 +20,14 @@ func (defaultTokenizer) Estimate(size int64, _ interface{}) int64 { return size 
 
 // Stream manages a collection of files, sections, and prompts for rendering.
 type Stream struct {
-	items            []interface{}
-	tokenizer        core.Tokenizer
-	engine           *core.TemplateEngine
-	renderCfg        core.RunnerConfig
-	workDir          string
-	format           string
-	finalStats       *core.GlobalContext
-	sections         []*core.SectionContext
+	items       []interface{}
+	tokenizer   core.Tokenizer
+	engine      *core.TemplateEngine
+	renderCfg   core.RunnerConfig
+	workDir     string
+	format      string
+	finalStats  *core.GlobalContext
+	sections    []*core.SectionContext
 	onFileError FileErrorHandler
 	concurrency int
 	prepared    []render.PreparedItem

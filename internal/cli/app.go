@@ -607,4 +607,3 @@ func determineOutput(globals map[string]string, defaultMode string) (io.Writer, 
 
 	return out, clipBuf, debugOut, nil
 }
-
