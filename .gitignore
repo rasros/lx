@@ -12,6 +12,7 @@
 *.test
 *.out
 *.coverprofile
+/profiles/
 
 # --- Dependency Management ---
 go.work
