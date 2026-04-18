@@ -4,7 +4,10 @@ import (
 	"github.com/odvcencio/gotreesitter"
 	"github.com/rasros/lx/pkg/lx/internal"
 	"github.com/rasros/lx/pkg/lx/skeleton/langs"
+	"sync"
 )
+
+var parserPools sync.Map // map[string]*gotreesitter.ParserPool
 
 func extract(langName string, src []byte, functions, structs bool) (out []byte) {
 	defer func() {
@@ -18,9 +21,9 @@ func extract(langName string, src []byte, functions, structs bool) (out []byte) 
 		return src
 	}
 	lang := def.newLang()
-	parser := gotreesitter.NewParser(lang)
+	pool := parserPoolFor(langName, lang)
 
-	tree, err := parser.Parse(src)
+	tree, err := pool.Parse(src)
 
 	if err != nil {
 		return src
@@ -32,6 +35,16 @@ func extract(langName string, src []byte, functions, structs bool) (out []byte) 
 		out = def.processNode(root.Child(i), out, src, lines, lang, functions, structs)
 	}
 	return out
+}
+
+func parserPoolFor(langName string, lang *gotreesitter.Language) *gotreesitter.ParserPool {
+	if v, ok := parserPools.Load(langName); ok {
+		return v.(*gotreesitter.ParserPool)
+	}
+
+	pool := gotreesitter.NewParserPool(lang)
+	actual, _ := parserPools.LoadOrStore(langName, pool)
+	return actual.(*gotreesitter.ParserPool)
 }
 
 func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines [][]byte, lang *gotreesitter.Language, functions, structs bool) []byte {
