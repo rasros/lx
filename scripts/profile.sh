@@ -12,7 +12,6 @@ Profiles lx across multiple repository scenarios and writes pprof top reports to
 Repository bootstrap (reused if already present):
   <output_dir>/repos/linux       (https://github.com/torvalds/linux.git)
   <output_dir>/repos/linguist    (https://github.com/github-linguist/linguist.git)
-  <output_dir>/repos/documents   (https://github.com/mdn/content.git)
   <output_dir>/archives          (generated from Linux subdirectories)
 
 Arguments:
@@ -21,7 +20,6 @@ Arguments:
 
 Scenarios:
   - Code repos (fixed subdirs): linux/kernel and linguist/samples with -Y -u
-  - Documents repo: -D
   - Generated archive corpus: -Z
   - Every repo: -n0 and -t
 EOF
@@ -50,12 +48,10 @@ REPOS_DIR="$OUT_DIR/repos"
 
 LINUX_REPO_DIR="$REPOS_DIR/linux"
 LINGUIST_REPO_DIR="$REPOS_DIR/linguist"
-DOCS_REPO_DIR="$REPOS_DIR/documents"
 ARCHIVE_CORPUS_DIR="$OUT_DIR/archives"
 
 LINUX_REPO_URL="https://github.com/torvalds/linux.git"
 LINGUIST_REPO_URL="https://github.com/github-linguist/linguist.git"
-DOCS_REPO_URL="https://github.com/mdn/content.git"
 
 require_cmd() {
   local cmd="$1"
@@ -171,7 +167,6 @@ mkdir -p "$RAW_DIR" "$TEXT_DIR" "$REPOS_DIR"
 
 ensure_repo "linux" "$LINUX_REPO_URL" "$LINUX_REPO_DIR"
 ensure_repo "linguist" "$LINGUIST_REPO_URL" "$LINGUIST_REPO_DIR"
-ensure_repo "documents" "$DOCS_REPO_URL" "$DOCS_REPO_DIR"
 
 if [[ -n "$LINUX_ROOT_OVERRIDE" ]]; then
   LINUX_ROOT="$LINUX_ROOT_OVERRIDE"
@@ -208,9 +203,6 @@ linux head: $(repo_head "$LINUX_REPO_DIR")
 linguist dir: $LINGUIST_REPO_DIR
 linguist origin: $(repo_origin "$LINGUIST_REPO_DIR")
 linguist head: $(repo_head "$LINGUIST_REPO_DIR")
-documents dir: $DOCS_REPO_DIR
-documents origin: $(repo_origin "$DOCS_REPO_DIR")
-documents head: $(repo_head "$DOCS_REPO_DIR")
 archives dir: $ARCHIVE_CORPUS_DIR
 archives source root: $LINUX_ROOT
 EOF
@@ -226,8 +218,8 @@ CODE_REPO_NAMES=("linux" "linguist")
 CODE_REPO_PATHS=("$LINUX_ROOT" "$LINGUIST_REPO_DIR")
 CODE_REPO_SKELETON_SUBDIRS=("kernel" "samples")
 
-ALL_REPO_NAMES=("linux" "linguist" "documents" "archives")
-ALL_REPO_PATHS=("$LINUX_ROOT" "$LINGUIST_REPO_DIR" "$DOCS_REPO_DIR" "$ARCHIVE_CORPUS_DIR")
+ALL_REPO_NAMES=("linux" "linguist" "archives")
+ALL_REPO_PATHS=("$LINUX_ROOT" "$LINGUIST_REPO_DIR" "$ARCHIVE_CORPUS_DIR")
 
 for i in "${!CODE_REPO_NAMES[@]}"; do
   name="${CODE_REPO_NAMES[$i]}"
@@ -242,7 +234,6 @@ for i in "${!CODE_REPO_NAMES[@]}"; do
   run_scenario "${name}_skeleton_subdir" -Y -u "$subdir_path"
 done
 
-run_scenario "documents_extract" -D "$DOCS_REPO_DIR"
 run_scenario "archives_expand" -Z "$ARCHIVE_CORPUS_DIR"
 
 for i in "${!ALL_REPO_NAMES[@]}"; do
