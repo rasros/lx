@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/rasros/lx/pkg/lx"
 )
 
 func TestRun_Basic(t *testing.T) {
@@ -167,4 +169,64 @@ func captureStdout(f func() error) (string, error) {
 	<-ioCopyC
 	os.Stdout = oldStdout
 	return buf.String(), err
+}
+
+func TestWorkloadConcurrency(t *testing.T) {
+	tests := []struct {
+		name        string
+		sections    []Section
+		cpuCount    int
+		wantWorkers int
+		wantLimited bool
+	}{
+		{
+			name:        "no skeleton flags",
+			sections:    []Section{{RunCfg: lx.RunnerConfig{}}},
+			cpuCount:    8,
+			wantWorkers: 0,
+			wantLimited: false,
+		},
+		{
+			name: "skeleton functions limited to max",
+			sections: []Section{{
+				RunCfg: lx.RunnerConfig{
+					SkeletonFunctions: true,
+				},
+			}},
+			cpuCount:    8,
+			wantWorkers: maxSkeletonWorkers,
+			wantLimited: true,
+		},
+		{
+			name: "skeleton types keeps low cpu count",
+			sections: []Section{{
+				RunCfg: lx.RunnerConfig{
+					SkeletonTypes: true,
+				},
+			}},
+			cpuCount:    1,
+			wantWorkers: 1,
+			wantLimited: true,
+		},
+		{
+			name: "multiple sections one skeleton section limits",
+			sections: []Section{
+				{RunCfg: lx.RunnerConfig{}},
+				{RunCfg: lx.RunnerConfig{SkeletonTypes: true}},
+			},
+			cpuCount:    6,
+			wantWorkers: maxSkeletonWorkers,
+			wantLimited: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotWorkers, gotLimited := workloadConcurrency(tt.sections, tt.cpuCount)
+			if gotWorkers != tt.wantWorkers || gotLimited != tt.wantLimited {
+				t.Fatalf("workloadConcurrency() = (%d, %v), want (%d, %v)",
+					gotWorkers, gotLimited, tt.wantWorkers, tt.wantLimited)
+			}
+		})
+	}
 }
