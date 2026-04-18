@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -163,6 +164,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 	globalIgnoreRules := LoadGlobalIgnorePatterns()
 	sections := parseSections(parsed.Ops, defaultRunCfg)
+	applyWorkloadConcurrency(stream, sections, runtime.NumCPU())
 	precomputeTrees(ctx, sections, globalIgnoreRules)
 
 	for si, section := range sections {
@@ -472,6 +474,33 @@ func setupLogger(level slog.Level) {
 		})
 	}
 	slog.SetDefault(slog.New(handler))
+}
+
+const maxSkeletonWorkers = 2
+
+func applyWorkloadConcurrency(stream *lx.Stream, sections []Section, cpuCount int) {
+	workers, limited := workloadConcurrency(sections, cpuCount)
+	if !limited {
+		return
+	}
+	stream.WithConcurrency(workers)
+	slog.Debug("Applying skeleton concurrency limit", "workers", workers, "cpu_count", cpuCount)
+}
+
+func workloadConcurrency(sections []Section, cpuCount int) (int, bool) {
+	if cpuCount < 1 {
+		cpuCount = 1
+	}
+
+	for _, section := range sections {
+		if section.RunCfg.SkeletonFunctions || section.RunCfg.SkeletonTypes {
+			if cpuCount > maxSkeletonWorkers {
+				return maxSkeletonWorkers, true
+			}
+			return cpuCount, true
+		}
+	}
+	return 0, false
 }
 
 func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer) {
