@@ -7,6 +7,15 @@ type Rule struct {
 	IsLiteral bool
 	BasePath  string
 	Source    string
+
+	// Precomputed fields to keep the match hot path allocation-light.
+	MatchPattern   string
+	PatternValid   bool
+	DirOnly        bool
+	Anchored       bool
+	HasSlash       bool
+	HasDoubleStar  bool
+	BasePathPrefix string
 }
 
 // Walker configures the file traversal.

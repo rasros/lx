@@ -2,9 +2,39 @@ package walker
 
 import (
 	"path/filepath"
+	"sync"
 
 	"github.com/bmatcuk/doublestar/v4"
 )
+
+type filterPattern struct {
+	pattern      string
+	hasMagic     bool
+	hasSlash     bool
+	patternValid bool
+}
+
+var filterPatternCache sync.Map // map[string]filterPattern
+
+func compiledFilterPattern(pattern string) filterPattern {
+	if v, ok := filterPatternCache.Load(pattern); ok {
+		return v.(filterPattern)
+	}
+
+	fp := filterPattern{pattern: pattern}
+	for i := 0; i < len(pattern); i++ {
+		switch pattern[i] {
+		case '*', '?', '[', '{', '\\':
+			fp.hasMagic = true
+		case '/':
+			fp.hasSlash = true
+		}
+	}
+	fp.patternValid = !fp.hasMagic || doublestar.ValidatePattern(pattern)
+
+	actual, _ := filterPatternCache.LoadOrStore(pattern, fp)
+	return actual.(filterPattern)
+}
 
 // IsKept checks if a path matches include patterns and does not match exclude patterns.
 func IsKept(p string, includes, excludes []string) bool {
@@ -39,33 +69,28 @@ func fastMatch(pattern, fullPath, baseName string) bool {
 		return true
 	}
 
-	hasMagic := false
-	hasSlash := false
-	for i := 0; i < len(pattern); i++ {
-		switch pattern[i] {
-		case '*', '?', '[', '{', '\\':
-			hasMagic = true
-		case '/':
-			hasSlash = true
-		}
-	}
+	fp := compiledFilterPattern(pattern)
 
-	if !hasMagic {
-		if hasSlash {
+	if !fp.hasMagic {
+		if fp.hasSlash {
 			return false
 		}
-		return pattern == baseName
+		return fp.pattern == baseName
 	}
 
-	if hasSlash {
-		if m, _ := doublestar.Match(pattern, fullPath); m {
+	if !fp.patternValid {
+		return false
+	}
+
+	if fp.hasSlash {
+		if doublestar.MatchUnvalidated(fp.pattern, fullPath) {
 			return true
 		}
 	} else {
-		if m, _ := doublestar.Match(pattern, baseName); m {
+		if doublestar.MatchUnvalidated(fp.pattern, baseName) {
 			return true
 		}
-		if m, _ := doublestar.Match(pattern, fullPath); m {
+		if doublestar.MatchUnvalidated(fp.pattern, fullPath) {
 			return true
 		}
 	}

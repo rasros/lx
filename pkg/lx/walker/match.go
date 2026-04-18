@@ -18,26 +18,52 @@ func IsMatch(pattern, relPath string) bool {
 	relPath = path.Clean(relPath)
 	pattern = path.Clean(pattern)
 
+	pattern = strings.TrimSuffix(pattern, "/")
 	isAnchored := strings.HasPrefix(pattern, "/")
 	pattern = strings.TrimPrefix(pattern, "/")
+	isLiteral := !strings.ContainsAny(pattern, "*?[{")
+	patternValid := isLiteral || doublestar.ValidatePattern(pattern)
 
 	if strings.Contains(pattern, "/") || isAnchored {
-		matched, _ := doublestar.Match(pattern, relPath)
-		return matched
+		if isLiteral {
+			return pattern == relPath
+		}
+		if !patternValid {
+			return false
+		}
+		return doublestar.MatchUnvalidated(pattern, relPath)
 	}
 
 	name := path.Base(relPath)
-	if matched, _ := doublestar.Match(pattern, name); matched {
-		return true
+	if isLiteral {
+		if pattern == name {
+			return true
+		}
+	} else {
+		if !patternValid {
+			return false
+		}
+		if doublestar.MatchUnvalidated(pattern, name) {
+			return true
+		}
 	}
 
-	parts := strings.Split(relPath, "/")
-	for i, part := range parts {
-		if isDirOnly && i == len(parts)-1 {
-			continue
-		}
-		if matched, _ := doublestar.Match(pattern, part); matched {
-			return true
+	start := 0
+	for i := 0; i <= len(relPath); i++ {
+		if i == len(relPath) || relPath[i] == '/' {
+			part := relPath[start:i]
+			start = i + 1
+
+			if isDirOnly && i == len(relPath) {
+				continue
+			}
+			if isLiteral {
+				if pattern == part {
+					return true
+				}
+			} else if doublestar.MatchUnvalidated(pattern, part) {
+				return true
+			}
 		}
 	}
 	return false
@@ -45,6 +71,11 @@ func IsMatch(pattern, relPath string) bool {
 
 func parseRules(lines []string, basePath, source string) []Rule {
 	var rules []Rule
+	basePathPrefix := ""
+	if basePath != "" && basePath != "." {
+		basePathPrefix = basePath + "/"
+	}
+
 	for _, p := range lines {
 		p = strings.TrimSpace(p)
 		if p == "" || strings.HasPrefix(p, "#") {
@@ -64,12 +95,29 @@ func parseRules(lines []string, basePath, source string) []Rule {
 			p += "/"
 		}
 
+		isLiteral := !strings.ContainsAny(p, "*?[{")
+		matchPattern := strings.TrimSuffix(p, "/")
+		isAnchored := strings.HasPrefix(matchPattern, "/")
+		matchPattern = strings.TrimPrefix(matchPattern, "/")
+
+		patternValid := true
+		if !isLiteral {
+			patternValid = doublestar.ValidatePattern(matchPattern)
+		}
+
 		rules = append(rules, Rule{
-			Pattern:   p,
-			Negate:    negate,
-			IsLiteral: !strings.ContainsAny(p, "*?[{"),
-			BasePath:  basePath,
-			Source:    source,
+			Pattern:        p,
+			Negate:         negate,
+			IsLiteral:      isLiteral,
+			BasePath:       basePath,
+			Source:         source,
+			MatchPattern:   matchPattern,
+			PatternValid:   patternValid,
+			DirOnly:        strings.HasSuffix(p, "/"),
+			Anchored:       isAnchored,
+			HasSlash:       strings.Contains(matchPattern, "/"),
+			HasDoubleStar:  strings.Contains(matchPattern, "**"),
+			BasePathPrefix: basePathPrefix,
 		})
 	}
 	return rules
@@ -77,44 +125,44 @@ func parseRules(lines []string, basePath, source string) []Rule {
 
 func match(rule Rule, relPath string, isDir bool) bool {
 	targetPath := relPath
-	pattern := rule.Pattern
 
-	isDirOnly := strings.HasSuffix(pattern, "/")
-	pattern = strings.TrimSuffix(pattern, "/")
-
-	if isDirOnly && !isDir {
+	if rule.DirOnly && !isDir {
 		return false
 	}
 
-	if rule.BasePath != "" && rule.BasePath != "." {
-		if !strings.HasPrefix(relPath, rule.BasePath+"/") && relPath != rule.BasePath {
+	if rule.BasePathPrefix != "" {
+		if !strings.HasPrefix(relPath, rule.BasePathPrefix) && relPath != rule.BasePath {
 			return false
 		}
 		if relPath == rule.BasePath {
 			targetPath = "."
 		} else {
-			targetPath = strings.TrimPrefix(relPath, rule.BasePath+"/")
+			targetPath = strings.TrimPrefix(relPath, rule.BasePathPrefix)
 		}
 	}
 
-	isAnchored := strings.HasPrefix(pattern, "/")
-	pattern = strings.TrimPrefix(pattern, "/")
-
-	if strings.Contains(pattern, "/") || isAnchored {
+	if rule.HasSlash || rule.Anchored {
 		if rule.IsLiteral {
-			return pattern == targetPath
+			return rule.MatchPattern == targetPath
 		}
-		matched, _ := doublestar.Match(pattern, targetPath)
-		return matched
+		if !rule.PatternValid {
+			return false
+		}
+		return doublestar.MatchUnvalidated(rule.MatchPattern, targetPath)
 	}
 
 	name := path.Base(targetPath)
 	if rule.IsLiteral {
-		if pattern == name {
+		if rule.MatchPattern == name {
 			return true
 		}
-	} else if matched, _ := doublestar.Match(pattern, name); matched {
-		return true
+	} else {
+		if !rule.PatternValid {
+			return false
+		}
+		if doublestar.MatchUnvalidated(rule.MatchPattern, name) {
+			return true
+		}
 	}
 
 	start := 0
@@ -123,10 +171,10 @@ func match(rule Rule, relPath string, isDir bool) bool {
 			part := targetPath[start:i]
 			start = i + 1
 			if rule.IsLiteral {
-				if pattern == part {
+				if rule.MatchPattern == part {
 					return true
 				}
-			} else if matched, _ := doublestar.Match(pattern, part); matched {
+			} else if doublestar.MatchUnvalidated(rule.MatchPattern, part) {
 				return true
 			}
 		}
@@ -168,22 +216,20 @@ func hasNestedException(dirPath string, rules []Rule) bool {
 			}
 		}
 
-		pattern := strings.TrimSuffix(rule.Pattern, "/")
-		isAnchored := strings.HasPrefix(pattern, "/")
-		pattern = strings.TrimPrefix(pattern, "/")
+		pattern := rule.MatchPattern
 
 		// Floating patterns (e.g. "*.go") match files in any subdirectory.
-		if !strings.Contains(pattern, "/") && !isAnchored {
+		if !rule.HasSlash && !rule.Anchored {
 			return true
 		}
 
 		// Anchored patterns.
 		fullPattern := pattern
-		if rule.BasePath != "" && rule.BasePath != "." {
-			fullPattern = rule.BasePath + "/" + pattern
+		if rule.BasePathPrefix != "" {
+			fullPattern = rule.BasePathPrefix + pattern
 		}
 
-		if strings.Contains(fullPattern, "**") {
+		if rule.HasDoubleStar {
 			return true
 		}
 
@@ -195,8 +241,10 @@ func hasNestedException(dirPath string, rules []Rule) bool {
 		isParent := true
 		for i, part := range dirParts {
 			rulePart := ruleParts[i]
-			matched, _ := doublestar.Match(rulePart, part)
-			if !matched {
+			if rulePart == part {
+				continue
+			}
+			if !doublestar.ValidatePattern(rulePart) || !doublestar.MatchUnvalidated(rulePart, part) {
 				isParent = false
 				break
 			}
