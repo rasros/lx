@@ -7,7 +7,15 @@ import (
 	"sync"
 )
 
-var parserPools sync.Map // map[string]*gotreesitter.ParserPool
+type parserRuntime struct {
+	lang *gotreesitter.Language
+	pool *gotreesitter.ParserPool
+}
+
+var (
+	parserRuntimes sync.Map // map[string]*parserRuntime
+	parserInitMu   sync.Mutex
+)
 
 func extract(langName string, src []byte, functions, structs bool) (out []byte) {
 	defer func() {
@@ -20,14 +28,14 @@ func extract(langName string, src []byte, functions, structs bool) (out []byte) 
 	if !ok {
 		return src
 	}
-	lang := def.newLang()
-	pool := parserPoolFor(langName, lang)
+	pool, lang := parserPoolFor(langName, def.newLang)
 
 	tree, err := pool.Parse(src)
-
 	if err != nil {
 		return src
 	}
+	defer tree.Release()
+
 	root := tree.RootNode()
 	lines := internal.SplitLines(src)
 
@@ -37,14 +45,27 @@ func extract(langName string, src []byte, functions, structs bool) (out []byte) 
 	return out
 }
 
-func parserPoolFor(langName string, lang *gotreesitter.Language) *gotreesitter.ParserPool {
-	if v, ok := parserPools.Load(langName); ok {
-		return v.(*gotreesitter.ParserPool)
+func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*gotreesitter.ParserPool, *gotreesitter.Language) {
+	if v, ok := parserRuntimes.Load(langName); ok {
+		rt := v.(*parserRuntime)
+		return rt.pool, rt.lang
 	}
 
-	pool := gotreesitter.NewParserPool(lang)
-	actual, _ := parserPools.LoadOrStore(langName, pool)
-	return actual.(*gotreesitter.ParserPool)
+	parserInitMu.Lock()
+	defer parserInitMu.Unlock()
+
+	if v, ok := parserRuntimes.Load(langName); ok {
+		rt := v.(*parserRuntime)
+		return rt.pool, rt.lang
+	}
+
+	lang := newLang()
+	rt := &parserRuntime{
+		lang: lang,
+		pool: gotreesitter.NewParserPool(lang),
+	}
+	parserRuntimes.Store(langName, rt)
+	return rt.pool, rt.lang
 }
 
 func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines [][]byte, lang *gotreesitter.Language, functions, structs bool) []byte {
