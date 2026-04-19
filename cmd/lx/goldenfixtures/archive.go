@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mholt/archives"
 )
 
 func SetupArchiveFixture(t *testing.T) string {
@@ -21,6 +23,14 @@ func SetupArchiveFixture(t *testing.T) string {
 	})
 	createTestTarGz(filepath.Join(dir, "archive.tar.gz"), [][2]string{
 		{"hello.txt", "Hello from tar!\n"},
+		{"nested/world.go", "package nested\n"},
+	})
+	createTestTarBz2(filepath.Join(dir, "archive.tar.bz2"), [][2]string{
+		{"hello.txt", "Hello from tar bz2!\n"},
+		{"nested/world.go", "package nested\n"},
+	})
+	createTestTar(filepath.Join(dir, "archive.tar"), [][2]string{
+		{"hello.txt", "Hello from tar plain!\n"},
 		{"nested/world.go", "package nested\n"},
 	})
 
@@ -73,6 +83,60 @@ func createTestTarGz(path string, files [][2]string) {
 	}
 	if err := gw.Close(); err != nil {
 		panic("createTestTarGz: " + err.Error())
+	}
+}
+
+func createTestTarBz2(path string, files [][2]string) {
+	f, err := os.Create(path)
+	if err != nil {
+		panic("createTestTarBz2: " + err.Error())
+	}
+	defer f.Close()
+
+	bw, err := archives.Bz2{}.OpenWriter(f)
+	if err != nil {
+		panic("createTestTarBz2: " + err.Error())
+	}
+
+	tw := tar.NewWriter(bw)
+	for _, file := range files {
+		body := []byte(file[1])
+		hdr := &tar.Header{Name: file[0], Mode: 0644, Size: int64(len(body))}
+		if err := tw.WriteHeader(hdr); err != nil {
+			panic("createTestTarBz2: " + err.Error())
+		}
+		if _, err := tw.Write(body); err != nil {
+			panic("createTestTarBz2: " + err.Error())
+		}
+	}
+	if err := tw.Close(); err != nil {
+		panic("createTestTarBz2: " + err.Error())
+	}
+	if err := bw.Close(); err != nil {
+		panic("createTestTarBz2: " + err.Error())
+	}
+}
+
+func createTestTar(path string, files [][2]string) {
+	f, err := os.Create(path)
+	if err != nil {
+		panic("createTestTar: " + err.Error())
+	}
+	defer f.Close()
+
+	tw := tar.NewWriter(f)
+	for _, file := range files {
+		body := []byte(file[1])
+		hdr := &tar.Header{Name: file[0], Mode: 0644, Size: int64(len(body))}
+		if err := tw.WriteHeader(hdr); err != nil {
+			panic("createTestTar: " + err.Error())
+		}
+		if _, err := tw.Write(body); err != nil {
+			panic("createTestTar: " + err.Error())
+		}
+	}
+	if err := tw.Close(); err != nil {
+		panic("createTestTar: " + err.Error())
 	}
 }
 
