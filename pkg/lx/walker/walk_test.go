@@ -344,8 +344,8 @@ func TestParseRules(t *testing.T) {
 			{3, false, "a[bc]"},
 		}
 		for _, c := range cases {
-			if rules[c.idx].IsLiteral != c.want {
-				t.Errorf("rules[%d] (%s).IsLiteral = %v, want %v", c.idx, c.name, rules[c.idx].IsLiteral, c.want)
+			if rules[c.idx].Spec.Pattern.IsLiteral != c.want {
+				t.Errorf("rules[%d] (%s).Spec.Pattern.IsLiteral = %v, want %v", c.idx, c.name, rules[c.idx].Spec.Pattern.IsLiteral, c.want)
 			}
 		}
 	})
