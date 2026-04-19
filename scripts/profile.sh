@@ -62,6 +62,30 @@ require_cmd() {
   fi
 }
 
+ensure_profiles_module() {
+  local out_dir="$1"
+  local mod_file="$out_dir/go.mod"
+
+  if [[ -f "$mod_file" ]]; then
+    return 0
+  fi
+
+  local go_version="1.22"
+  if [[ -f "$ROOT_DIR/go.mod" ]]; then
+    local root_go_version
+    root_go_version="$(awk '$1=="go"{print $2; exit}' "$ROOT_DIR/go.mod" || true)"
+    if [[ -n "$root_go_version" ]]; then
+      go_version="$root_go_version"
+    fi
+  fi
+
+  cat >"$mod_file" <<EOF
+module github.com/rasros/lx/profiles
+
+go $go_version
+EOF
+}
+
 ensure_repo() {
   local name="$1"
   local url="$2"
@@ -174,6 +198,7 @@ require_cmd tar
 require_cmd zip
 
 mkdir -p "$RAW_DIR" "$TEXT_DIR" "$REPOS_DIR"
+ensure_profiles_module "$OUT_DIR"
 
 ensure_repo "linux" "$LINUX_REPO_URL" "$LINUX_REPO_DIR"
 ensure_repo "linguist" "$LINGUIST_REPO_URL" "$LINGUIST_REPO_DIR"
