@@ -35,6 +35,15 @@ type Processor struct {
 	format         string
 }
 
+type readerAtWithSize interface {
+	io.ReaderAt
+	Size() int64
+}
+
+type byteReaderProvider interface {
+	ByteReader() *bytes.Reader
+}
+
 func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext, onError FileErrorHandler, format string) *Processor {
 	return &Processor{
 		engine:       engine,
@@ -156,6 +165,13 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	var size int64
 	if f, ok := rc.(*os.File); ok {
 		reader, size = f, file.Size
+	} else if brp, ok := rc.(byteReaderProvider); ok {
+		br := brp.ByteReader()
+		reader, size = br, br.Size()
+	} else if ras, ok := rc.(readerAtWithSize); ok {
+		reader, size = ras, ras.Size()
+	} else if ra, ok := rc.(io.ReaderAt); ok {
+		reader, size = ra, file.Size
 	} else {
 		data, _ := io.ReadAll(rc)
 		reader, size = bytes.NewReader(data), int64(len(data))
@@ -282,6 +298,7 @@ func (p *Processor) formatContent(head, tail, gap []byte, totalRows int, cfg cor
 		return internal.LineNumberFormatter{Head: head, Gap: gap, Tail: tail, TotalRows: totalRows}
 	}
 	var res bytes.Buffer
+	res.Grow(len(head) + len(gap) + len(tail))
 	res.Write(head)
 	res.Write(gap)
 	res.Write(tail)
@@ -301,4 +318,63 @@ func tailFromBuffer(r *bytes.Reader, lines int) ([]byte, error) {
 		}
 	}
 	return data, nil
+}
+
+const (
+	maxPreparedBufferHint = 2 << 20 // 2 MiB cap to avoid oversized pre-grows.
+	minPreparedBufferHint = 256
+)
+
+// EstimatePreparedBufferSize returns a best-effort render output size hint.
+func EstimatePreparedBufferSize(item PreparedItem) int {
+	switch v := item.Raw.(type) {
+	case sources.InputFile:
+		hint := minPreparedBufferHint + len(v.Path)
+		cfg := v.Config
+		switch {
+		case cfg.Head == 0 && cfg.Tail == 0:
+			// Compact view: header-only output.
+		case cfg.Head < 0:
+			hint += clampHint(v.Size)
+		default:
+			// Sliced view: usually much smaller than full file content.
+			hint += 16 * 1024
+		}
+		if cfg.LineNumbers {
+			hint += hint / 4
+		}
+		if hint > maxPreparedBufferHint {
+			hint = maxPreparedBufferHint
+		}
+		return hint
+	case core.TreeContext:
+		return clampBodyHint(v.Body)
+	case core.PromptContext:
+		return clampBodyHint(v.Body)
+	case core.SectionContext:
+		return clampBodyHint(v.Body)
+	default:
+		return 0
+	}
+}
+
+func clampHint(size int64) int {
+	if size <= 0 {
+		return 0
+	}
+	if size > int64(maxPreparedBufferHint) {
+		return maxPreparedBufferHint
+	}
+	return int(size)
+}
+
+func clampBodyHint(body string) int {
+	hint := len(body) + minPreparedBufferHint
+	if hint < minPreparedBufferHint {
+		return minPreparedBufferHint
+	}
+	if hint > maxPreparedBufferHint {
+		return maxPreparedBufferHint
+	}
+	return hint
 }
