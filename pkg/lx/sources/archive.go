@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -167,7 +166,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 		if candidates[i].materialized {
 			continue
 		}
-		data, err := snapshotArchiveEntry(fsys, candidates[i].entryPath)
+		data, err := snapshotArchiveEntry(fsys, candidates[i].entryPath, candidates[i].size)
 		if err != nil {
 			slog.Warn("Failed to read archive entry", "archive", displayPath, "path", candidates[i].entryPath, "error", err)
 			continue
@@ -188,7 +187,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 			Size:    int64(len(cached)),
 			ModTime: candidates[i].modTime,
 			Open: func() (io.ReadCloser, error) {
-				return io.NopCloser(bytes.NewReader(cached)), nil
+				return newByteReaderReadCloser(cached), nil
 			},
 		}
 		slog.Debug("File accepted from archive", "path", f.Path, "size", f.Size)
@@ -206,13 +205,57 @@ func closeFS(fsys fs.FS) {
 	}
 }
 
-func snapshotArchiveEntry(fsys fs.FS, path string) ([]byte, error) {
+const maxInt = int64(^uint(0) >> 1)
+
+func readAllWithSizeHint(r io.Reader, sizeHint int64) ([]byte, error) {
+	if sizeHint <= 0 || sizeHint > maxInt {
+		return io.ReadAll(r)
+	}
+
+	buf := make([]byte, int(sizeHint))
+	n, err := io.ReadFull(r, buf)
+	if err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return buf[:n], nil
+		}
+		return nil, err
+	}
+
+	// Size hints can be inaccurate for some formats. Keep reading if there is tail data.
+	var probe [1]byte
+	m, readErr := r.Read(probe[:])
+	if errors.Is(readErr, io.EOF) {
+		return buf, nil
+	}
+	if readErr != nil {
+		return nil, readErr
+	}
+
+	tail, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]byte, 0, n+m+len(tail))
+	out = append(out, buf...)
+	out = append(out, probe[:m]...)
+	out = append(out, tail...)
+	return out, nil
+}
+
+func snapshotArchiveEntry(fsys fs.FS, path string, sizeHint int64) ([]byte, error) {
 	f, err := fsys.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return io.ReadAll(f)
+
+	if sizeHint <= 0 {
+		if info, statErr := f.Stat(); statErr == nil {
+			sizeHint = info.Size()
+		}
+	}
+	return readAllWithSizeHint(f, sizeHint)
 }
 
 func materializeWithExtractor(ctx context.Context, absPath string, candidates []archiveCandidate, candidateByKey map[string]int) (bool, error) {
@@ -256,7 +299,7 @@ func materializeWithExtractor(ctx context.Context, absPath string, candidates []
 			slog.Warn("Failed to open extractor entry", "archive", absPath, "path", key, "error", err)
 			return nil
 		}
-		data, readErr := io.ReadAll(rc)
+		data, readErr := readAllWithSizeHint(rc, info.Size())
 		closeErr := rc.Close()
 		if readErr != nil {
 			slog.Warn("Failed to read extractor entry", "archive", absPath, "path", key, "error", readErr)

@@ -16,6 +16,10 @@ type Rule struct {
 	HasSlash       bool
 	HasDoubleStar  bool
 	BasePathPrefix string
+	// Fast prefilter for patterns that only use '*' wildcards.
+	OnlyStarWildcards bool
+	LiteralPrefix     string
+	LiteralSuffix     string
 }
 
 // Walker configures the file traversal.

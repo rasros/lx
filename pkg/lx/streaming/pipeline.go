@@ -47,6 +47,9 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				readBuf := *readBufPtr
 				buf := bufferPool.Get().(*bytes.Buffer)
 				buf.Reset()
+				if capHint := render.EstimatePreparedBufferSize(j.item); capHint > 0 {
+					buf.Grow(capHint)
+				}
 				localCounter := &byteCounter{w: buf}
 
 				err := proc.RenderPrepared(localCounter, j.item, readBuf)

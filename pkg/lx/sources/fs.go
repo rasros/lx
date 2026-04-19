@@ -21,6 +21,17 @@ type InputFile struct {
 	Open func() (io.ReadCloser, error)
 }
 
+type byteReaderReadCloser struct {
+	*bytes.Reader
+}
+
+func (r byteReaderReadCloser) Close() error              { return nil }
+func (r byteReaderReadCloser) ByteReader() *bytes.Reader { return r.Reader }
+
+func newByteReaderReadCloser(data []byte) io.ReadCloser {
+	return byteReaderReadCloser{Reader: bytes.NewReader(data)}
+}
+
 func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	return InputFile{
 		Path:    path,
@@ -48,7 +59,7 @@ func NewBufferInputFile(name string, data []byte) InputFile {
 		Size:    int64(len(data)),
 		ModTime: time.Now(),
 		Open: func() (io.ReadCloser, error) {
-			return io.NopCloser(bytes.NewReader(data)), nil
+			return newByteReaderReadCloser(data), nil
 		},
 	}
 }
