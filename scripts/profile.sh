@@ -247,9 +247,6 @@ FILTER_REPO_PATH="$LINUX_ROOT"
 FILTER_INCLUDE_PATTERN="**/*.c"
 FILTER_EXCLUDE_PATTERN="**/*_test.c"
 
-ALL_REPO_NAMES=("linux" "archives")
-ALL_REPO_PATHS=("$LINUX_ROOT" "$ARCHIVE_CORPUS_DIR")
-
 for i in "${!CODE_REPO_NAMES[@]}"; do
   name="${CODE_REPO_NAMES[$i]}"
   path="${CODE_REPO_PATHS[$i]}"
@@ -275,16 +272,7 @@ fi
 run_scenario "linux_filters_include_exclude" -i "$FILTER_INCLUDE_PATTERN" -e "$FILTER_EXCLUDE_PATTERN" "$FILTER_REPO_PATH"
 
 run_scenario "archives_expand_dir" -Z "$ARCHIVE_CORPUS_DIR"
-
-for i in "${!ALL_REPO_NAMES[@]}"; do
-  name="${ALL_REPO_NAMES[$i]}"
-  path="${ALL_REPO_PATHS[$i]}"
-  common_args=()
-  if [[ "$name" == "archives" ]]; then
-    common_args+=("-Z")
-  fi
-  run_scenario "${name}_compact" "${common_args[@]}" -n0 "$path"
-  run_scenario "${name}_tree" "${common_args[@]}" -t "$path"
-done
+run_scenario "linux_compact" -n0 "$LINUX_ROOT"
+run_scenario "linux_tree" -t "$LINUX_ROOT"
 
 echo "Done. Artifacts are in: $OUT_DIR"
