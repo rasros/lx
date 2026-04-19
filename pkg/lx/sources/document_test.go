@@ -388,29 +388,42 @@ func TestExtractDocumentText_UnsupportedExtension(t *testing.T) {
 }
 
 func TestExtractDocumentText_DispatchToPDF(t *testing.T) {
-	data := []byte("garbage")
+	data := makeTestPDF(t, "PDF dispatch content")
 	r := bytes.NewReader(data)
-	_, err := ExtractDocumentText("file.pdf", r, int64(len(data)))
-	if err != nil && strings.Contains(err.Error(), "unsupported") {
-		t.Errorf("pdf extension was not dispatched: %v", err)
+	text, err := ExtractDocumentText("file.pdf", r, int64(len(data)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(text), "PDF") {
+		t.Errorf("expected extracted PDF text, got: %q", string(text))
 	}
 }
 
 func TestExtractDocumentText_DispatchToDOCX(t *testing.T) {
-	data := []byte("garbage")
+	data := makeTestDOCX(t, "DOCX dispatch content")
 	r := bytes.NewReader(data)
-	_, err := ExtractDocumentText("file.docx", r, int64(len(data)))
-	if err != nil && strings.Contains(err.Error(), "unsupported") {
-		t.Errorf("docx extension was not dispatched: %v", err)
+	text, err := ExtractDocumentText("file.docx", r, int64(len(data)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(text), "DOCX dispatch content") {
+		t.Errorf("expected extracted DOCX text, got: %q", string(text))
 	}
 }
 
 func TestExtractDocumentText_DispatchToXLSX(t *testing.T) {
-	data := []byte("garbage")
+	data := makeTestXLSX(t, "Sheet1", map[string]interface{}{
+		"A1": "XLSX dispatch",
+		"B1": "content",
+	})
 	r := bytes.NewReader(data)
-	_, err := ExtractDocumentText("file.xlsx", r, int64(len(data)))
-	if err != nil && strings.Contains(err.Error(), "unsupported") {
-		t.Errorf("xlsx extension was not dispatched: %v", err)
+	text, err := ExtractDocumentText("file.xlsx", r, int64(len(data)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := string(text)
+	if !strings.Contains(got, "XLSX dispatch") || !strings.Contains(got, "content") {
+		t.Errorf("expected extracted XLSX text, got:\n%s", got)
 	}
 }
 
