@@ -123,15 +123,6 @@ repo_origin() {
   fi
 }
 
-archive_scenario_name() {
-  local path="$1"
-  local base
-  base="$(basename "$path")"
-  base="${base//./_}"
-  base="${base//-/_}"
-  echo "archives_expand_${base}"
-}
-
 run_scenario() {
   local name="$1"
   shift
@@ -252,12 +243,12 @@ EOF
 CODE_REPO_NAMES=("linux" "linguist")
 CODE_REPO_PATHS=("$LINUX_ROOT" "$LINGUIST_REPO_DIR")
 CODE_REPO_SKELETON_SUBDIRS=("kernel" "samples")
-FILTER_REPO_PATH="$LINGUIST_REPO_DIR/samples"
-FILTER_INCLUDE_PATTERN="**/*.rb"
-FILTER_EXCLUDE_PATTERN="**/*_test.rb"
+FILTER_REPO_PATH="$LINUX_ROOT"
+FILTER_INCLUDE_PATTERN="**/*.c"
+FILTER_EXCLUDE_PATTERN="**/*_test.c"
 
-ALL_REPO_NAMES=("linux" "linguist" "archives")
-ALL_REPO_PATHS=("$LINUX_ROOT" "$LINGUIST_REPO_DIR" "$ARCHIVE_CORPUS_DIR")
+ALL_REPO_NAMES=("linux" "archives")
+ALL_REPO_PATHS=("$LINUX_ROOT" "$ARCHIVE_CORPUS_DIR")
 
 for i in "${!CODE_REPO_NAMES[@]}"; do
   name="${CODE_REPO_NAMES[$i]}"
@@ -281,20 +272,19 @@ fi
   echo "filter include: $FILTER_INCLUDE_PATTERN"
   echo "filter exclude: $FILTER_EXCLUDE_PATTERN"
 } >>"$SCENARIO_FILE"
-run_scenario "linguist_filters_include_exclude" -i "$FILTER_INCLUDE_PATTERN" -e "$FILTER_EXCLUDE_PATTERN" "$FILTER_REPO_PATH"
+run_scenario "linux_filters_include_exclude" -i "$FILTER_INCLUDE_PATTERN" -e "$FILTER_EXCLUDE_PATTERN" "$FILTER_REPO_PATH"
 
 run_scenario "archives_expand_dir" -Z "$ARCHIVE_CORPUS_DIR"
-
-while IFS= read -r archive_path; do
-  scenario_name="$(archive_scenario_name "$archive_path")"
-  run_scenario "$scenario_name" -Z "$archive_path"
-done < <(find "$ARCHIVE_CORPUS_DIR" -maxdepth 1 -type f | sort)
 
 for i in "${!ALL_REPO_NAMES[@]}"; do
   name="${ALL_REPO_NAMES[$i]}"
   path="${ALL_REPO_PATHS[$i]}"
-  run_scenario "${name}_compact" -n0 "$path"
-  run_scenario "${name}_tree" -t "$path"
+  common_args=()
+  if [[ "$name" == "archives" ]]; then
+    common_args+=("-Z")
+  fi
+  run_scenario "${name}_compact" "${common_args[@]}" -n0 "$path"
+  run_scenario "${name}_tree" "${common_args[@]}" -t "$path"
 done
 
 echo "Done. Artifacts are in: $OUT_DIR"
