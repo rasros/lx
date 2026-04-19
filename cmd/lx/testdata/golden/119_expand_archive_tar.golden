@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] archive.tar/hello.txt (1 rows)
+---
+```text
+Hello from tar plain!
+```
+
+[2/2] archive.tar/nested/world.go (1 rows)
+---
+```go
+package nested
+```
+
+
+--- STDERR ---
