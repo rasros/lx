@@ -20,7 +20,8 @@ Arguments:
 
 Scenarios:
   - Code repos (fixed subdirs): linux/kernel and linguist/samples with -Y -u
-  - Generated archive corpus: -Z
+  - Filtered walk mode: linguist/samples with -i and -e
+  - Generated archive corpus: -Z on corpus dir and each archive file type
   - Every repo: -n0 and -t
 EOF
 }
@@ -96,6 +97,15 @@ repo_origin() {
   else
     echo "unknown"
   fi
+}
+
+archive_scenario_name() {
+  local path="$1"
+  local base
+  base="$(basename "$path")"
+  base="${base//./_}"
+  base="${base//-/_}"
+  echo "archives_expand_${base}"
 }
 
 run_scenario() {
@@ -217,6 +227,9 @@ EOF
 CODE_REPO_NAMES=("linux" "linguist")
 CODE_REPO_PATHS=("$LINUX_ROOT" "$LINGUIST_REPO_DIR")
 CODE_REPO_SKELETON_SUBDIRS=("kernel" "samples")
+FILTER_REPO_PATH="$LINGUIST_REPO_DIR/samples"
+FILTER_INCLUDE_PATTERN="**/*.rb"
+FILTER_EXCLUDE_PATTERN="**/*_test.rb"
 
 ALL_REPO_NAMES=("linux" "linguist" "archives")
 ALL_REPO_PATHS=("$LINUX_ROOT" "$LINGUIST_REPO_DIR" "$ARCHIVE_CORPUS_DIR")
@@ -234,7 +247,23 @@ for i in "${!CODE_REPO_NAMES[@]}"; do
   run_scenario "${name}_skeleton_subdir" -Y -u "$subdir_path"
 done
 
-run_scenario "archives_expand" -Z "$ARCHIVE_CORPUS_DIR"
+if [[ ! -d "$FILTER_REPO_PATH" ]]; then
+  echo "required filter scenario path missing: $FILTER_REPO_PATH" >&2
+  exit 1
+fi
+{
+  echo "filter scenario path: $FILTER_REPO_PATH"
+  echo "filter include: $FILTER_INCLUDE_PATTERN"
+  echo "filter exclude: $FILTER_EXCLUDE_PATTERN"
+} >>"$SCENARIO_FILE"
+run_scenario "linguist_filters_include_exclude" -i "$FILTER_INCLUDE_PATTERN" -e "$FILTER_EXCLUDE_PATTERN" "$FILTER_REPO_PATH"
+
+run_scenario "archives_expand_dir" -Z "$ARCHIVE_CORPUS_DIR"
+
+while IFS= read -r archive_path; do
+  scenario_name="$(archive_scenario_name "$archive_path")"
+  run_scenario "$scenario_name" -Z "$archive_path"
+done < <(find "$ARCHIVE_CORPUS_DIR" -maxdepth 1 -type f | sort)
 
 for i in "${!ALL_REPO_NAMES[@]}"; do
   name="${ALL_REPO_NAMES[$i]}"
