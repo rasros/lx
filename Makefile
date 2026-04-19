@@ -2,7 +2,6 @@ GO           ?= go
 BINARY_NAME  ?= lx
 CMD_DIR      := ./cmd/lx
 BIN_DIR      := ./bin
-SOURCE_PKGS  := ./cmd/... ./internal/... ./pkg/...
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -s -w -X 'github.com/rasros/lx/internal/cli.Version=$(VERSION)'
@@ -21,12 +20,12 @@ install:
 	$(GO) install $(CMD_DIR)
 
 fmt:
-	$(GO) fmt $(SOURCE_PKGS)
+	$(GO) fmt ./...
 	$(GO) mod tidy
-	$(GO) vet $(SOURCE_PKGS)
+	$(GO) vet ./...
 
 test:
-	$(GO) test $(SOURCE_PKGS)
+	$(GO) test ./...
 
 test-update:
 	$(GO) test ./cmd/lx -update
