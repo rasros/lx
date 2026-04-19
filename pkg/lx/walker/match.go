@@ -8,6 +8,67 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 )
 
+type pathMatchInfo struct {
+	relPath  string
+	baseName string
+	parts    []string
+}
+
+var dotPathMatchInfo = pathMatchInfo{
+	relPath:  ".",
+	baseName: ".",
+	parts:    []string{"."},
+}
+
+func buildPathMatchInfo(relPath string) pathMatchInfo {
+	parts := strings.Split(relPath, "/")
+	baseName := relPath
+	if len(parts) > 0 {
+		baseName = parts[len(parts)-1]
+	}
+	return pathMatchInfo{
+		relPath:  relPath,
+		baseName: baseName,
+		parts:    parts,
+	}
+}
+
+func hasOnlyStarWildcards(pattern string) bool {
+	for i := 0; i < len(pattern); i++ {
+		switch pattern[i] {
+		case '?', '[', '{':
+			return false
+		}
+	}
+	return true
+}
+
+func starWildcardPrefixSuffix(pattern string) (string, string) {
+	firstStar := strings.IndexByte(pattern, '*')
+	if firstStar < 0 {
+		return pattern, pattern
+	}
+	lastStar := strings.LastIndexByte(pattern, '*')
+	return pattern[:firstStar], pattern[lastStar+1:]
+}
+
+func quickStarPatternMismatch(prefix, suffix, target string) bool {
+	if prefix != "" && !strings.HasPrefix(target, prefix) {
+		return true
+	}
+	if suffix != "" && !strings.HasSuffix(target, suffix) {
+		return true
+	}
+	return false
+}
+
+func ruleCandidatePassesPrefilter(rule Rule, candidate string) bool {
+	if !rule.OnlyStarWildcards {
+		return true
+	}
+	return !quickStarPatternMismatch(rule.LiteralPrefix, rule.LiteralSuffix, candidate)
+}
+
 // IsMatch checks if a path matches a pattern. Exposed for CLI filtering.
 func IsMatch(pattern, relPath string) bool {
 	relPath = strings.ReplaceAll(relPath, "\\", "/")
@@ -23,12 +84,22 @@ func IsMatch(pattern, relPath string) bool {
 	pattern = strings.TrimPrefix(pattern, "/")
 	isLiteral := !strings.ContainsAny(pattern, "*?[{")
 	patternValid := isLiteral || doublestar.ValidatePattern(pattern)
+	onlyStarWildcards := false
+	literalPrefix := ""
+	literalSuffix := ""
+	if !isLiteral && hasOnlyStarWildcards(pattern) && !strings.Contains(pattern, "**") {
+		onlyStarWildcards = true
+		literalPrefix, literalSuffix = starWildcardPrefixSuffix(pattern)
+	}
 
 	if strings.Contains(pattern, "/") || isAnchored {
 		if isLiteral {
 			return pattern == relPath
 		}
 		if !patternValid {
+			return false
+		}
+		if onlyStarWildcards && quickStarPatternMismatch(literalPrefix, literalSuffix, relPath) {
 			return false
 		}
 		return doublestar.MatchUnvalidated(pattern, relPath)
@@ -43,7 +114,8 @@ func IsMatch(pattern, relPath string) bool {
 		if !patternValid {
 			return false
 		}
-		if doublestar.MatchUnvalidated(pattern, name) {
+		if (!onlyStarWildcards || !quickStarPatternMismatch(literalPrefix, literalSuffix, name)) &&
+			doublestar.MatchUnvalidated(pattern, name) {
 			return true
 		}
 	}
@@ -61,7 +133,8 @@ func IsMatch(pattern, relPath string) bool {
 				if pattern == part {
 					return true
 				}
-			} else if doublestar.MatchUnvalidated(pattern, part) {
+			} else if (!onlyStarWildcards || !quickStarPatternMismatch(literalPrefix, literalSuffix, part)) &&
+				doublestar.MatchUnvalidated(pattern, part) {
 				return true
 			}
 		}
@@ -101,82 +174,99 @@ func parseRules(lines []string, basePath, source string) []Rule {
 		matchPattern = strings.TrimPrefix(matchPattern, "/")
 
 		patternValid := true
+		onlyStarWildcards := false
+		literalPrefix := ""
+		literalSuffix := ""
 		if !isLiteral {
 			patternValid = doublestar.ValidatePattern(matchPattern)
+			onlyStarWildcards = hasOnlyStarWildcards(matchPattern) && !strings.Contains(matchPattern, "**")
+			if onlyStarWildcards {
+				literalPrefix, literalSuffix = starWildcardPrefixSuffix(matchPattern)
+			}
 		}
 
 		rules = append(rules, Rule{
-			Pattern:        p,
-			Negate:         negate,
-			IsLiteral:      isLiteral,
-			BasePath:       basePath,
-			Source:         source,
-			MatchPattern:   matchPattern,
-			PatternValid:   patternValid,
-			DirOnly:        strings.HasSuffix(p, "/"),
-			Anchored:       isAnchored,
-			HasSlash:       strings.Contains(matchPattern, "/"),
-			HasDoubleStar:  strings.Contains(matchPattern, "**"),
-			BasePathPrefix: basePathPrefix,
+			Pattern:           p,
+			Negate:            negate,
+			IsLiteral:         isLiteral,
+			BasePath:          basePath,
+			Source:            source,
+			MatchPattern:      matchPattern,
+			PatternValid:      patternValid,
+			DirOnly:           strings.HasSuffix(p, "/"),
+			Anchored:          isAnchored,
+			HasSlash:          strings.Contains(matchPattern, "/"),
+			HasDoubleStar:     strings.Contains(matchPattern, "**"),
+			BasePathPrefix:    basePathPrefix,
+			OnlyStarWildcards: onlyStarWildcards,
+			LiteralPrefix:     literalPrefix,
+			LiteralSuffix:     literalSuffix,
 		})
 	}
 	return rules
 }
 
 func match(rule Rule, relPath string, isDir bool) bool {
-	targetPath := relPath
+	return matchWithPathInfo(rule, buildPathMatchInfo(relPath), isDir)
+}
+
+func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool) bool {
+	target := ctx
 
 	if rule.DirOnly && !isDir {
 		return false
 	}
 
 	if rule.BasePathPrefix != "" {
-		if !strings.HasPrefix(relPath, rule.BasePathPrefix) && relPath != rule.BasePath {
+		if !strings.HasPrefix(ctx.relPath, rule.BasePathPrefix) && ctx.relPath != rule.BasePath {
 			return false
 		}
-		if relPath == rule.BasePath {
-			targetPath = "."
+		if ctx.relPath == rule.BasePath {
+			target = dotPathMatchInfo
 		} else {
-			targetPath = strings.TrimPrefix(relPath, rule.BasePathPrefix)
+			target = buildPathMatchInfo(strings.TrimPrefix(ctx.relPath, rule.BasePathPrefix))
 		}
 	}
 
 	if rule.HasSlash || rule.Anchored {
 		if rule.IsLiteral {
-			return rule.MatchPattern == targetPath
+			return rule.MatchPattern == target.relPath
 		}
 		if !rule.PatternValid {
 			return false
 		}
-		return doublestar.MatchUnvalidated(rule.MatchPattern, targetPath)
+		if !ruleCandidatePassesPrefilter(rule, target.relPath) {
+			return false
+		}
+		return doublestar.MatchUnvalidated(rule.MatchPattern, target.relPath)
 	}
 
-	name := path.Base(targetPath)
 	if rule.IsLiteral {
-		if rule.MatchPattern == name {
+		if rule.MatchPattern == target.baseName {
 			return true
 		}
 	} else {
 		if !rule.PatternValid {
 			return false
 		}
-		if doublestar.MatchUnvalidated(rule.MatchPattern, name) {
+		if ruleCandidatePassesPrefilter(rule, target.baseName) &&
+			doublestar.MatchUnvalidated(rule.MatchPattern, target.baseName) {
 			return true
 		}
 	}
 
-	start := 0
-	for i := 0; i <= len(targetPath); i++ {
-		if i == len(targetPath) || targetPath[i] == '/' {
-			part := targetPath[start:i]
-			start = i + 1
-			if rule.IsLiteral {
-				if rule.MatchPattern == part {
-					return true
-				}
-			} else if doublestar.MatchUnvalidated(rule.MatchPattern, part) {
+	for i, part := range target.parts {
+		// Basename already checked above.
+		if i == len(target.parts)-1 {
+			break
+		}
+		if rule.IsLiteral {
+			if rule.MatchPattern == part {
 				return true
 			}
+		} else if ruleCandidatePassesPrefilter(rule, part) &&
+			doublestar.MatchUnvalidated(rule.MatchPattern, part) {
+			return true
 		}
 	}
 
@@ -187,9 +277,10 @@ func match(rule Rule, relPath string, isDir bool) bool {
 func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool) (bool, string) {
 	ignored := parentIgnored
 	reason := "parent directory"
+	ctx := buildPathMatchInfo(relPath)
 
 	for _, rule := range rules {
-		if match(rule, relPath, isDir) {
+		if matchWithPathInfo(rule, ctx, isDir) {
 			if rule.Negate {
 				ignored = false
 				reason = ""
