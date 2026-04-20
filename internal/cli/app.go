@@ -522,11 +522,7 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 	if !show {
 		_, hasCopy := parsed.Globals["copy"]
 		_, hasOutput := parsed.Globals["output"]
-		stdoutIsTerm := true
-		if stat, err := os.Stdout.Stat(); err == nil {
-			stdoutIsTerm = (stat.Mode() & os.ModeCharDevice) != 0
-		}
-		if hasCopy || hasOutput || !stdoutIsTerm {
+		if hasCopy || hasOutput {
 			show = true
 		}
 	}

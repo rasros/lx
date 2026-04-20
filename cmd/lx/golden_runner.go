@@ -19,9 +19,10 @@ import (
 var update = flag.Bool("update", false, "update .golden files")
 
 type goldenTestCase struct {
-	name  string
-	args  []string
-	stdin string
+	name     string
+	args     []string
+	stdin    string
+	autoStat bool
 }
 
 func setupMockConfig(t *testing.T) {
@@ -127,7 +128,7 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, pkgDir string, scrubPa
 					hasStatsControl = true
 				}
 			}
-			if !hasStatsControl {
+			if !hasStatsControl && !tc.autoStat {
 				runArgs = append(runArgs, "--no-stats")
 			}
 

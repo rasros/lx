@@ -116,6 +116,7 @@ func TestGoldenStats(t *testing.T) {
 		{name: "072_verbose_debug", args: []string{"-vv", "main.go"}},
 		{name: "073_verbose_flag", args: []string{"--verbose=debug", "main.go"}},
 		{name: "074_no_stats", args: []string{"--no-stats", "main.go"}},
+		{name: "075_stats_auto_piped", args: []string{"main.go"}, autoStat: true},
 	})
 }
 
