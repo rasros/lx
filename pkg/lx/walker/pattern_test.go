@@ -204,3 +204,69 @@ func TestParseRulesUsesCompiledSpec(t *testing.T) {
 		}
 	}
 }
+
+func TestCompileSpecsAndMatchAnyCompiled(t *testing.T) {
+	specs := CompileSpecs([]string{"*.go", "docs/*.md"})
+	if len(specs) != 2 {
+		t.Fatalf("CompileSpecs len = %d, want 2", len(specs))
+	}
+
+	if !IsMatchAnyCompiled(specs, "main.go") {
+		t.Fatal("expected compiled include specs to match main.go")
+	}
+	if !IsMatchAnyCompiled(specs, "docs/readme.md") {
+		t.Fatal("expected compiled include specs to match docs/readme.md")
+	}
+	if IsMatchAnyCompiled(specs, "scripts/build.sh") {
+		t.Fatal("did not expect compiled include specs to match scripts/build.sh")
+	}
+}
+
+func TestCouldMatchAnyDescendant(t *testing.T) {
+	tests := []struct {
+		name     string
+		patterns []string
+		dir      string
+		want     bool
+	}{
+		{
+			name:     "literal file keeps ancestor",
+			patterns: []string{"scripts/bpf_doc.py"},
+			dir:      "scripts",
+			want:     true,
+		},
+		{
+			name:     "literal file prunes unrelated dir",
+			patterns: []string{"scripts/bpf_doc.py"},
+			dir:      "kernel",
+			want:     false,
+		},
+		{
+			name:     "star with fixed prefix keeps matching subtree",
+			patterns: []string{"scripts/*bpf_doc.py"},
+			dir:      "scripts/tools",
+			want:     true,
+		},
+		{
+			name:     "double-star cannot be pruned by prefix",
+			patterns: []string{"**/*bpf_doc.py"},
+			dir:      "kernel",
+			want:     true,
+		},
+		{
+			name:     "floating basename pattern cannot be pruned",
+			patterns: []string{"*.go"},
+			dir:      "anywhere/deep",
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			specs := CompileSpecs(tt.patterns)
+			if got := CouldMatchAnyDescendant(specs, tt.dir); got != tt.want {
+				t.Fatalf("CouldMatchAnyDescendant(%v, %q) = %v, want %v", tt.patterns, tt.dir, got, tt.want)
+			}
+		})
+	}
+}
