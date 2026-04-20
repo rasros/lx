@@ -38,7 +38,7 @@ func TestMatch_DirOnlyRequiresDirEntry(t *testing.T) {
 func TestCheckIgnore_NegationOverridesPreviousRule(t *testing.T) {
 	rules := parseRules([]string{"*.log", "!keep.log"}, "", ".gitignore")
 
-	ignored, reason := checkIgnore("app.log", false, rules, false)
+	ignored, reason := checkIgnore("app.log", false, rules, false, true)
 	if !ignored {
 		t.Fatal("expected app.log to be ignored")
 	}
@@ -46,7 +46,7 @@ func TestCheckIgnore_NegationOverridesPreviousRule(t *testing.T) {
 		t.Fatalf("unexpected ignore reason: %q", reason)
 	}
 
-	ignored, reason = checkIgnore("keep.log", false, rules, false)
+	ignored, reason = checkIgnore("keep.log", false, rules, false, true)
 	if ignored {
 		t.Fatal("expected keep.log to be un-ignored by negation rule")
 	}
@@ -58,14 +58,25 @@ func TestCheckIgnore_NegationOverridesPreviousRule(t *testing.T) {
 func TestCheckIgnore_ParentIgnoredWithNegation(t *testing.T) {
 	rules := parseRules([]string{"!keep.go"}, "", ".gitignore")
 
-	ignored, _ := checkIgnore("other.go", false, rules, true)
+	ignored, _ := checkIgnore("other.go", false, rules, true, false)
 	if !ignored {
 		t.Fatal("expected parent ignored state to persist when negation does not match")
 	}
 
-	ignored, _ = checkIgnore("keep.go", false, rules, true)
+	ignored, _ = checkIgnore("keep.go", false, rules, true, false)
 	if ignored {
 		t.Fatal("expected matching negation to clear parent ignored state")
+	}
+}
+
+func TestCheckIgnore_OmitsReasonWhenNotRequested(t *testing.T) {
+	rules := parseRules([]string{"*.log"}, "", ".gitignore")
+	ignored, reason := checkIgnore("app.log", false, rules, false, false)
+	if !ignored {
+		t.Fatal("expected app.log to be ignored")
+	}
+	if reason != "" {
+		t.Fatalf("expected empty reason when wantReason=false, got %q", reason)
 	}
 }
 

@@ -105,6 +105,24 @@ func TestWalker_StartOnFile_Ignored(t *testing.T) {
 	}
 }
 
+func TestWalker_SkipHidden(t *testing.T) {
+	tmp := t.TempDir()
+	mustMkdir(t, tmp, ".hidden")
+	mustMkdir(t, tmp, "visible")
+	mustWriteFile(t, tmp, ".env", "secret")
+	mustWriteFile(t, tmp, ".hidden/file.txt", "secret")
+	mustWriteFile(t, tmp, "visible/file.txt", "public")
+
+	w := NewWalker(nil, nil)
+	w.SkipHidden = true
+	w.IgnoreEnabled = false
+
+	files := collectPaths(t, w, tmp)
+	assertNotContains(t, files, ".env")
+	assertNotContains(t, files, ".hidden/file.txt")
+	assertContains(t, files, "visible/file.txt")
+}
+
 func TestWalker_Anchoring(t *testing.T) {
 	tmp := t.TempDir()
 	mustMkdir(t, tmp, "nested")
