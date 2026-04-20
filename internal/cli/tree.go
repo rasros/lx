@@ -73,6 +73,7 @@ func computeSectionTrees(ctx context.Context, g *Section, globalIgnoreRules []st
 
 func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includes, excludes []string, globalIgnoreRules []string) []string {
 	var paths []string
+	includeSpecs := lx.CompileSpecs(includes)
 
 	rawPath := op.Value
 	isForced := op.Action == "file"
@@ -112,18 +113,22 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 	if !runCfg.NoIgnore {
 		baseRules = append(baseRules, globalIgnoreRules...)
 	}
-	if !runCfg.ShowHidden && !isForced {
-		overrideRules = append(overrideRules, ".*")
-	}
 	if !isForced {
 		overrideRules = append(overrideRules, excludes...)
 	}
 
 	w := lx.NewWalker(baseRules, overrideRules)
 	w.IgnoreEnabled = !runCfg.NoIgnore
+	w.SkipHidden = !runCfg.ShowHidden && !isForced
 
 	_ = w.Walk(fsys, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if !isForced && len(includeSpecs) > 0 && path != "." && !lx.CouldMatchAnyDescendant(includeSpecs, path) {
+				return fs.SkipDir
+			}
 			return nil
 		}
 
@@ -136,15 +141,8 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 			effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
 		}
 
-		if !isForced && len(includes) > 0 {
-			matched := false
-			for _, inc := range includes {
-				if lx.IsMatch(inc, path) {
-					matched = true
-					break
-				}
-			}
-			if !matched {
+		if !isForced && len(includeSpecs) > 0 {
+			if !lx.IsMatchAnyCompiled(includeSpecs, path) {
 				return nil
 			}
 		}

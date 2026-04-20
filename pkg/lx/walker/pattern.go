@@ -64,6 +64,23 @@ func compileSpec(rawPattern string) CompiledSpec {
 	return actual.(CompiledSpec)
 }
 
+// CompileSpec parses and compiles one filter pattern.
+func CompileSpec(rawPattern string) CompiledSpec {
+	return compileSpec(rawPattern)
+}
+
+// CompileSpecs compiles all filter patterns.
+func CompileSpecs(rawPatterns []string) []CompiledSpec {
+	if len(rawPatterns) == 0 {
+		return nil
+	}
+	specs := make([]CompiledSpec, 0, len(rawPatterns))
+	for _, p := range rawPatterns {
+		specs = append(specs, compileSpec(p))
+	}
+	return specs
+}
+
 func compileNormalizedSpec(normalizedPattern string) CompiledSpec {
 	dirOnly := strings.HasSuffix(normalizedPattern, "/")
 	trimmed := strings.TrimSuffix(normalizedPattern, "/")
@@ -92,6 +109,68 @@ func normalizePathForMatch(raw string) string {
 	return path.Clean(raw)
 }
 
+// IsMatchCompiled checks whether relPath matches an already-compiled pattern.
+func IsMatchCompiled(spec CompiledSpec, relPath string) bool {
+	ctx := buildPathMatchInfo(normalizePathForMatch(relPath))
+	return matchCompiledSpec(spec, ctx)
+}
+
+// IsMatchAnyCompiled checks whether relPath matches at least one compiled pattern.
+func IsMatchAnyCompiled(specs []CompiledSpec, relPath string) bool {
+	if len(specs) == 0 {
+		return true
+	}
+	ctx := buildPathMatchInfo(normalizePathForMatch(relPath))
+	for _, spec := range specs {
+		if matchCompiledSpec(spec, ctx) {
+			return true
+		}
+	}
+	return false
+}
+
+// CouldMatchAnyDescendant reports whether at least one compiled pattern might match
+// a file at or under dirRelPath. Returning false is a safe prune signal.
+func CouldMatchAnyDescendant(specs []CompiledSpec, dirRelPath string) bool {
+	if len(specs) == 0 {
+		return true
+	}
+	dir := normalizePathForMatch(dirRelPath)
+	if dir == "." {
+		return true
+	}
+	for _, spec := range specs {
+		if couldMatchDescendant(spec, dir) {
+			return true
+		}
+	}
+	return false
+}
+
+func couldMatchDescendant(spec CompiledSpec, dir string) bool {
+	// Floating patterns (e.g. "*.go") can match files in any subtree.
+	if !spec.Pattern.HasSlash && !spec.Anchored {
+		return true
+	}
+
+	pattern := spec.Pattern.Pattern
+	if spec.Pattern.HasDoubleStar {
+		return true
+	}
+
+	literalPrefix := prefixBeforeMeta(pattern)
+	if literalPrefix == "" {
+		return true
+	}
+	prefix := strings.TrimSuffix(normalizePathForMatch(literalPrefix), "/")
+	if prefix == "." || prefix == "" {
+		return true
+	}
+
+	// Keep traversal if either side is an ancestor of the other.
+	return dir == prefix || strings.HasPrefix(dir, prefix+"/") || strings.HasPrefix(prefix, dir+"/")
+}
+
 func hasOnlyStarWildcards(pattern string) bool {
 	for i := 0; i < len(pattern); i++ {
 		switch pattern[i] {
@@ -109,6 +188,16 @@ func starWildcardPrefixSuffix(pattern string) (string, string) {
 	}
 	lastStar := strings.LastIndexByte(pattern, '*')
 	return pattern[:firstStar], pattern[lastStar+1:]
+}
+
+func prefixBeforeMeta(pattern string) string {
+	for i := 0; i < len(pattern); i++ {
+		switch pattern[i] {
+		case '*', '?', '[', '{':
+			return pattern[:i]
+		}
+	}
+	return pattern
 }
 
 func (cp CompiledPattern) matchCandidate(candidate string) bool {
