@@ -1,0 +1,15 @@
+--- STDOUT ---
+```
+archive.zip/
+└── nested/
+    └── world.go
+```
+
+archive.zip/nested/world.go (1 rows)
+---
+```go
+package nested
+```
+
+
+--- STDERR ---

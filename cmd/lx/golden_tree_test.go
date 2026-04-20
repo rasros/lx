@@ -1,9 +1,20 @@
 package main
 
-import "testing"
+import (
+	"archive/zip"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestGoldenTree(t *testing.T) {
+	pkgDir, _ := os.Getwd()
 	dir := setupTreeFixture(t)
+	server := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	defer server.Close()
+
 	runTestGolden(t, dir, []goldenTestCase{
 		// Tree-only: just the tree, no file content
 		{name: "700_tree_only_subdir", args: []string{"-t", "src"}},
@@ -37,5 +48,47 @@ func TestGoldenTree(t *testing.T) {
 		{name: "742_tree_xml_with_content", args: []string{"--xml", "-T", "src"}},
 		{name: "743_tree_content_line_numbers", args: []string{"-l", "-T", "src"}},
 		{name: "744_tree_content_skeleton_functions", args: []string{"-u", "-T", "src"}},
+
+		// URL tree parity
+		{name: "745_tree_only_url", args: []string{"-t", server.URL + "/main.go"}},
+		{name: "746_tree_url_with_content", args: []string{"-T", server.URL + "/main.go"}},
+	}, server.URL)
+
+	if err := os.Chdir(pkgDir); err != nil {
+		t.Fatal(err)
+	}
+
+	createZipFixture(t, filepath.Join(dir, "archive.zip"), map[string]string{
+		"hello.txt":       "Hello from archive!\n",
+		"nested/world.go": "package nested\n",
+		".hidden_in_zip":  "hidden inside zip\n",
 	})
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "747_tree_archive_include_go_only", args: []string{"-Z", "-i", "*.go", "-t", "archive.zip"}},
+		{name: "748_tree_archive_include_go_with_content", args: []string{"-Z", "-i", "*.go", "-T", "archive.zip"}},
+	})
+}
+
+func createZipFixture(t *testing.T, path string, files map[string]string) {
+	t.Helper()
+
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create zip fixture: %v", err)
+	}
+	defer f.Close()
+
+	w := zip.NewWriter(f)
+	for name, body := range files {
+		fw, err := w.Create(name)
+		if err != nil {
+			t.Fatalf("create zip entry %s: %v", name, err)
+		}
+		if _, err := fw.Write([]byte(body)); err != nil {
+			t.Fatalf("write zip entry %s: %v", name, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close zip fixture: %v", err)
+	}
 }

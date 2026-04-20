@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestGoldenWalk(t *testing.T) {
 	dir := setupWalkFixture(t)
@@ -132,6 +136,11 @@ func TestGoldenDetection(t *testing.T) {
 
 func TestGoldenConfig(t *testing.T) {
 	dir := setupConfigFixture(t)
+	copyCfgDir := t.TempDir()
+	copyCfgPath := filepath.Join(copyCfgDir, "copy.yaml")
+	if err := os.WriteFile(copyCfgPath, []byte("output_mode: copy\n"), 0644); err != nil {
+		t.Fatalf("write copy config: %v", err)
+	}
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "090_config_hidden", args: []string{"-H", "."}},
 		{name: "091_config_follow", args: []string{"--follow", "links"}},
@@ -140,6 +149,7 @@ func TestGoldenConfig(t *testing.T) {
 		{name: "094_force_file_flag_excludes", args: []string{"-e", "*.go", "-f", "main.go"}},
 		{name: "095_config_custom_sections", args: []string{"-y", "configs/custom_sections.yaml", "-s", "Head", "main.go"}},
 		{name: "096_direct_file_parent_ignore", args: []string{"direct_ignore_test/test.ignored", "direct_ignore_test/test.kept"}},
+		{name: "097_stdout_overrides_copy_mode", args: []string{"--stdout", "-y", copyCfgPath, "main.go"}},
 	})
 }
 

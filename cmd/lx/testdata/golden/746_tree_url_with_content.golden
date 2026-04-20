@@ -1,0 +1,15 @@
+--- STDOUT ---
+```
+/ROOT/
+└── main.go
+```
+
+/ROOT/main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---
