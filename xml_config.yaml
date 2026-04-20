@@ -9,7 +9,7 @@
 # This matches the Go default exactly.
 
 file_content_template: |2-
-    <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}">
+    <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}"{{ if .SkeletonMode }} skeleton="{{ .SkeletonMode }}"{{ end }}>
       <source>{{ .Path }}</source>
       <document_content>
   {{ .Content | endNewline }}    </document_content>
@@ -40,7 +40,7 @@ file_compact_template: |2-
 section_header_template: "{{ if .IsImplicit }}<content>\n{{ end }}"
 
 section_template: |-
-  {{ if not .IsImplicit }}<section>
+  {{- if not .IsImplicit }}<section>
     <section_name>{{ .Body }}</section_name>{{ end }}
 
 section_footer_template: "\n{{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}"
@@ -51,7 +51,22 @@ section_footer_template: "\n{{ if .IsImplicit }}</content>{{ else }}</section>{{
 
 prompt_template: |2-
     <instruction>
-    {{ .Body | endNewline -}}
-    </instruction>
+  {{ .Body | endNewline }}  </instruction>
+
+tree_template: |2-
+    <tree>
+  {{ .Body | endNewline }}  </tree>
+
+output_header_template: ""
+output_footer_template: "\n\n"
+
+stats_template: |
+  Files: {{ .Global.TotalFiles }}
+  Size: {{ .Global.TotalWrittenBytes | humanize }}
+  Est. Tokens: {{ .Global.TokenEstimate }}
+
+output_mode: "stdout"
+show_stats: "auto"
+verbosity: "warn"
 
 output_format: "xml"

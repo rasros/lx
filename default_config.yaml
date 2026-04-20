@@ -9,7 +9,7 @@ file_header_template: |-
 
 # Renders standard file content
 file_content_template: |-
-  {{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
+  {{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows{{ if .SkeletonMode }}, {{ .SkeletonMode }}{{ end }})
   ---
   ```{{ .Language }}
   {{ .Content | endNewline -}}```
@@ -24,7 +24,7 @@ file_binary_template: |-
 
 # Renders when in compact mode (-n 0)
 file_compact_template: |-
-  {{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows)
+  {{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows{{ if .SkeletonMode }}, {{ .SkeletonMode }}{{ end }})
 
 # -----------------------------------------------------------------------------
 # Item Templates
@@ -37,6 +37,11 @@ section_template: |-
 # Custom prompts (-p)
 prompt_template: |-
   {{ .Body | endNewline }}
+
+# Tree output (-t / -T)
+tree_template: |-
+  ```
+  {{ .Body | endNewline -}}```
 
 # -----------------------------------------------------------------------------
 # Global & Wrapper Templates
@@ -61,8 +66,3 @@ output_mode: "stdout"
 show_stats: "auto"
 verbosity: "warn"
 output_format: "markdown"
-
-follow_symlinks: false
-no_file_links: false
-show_hidden: false
-ignore: true
