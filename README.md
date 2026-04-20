@@ -4,13 +4,13 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rasros/lx)](https://goreportcard.com/report/github.com/rasros/lx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`lx` is a CLI tool that bundles your codebase into a single context string for LLMs.
+lx is a CLI tool that bundles files into a single LLM-ready context.
 
-It crawls directories, respects your gitignores, skips binaries, and outputs Markdown, XML, or HTML directly to 
-clipboard along with an estimated token count.
+It traverses directories, respects `.gitignore`, skips binaries by default, and outputs Markdown, XML, or HTML.
+It can also fetch URL inputs, expand archives, extract text from office documents, and report estimated token usage.
 
-Instead of blindly concatenating files together, `lx` processes arguments as a stream. This means you can apply
-different rules (like line limits or filters) to specific files on the fly within a single command.
+lx reads arguments from left to right. You can change options mid-command, and each change applies to the files that
+follow, so one command can mix different filters, slices, and formatting rules.
 
 ---
 
@@ -18,12 +18,13 @@ different rules (like line limits or filters) to specific files on the fly withi
 
 ## Features
 
-* Token estimation for individual files and the final output.
-* Smart traversal that respects `.gitignore`, `.ignore`, and `.lxignore`.
-* Stream processing to apply interleaved options (like `--tail 50`) mid-command.
-* Outputs standard Markdown, XML (ideal for Claude), or HTML.
-* Copies directly to your system clipboard on Linux, macOS, and Windows.
-* Plays nice with Unix pipelines (`find`, `fd`, `git`, etc.).
+* Directory traversal that respects `.gitignore`, `.ignore`, and `.lxignore`.
+* Output formats for Markdown (default), XML (Claude-friendly), and standalone HTML.
+* URL input support without manual download.
+* Archive expansion (`-Z`) for zip, tar, 7z, rar, and more.
+* Document extraction (`-D`) for PDF, DOCX, XLSX, and PPTX.
+* Structural views with tree output (`-t`/`-T`) and code skeleton extraction (`-u`/`-Y`).
+* Direct clipboard copy (`-c`) and strong pipeline support (stdin, `-0`).
 
 ## Installation
 
@@ -39,7 +40,7 @@ curl -fsSL https://raw.github.com/rasros/lx/main/install.sh | bash
 
 ### Dependencies
 
-Clipboard support (`-c`) requires `xclip` on X11 Linux or `wl-clipboard` on Wayland. macOS and Windows work out of the
+Clipboard support (`-c`) requires xclip on X11 Linux or wl-clipboard on Wayland. macOS and Windows work out of the
 box.
 
 ## Usage
@@ -50,16 +51,58 @@ Grab everything in the current directory (ignoring hidden files) and copy to cli
 lx -c
 ```
 
+### Tree overview only
+Show project structure without file content:
+```bash
+lx -t src/
+```
+
+### Tree + content
+Print a tree plus the same files as content:
+```bash
+lx -T src/
+```
+
 ### Filter by type
 Get all Python files, but skip the tests:
 ```bash
 lx -i "*.py" -e "*test*" src/
 ```
 
+### Function and type skeletons
+Send only signatures and type definitions:
+```bash
+lx -u -Y src/
+```
+
+### Archive expansion
+Expand a repository archive and include only Go files:
+```bash
+lx -Z -i "*.go" https://github.com/owner/repo/archive/refs/heads/main.zip
+```
+
+### Document extraction
+Extract text from documents instead of treating them as binary:
+```bash
+lx -D docs/
+```
+
 ### XML output
 Dump the directory as structured XML (Claude prefers this):
 ```bash
 lx --xml .
+```
+
+### HTML output
+Generate a standalone, shareable HTML bundle:
+```bash
+lx --html src/ docs/
+```
+
+### URL input
+Fetch a remote file and include it alongside local sources:
+```bash
+lx https://example.com/config.yaml src/
 ```
 
 ### Prompt injection
@@ -75,7 +118,7 @@ lx -s "Code under test" src/database/users -s "Test fixtures" src/tests/fixtures
 ```
 
 ### Interactive selection with fzf
-Use `fd` to find files, preview them with `lx`, and bundle the final selection:
+Use fd to find files, preview them with lx, and bundle the final selection:
 ```bash
 fd -t f | fzf -m --preview 'lx -n 20 {}' | lx -c
 ```
@@ -94,12 +137,17 @@ git diff --name-only main | lx -c
 
 ## Stream Processing Model
 
-`lx` processes arguments left to right as a stream of **sections** - consecutive file/directory arguments with
-no interleaved options between them. Interleaved options (like `-n`, `--tail`, `-l`, `-i`) are scoped to the section
-they precede. When an interleaved option appears *after* files, it creates a **section boundary**: all interleaved
-options reset to defaults before the new option takes effect.
+Arguments are processed left to right as a stream of sections. Interleaved options (like `-n`, `--tail`, `-l`, `-i`)
+are scoped to the section that follows.
 
-Example: Grab the last 50 lines of a log file, then `src/` with line numbers enabled:
+Section boundaries are created when:
+
+* An interleaved option appears after files.
+* A section action (`-s`) is used.
+
+At each boundary, interleaved options reset to defaults before new settings apply.
+
+Example: Grab the last 50 lines of a log file, then src/ with line numbers enabled:
 ```bash
 lx --tail 50 app.log -l src/
 ```
