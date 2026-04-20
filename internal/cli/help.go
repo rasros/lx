@@ -45,7 +45,7 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
   Claude, ChatGPT, and GitHub Copilot.
 
   It recursively walks directories, respecting .gitignore rules, detects binary
-  files, and streams content into a clean Markdown (or XML/HTML) structure with
+  files, and streams content into Markdown, XML/HTML, or bare text with
   token estimations.
 
   {{ "Stream Processing Model:" | bold }}
@@ -71,7 +71,7 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
 
 {{ "Arguments:" | head }}
   {{ "[OPTIONS]" | bold }}
-          Global options that affect the entire execution (e.g., --copy, --xml).
+          Global options that affect the entire execution (e.g., --copy, --xml, --bare).
           These can be placed anywhere in the command.
 
   {{ "[interleaved options]" | bold }}

@@ -166,13 +166,14 @@ lx --tail 50 app.log -l src/
 | (default) | Markdown | ChatGPT, GitHub Copilot, DeepSeek              |
 | `--xml`   | XML      | Claude (uses `<document>` and `<source>` tags) |
 | `--html`  | HTML     | Archiving or visual debugging                  |
+| `--bare`  | Bare     | Plain text concatenation with minimal output   |
 
 ## Configuration
 
 You can set your defaults in `~/.config/lx/config.yaml`:
 ```yaml
 output_mode: "stdout"    # stdout, copy
-output_format: "xml"     # markdown, xml, html
+output_format: "xml"     # markdown, xml, html, bare
 ```
 
 ## Comparison

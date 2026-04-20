@@ -28,6 +28,7 @@ func TestGoldenFormatting(t *testing.T) {
 		{name: "013_fmt_xml_sections", args: []string{"--xml", "-s", "Core", "main.go", "-s", "Docs", "README.md"}},
 		{name: "014_fmt_html_sections", args: []string{"--html", "-s", "Core", "main.go"}},
 		{name: "015_fmt_markdown_no_fences", args: []string{"-y", "configs/custom_template.yaml", "main.go"}},
+		{name: "016_fmt_bare", args: []string{"--bare", "main.go", "README.md"}},
 	})
 }
 

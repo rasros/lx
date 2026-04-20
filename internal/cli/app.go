@@ -122,11 +122,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 	slog.Debug("Configuration loaded", "format", cfg.OutputFormat)
 
-	if _, ok := parsed.Globals["xml"]; ok {
-		cfg.OutputFormat = "xml"
-	} else if _, ok := parsed.Globals["html"]; ok {
-		cfg.OutputFormat = "html"
-	}
+	applyOutputFormatOverrides(cfg, parsed)
 
 	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, cliOpts.OutputMode)
 	if err != nil {
@@ -603,6 +599,21 @@ func parseLogLevel(s string) (slog.Level, error) {
 		return slog.LevelError + 1, nil
 	default:
 		return 0, fmt.Errorf("unknown log level: %q", s)
+	}
+}
+
+func applyOutputFormatOverrides(cfg *lx.Config, parsed *ParsedArgs) {
+	for _, op := range parsed.Ops {
+		switch op.Action {
+		case "md":
+			cfg.OutputFormat = "markdown"
+		case "xml":
+			cfg.OutputFormat = "xml"
+		case "html":
+			cfg.OutputFormat = "html"
+		case "bare":
+			cfg.OutputFormat = "bare"
+		}
 	}
 }
 

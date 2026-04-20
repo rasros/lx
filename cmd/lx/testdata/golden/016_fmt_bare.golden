@@ -1,0 +1,7 @@
+--- STDOUT ---
+package main
+func main() {}
+# Project
+Documentation here.
+
+--- STDERR ---

@@ -10,7 +10,8 @@
 //
 // Main configuration:
 //
-//   - Config.OutputFormat controls rendering format: "markdown", "xml", or "html".
+//   - Config.OutputFormat controls rendering format: "markdown", "xml", "html",
+//     or "bare".
 //   - Config template fields (FileContentTemplate, SectionTemplate, etc.) allow
 //     custom output structure.
 //
