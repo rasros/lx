@@ -1,7 +1,11 @@
 package cli
 
 import (
+	"archive/zip"
 	"context"
+	"os"
+	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/rasros/lx/pkg/lx"
@@ -55,7 +59,7 @@ func TestBuildASCIITree_Empty(t *testing.T) {
 	}
 }
 
-func TestCollectTreePaths_SkipsStdinAndURL(t *testing.T) {
+func TestCollectTreePaths_StdinAndURLHandling(t *testing.T) {
 	ctx := context.Background()
 	runCfg := lx.RunnerConfig{}
 
@@ -64,10 +68,28 @@ func TestCollectTreePaths_SkipsStdinAndURL(t *testing.T) {
 		t.Fatalf("stdin should not contribute paths, got: %v", stdinPaths)
 	}
 
-	// URL with ExpandArchives=false (default) should return no paths
-	urlPaths := collectTreePaths(ctx, Op{Action: "FILE", Value: "https://example.com/repo.zip", Type: CmdAction}, runCfg, nil, nil, nil)
-	if len(urlPaths) != 0 {
-		t.Fatalf("url should not contribute paths when ExpandArchives=false, got: %v", urlPaths)
+	url := "https://example.com/repo.zip"
+	urlPaths := collectTreePaths(ctx, Op{Action: "FILE", Value: url, Type: CmdAction}, runCfg, nil, nil, nil)
+	if len(urlPaths) != 1 || urlPaths[0] != url {
+		t.Fatalf("url should be included as a file when not expanded, got: %v", urlPaths)
+	}
+}
+
+func TestCollectTreePaths_ExpandsLocalArchiveWithEntryIncludes(t *testing.T) {
+	ctx := context.Background()
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+
+	archivePath := filepath.Join(tmp, "archive.zip")
+	createTestZip(t, archivePath, map[string]string{
+		"hello.txt":       "hello\n",
+		"nested/world.go": "package nested\n",
+	})
+
+	paths := collectTreePaths(ctx, Op{Action: "FILE", Value: "archive.zip", Type: CmdAction}, lx.RunnerConfig{ExpandArchives: true}, []string{"*.go"}, nil, nil)
+	want := []string{"archive.zip/nested/world.go"}
+	if !slices.Equal(paths, want) {
+		t.Fatalf("collectTreePaths archive include mismatch\nwant: %v\ngot:  %v", want, paths)
 	}
 }
 
@@ -85,5 +107,29 @@ func TestPrecomputeTrees_TreeOnlyMarksFileOps(t *testing.T) {
 	precomputeTrees(ctx, groups, nil)
 	if !groups[0].skipFileOps[1] {
 		t.Fatalf("expected file op at index 1 to be skipped in tree-only section")
+	}
+}
+
+func createTestZip(t *testing.T, path string, files map[string]string) {
+	t.Helper()
+
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create zip: %v", err)
+	}
+	defer f.Close()
+
+	w := zip.NewWriter(f)
+	for name, body := range files {
+		fw, err := w.Create(name)
+		if err != nil {
+			t.Fatalf("zip create %s: %v", name, err)
+		}
+		if _, err := fw.Write([]byte(body)); err != nil {
+			t.Fatalf("zip write %s: %v", name, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("zip close: %v", err)
 	}
 }

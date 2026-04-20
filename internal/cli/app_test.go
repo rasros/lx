@@ -230,3 +230,44 @@ func TestWorkloadConcurrency(t *testing.T) {
 		})
 	}
 }
+
+func TestDetermineOutput_StdoutOverridesCopyDefault(t *testing.T) {
+	out, clipBuf, debugOut, err := determineOutput(map[string]string{"stdout": "true"}, "copy")
+	if err != nil {
+		t.Fatalf("determineOutput error: %v", err)
+	}
+	if out != os.Stdout {
+		t.Fatalf("out = %T, want os.Stdout", out)
+	}
+	if clipBuf != nil {
+		t.Fatalf("clipBuf should be nil when stdout is forced")
+	}
+	if debugOut != os.Stderr {
+		t.Fatalf("debugOut should stay on stderr when stdout is forced")
+	}
+}
+
+func TestDetermineOutput_OutputWinsOverStdoutAndCopy(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "out.txt")
+	out, clipBuf, debugOut, err := determineOutput(
+		map[string]string{"output": target, "stdout": "true", "copy": "true"},
+		"copy",
+	)
+	if err != nil {
+		t.Fatalf("determineOutput error: %v", err)
+	}
+	fileOut, ok := out.(*os.File)
+	if !ok {
+		t.Fatalf("out type = %T, want *os.File", out)
+	}
+	defer fileOut.Close()
+	if fileOut.Name() != target {
+		t.Fatalf("output file = %q, want %q", fileOut.Name(), target)
+	}
+	if clipBuf != nil {
+		t.Fatalf("clipBuf should be nil when output file is used")
+	}
+	if debugOut != os.Stdout {
+		t.Fatalf("debugOut should be stdout when output file is used")
+	}
+}
