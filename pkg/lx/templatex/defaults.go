@@ -57,6 +57,17 @@ func getFormatDefaults(fmtType string) formatDefaults {
 			OutputHeader:  defaultHTMLOutputHeader,
 			OutputFooter:  defaultHTMLOutputFooter,
 		}
+	case "bare":
+		return formatDefaults{
+			FileContent: defaultBareContent,
+			FileError:   defaultBareError,
+			FileBinary:  defaultBareBinary,
+			FileCompact: defaultBareCompact,
+			FileHeader:  defaultBareFileHeader,
+			Section:     defaultBareSection,
+			Prompt:      defaultBarePrompt,
+			Tree:        defaultBareTree,
+		}
 	default: // markdown
 		return formatDefaults{
 			FileContent:  defaultMarkdownContent,
@@ -220,6 +231,15 @@ const defaultHTMLSection = `<section id="section-{{ .Index }}"><h2><a href="#sec
 const defaultHTMLSectionFooter = `</section>`
 const defaultHTMLPrompt = `<blockquote>{{ .Body | endNewline }}</blockquote>`
 const defaultHTMLTree = `<pre class="file-tree">{{ .Body | escape | endNewline }}</pre>`
+
+const defaultBareFileHeader = ``
+const defaultBareContent = `{{ .Content | endNewline -}}`
+const defaultBareError = ``
+const defaultBareBinary = ``
+const defaultBareCompact = ``
+const defaultBareSection = ``
+const defaultBarePrompt = ``
+const defaultBareTree = ``
 
 const defaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
 	`Size: {{ .Global.TotalWrittenBytes | humanize }}` + "\n" +

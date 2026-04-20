@@ -30,7 +30,7 @@ func TestCompileTemplates_InvalidSyntax(t *testing.T) {
 }
 
 func TestCompileTemplates_AllFormats(t *testing.T) {
-	for _, format := range []string{"markdown", "xml", "html"} {
+	for _, format := range []string{"markdown", "xml", "html", "bare"} {
 		t.Run(format, func(t *testing.T) {
 			cfg := core.NewConfig()
 			cfg.OutputFormat = format

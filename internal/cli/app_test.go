@@ -84,6 +84,25 @@ func TestRun_StickyFlags(t *testing.T) {
 	}
 }
 
+func TestApplyOutputFormatOverrides_LastFlagWins(t *testing.T) {
+	cfg := lx.NewConfig()
+	cfg.OutputFormat = "xml"
+
+	parsed := &ParsedArgs{
+		Ops: []Op{
+			{Action: "html", Type: CmdGlobal},
+			{Action: "md", Type: CmdGlobal},
+			{Action: "bare", Type: CmdGlobal},
+		},
+	}
+
+	applyOutputFormatOverrides(cfg, parsed)
+
+	if cfg.OutputFormat != "bare" {
+		t.Fatalf("cfg.OutputFormat = %q, want %q", cfg.OutputFormat, "bare")
+	}
+}
+
 func TestRun_HTTPURLInput(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

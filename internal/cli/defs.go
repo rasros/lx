@@ -93,6 +93,17 @@ snippets, documentation, or logs that can be viewed in any browser.`,
 	},
 	{
 		Category:  CatFormatting,
+		Name:      "bare",
+		Type:      CmdGlobal,
+		ValueType: ValueNone,
+		Usage:     "Format output as plain concatenated text (no wrappers)",
+		Long: `Format output as plain text with minimal structure.
+
+This mode emits only file content and separates files with a single newline.
+No code fences, headers, section wrappers, or tree/prompt blocks are added.`,
+	},
+	{
+		Category:  CatFormatting,
 		Name:      "stdout",
 		Short:     "C",
 		Type:      CmdGlobal,

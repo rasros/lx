@@ -85,7 +85,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		close(resultsCh)
 	}()
 
-	useSeparators := s.format != "html"
+	useSeparators := s.format != "html" && s.format != "bare"
 	layout := render.NewLayoutWriter(dest, s.engine, s.sections, useSeparators)
 	defer layout.Close()
 
