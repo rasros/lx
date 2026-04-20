@@ -20,9 +20,9 @@ Arguments:
 
 Scenarios:
   - Code repos (fixed subdirs): linux/kernel and linguist/samples with -Y -u
-  - Filtered walk mode: linguist/samples with -i and -e
-  - Generated archive corpus: -Z on corpus dir and each archive file type
-  - Every repo: -n0 and -t
+  - Filtered walk mode: linux root with 3 single-file include/exclude patterns
+  - Generated archive corpus: -Z on corpus dir
+  - Linux baseline modes: -n0 and -t
 EOF
 }
 
@@ -244,8 +244,19 @@ CODE_REPO_NAMES=("linux" "linguist")
 CODE_REPO_PATHS=("$LINUX_ROOT" "$LINGUIST_REPO_DIR")
 CODE_REPO_SKELETON_SUBDIRS=("kernel" "samples")
 FILTER_REPO_PATH="$LINUX_ROOT"
-FILTER_INCLUDE_PATTERN="**/*.c"
-FILTER_EXCLUDE_PATTERN="**/*_test.c"
+FILTER_TARGET_REL_PATH="scripts/bpf_doc.py"
+FILTER_TARGET_ABS_PATH="$FILTER_REPO_PATH/$FILTER_TARGET_REL_PATH"
+FILTER_EXCLUDE_PATTERN="__never_match__"
+FILTER_SCENARIO_NAMES=(
+  "linux_filters_single_file_star"
+  "linux_filters_single_file_doublestar_star"
+  "linux_filters_single_file_literal"
+)
+FILTER_INCLUDE_PATTERNS=(
+  "scripts/*bpf_doc.py"
+  "**/*bpf_doc.py"
+  "$FILTER_TARGET_REL_PATH"
+)
 
 for i in "${!CODE_REPO_NAMES[@]}"; do
   name="${CODE_REPO_NAMES[$i]}"
@@ -264,12 +275,21 @@ if [[ ! -d "$FILTER_REPO_PATH" ]]; then
   echo "required filter scenario path missing: $FILTER_REPO_PATH" >&2
   exit 1
 fi
+if [[ ! -f "$FILTER_TARGET_ABS_PATH" ]]; then
+  echo "required filter target file missing: $FILTER_TARGET_ABS_PATH" >&2
+  exit 1
+fi
 {
   echo "filter scenario path: $FILTER_REPO_PATH"
-  echo "filter include: $FILTER_INCLUDE_PATTERN"
+  echo "filter target file: $FILTER_TARGET_REL_PATH"
   echo "filter exclude: $FILTER_EXCLUDE_PATTERN"
+  for i in "${!FILTER_SCENARIO_NAMES[@]}"; do
+    echo "filter scenario ${FILTER_SCENARIO_NAMES[$i]} include: ${FILTER_INCLUDE_PATTERNS[$i]}"
+  done
 } >>"$SCENARIO_FILE"
-run_scenario "linux_filters_include_exclude" -i "$FILTER_INCLUDE_PATTERN" -e "$FILTER_EXCLUDE_PATTERN" "$FILTER_REPO_PATH"
+for i in "${!FILTER_SCENARIO_NAMES[@]}"; do
+  run_scenario "${FILTER_SCENARIO_NAMES[$i]}" -i "${FILTER_INCLUDE_PATTERNS[$i]}" -e "$FILTER_EXCLUDE_PATTERN" "$FILTER_REPO_PATH"
+done
 
 run_scenario "archives_expand_dir" -Z "$ARCHIVE_CORPUS_DIR"
 run_scenario "linux_compact" -n0 "$LINUX_ROOT"
