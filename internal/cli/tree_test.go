@@ -59,6 +59,17 @@ func TestBuildASCIITree_Empty(t *testing.T) {
 	}
 }
 
+func TestBuildASCIITree_URLPreservesScheme(t *testing.T) {
+	got := buildASCIITree([]string{"http://127.0.0.1:18082/a.txt"})
+	want := "" +
+		"http://127.0.0.1:18082/\n" +
+		"└── a.txt"
+
+	if got != want {
+		t.Fatalf("buildASCIITree URL mismatch\nwant:\n%s\n\ngot:\n%s", want, got)
+	}
+}
+
 func TestCollectTreePaths_StdinAndURLHandling(t *testing.T) {
 	ctx := context.Background()
 	runCfg := lx.RunnerConfig{}

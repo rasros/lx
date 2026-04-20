@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/fs"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -234,16 +235,12 @@ func buildASCIITree(paths []string) string {
 	root := newTreeNode()
 
 	for _, p := range paths {
-		p = filepath.ToSlash(filepath.Clean(p))
-		p = strings.TrimPrefix(p, "./")
-		if p == "" || p == "." {
+		parts := splitTreePathParts(p)
+		if len(parts) == 0 {
 			continue
 		}
 		node := root
-		for _, part := range strings.Split(p, "/") {
-			if part == "" {
-				continue
-			}
+		for _, part := range parts {
 			if _, ok := node.children[part]; !ok {
 				node.children[part] = newTreeNode()
 				node.childOrder = append(node.childOrder, part)
@@ -273,6 +270,45 @@ func buildASCIITree(paths []string) string {
 	}
 
 	return strings.TrimSuffix(buf.String(), "\n")
+}
+
+func splitTreePathParts(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+
+	if u, err := url.Parse(raw); err == nil {
+		scheme := strings.ToLower(u.Scheme)
+		if (scheme == "http" || scheme == "https") && u.Host != "" {
+			root := scheme + "://" + u.Host
+			escaped := strings.TrimPrefix(u.EscapedPath(), "/")
+			if escaped == "" {
+				return []string{root}
+			}
+			parts := strings.Split(escaped, "/")
+			if u.RawQuery != "" {
+				last := len(parts) - 1
+				parts[last] = parts[last] + "?" + u.RawQuery
+			}
+			return append([]string{root}, parts...)
+		}
+	}
+
+	cleaned := filepath.ToSlash(filepath.Clean(raw))
+	cleaned = strings.TrimPrefix(cleaned, "./")
+	if cleaned == "" || cleaned == "." {
+		return nil
+	}
+
+	allParts := strings.Split(cleaned, "/")
+	parts := make([]string, 0, len(allParts))
+	for _, part := range allParts {
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return parts
 }
 
 func sortTreeNode(node *treeNode) {
