@@ -30,6 +30,7 @@ type Tokenizer = core.Tokenizer
 type InputFile = sources.InputFile
 type Rule = walkerpkg.Rule
 type Walker = walkerpkg.Walker
+type CompiledSpec = walkerpkg.CompiledSpec
 
 type FileErrorHandler = streamingpkg.FileErrorHandler
 
@@ -51,6 +52,16 @@ func NewWalker(basePatterns, overridePatterns []string) *Walker {
 }
 
 func IsMatch(pattern, relPath string) bool { return walkerpkg.IsMatch(pattern, relPath) }
+
+func CompileSpecs(patterns []string) []CompiledSpec { return walkerpkg.CompileSpecs(patterns) }
+
+func IsMatchAnyCompiled(specs []CompiledSpec, relPath string) bool {
+	return walkerpkg.IsMatchAnyCompiled(specs, relPath)
+}
+
+func CouldMatchAnyDescendant(specs []CompiledSpec, dirRelPath string) bool {
+	return walkerpkg.CouldMatchAnyDescendant(specs, dirRelPath)
+}
 
 func IsKept(p string, includes, excludes []string) bool {
 	return walkerpkg.IsKept(p, includes, excludes)

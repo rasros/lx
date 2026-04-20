@@ -16,6 +16,7 @@ type Walker struct {
 	BaseRules     []Rule
 	OverrideRules []Rule
 	IgnoreEnabled bool
+	SkipHidden    bool
 	OnIgnore      func(path string, reason string)
 }
 

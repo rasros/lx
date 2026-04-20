@@ -15,6 +15,13 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	}
 
 	if !info.IsDir() {
+		if w.SkipHidden && isHiddenName(path.Base(root)) {
+			if w.OnIgnore != nil {
+				w.OnIgnore(root, "hidden path")
+			}
+			return nil
+		}
+
 		var localRules []Rule
 		if w.IgnoreEnabled {
 			dir := path.Dir(root)
@@ -40,7 +47,7 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 		effectiveRules = append(effectiveRules, localRules...)
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 
-		isIgnored, reason := checkIgnore(root, info.IsDir(), effectiveRules, false)
+		isIgnored, reason := checkIgnore(root, info.IsDir(), effectiveRules, false, w.OnIgnore != nil)
 		if isIgnored {
 			if w.OnIgnore != nil {
 				w.OnIgnore(root, reason)
@@ -50,9 +57,8 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 		return walkFn(root, dirEntryAdapter{info}, nil)
 	}
 
-	initialRules := make([]Rule, 0, len(w.BaseRules)+len(w.OverrideRules))
+	initialRules := make([]Rule, 0, len(w.BaseRules))
 	initialRules = append(initialRules, w.BaseRules...)
-	initialRules = append(initialRules, w.OverrideRules...)
 	return w.recursiveWalk(fsys, root, initialRules, walkFn, false)
 }
 
@@ -62,13 +68,21 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 		localRules = w.loadIgnoreFiles(fsys, dir)
 	}
 
-	var effectiveRules []Rule
+	var mergedRules []Rule
 	if len(localRules) == 0 {
-		effectiveRules = parentRules
+		mergedRules = parentRules
 	} else {
-		effectiveRules = make([]Rule, 0, len(parentRules)+len(localRules)+len(w.OverrideRules))
-		effectiveRules = append(effectiveRules, parentRules...)
-		effectiveRules = append(effectiveRules, localRules...)
+		mergedRules = make([]Rule, 0, len(parentRules)+len(localRules))
+		mergedRules = append(mergedRules, parentRules...)
+		mergedRules = append(mergedRules, localRules...)
+	}
+
+	var effectiveRules []Rule
+	if len(w.OverrideRules) == 0 {
+		effectiveRules = mergedRules
+	} else {
+		effectiveRules = make([]Rule, 0, len(mergedRules)+len(w.OverrideRules))
+		effectiveRules = append(effectiveRules, mergedRules...)
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 	}
 
@@ -83,12 +97,19 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 			childPath = path.Join(dir, d.Name())
 		}
 
-		isIgnored, reason := checkIgnore(childPath, d.IsDir(), effectiveRules, parentIgnored)
+		if w.SkipHidden && isHiddenName(d.Name()) {
+			if w.OnIgnore != nil {
+				w.OnIgnore(childPath, "hidden path")
+			}
+			continue
+		}
+
+		isIgnored, reason := checkIgnore(childPath, d.IsDir(), effectiveRules, parentIgnored, w.OnIgnore != nil)
 
 		if d.IsDir() {
 			if isIgnored {
 				if hasNestedException(childPath, effectiveRules) {
-					if err := w.recursiveWalk(fsys, childPath, effectiveRules, walkFn, true); err != nil {
+					if err := w.recursiveWalk(fsys, childPath, mergedRules, walkFn, true); err != nil {
 						return err
 					}
 					continue
@@ -106,7 +127,7 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 				return err
 			}
 
-			if err := w.recursiveWalk(fsys, childPath, effectiveRules, walkFn, false); err != nil {
+			if err := w.recursiveWalk(fsys, childPath, mergedRules, walkFn, false); err != nil {
 				return err
 			}
 			continue
@@ -123,6 +144,10 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 		}
 	}
 	return nil
+}
+
+func isHiddenName(name string) bool {
+	return strings.HasPrefix(name, ".") && name != "." && name != ".."
 }
 
 func (w *Walker) loadIgnoreFiles(fsys fs.FS, dir string) []Rule {

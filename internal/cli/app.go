@@ -166,10 +166,12 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	sections := parseSections(parsed.Ops, defaultRunCfg)
 	applyWorkloadConcurrency(stream, sections, runtime.NumCPU())
 	precomputeTrees(ctx, sections, globalIgnoreRules)
+	debugLoggingEnabled := slog.Default().Enabled(ctx, slog.LevelDebug)
 
 	for si, section := range sections {
 		slog.Debug("Processing section", "index", si, "ops", len(section.Ops))
 		stream.WithRunnerConfig(section.RunCfg)
+		includeSpecs := lx.CompileSpecs(section.Includes)
 
 		for oi, op := range section.Ops {
 			slog.Debug("Processing op", "action", op.Action, "value", op.Value)
@@ -210,8 +212,10 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						tempCleanups = append(tempCleanups, cleanup)
 
 						archiveWalker := newArchiveWalker(section.RunCfg.ShowHidden, isForced)
-						archiveWalker.OnIgnore = func(p, reason string) {
-							slog.Debug("Ignored in URL archive", "path", rawPath+"/"+p, "reason", reason)
+						if debugLoggingEnabled {
+							archiveWalker.OnIgnore = func(p, reason string) {
+								slog.Debug("Ignored in URL archive", "path", rawPath+"/"+p, "reason", reason)
+							}
 						}
 						archiveIncludes := section.Includes
 						if isForced {
@@ -291,10 +295,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 					baseRules = append(baseRules, globalIgnoreRules...)
 				}
 
-				if !section.RunCfg.ShowHidden && !isForced {
-					overrideRules = append(overrideRules, ".*")
-				}
-
 				if !isForced {
 					overrideRules = append(overrideRules, section.Excludes...)
 				}
@@ -308,8 +308,11 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 
 				walker := lx.NewWalker(baseRules, overrideRules)
 				walker.IgnoreEnabled = !section.RunCfg.NoIgnore
-				walker.OnIgnore = func(p, reason string) {
-					slog.Debug("Ignored", "path", p, "reason", reason)
+				walker.SkipHidden = !section.RunCfg.ShowHidden && !isForced
+				if debugLoggingEnabled {
+					walker.OnIgnore = func(p, reason string) {
+						slog.Debug("Ignored", "path", p, "reason", reason)
+					}
 				}
 
 				count := 0
@@ -320,6 +323,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						return nil
 					}
 					if d.IsDir() {
+						if !isForced && len(includeSpecs) > 0 && path != "." && !lx.CouldMatchAnyDescendant(includeSpecs, path) {
+							return fs.SkipDir
+						}
 						return nil
 					}
 
@@ -359,8 +365,10 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 							archiveAbsPath = absPath
 						}
 						archiveWalker := newArchiveWalker(section.RunCfg.ShowHidden, isForced)
-						archiveWalker.OnIgnore = func(p, reason string) {
-							slog.Debug("Ignored in archive", "path", effectivePath+"/"+p, "reason", reason)
+						if debugLoggingEnabled {
+							archiveWalker.OnIgnore = func(p, reason string) {
+								slog.Debug("Ignored in archive", "path", effectivePath+"/"+p, "reason", reason)
+							}
 						}
 						archiveIncludes := section.Includes
 						if isForced {
@@ -372,15 +380,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 						return nil
 					}
 
-					if !isForced && len(section.Includes) > 0 {
-						matched := false
-						for _, inc := range section.Includes {
-							if lx.IsMatch(inc, path) {
-								matched = true
-								break
-							}
-						}
-						if !matched {
+					if !isForced && len(includeSpecs) > 0 {
+						if !lx.IsMatchAnyCompiled(includeSpecs, path) {
 							slog.Debug("Ignored by include filter (-i)", "path", effectivePath)
 							return nil
 						}

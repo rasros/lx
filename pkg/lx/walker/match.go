@@ -116,19 +116,26 @@ func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool) bool {
 }
 
 // checkIgnore determines if a path should be ignored and returns the reason.
-func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool) (bool, string) {
+func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool, wantReason bool) (bool, string) {
 	ignored := parentIgnored
-	reason := "parent directory"
+	reason := ""
+	if parentIgnored && wantReason {
+		reason = "parent directory"
+	}
 	ctx := buildPathMatchInfo(relPath)
 
 	for _, rule := range rules {
 		if matchWithPathInfo(rule, ctx, isDir) {
 			if rule.Negate {
 				ignored = false
-				reason = ""
+				if wantReason {
+					reason = ""
+				}
 			} else {
 				ignored = true
-				reason = fmt.Sprintf("rule %q in %s", rule.Pattern, rule.Source)
+				if wantReason {
+					reason = fmt.Sprintf("rule %q in %s", rule.Pattern, rule.Source)
+				}
 			}
 		}
 	}
