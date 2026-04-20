@@ -613,6 +613,7 @@ func parseLogLevel(s string) (slog.Level, error) {
 func determineOutput(globals map[string]string, defaultMode string) (io.Writer, *bytes.Buffer, io.Writer, error) {
 	outputPath, hasOutput := globals["output"]
 	_, hasCopy := globals["copy"]
+	_, hasStdout := globals["stdout"]
 
 	var out io.Writer = os.Stdout
 	var clipBuf *bytes.Buffer
@@ -626,6 +627,8 @@ func determineOutput(globals map[string]string, defaultMode string) (io.Writer, 
 		out = f
 		debugOut = os.Stdout
 		slog.Debug("Output set to file", "path", outputPath)
+	} else if hasStdout {
+		slog.Debug("Output explicitly forced to stdout")
 	} else if hasCopy || defaultMode == "copy" {
 		clipBuf = new(bytes.Buffer)
 		out = clipBuf

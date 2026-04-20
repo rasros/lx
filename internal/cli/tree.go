@@ -84,9 +84,19 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 
 	if lx.IsHTTPURL(rawPath) {
 		if runCfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
-			return collectURLArchiveTreePaths(ctx, rawPath, runCfg.ShowHidden, includes)
+			if !isForced && !lx.IsKept(rawPath, nil, excludes) {
+				return paths
+			}
+			archiveIncludes := includes
+			if isForced {
+				archiveIncludes = nil
+			}
+			return collectURLArchiveTreePaths(ctx, rawPath, runCfg.ShowHidden, isForced, archiveIncludes)
 		}
-		return paths
+		if !isForced && !lx.IsKept(rawPath, includes, excludes) {
+			return paths
+		}
+		return append(paths, rawPath)
 	}
 
 	absPath, err := filepath.Abs(rawPath)
@@ -100,10 +110,34 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 	}
 
 	if !stat.IsDir() {
-		if !isForced && !lx.IsKept(rawPath, includes, excludes) {
+		isExpandableArchive := runCfg.ExpandArchives && lx.IsArchivePath(rawPath)
+		if !isForced && !isExpandableArchive && !lx.IsKept(rawPath, includes, excludes) {
 			return paths
 		}
-		return append(paths, filepath.Clean(rawPath))
+		if !isForced && isExpandableArchive && !lx.IsKept(rawPath, nil, excludes) {
+			return paths
+		}
+
+		rawPathClean := filepath.Clean(rawPath)
+		effectivePath := filepath.ToSlash(rawPathClean)
+		if filepath.IsAbs(rawPathClean) {
+			effectivePath = filepath.ToSlash(absPath)
+		}
+
+		if isExpandableArchive {
+			archiveWalker := newArchiveWalker(runCfg.ShowHidden, isForced)
+			archiveIncludes := includes
+			if isForced {
+				archiveIncludes = nil
+			}
+			archivePaths, err := lx.ExpandArchivePaths(ctx, absPath, effectivePath, archiveWalker, archiveIncludes)
+			if err != nil {
+				slog.Debug("Failed to expand archive for tree", "path", rawPath, "error", err)
+				return paths
+			}
+			return append(paths, archivePaths...)
+		}
+		return append(paths, rawPathClean)
 	}
 
 	fsys := os.DirFS(absPath)
@@ -141,6 +175,22 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 			effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
 		}
 
+		if runCfg.ExpandArchives && lx.IsArchivePath(path) {
+			archiveAbsPath := filepath.Join(absPath, filepath.FromSlash(path))
+			archiveWalker := newArchiveWalker(runCfg.ShowHidden, isForced)
+			archiveIncludes := includes
+			if isForced {
+				archiveIncludes = nil
+			}
+			archivePaths, err := lx.ExpandArchivePaths(ctx, archiveAbsPath, effectivePath, archiveWalker, archiveIncludes)
+			if err != nil {
+				slog.Debug("Failed to expand archive for tree", "path", effectivePath, "error", err)
+				return nil
+			}
+			paths = append(paths, archivePaths...)
+			return nil
+		}
+
 		if !isForced && len(includeSpecs) > 0 {
 			if !lx.IsMatchAnyCompiled(includeSpecs, path) {
 				return nil
@@ -154,7 +204,7 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 	return paths
 }
 
-func collectURLArchiveTreePaths(ctx context.Context, rawPath string, showHidden bool, includes []string) []string {
+func collectURLArchiveTreePaths(ctx context.Context, rawPath string, showHidden bool, isForced bool, includes []string) []string {
 	tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
 	if err != nil {
 		slog.Debug("Failed to download URL archive for tree", "url", rawPath, "error", err)
@@ -162,7 +212,7 @@ func collectURLArchiveTreePaths(ctx context.Context, rawPath string, showHidden 
 	}
 	defer cleanup()
 
-	archiveWalker := newArchiveWalker(showHidden, false)
+	archiveWalker := newArchiveWalker(showHidden, isForced)
 	paths, err := lx.ExpandArchivePaths(ctx, tempPath, rawPath, archiveWalker, includes)
 	if err != nil {
 		slog.Debug("Failed to expand URL archive for tree", "url", rawPath, "error", err)
