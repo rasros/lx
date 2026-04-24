@@ -14,8 +14,6 @@ follow, so one command can mix different filters, slices, and formatting rules.
 
 ![demo](demo/demo.gif)
 
----
-
 [Installation](#installation) • [Usage](#usage) • [Stream Processing](#stream-processing-model) • [Configuration](#configuration)
 
 ## Features
