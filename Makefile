@@ -6,7 +6,7 @@ BIN_DIR      := ./bin
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -s -w -X 'github.com/rasros/lx/internal/cli.Version=$(VERSION)'
 
-.PHONY: all build clean
+.PHONY: all build clean demo
 
 all: build
 
@@ -32,6 +32,10 @@ test-update:
 
 run: build
 	$(BIN_DIR)/$(BINARY_NAME)
+
+demo: build
+	@command -v vhs >/dev/null || { echo "vhs not found — install from https://github.com/charmbracelet/vhs"; exit 1; }
+	PATH="$(CURDIR)/$(BIN_DIR):$$PATH" vhs demo/demo.tape
 
 clean:
 	rm -rf $(BIN_DIR)

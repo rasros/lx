@@ -4,6 +4,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/rasros/lx)](https://goreportcard.com/report/github.com/rasros/lx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+![demo](demo/demo.gif)
+
 lx is a CLI tool that bundles files into a single LLM-ready context.
 
 It traverses directories, respects `.gitignore`, skips binaries by default, and outputs Markdown, XML, or HTML.
