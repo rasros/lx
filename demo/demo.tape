@@ -6,9 +6,9 @@ Output demo/demo.gif
 Require lx
 
 Set Shell "bash"
-Set FontSize 14
-Set Width 1100
-Set Height 520
+Set FontSize 20
+Set Width 920
+Set Height 600
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 90ms
 Set PlaybackSpeed 1.0
