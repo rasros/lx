@@ -110,15 +110,7 @@ func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines 
 func prependDoc(out []byte, lines [][]byte, startRow int) []byte {
 	docStart := langs.LeadingDocStart(lines, startRow)
 	if docStart < startRow {
-		return appendRange(out, lines, docStart, startRow-1)
-	}
-	return out
-}
-
-func appendRange(out []byte, lines [][]byte, from, to int) []byte {
-	for i := from; i <= to && i < len(lines); i++ {
-		out = append(out, lines[i]...)
-		out = append(out, '\n')
+		return internal.AppendLines(out, lines, docStart, startRow-1)
 	}
 	return out
 }
