@@ -29,12 +29,14 @@ func JavaEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		}
 		switch child.Type(lang) {
 		case "field_declaration":
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "method_declaration", "constructor_declaration":
 			if functions {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
 		case "class_declaration", "interface_declaration", "enum_declaration", "record_declaration":
+			out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 			out = JavaEmitClass(out, src, lines, child, lang, functions)
 		}
 	}

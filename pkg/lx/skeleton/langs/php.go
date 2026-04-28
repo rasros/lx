@@ -23,13 +23,14 @@ func PHPEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *g
 		}
 		switch child.Type(lang) {
 		case "property_declaration":
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "method_declaration":
 			if functions {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
 		case "const_declaration":
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {

@@ -33,12 +33,14 @@ func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		}
 		switch child.Type(lang) {
 		case "property_declaration":
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "function_declaration":
 			if functions {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "function_body")
 			}
 		case "class_declaration":
+			out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 			out = KotlinEmitClass(out, src, lines, child, lang, functions)
 		}
 	}
@@ -65,9 +67,10 @@ func kotlinEmitObject(out, src []byte, lines [][]byte, n *gotreesitter.Node, lan
 			}
 			switch child.Type(lang) {
 			case "property_declaration":
-				out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+				out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 			case "function_declaration":
 				if functions {
+					out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 					out = emitFuncSig(out, lines, child, lang, false, "function_body")
 				}
 			}

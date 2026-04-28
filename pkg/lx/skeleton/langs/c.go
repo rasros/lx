@@ -35,7 +35,7 @@ func CEmitTypedef(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *g
 	for i := 0; i < fieldList.ChildCount(); i++ {
 		child := fieldList.Child(i)
 		if child.Type(lang) == "field_declaration" {
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 	if closingRow := int(n.EndPoint().Row); closingRow > headerEnd {

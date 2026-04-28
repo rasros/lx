@@ -46,7 +46,17 @@ func ocamlEmitModule(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 	}
 	out = internal.AppendLines(out, lines, int(n.StartPoint().Row), int(structure.StartPoint().Row))
 	for i := 0; i < structure.ChildCount(); i++ {
-		out = OCamlEmitDefinition(out, src, lines, structure.Child(i), lang, functions)
+		child := structure.Child(i)
+		before := len(out)
+		out = OCamlEmitDefinition(out, src, lines, child, lang, functions)
+		if len(out) > before {
+			doc := EmitLeadingDoc(nil, lines, int(child.StartPoint().Row))
+			if len(doc) > 0 {
+				tail := append([]byte{}, out[before:]...)
+				out = append(out[:before], doc...)
+				out = append(out, tail...)
+			}
+		}
 	}
 	if endRow := int(structure.EndPoint().Row); endRow > int(structure.StartPoint().Row) {
 		out = internal.AppendLine(out, lines, endRow)

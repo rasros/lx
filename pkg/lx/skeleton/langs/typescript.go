@@ -30,9 +30,10 @@ func tsEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *go
 		}
 		switch child.Type(lang) {
 		case "public_field_definition", "field_definition":
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "method_definition":
 			if functions {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
 		}
@@ -58,7 +59,7 @@ func tsEmitInterface(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		child := body.Child(i)
 		switch child.Type(lang) {
 		case "method_signature", "property_signature", "call_signature", "construct_signature", "index_signature":
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
