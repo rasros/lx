@@ -19,9 +19,10 @@ func GroovyEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		child := body.Child(i)
 		switch child.Type(lang) {
 		case "declaration":
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "function_definition":
 			if functions && !strings.HasPrefix(strings.TrimSpace(string(child.Text(src))), "private ") {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "closure")
 			}
 		}

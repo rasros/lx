@@ -41,19 +41,20 @@ func CppEmitClassOrStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node,
 		switch child.Type(lang) {
 		case "field_declaration":
 			if !hasDescendantOfType(child, "function_declarator", lang) {
-				out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+				out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 			}
 		case "function_definition":
 			if functions {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
 		case "declaration":
 			if hasDescendantOfType(child, "function_declarator", lang) {
 				if functions {
-					out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+					out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 				}
 			} else {
-				out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+				out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 			}
 		}
 	}

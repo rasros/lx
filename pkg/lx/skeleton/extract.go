@@ -78,6 +78,8 @@ func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines 
 		return out
 	}
 
+	outerStart := int(node.StartPoint().Row)
+
 	if def.decoratedType != "" && nodeType == def.decoratedType {
 		if defNode := node.ChildByFieldName(def.definitionField, lang); defNode != nil {
 			node = defNode
@@ -88,14 +90,35 @@ func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines 
 	switch {
 	case functions && containsStr(def.funcTypes, nodeType):
 		if def.funcVisible == nil || def.funcVisible(node, src, lang) {
+			out = prependDoc(out, lines, outerStart)
 			if def.emitFunc != nil {
 				out = def.emitFunc(out, src, lines, node, lang)
 			} else {
 				out = langs.EmitFuncSig(out, lines, node, lang, def.indentBody, def.bodyChildType, def.singleLineSig)
+				if def.indentBody {
+					out = langs.AppendPyDocstring(out, lines, node, lang)
+				}
 			}
 		}
 	case structs && containsStr(def.structTypes, nodeType):
+		out = prependDoc(out, lines, outerStart)
 		out = def.emitStruct(out, src, lines, node, lang, functions)
+	}
+	return out
+}
+
+func prependDoc(out []byte, lines [][]byte, startRow int) []byte {
+	docStart := langs.LeadingDocStart(lines, startRow)
+	if docStart < startRow {
+		return appendRange(out, lines, docStart, startRow-1)
+	}
+	return out
+}
+
+func appendRange(out []byte, lines [][]byte, from, to int) []byte {
+	for i := from; i <= to && i < len(lines); i++ {
+		out = append(out, lines[i]...)
+		out = append(out, '\n')
 	}
 	return out
 }

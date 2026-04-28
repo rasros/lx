@@ -26,12 +26,14 @@ func ScalaEmitType(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		}
 		switch child.Type(lang) {
 		case "val_definition", "var_definition":
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "function_definition", "function_declaration":
 			if functions {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
 		case "class_definition", "object_definition", "trait_definition":
+			out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 			out = ScalaEmitType(out, src, lines, child, lang, functions)
 		}
 	}

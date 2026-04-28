@@ -46,7 +46,7 @@ func rustEmitStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang 
 	for i := 0; i < fieldList.ChildCount(); i++ {
 		child := fieldList.Child(i)
 		if child.Type(lang) == "field_declaration" && rustIsPublic(child, src, lang) {
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 	if closingRow := int(fieldList.EndPoint().Row); closingRow > headerEnd {
@@ -66,7 +66,7 @@ func rustEmitEnum(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *g
 	for i := 0; i < variantList.ChildCount(); i++ {
 		child := variantList.Child(i)
 		if child.Type(lang) == "enum_variant" {
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 	if closingRow := int(variantList.EndPoint().Row); closingRow > headerEnd {
@@ -88,6 +88,7 @@ func rustEmitTrait(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 			child := declList.Child(i)
 			t := child.Type(lang)
 			if t == "function_item" || t == "function_signature_item" {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
 		}
@@ -110,6 +111,7 @@ func rustEmitImpl(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *g
 		for i := 0; i < declList.ChildCount(); i++ {
 			child := declList.Child(i)
 			if child.Type(lang) == "function_item" && rustIsPublic(child, src, lang) {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
 		}

@@ -27,15 +27,17 @@ func RubyEmitClassOrModule(out, src []byte, lines [][]byte, n *gotreesitter.Node
 			isPrivate = text == "private" || text == "protected"
 		case "class", "module":
 			if !isPrivate {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = RubyEmitClassOrModule(out, src, lines, child, lang, functions)
 			}
 		case "method", "singleton_method":
 			if !isPrivate && functions {
+				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, true, "")
 			}
 		case "call", "assignment":
 			if !isPrivate {
-				out = internal.AppendLine(out, lines, int(child.StartPoint().Row))
+				out = EmitLineWithDoc(out, lines, int(child.StartPoint().Row))
 			}
 		}
 	}

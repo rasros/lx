@@ -22,6 +22,7 @@ func PyEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *go
 		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	out = internal.AppendLines(out, lines, int(n.StartPoint().Row), int(bodyNode.StartPoint().Row)-1)
+	out = AppendPyDocstring(out, lines, n, lang)
 	for i := 0; i < bodyNode.ChildCount(); i++ {
 		out = pyProcessMember(out, src, lines, bodyNode.Child(i), lang, functions)
 	}
@@ -35,6 +36,7 @@ func pyProcessMember(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 			actual = defNode
 		}
 	}
+	outerStart := int(n.StartPoint().Row)
 	switch actual.Type(lang) {
 	case "function_definition":
 		if !functions {
@@ -44,14 +46,18 @@ func pyProcessMember(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		if nameNode == nil || isPrivateName(nameNode.Text(src)) {
 			return out
 		}
-		return emitFuncSig(out, lines, actual, lang, true, "")
+		out = EmitLeadingDoc(out, lines, outerStart)
+		out = emitFuncSig(out, lines, actual, lang, true, "")
+		out = AppendPyDocstring(out, lines, actual, lang)
+		return out
 	case "class_definition":
+		out = EmitLeadingDoc(out, lines, outerStart)
 		return PyEmitClass(out, src, lines, actual, lang, functions)
 	default:
 		if pyIsClassVar(n, lang) {
 			name := pyVarName(n, lines)
 			if name != "" && !isPrivateName(name) {
-				return internal.AppendLine(out, lines, int(n.StartPoint().Row))
+				return EmitLineWithDoc(out, lines, int(n.StartPoint().Row))
 			}
 		}
 	}

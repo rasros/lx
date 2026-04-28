@@ -23,7 +23,16 @@ func GoEmitTypeDecl(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang 
 		}
 
 		if grouped {
+			before := len(groupMembers)
 			groupMembers = goEmitTypeSpec(groupMembers, src, lines, spec, lang, functions)
+			if len(groupMembers) > before {
+				doc := EmitLeadingDoc(nil, lines, int(spec.StartPoint().Row))
+				if len(doc) > 0 {
+					tail := append([]byte{}, groupMembers[before:]...)
+					groupMembers = append(groupMembers[:before], doc...)
+					groupMembers = append(groupMembers, tail...)
+				}
+			}
 		} else {
 			out = goEmitTypeSpec(out, src, lines, spec, lang, functions)
 		}
@@ -69,7 +78,7 @@ func goEmitStruct(out, src []byte, lines [][]byte, specNode, structNode *gotrees
 	for i := 0; i < fieldList.ChildCount(); i++ {
 		child := fieldList.Child(i)
 		if child.Type(lang) == "field_declaration" && goFieldIsExported(child, src, lang) && int(child.StartPoint().Row) != headerStart {
-			out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		}
 	}
 
@@ -92,7 +101,7 @@ func goEmitInterface(out, src []byte, lines [][]byte, specNode, ifaceNode *gotre
 			}
 			nameNode := findChildByType(child, "field_identifier", lang)
 			if nameNode != nil && isUppercase(nameNode.Text(src)) && int(child.StartPoint().Row) != headerStart {
-				out = internal.AppendLines(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+				out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 			}
 		}
 	}
