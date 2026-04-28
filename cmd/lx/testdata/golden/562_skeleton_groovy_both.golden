@@ -1,13 +1,17 @@
 --- STDOUT ---
-skeleton/main.groovy (9 rows, definitions)
+skeleton/main.groovy (13 rows, definitions)
 ---
 ```groovy
+/** Animal with name and species. */
 class Animal {
     String name
     String species // taxonomy
+    // Make the animal speak.
     def speak() {
 }
+// Standalone increment.
 def standalone(x) {
+/* Combine two values. */
 def combine(
     x,
     y) {

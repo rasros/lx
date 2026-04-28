@@ -1,16 +1,23 @@
 --- STDOUT ---
-skeleton/main.cs (14 rows, definitions)
+skeleton/main.cs (21 rows, definitions)
 ---
 ```csharp
+/// <summary>Geometric shape contract.</summary>
 public interface IShape {
     double Area();
     double Perimeter();
 }
+/**
+ * Immutable 2-D point.
+ */
 public class Point {
     public double X { get; set; }
     public double Y { get; set; }
+    // Construct from coordinates.
     public Point(double x, double y) {
+    /// <summary>Scale this point.</summary>
     public Point Scale(double factor) {
+    // Translate by deltas.
     public Point Combine(
         double dx,
         double dy

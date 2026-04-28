@@ -1,12 +1,16 @@
 --- STDOUT ---
-skeleton/main.c (10 rows, definitions)
+skeleton/main.c (14 rows, definitions)
 ---
 ```c
+/* 2-D point type */
 typedef struct Point {
     int x; /* x coordinate */
     int y; /* y coordinate */
 } Point;
+// Add two integers and return the sum.
 int add(int a, int b) {
+/* Subtract b from a over
+   multiple lines. */
 int subtract(
     int a,
     int b

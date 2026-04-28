@@ -1,10 +1,10 @@
 --- STDOUT ---
-[1/3] skeleton/main.go (12 rows, definitions)
+[1/3] skeleton/main.go (16 rows, definitions)
 ---
 ```go
+// Person represents a named individual.
 type Person struct {
-	Name string
-... (9 rows skipped)
+... (13 rows skipped)
 func (p Person) Greet() string {
 ```
 

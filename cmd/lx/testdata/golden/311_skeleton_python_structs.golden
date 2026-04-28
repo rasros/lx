@@ -1,8 +1,9 @@
 --- STDOUT ---
-skeleton/main.py (2 rows, type definitions)
+skeleton/main.py (3 rows, type definitions)
 ---
 ```python
 class Animal:
+    """Base class for all animals."""
     species = "unknown"
 ```
 

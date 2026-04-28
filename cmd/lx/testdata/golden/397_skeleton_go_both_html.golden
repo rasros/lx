@@ -49,16 +49,20 @@ article > header {
 <article id="file-1">
 <header>
  <a href="#file-1" aria-label="Link to this file"><strong>skeleton/main.go</strong></a>
- <small>(12 rows)</small>
+ <small>(16 rows)</small>
 </header>
 <pre><code class="language-go">
+// Person represents a named individual.
 type Person struct {
 	Name string
 }
+/* Worker defines the work contract. */
 type Worker interface {
 	Work()
 }
+// NewPerson creates a Person with the given name.
 func NewPerson(name string) Person {
+// NewWorker creates a worker with name and role.
 func NewWorker(
 	name string,
 	role string,

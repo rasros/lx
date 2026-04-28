@@ -1,18 +1,26 @@
 --- STDOUT ---
-skeleton/main.php (15 rows, definitions)
+skeleton/main.php (23 rows, definitions)
 ---
 ```php
+/** Geometric shape contract. */
 interface Shape {
     public function area(): float;
     public function perimeter(): float;
 }
+/**
+ * Immutable 2-D point.
+ */
 class Point {
     public float $x;
     public float $y;
+    # Construct from coordinates.
     public function __construct(float $x, float $y) {
+    /* Scale this point. */
     public function scale(float $factor): Point {
 }
+// Simple increment.
 function topLevel(int $x): int {
+# Combine two integers.
 function combine(
     int $x,
     int $y,

@@ -1,16 +1,21 @@
 --- STDOUT ---
-skeleton/main.js (10 rows, definitions)
+skeleton/main.js (15 rows, definitions)
 ---
 ```javascript
+/** A simple greeter class. */
 export class Greeter {
     message = "hi"; // default message
+    // Greet by name.
     greet(name) {
 }
+/* Top-level utility function. */
 export function topLevel(x) {
+// Combine two values.
 export function combine(
     x,
     y,
 ) {
+// Arrow function handler.
 export const handler = async (req, res) => {
 ```
 

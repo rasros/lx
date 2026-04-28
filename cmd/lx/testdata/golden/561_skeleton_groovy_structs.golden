@@ -1,7 +1,8 @@
 --- STDOUT ---
-skeleton/main.groovy (4 rows, type definitions)
+skeleton/main.groovy (5 rows, type definitions)
 ---
 ```groovy
+/** Animal with name and species. */
 class Animal {
     String name
     String species // taxonomy

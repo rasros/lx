@@ -1,10 +1,12 @@
 --- STDOUT ---
-skeleton/main.go (5 rows, type definitions)
+skeleton/main.go (7 rows, type definitions)
 ---
 ```go
+// Person represents a named individual.
 type Person struct {
 	Name string
 }
+/* Worker defines the work contract. */
 type Worker interface {
 }
 ```

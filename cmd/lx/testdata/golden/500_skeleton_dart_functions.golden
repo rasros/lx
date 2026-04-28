@@ -1,8 +1,10 @@
 --- STDOUT ---
-skeleton/main.dart (5 rows, function signatures)
+skeleton/main.dart (7 rows, function signatures)
 ---
 ```dart
+/* Greet a person by name. */
 String greet(String name) {
+/// Combine name and greeting.
 String combine(
   String name,
   String greeting,

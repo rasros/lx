@@ -1,9 +1,9 @@
 --- STDOUT ---
-skeleton/main.go (12 rows, definitions)
+skeleton/main.go (16 rows, definitions)
 ---
 ```go
+// Person represents a named individual.
 type Person struct {
-	Name string
 ```
 
 

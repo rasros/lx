@@ -1,20 +1,31 @@
 --- STDOUT ---
-skeleton/main.scala (17 rows, definitions)
+skeleton/main.scala (28 rows, definitions)
 ---
 ```scala
+/** Geometric shape abstraction. */
 trait Shape {
     def area(): Double
     def perimeter(): Double
 }
+/**
+ * Immutable 2-D point.
+ *
+ * @param x horizontal coordinate
+ * @param y vertical coordinate
+ */
 case class Point(x: Double, y: Double) {
     val label: String = "" // display label
+    // Scale uniformly.
     def scale(factor: Double): Point = 
 }
+// Singleton calculator.
 object Calculator {
     val Max: Int = 100
+    /** Add x to Max. */
     def add(x: Int): Int = 
 }
 def topLevel(x: Int): Int = 
+/* Combine two values. */
 def combine(
     x: Int,
     y: Int,

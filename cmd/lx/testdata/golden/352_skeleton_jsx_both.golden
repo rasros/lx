@@ -1,12 +1,16 @@
 --- STDOUT ---
-skeleton/main.jsx (9 rows, definitions)
+skeleton/main.jsx (13 rows, definitions)
 ---
 ```jsx
+/* Card component with a title. */
 export class Card extends React.Component {
     title = "default"; // fallback title
+    // Render the card.
     render() {
 }
+/** Create a card element. */
 export function makeCard(name) {
+// Build a card with explicit name and title.
 export function buildCard(
     name,
     title,

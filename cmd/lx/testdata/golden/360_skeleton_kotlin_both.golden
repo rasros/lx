@@ -1,22 +1,32 @@
 --- STDOUT ---
-skeleton/main.kt (19 rows, definitions)
+skeleton/main.kt (29 rows, definitions)
 ---
 ```kotlin
+/** Immutable 2-D point. */
 data class Point(val x: Double, val y: Double)
+// Shape abstraction.
 interface Shape {
     fun area(): Double
     fun perimeter(): Double
 }
+/**
+ * Calculator with a configurable maximum.
+ */
 class Calculator {
     val max: Int = 100 // upper bound
+    // Add x to the max.
     fun add(x: Int): Int {
 }
+/** Singleton registry of default values. */
 object Defaults {
     val max: Int = 100
     val name: String = "default" // fallback name
+    // Return max scaled by factor.
     fun scaled(factor: Int): Int {
 }
+/** Simple top-level increment. */
 fun topLevel(x: Int): Int {
+// Combine two integers.
 fun combine(
     x: Int,
     y: Int,

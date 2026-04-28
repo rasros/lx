@@ -1,7 +1,8 @@
 --- STDOUT ---
-skeleton/main.dart (5 rows, type definitions)
+skeleton/main.dart (6 rows, type definitions)
 ---
 ```dart
+/// An animal with a name and species.
 class Animal {
   final String name;
   final String species; // taxonomy

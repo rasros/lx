@@ -1,10 +1,10 @@
 --- STDOUT ---
-skeleton/main.php (15 rows, definitions)
+skeleton/main.php (23 rows, definitions)
 ---
 ```php
+/** Geometric shape contract. */
 interface Shape {
-    public function area(): float;
-... (12 rows skipped)
+... (20 rows skipped)
 ): int {
 ```
 

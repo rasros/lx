@@ -1,10 +1,10 @@
 --- STDOUT ---
-skeleton/main.cpp (10 rows, definitions)
+skeleton/main.cpp (13 rows, definitions)
 ---
 ```cpp
+// UI widget with a single integer value.
 class Widget {
     int value; // current value
-    void set(int v) {
 ```
 
 

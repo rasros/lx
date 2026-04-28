@@ -1,9 +1,13 @@
 --- STDOUT ---
-skeleton/main.cs (6 rows, type definitions)
+skeleton/main.cs (10 rows, type definitions)
 ---
 ```csharp
+/// <summary>Geometric shape contract.</summary>
 public interface IShape {
 }
+/**
+ * Immutable 2-D point.
+ */
 public class Point {
     public double X { get; set; }
     public double Y { get; set; }

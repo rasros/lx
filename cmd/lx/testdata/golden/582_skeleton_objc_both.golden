@@ -1,7 +1,8 @@
 --- STDOUT ---
-skeleton/main.m (11 rows, definitions)
+skeleton/main.m (14 rows, definitions)
 ---
 ```objectivec
+/** Animal with name and species. */
 @interface Animal : NSObject
 @property (nonatomic, strong) NSString *name;
 @property (nonatomic, strong) NSString *species; // taxonomy
@@ -9,9 +10,11 @@ skeleton/main.m (11 rows, definitions)
 - (NSString *)greetWithName:(NSString *)name
                    greeting:(NSString *)greeting; // multi-line selector
 @end
+/* Protocol for greeting behaviour. */
 @protocol Greeter <NSObject>
 - (NSString *)greet;
 @end
+// Standalone C function.
 int standalone(int x) {
 ```
 

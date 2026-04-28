@@ -1,8 +1,11 @@
 --- STDOUT ---
-skeleton/main.c (6 rows, function signatures)
+skeleton/main.c (9 rows, function signatures)
 ---
 ```c
+// Add two integers and return the sum.
 int add(int a, int b) {
+/* Subtract b from a over
+   multiple lines. */
 int subtract(
     int a,
     int b
