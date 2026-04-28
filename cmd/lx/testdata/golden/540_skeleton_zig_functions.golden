@@ -1,8 +1,10 @@
 --- STDOUT ---
-skeleton/main.zig (5 rows, function signatures)
+skeleton/main.zig (7 rows, function signatures)
 ---
 ```zig
+/// Greet by printing a name.
 pub fn greet(name: []const u8) void {
+// Add two i32 values.
 pub fn add(
     a: i32,
     b: i32,

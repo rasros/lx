@@ -1,10 +1,10 @@
 --- STDOUT ---
-skeleton/main.tsx (13 rows, definitions)
+skeleton/main.tsx (20 rows, definitions)
 ---
 ```tsx
+/** Props accepted by Panel. */
 export interface Props {
     title: string; // display title
-}
 ```
 
 

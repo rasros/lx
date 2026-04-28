@@ -1,9 +1,9 @@
 --- STDOUT ---
-skeleton/main.swift (15 rows, definitions)
+skeleton/main.swift (23 rows, definitions)
 ---
 ```swift
+/// Geometric shape contract.
 public protocol Shape {
-    func area() -> Double
 ```
 
 

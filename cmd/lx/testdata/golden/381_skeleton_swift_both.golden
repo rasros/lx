@@ -1,18 +1,26 @@
 --- STDOUT ---
-skeleton/main.swift (15 rows, definitions)
+skeleton/main.swift (23 rows, definitions)
 ---
 ```swift
+/// Geometric shape contract.
 public protocol Shape {
     func area() -> Double
     func perimeter() -> Double
 }
+/**
+ * Immutable 2-D point with label.
+ */
 public struct Point {
     public var x: Double
     public var y: Double
+    /// Initialise from coordinates.
     public init(x: Double, y: Double) {
+    // Scale the point by a factor.
     public func scale(factor: Double) -> Point {
 }
+/// Top-level increment function.
 public func topLevel(x: Double) -> Double {
+// Combine two doubles.
 public func combine(
     x: Double,
     y: Double,

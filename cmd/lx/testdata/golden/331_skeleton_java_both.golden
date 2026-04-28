@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/Main.java (12 rows, definitions)
+skeleton/Main.java (20 rows, definitions)
 ---
 ```java
 /**
@@ -7,8 +7,16 @@ skeleton/Main.java (12 rows, definitions)
  */
 public class Calculator {
     public static final int MAX = 100; // upper bound
+    /** Initialise with a starting value. */
     public Calculator(int initial) {
+    // Add x to the current value.
     public int add(int x) {
+    /**
+     * Combine value with two operands.
+     *
+     * @param x first operand
+     * @param y second operand
+     */
     public int combine(
         int x,
         int y

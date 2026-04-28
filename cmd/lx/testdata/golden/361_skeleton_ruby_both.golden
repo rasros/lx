@@ -1,14 +1,17 @@
 --- STDOUT ---
-skeleton/main.rb (11 rows, definitions)
+skeleton/main.rb (14 rows, definitions)
 ---
 ```ruby
+# Animal with a name and a maximum count.
 class Animal
   attr_reader :name
   MAX = 100 # class constant
   def initialize(name)
+  # Make the animal speak.
   def speak
 end
 def standalone(x)
+# Combine two values.
 def combine(
   x,
   y

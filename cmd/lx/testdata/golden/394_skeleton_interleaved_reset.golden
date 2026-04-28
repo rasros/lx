@@ -1,21 +1,25 @@
 --- STDOUT ---
-[1/2] skeleton/main.py (8 rows, definitions)
+[1/2] skeleton/main.py (11 rows, definitions)
 ---
 ```python
 class Animal:
+    """Base class for all animals."""
     species = "unknown"
     def speak(self):
+        """Return the animal's sound."""
 def top_level():
+# factory helper
 def create(
     name: str,
     tag: str = "default",
 ) -> "Animal":
 ```
 
-[2/2] skeleton/main.py (5 rows, function signatures)
+[2/2] skeleton/main.py (6 rows, function signatures)
 ---
 ```python
 def top_level():
+# factory helper
 def create(
     name: str,
     tag: str = "default",

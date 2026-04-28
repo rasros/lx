@@ -1,15 +1,23 @@
 --- STDOUT ---
-skeleton/main.ml (11 rows, type definitions)
+skeleton/main.ml (19 rows, type definitions)
 ---
 ```ocaml
+(* Basic animal variants. *)
 type animal = Dog | Cat
+(* A 2-D point record.
+   Both fields are floats. *)
 type point = {
   x: float;
   y: float;
 }
+(* Greet by prepending "Hello, ". *)
+(* Combine name and greeting
+   with a separator. *)
+(* Module for geometry utilities. *)
 module Geometry = struct
   type shape = Circle | Square
 end
+(* Signature for printable types. *)
 module type Printable = sig
   val to_string : 'a -> string
 end

@@ -1,9 +1,9 @@
 --- STDOUT ---
-skeleton/main.py (8 rows, definitions)
+skeleton/main.py (11 rows, definitions)
 ---
 ```python
 class Animal:
-... (6 rows skipped)
+... (9 rows skipped)
 ) -> "Animal":
 ```
 

@@ -1,15 +1,19 @@
 --- STDOUT ---
 <content>
-  <document index="1" language="go" rows="12" skeleton="definitions">
+  <document index="1" language="go" rows="16" skeleton="definitions">
     <source>skeleton/main.go</source>
     <document_content>
+// Person represents a named individual.
 type Person struct {
 	Name string
 }
+/* Worker defines the work contract. */
 type Worker interface {
 	Work()
 }
+// NewPerson creates a Person with the given name.
 func NewPerson(name string) Person {
+// NewWorker creates a worker with name and role.
 func NewWorker(
 	name string,
 	role string,

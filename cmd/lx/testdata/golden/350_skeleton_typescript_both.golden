@@ -1,22 +1,30 @@
 --- STDOUT ---
-skeleton/main.ts (16 rows, definitions)
+skeleton/main.ts (24 rows, definitions)
 ---
 ```typescript
+/** Geometric shape contract. */
 export interface Shape {
     area(): number;
     name: string; // display label
 }
+/**
+ * Immutable 2-D point.
+ */
 export class Point {
     public x: number;
     public y: number;
     constructor(x: number, y: number) {
+    // Scale this point by a factor.
     public scale(factor: number): Point {
 }
+// Top-level utility.
 export function topLevel(x: number): number {
+/** Combine two numbers. */
 export function combine(
     x: number,
     y: number,
 ): number {
+// Arrow function handler.
 export const handler = async (req: Request): Promise<void> => {
 ```
 

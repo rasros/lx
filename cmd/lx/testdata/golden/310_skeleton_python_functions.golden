@@ -1,8 +1,9 @@
 --- STDOUT ---
-skeleton/main.py (5 rows, function signatures)
+skeleton/main.py (6 rows, function signatures)
 ---
 ```python
 def top_level():
+# factory helper
 def create(
     name: str,
     tag: str = "default",

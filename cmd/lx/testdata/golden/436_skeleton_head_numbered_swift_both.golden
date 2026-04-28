@@ -1,10 +1,10 @@
 --- STDOUT ---
-skeleton/main.swift (15 rows, definitions)
+skeleton/main.swift (23 rows, definitions)
 ---
 ```swift
- 1: public protocol Shape {
- 2:     func area() -> Double
- 3:     func perimeter() -> Double
+ 1: /// Geometric shape contract.
+ 2: public protocol Shape {
+ 3:     func area() -> Double
 ```
 
 

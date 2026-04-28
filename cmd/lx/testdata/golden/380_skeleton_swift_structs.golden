@@ -1,11 +1,15 @@
 --- STDOUT ---
-skeleton/main.swift (8 rows, type definitions)
+skeleton/main.swift (12 rows, type definitions)
 ---
 ```swift
+/// Geometric shape contract.
 public protocol Shape {
     func area() -> Double
     func perimeter() -> Double
 }
+/**
+ * Immutable 2-D point with label.
+ */
 public struct Point {
     public var x: Double
     public var y: Double

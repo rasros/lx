@@ -1,22 +1,28 @@
 --- STDOUT ---
-skeleton/main.rs (19 rows, definitions)
+skeleton/main.rs (25 rows, definitions)
 ---
 ```rust
+/// A registered user with a public name.
 pub struct User {
     pub name: String,
 }
+// Possible roles for a user.
 pub enum Role {
     Admin,
     User,
 }
+/// Greeting behaviour.
 pub trait Greet {
     fn greet(&self) -> String;
 }
+/* User method implementations. */
 impl User {
     pub fn new(name: String) -> Self {
     pub fn display(&self) -> String {
 }
+/// Create a User from a name alone.
 pub fn create(name: String) -> User {
+/// Create a User with both fields.
 pub fn combine(
     name: String,
     email: String,

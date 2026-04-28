@@ -1,12 +1,20 @@
 --- STDOUT ---
-skeleton/main.scala (8 rows, type definitions)
+skeleton/main.scala (16 rows, type definitions)
 ---
 ```scala
+/** Geometric shape abstraction. */
 trait Shape {
 }
+/**
+ * Immutable 2-D point.
+ *
+ * @param x horizontal coordinate
+ * @param y vertical coordinate
+ */
 case class Point(x: Double, y: Double) {
     val label: String = "" // display label
 }
+// Singleton calculator.
 object Calculator {
     val Max: Int = 100
 }

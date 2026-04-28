@@ -1,12 +1,12 @@
 --- STDOUT ---
-skeleton/main.go (12 rows, definitions)
+skeleton/main.go (16 rows, definitions)
 ---
 ```go
- 1: type Person struct {
- 2: 	Name string
-... (8 rows skipped)
-11: ) Person {
-12: func (p Person) Greet() string {
+ 1: // Person represents a named individual.
+ 2: type Person struct {
+... (12 rows skipped)
+15: ) Person {
+16: func (p Person) Greet() string {
 ```
 
 

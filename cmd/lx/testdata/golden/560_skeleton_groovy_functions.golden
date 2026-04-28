@@ -1,8 +1,10 @@
 --- STDOUT ---
-skeleton/main.groovy (4 rows, function signatures)
+skeleton/main.groovy (6 rows, function signatures)
 ---
 ```groovy
+// Standalone increment.
 def standalone(x) {
+/* Combine two values. */
 def combine(
     x,
     y) {
