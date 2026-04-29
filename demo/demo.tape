@@ -32,7 +32,7 @@ Sleep 2s
 
 
 Ctrl+L
-Type "# -c copies straight to the system clipboard."
+Type "# Copy straight to the system clipboard."
 Enter
 Sleep 400ms
 Type "lx -c"

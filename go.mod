@@ -10,7 +10,7 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/mholt/archives v0.1.5
 	github.com/nguyenthenguyen/docx v0.0.0-20230621112118-9c8e795a11db
-	github.com/odvcencio/gotreesitter v0.14.0
+	github.com/odvcencio/gotreesitter v0.15.3
 	github.com/xuri/excelize/v2 v2.10.1
 )
 
