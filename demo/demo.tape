@@ -55,7 +55,14 @@ Sleep 500ms
 Enter
 Sleep 3s
 
-# 6. Pipe-friendly: copy straight to clipboard for LLM paste.
+# 6. Reusable prompts from a directory ($LX_PROMPTS_DIR).
+Ctrl+L
+Type "lx -P go/test src/"
+Sleep 500ms
+Enter
+Sleep 3s
+
+# 7. Pipe-friendly: copy straight to clipboard for LLM paste.
 Ctrl+L
 Type "# Paste straight into Claude / ChatGPT:"
 Enter

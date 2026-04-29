@@ -42,6 +42,18 @@ cat >"$_lx_demo_dir/README.md" <<'EOF'
 A tiny project to show off lx.
 EOF
 
+mkdir -p "$_lx_demo_dir/prompts/go"
+cat >"$_lx_demo_dir/prompts/go/test.md" <<'EOF'
+# Go test prompt
+Write table-driven tests for the Greeter type.
+EOF
+cat >"$_lx_demo_dir/prompts/refactor.md" <<'EOF'
+# Refactor prompt
+Refactor for readability without changing behavior.
+EOF
+
+export LX_PROMPTS_DIR="$_lx_demo_dir/prompts"
+
 cd "$_lx_demo_dir"
 unset _lx_demo_dir
 
