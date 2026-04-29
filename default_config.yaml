@@ -62,12 +62,26 @@ stats_template: |
 # -----------------------------------------------------------------------------
 # Options
 # -----------------------------------------------------------------------------
+
+# Where to send rendered output by default. CLI flags (-c, -C, -o) override.
+# values: stdout | copy
 output_mode: "stdout"
+
+# When to print the file/token summary footer. CLI: --stats / --no-stats / -q.
+# values: auto | always | never
 show_stats: "auto"
+
+# Default log level. CLI: -v, -vv, --verbose=<level>, -q.
+# values: debug | info | warn | error | silent  (or numeric 0|1|2+)
 verbosity: "warn"
+
+# Output format. CLI: --md, --xml, --html, --bare.
+# values: markdown | xml | html | bare
 output_format: "markdown"
 
 # Directory containing reusable prompts loaded by -P/--prompt-file.
 # Override at runtime with --prompts-dir or $LX_PROMPTS_DIR.
 # prompts_dir: "~/.config/lx/prompts"
+
+# Extensions probed by -P when resolving "<value>" against prompts_dir.
 # prompt_extensions: [".md", ".txt", ".prompt"]
