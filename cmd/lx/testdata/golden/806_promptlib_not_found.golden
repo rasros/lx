@@ -1,0 +1,9 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+  go/test.md
+  plan.txt
+  refactor.md
+CLI Error: prompt "missing" not found in /ROOT/prompts
+available prompts:

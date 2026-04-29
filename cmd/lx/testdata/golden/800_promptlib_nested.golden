@@ -1,0 +1,13 @@
+--- STDOUT ---
+Write table-driven tests for the Greeter type.
+
+
+main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---

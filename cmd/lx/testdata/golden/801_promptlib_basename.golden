@@ -1,0 +1,13 @@
+--- STDOUT ---
+Refactor for readability without changing behavior.
+
+
+main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---
