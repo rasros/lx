@@ -1,0 +1,13 @@
+--- STDOUT ---
+Top-level test prompt.
+
+
+main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---
