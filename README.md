@@ -43,6 +43,28 @@ curl -fsSL https://raw.github.com/rasros/lx/main/install.sh | bash
 Clipboard support (`-c`) requires xclip on X11 Linux or wl-clipboard on Wayland. macOS and Windows work out of the
 box.
 
+## Use with AI agents
+
+[skills/lx/SKILL.md](skills/lx/SKILL.md) teaches a coding agent to reach for
+lx when exploring a codebase: head+tail slices and signature-only skeletons
+instead of full file reads, glob filters to scope a directory in one call.
+It is plain Markdown with YAML frontmatter, so most harnesses can load it
+directly.
+
+Harnesses that support the skill format (Claude Code, OpenCode, and others)
+typically read from a per-user skills directory. Symlink the skill there:
+
+```bash
+ln -s "$(pwd)/skills/lx" <harness-skills-dir>/lx
+```
+
+Harnesses that read a project-level rules file instead (AGENTS.md,
+.cursor/rules/, .clinerules, and similar) can include the contents directly;
+the frontmatter is ignored by tools that don't understand it.
+
+For anything else, paste the contents into the system prompt or context
+loader the harness uses.
+
 ## Usage
 
 ### Basic bundling
