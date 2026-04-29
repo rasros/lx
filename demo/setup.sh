@@ -63,3 +63,16 @@ export LX_PROMPTS_DIR="$_lx_demo_dir/prompts"
 
 cd "$_lx_demo_dir"
 unset _lx_demo_dir
+
+# Pace lx's stdout for the demo so large outputs scroll visibly instead of
+# painting the whole screen in a single frame. Skip pacing for the
+# "fits-on-one-screen" preview modes (-t tree-only, -Y types-only, -u
+# functions-only) so the demo shows that lx itself paints instantly.
+lx() {
+	for a in "$@"; do
+		case "$a" in
+			-t|-Y|-u) command lx "$@"; return ;;
+		esac
+	done
+	command lx "$@" | awk '{ print; fflush(); system("sleep 0.02") }'
+}
