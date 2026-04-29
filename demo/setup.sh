@@ -4,10 +4,13 @@ _lx_demo_dir="$(mktemp -d)"
 mkdir -p "$_lx_demo_dir/src"
 
 cat >"$_lx_demo_dir/src/main.go" <<'EOF'
+// Package main is the demo entrypoint used by lx's VHS tape.
 package main
 
 import "fmt"
 
+// main wires up a Greeter and prints a single greeting so the demo has
+// something concrete to bundle.
 func main() {
 	g := Greeter{Prefix: "hello"}
 	fmt.Println(g.Greet("world"))
@@ -19,18 +22,22 @@ package main
 
 // Greeter builds greeting strings with a configurable prefix.
 type Greeter struct {
+	// Prefix is prepended to every name passed to Greet.
 	Prefix string
 }
 
 // Speaker is anything that can produce a greeting for a given name.
 type Speaker interface {
+	// Greet returns a greeting addressed to name.
 	Greet(name string) string
 }
 
+// Greet returns "<Prefix>, <name>" using the receiver's configured prefix.
 func (g Greeter) Greet(name string) string {
 	return g.Prefix + ", " + name
 }
 
+// NewGreeter returns a Greeter that uses the given prefix for every greeting.
 func NewGreeter(prefix string) *Greeter {
 	return &Greeter{Prefix: prefix}
 }
