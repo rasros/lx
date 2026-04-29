@@ -63,10 +63,3 @@ export LX_PROMPTS_DIR="$_lx_demo_dir/prompts"
 
 cd "$_lx_demo_dir"
 unset _lx_demo_dir
-
-# Pace lx's stdout for the demo so output scrolls visibly instead of painting
-# the whole screen in a single frame. Terminal clipboard flag (-c) still works
-# because clipboard writes bypass stdout.
-lx() {
-	command lx "$@" | awk '{ print; fflush(); system("sleep 0.02") }'
-}
