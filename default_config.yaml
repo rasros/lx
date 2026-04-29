@@ -66,3 +66,8 @@ output_mode: "stdout"
 show_stats: "auto"
 verbosity: "warn"
 output_format: "markdown"
+
+# Directory containing reusable prompts loaded by -P/--prompt-file.
+# Override at runtime with --prompts-dir or $LX_PROMPTS_DIR.
+# prompts_dir: "~/.config/lx/prompts"
+# prompt_extensions: [".md", ".txt", ".prompt"]

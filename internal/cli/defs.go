@@ -427,7 +427,63 @@ Example:
   lx -p "Refactor the following code for better concurrency:" main.go
 `,
 	},
+	{
+		Category:  CatActions,
+		Name:      "prompt-file",
+		Short:     "P",
+		Type:      CmdAction,
+		ValueType: ValueAny,
+		Usage:     "Load a prompt by name from the prompts library, or from a path",
+		Long: `Load a prompt from a file and inject it into the output stream.
 
+The value is resolved in this order:
+  1. Path-like inputs (absolute, ~, ./, ../) are read directly from disk.
+  2. <prompts-dir>/<value> if it exists.
+  3. <prompts-dir>/<value>.md, .txt, .prompt (configurable).
+  4. Recursive search of <prompts-dir>: any file whose relative path or
+     basename (without extension) equals the value. If multiple files match,
+     lx errors and lists them so you can disambiguate with a longer path.
+
+The prompts library directory resolves in this order:
+  1. --prompts-dir <path>
+  2. $LX_PROMPTS_DIR
+  3. prompts_dir: in the loaded config
+  4. ~/.config/lx/prompts
+
+The flag can be repeated to stack multiple prompts. Use --list-prompts to
+see every prompt in the configured library.
+
+Examples:
+  lx -P go/test src/foo.go -c
+  lx -P refactor -i "*.py" src/ --xml -c
+  lx -P plan -P comments docs/ src/
+`,
+	},
+
+	{
+		Category:  CatConfig,
+		Name:      "prompts-dir",
+		Type:      CmdGlobal,
+		ValueType: ValueAny,
+		Usage:     "Directory containing prompt files for -P/--prompt-file",
+		Long: `Set the prompts library directory used by -P/--prompt-file.
+
+Overrides $LX_PROMPTS_DIR and the prompts_dir: config key. The default is
+~/.config/lx/prompts when none of these are set.`,
+	},
+	{
+		Category:  CatConfig,
+		Name:      "list-prompts",
+		Type:      CmdGlobal,
+		ValueType: ValueNone,
+		Usage:     "List every prompt in the library (relative<TAB>absolute) and exit",
+		Long: `Print every prompt file in the configured prompts library and exit.
+
+Output is "<relative path>\t<absolute path>" per line, useful for shell
+completion or piping to a fuzzy finder:
+
+  lx -P "$(lx --list-prompts | fzf | cut -f1)" src/`,
+	},
 	{
 		Category:  CatConfig,
 		Name:      "config",

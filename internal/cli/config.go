@@ -37,6 +37,9 @@ type CliConfig struct {
 	OutputMode string `yaml:"output_mode"`
 	ShowStats  string `yaml:"show_stats"`
 	Verbosity  string `yaml:"verbosity"`
+
+	PromptsDir       string   `yaml:"prompts_dir"`
+	PromptExtensions []string `yaml:"prompt_extensions"`
 }
 
 func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
@@ -122,6 +125,12 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		}
 		if loaded.Verbosity != "" {
 			mergedCli.Verbosity = loaded.Verbosity
+		}
+		if loaded.PromptsDir != "" {
+			mergedCli.PromptsDir = loaded.PromptsDir
+		}
+		if len(loaded.PromptExtensions) > 0 {
+			mergedCli.PromptExtensions = loaded.PromptExtensions
 		}
 
 		return nil

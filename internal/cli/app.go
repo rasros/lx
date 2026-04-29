@@ -60,13 +60,21 @@ func handleGlobals(parsed *ParsedArgs) bool {
 		fmt.Printf("lx version %s\n", Version)
 		return true
 	}
+
+	if _, ok := parsed.Globals["list-prompts"]; ok {
+		if err := runListPrompts(parsed); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return true
+	}
 	return false
 }
 
 func gatherInputs(parsed *ParsedArgs) error {
 	hasFilesOrGenerators := false
 	for _, op := range parsed.Ops {
-		if op.Action == "FILE" || op.Action == "file" || op.Action == "section" || op.Action == "prompt" {
+		if op.Action == "FILE" || op.Action == "file" || op.Action == "section" || op.Action == "prompt" || op.Action == "prompt-file" {
 			slog.Debug("Detected input from actions")
 			hasFilesOrGenerators = true
 			break
@@ -159,6 +167,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	slog.Debug("Processing operations", "total_ops", len(parsed.Ops))
 
 	globalIgnoreRules := LoadGlobalIgnorePatterns()
+	promptResolver := newPromptResolver(resolvePromptsDir(parsed, cliOpts), cliOpts.PromptExtensions)
 	sections := parseSections(parsed.Ops, defaultRunCfg)
 	applyWorkloadConcurrency(stream, sections, runtime.NumCPU())
 	precomputeTrees(ctx, sections, globalIgnoreRules)
@@ -433,6 +442,19 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			case "prompt":
 				slog.Debug("Adding prompt", "length", len(op.Value))
 				stream.AddPrompt(op.Value)
+			case "prompt-file":
+				path, err := promptResolver.resolve(op.Value)
+				if err != nil {
+					slog.Error("Failed to resolve prompt", "value", op.Value, "error", err)
+					return err
+				}
+				data, err := os.ReadFile(path)
+				if err != nil {
+					slog.Error("Failed to read prompt file", "path", path, "error", err)
+					return fmt.Errorf("read prompt file %s: %w", path, err)
+				}
+				slog.Debug("Adding prompt from file", "path", path, "length", len(data))
+				stream.AddPrompt(string(data))
 			}
 		}
 	}
