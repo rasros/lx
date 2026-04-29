@@ -83,6 +83,8 @@ func IsHTTPURL(raw string) bool { return sources.IsHTTPURL(raw) }
 
 func IsHTTPArchiveURL(raw string) bool { return sources.IsHTTPArchiveURL(raw) }
 
+func RewriteRepoURL(raw string) (string, bool) { return sources.RewriteRepoURL(raw) }
+
 func NewURLInputFile(raw string) (InputFile, error) { return sources.NewURLInputFile(raw) }
 
 func DownloadURLToTempFile(ctx context.Context, raw string) (path string, cleanup func(), err error) {

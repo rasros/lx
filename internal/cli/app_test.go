@@ -7,12 +7,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/rasros/lx/pkg/lx"
+	"github.com/rasros/lx/pkg/lx/sources"
 )
 
 func TestRun_Basic(t *testing.T) {
@@ -158,6 +160,58 @@ func TestRun_HTTPURLArchiveInput_Expand(t *testing.T) {
 		t.Fatalf("Run() error: %v", err)
 	}
 	if !strings.Contains(out, url+"/repo-main/README.md") {
+		t.Fatalf("output missing expanded archive entry. Got:\n%s", out)
+	}
+	if !strings.Contains(out, "hello archive") {
+		t.Fatalf("output missing expanded archive content. Got:\n%s", out)
+	}
+}
+
+func TestRun_ShortRepoURL_AutoExpand(t *testing.T) {
+	var zipBuf bytes.Buffer
+	zw := zip.NewWriter(&zipBuf)
+	w, err := zw.Create("repo-main/README.md")
+	if err != nil {
+		t.Fatalf("Create zip entry: %v", err)
+	}
+	if _, err := w.Write([]byte("hello archive")); err != nil {
+		t.Fatalf("Write zip entry: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("Close zip writer: %v", err)
+	}
+
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/zip")
+		_, _ = w.Write(zipBuf.Bytes())
+	}))
+	defer server.Close()
+
+	serverURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parse server URL: %v", err)
+	}
+	restore := sources.SetRepoHostForTest(serverURL.Host, func(owner, repo, ref string) string {
+		if ref == "" {
+			ref = "HEAD"
+		}
+		return server.URL + "/" + owner + "/" + repo + "/archive/" + ref + ".zip"
+	})
+	defer restore()
+
+	short := serverURL.Host + "/owner/repo"
+	out, err := captureStdout(func() error {
+		return Run(context.Background(), []string{short})
+	})
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+	if want := "/owner/repo/archive/HEAD.zip"; gotPath != want {
+		t.Fatalf("server got path %q, want %q", gotPath, want)
+	}
+	if !strings.Contains(out, "/repo-main/README.md") {
 		t.Fatalf("output missing expanded archive entry. Got:\n%s", out)
 	}
 	if !strings.Contains(out, "hello archive") {

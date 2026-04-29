@@ -81,6 +81,12 @@ Expand a repository archive and include only Go files:
 lx -Z -i "*.go" https://github.com/owner/repo/archive/refs/heads/main.zip
 ```
 
+Short repo URLs are auto-rewritten to the host's archive zip and expanded automatically — no `-Z` needed. Works for GitHub, GitLab, Bitbucket, and Codeberg, with or without the scheme:
+```bash
+lx github.com/owner/repo
+lx https://gitlab.com/owner/repo/-/tree/dev
+```
+
 ### Document extraction
 Extract text from documents instead of treating them as binary:
 ```bash
