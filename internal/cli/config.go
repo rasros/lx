@@ -42,6 +42,13 @@ type CliConfig struct {
 	PromptExtensions []string `yaml:"prompt_extensions"`
 }
 
+func overrideIfSet[T comparable](dst *T, src T) {
+	var zero T
+	if src != zero {
+		*dst = src
+	}
+}
+
 func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 	lxCfg := lx.NewConfig()
 
@@ -70,65 +77,29 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			return err
 		}
 
-		if loaded.FileContentTemplate != "" {
-			lxCfg.FileContentTemplate = loaded.FileContentTemplate
-		}
-		if loaded.FileErrorTemplate != "" {
-			lxCfg.FileErrorTemplate = loaded.FileErrorTemplate
-		}
-		if loaded.FileBinaryTemplate != "" {
-			lxCfg.FileBinaryTemplate = loaded.FileBinaryTemplate
-		}
-		if loaded.FileCompactTemplate != "" {
-			lxCfg.FileCompactTemplate = loaded.FileCompactTemplate
-		}
-		if loaded.FileHeaderTemplate != "" {
-			lxCfg.FileHeaderTemplate = loaded.FileHeaderTemplate
-		}
+		overrideIfSet(&lxCfg.FileContentTemplate, loaded.FileContentTemplate)
+		overrideIfSet(&lxCfg.FileErrorTemplate, loaded.FileErrorTemplate)
+		overrideIfSet(&lxCfg.FileBinaryTemplate, loaded.FileBinaryTemplate)
+		overrideIfSet(&lxCfg.FileCompactTemplate, loaded.FileCompactTemplate)
+		overrideIfSet(&lxCfg.FileHeaderTemplate, loaded.FileHeaderTemplate)
 
-		if loaded.SectionTemplate != "" {
-			lxCfg.SectionTemplate = loaded.SectionTemplate
-		}
-		if loaded.PromptTemplate != "" {
-			lxCfg.PromptTemplate = loaded.PromptTemplate
-		}
-		if loaded.TreeTemplate != "" {
-			lxCfg.TreeTemplate = loaded.TreeTemplate
-		}
+		overrideIfSet(&lxCfg.SectionTemplate, loaded.SectionTemplate)
+		overrideIfSet(&lxCfg.PromptTemplate, loaded.PromptTemplate)
+		overrideIfSet(&lxCfg.TreeTemplate, loaded.TreeTemplate)
 
-		if loaded.SectionHeaderTemplate != "" {
-			lxCfg.SectionHeaderTemplate = loaded.SectionHeaderTemplate
-		}
-		if loaded.SectionFooterTemplate != "" {
-			lxCfg.SectionFooterTemplate = loaded.SectionFooterTemplate
-		}
+		overrideIfSet(&lxCfg.SectionHeaderTemplate, loaded.SectionHeaderTemplate)
+		overrideIfSet(&lxCfg.SectionFooterTemplate, loaded.SectionFooterTemplate)
 
-		if loaded.OutputHeaderTemplate != "" {
-			lxCfg.OutputHeaderTemplate = loaded.OutputHeaderTemplate
-		}
-		if loaded.OutputFooterTemplate != "" {
-			lxCfg.OutputFooterTemplate = loaded.OutputFooterTemplate
-		}
-		if loaded.StatsTemplate != "" {
-			lxCfg.StatsTemplate = loaded.StatsTemplate
-		}
+		overrideIfSet(&lxCfg.OutputHeaderTemplate, loaded.OutputHeaderTemplate)
+		overrideIfSet(&lxCfg.OutputFooterTemplate, loaded.OutputFooterTemplate)
+		overrideIfSet(&lxCfg.StatsTemplate, loaded.StatsTemplate)
 
-		if loaded.OutputFormat != "" {
-			lxCfg.OutputFormat = loaded.OutputFormat
-		}
+		overrideIfSet(&lxCfg.OutputFormat, loaded.OutputFormat)
 
-		if loaded.OutputMode != "" {
-			mergedCli.OutputMode = loaded.OutputMode
-		}
-		if loaded.ShowStats != "" {
-			mergedCli.ShowStats = loaded.ShowStats
-		}
-		if loaded.Verbosity != "" {
-			mergedCli.Verbosity = loaded.Verbosity
-		}
-		if loaded.PromptsDir != "" {
-			mergedCli.PromptsDir = loaded.PromptsDir
-		}
+		overrideIfSet(&mergedCli.OutputMode, loaded.OutputMode)
+		overrideIfSet(&mergedCli.ShowStats, loaded.ShowStats)
+		overrideIfSet(&mergedCli.Verbosity, loaded.Verbosity)
+		overrideIfSet(&mergedCli.PromptsDir, loaded.PromptsDir)
 		if len(loaded.PromptExtensions) > 0 {
 			mergedCli.PromptExtensions = loaded.PromptExtensions
 		}
