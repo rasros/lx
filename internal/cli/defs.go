@@ -422,7 +422,9 @@ The second -s resets -l so web/ gets full content, with only -i active.`,
 		Usage:     "Inject a custom text prompt into the output",
 		Long: `Inject a custom text block directly into the output stream.
 
-Useful for adding specific instructions to the LLM alongside the code context.
+Useful for short, inline instructions. To load a prompt from a file or from
+your prompts library, use -P/--prompt-file instead.
+
 Example:
   lx -p "Refactor the following code for better concurrency:" main.go
 `,

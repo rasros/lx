@@ -142,8 +142,10 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
      Load a prompt by name from your prompts library (set via $LX_PROMPTS_DIR
      or --prompts-dir), then attach the source code:
        $ lx -P go/test src/ -c
-     Or inline a literal prompt with -p:
-       $ lx -p "$(cat prompt.txt)" -s "Context" src/ -c
+     Use -P with an explicit path for one-off prompt files:
+       $ lx -P ./prompt.txt -s "Context" src/ -c
+     Use -p only for inline literals:
+       $ lx -p "Refactor for concurrency:" main.go
 
   5. {{ "Search Integration" | underline }}
      Use 'grep' to find files with TODOs and pipe them to lx:
