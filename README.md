@@ -186,11 +186,20 @@ lx --tail 50 app.log -l src/
 
 ## Configuration
 
-You can set your defaults in `~/.config/lx/config.yaml`:
+Drop a YAML file at `~/.config/lx/config.yaml` to set defaults — only the keys
+you list are overridden:
 ```yaml
-output_mode: "stdout"    # stdout, copy
-output_format: "xml"     # markdown, xml, html, bare
+output_mode: "copy"          # stdout | copy
+output_format: "xml"         # markdown | xml | html | bare
+prompts_dir: "~/Workspaces/prompts"
 ```
+
+Two complete profiles ship in the repo: [`default_config.yaml`](default_config.yaml)
+(Markdown) and [`xml_config.yaml`](xml_config.yaml) (Claude-friendly XML). Load
+one ad hoc with `lx -y xml_config.yaml src/` or persistently via `$LX_CONFIG`.
+
+See [CONFIG.md](CONFIG.md) for the full key reference, the template context
+shapes, helper functions, and override recipes.
 
 ## Comparison
 
