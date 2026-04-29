@@ -441,7 +441,7 @@ Example:
 Value resolution (first match wins):
   - path-like input (absolute, ~, ./, ../) is read directly from disk
   - <prompts-dir>/<value> if it exists
-  - <prompts-dir>/<value>.md|.txt|.prompt (configurable)
+  - <prompts-dir>/<value>.md|.txt|.prompt (override via prompt_extensions:)
   - recursive search by relative path or basename (no extension)
 
 Ambiguous basename matches error with the candidate paths so you can
