@@ -143,7 +143,9 @@ All field names come from `pkg/lx/core/types.go`.
 | `Section` | SectionContext |
 | `Global`  | GlobalContext  |
 
-**TreeContext** — bound to `tree_template`: same shape as PromptContext.
+**TreeContext** — bound to `tree_template`: same shape as PromptContext, but
+`Body` holds the rendered tree text (for PromptContext, `Body` holds the
+injected prompt string).
 
 **HeaderContext / FooterContext** — bound to `output_header_template` /
 `output_footer_template`: a single field `Global` (GlobalContext).
