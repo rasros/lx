@@ -68,5 +68,5 @@ unset _lx_demo_dir
 # the whole screen in a single frame. Terminal clipboard flag (-c) still works
 # because clipboard writes bypass stdout.
 lx() {
-	command lx "$@" | awk '{ print; fflush(); system("sleep 0.03") }'
+	command lx "$@" | awk '{ print; fflush(); system("sleep 0.02") }'
 }
