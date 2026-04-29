@@ -202,8 +202,15 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 				rawPath := op.Value
 				isForced := op.Action == "file"
 
+				forceExpand := false
+				if rewritten, ok := lx.RewriteRepoURL(rawPath); ok {
+					slog.Debug("Rewrote repo URL to archive", "from", rawPath, "to", rewritten)
+					rawPath = rewritten
+					forceExpand = true
+				}
+
 				if lx.IsHTTPURL(rawPath) {
-					if section.RunCfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
+					if (section.RunCfg.ExpandArchives || forceExpand) && lx.IsHTTPArchiveURL(rawPath) {
 						if !isForced && !lx.IsKept(rawPath, nil, section.Excludes) {
 							slog.Debug("Skipping URL archive due to exclude filter", "url", rawPath)
 							continue
