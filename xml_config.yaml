@@ -1,13 +1,19 @@
-# lx XML Configuration
+# lx XML Configuration (Claude-friendly)
 # -----------------------------------------------------------------------------
 # File Templates
 # -----------------------------------------------------------------------------
+
+# Note: this profile does NOT define `file_header_template` because the XML
+# file_*_templates below don't reference {{ template "file_header" . }}. If you
+# add a custom template that uses the partial, define `file_header_template`
+# here too — otherwise template parsing will fail.
 
 # Indentation Fix:
 # The line containing {{ .Content }} is indented by exactly 2 spaces.
 # Since we use "|2-", 2 spaces - 2 spaces (base) = 0 spaces in the final string.
 # This matches the Go default exactly.
 
+# Renders standard file content
 file_content_template: |2-
     <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}"{{ if .SkeletonMode }} skeleton="{{ .SkeletonMode }}"{{ end }}>
       <source>{{ .Path }}</source>
@@ -15,18 +21,21 @@ file_content_template: |2-
   {{ .Content | endNewline }}    </document_content>
     </document>
 
+# Renders when a file cannot be read
 file_error_template: |2-
     <document index="{{ .FileIndex }}">
       <source>{{ .Path }}</source>
       <error>{{ .ReadError }}</error>
     </document>
 
+# Renders when a binary file is detected
 file_binary_template: |2-
     <document index="{{ .FileIndex }}">
       <source>{{ .Path }}</source>
       <error>Binary file ({{ .Size | humanize }})</error>
     </document>
 
+# Renders when in compact mode (-n 0)
 file_compact_template: |2-
     <document index="{{ .FileIndex }}">
       <source>{{ .Path }}</source>
@@ -34,28 +43,31 @@ file_compact_template: |2-
     </document>
 
 # -----------------------------------------------------------------------------
-# Section Wrappers
+# Item Templates
 # -----------------------------------------------------------------------------
 
-section_header_template: "{{ if .IsImplicit }}<content>\n{{ end }}"
-
+# Separator between files/groups (XML wraps groups in <section>)
 section_template: |-
   {{- if not .IsImplicit }}<section>
     <section_name>{{ .Body }}</section_name>{{ end }}
 
-section_footer_template: "\n{{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}"
-
-# -----------------------------------------------------------------------------
-# Other
-# -----------------------------------------------------------------------------
-
+# Custom prompts (-p / -P)
 prompt_template: |2-
     <instruction>
   {{ .Body | endNewline }}  </instruction>
 
+# Tree output (-t / -T)
 tree_template: |2-
     <tree>
   {{ .Body | endNewline }}  </tree>
+
+# -----------------------------------------------------------------------------
+# Global & Wrapper Templates
+# -----------------------------------------------------------------------------
+
+# XML wraps everything either in <content> (no -s) or <section> (with -s).
+section_header_template: "{{ if .IsImplicit }}<content>\n{{ end }}"
+section_footer_template: "\n{{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}"
 
 output_header_template: ""
 output_footer_template: "\n\n"
@@ -65,8 +77,29 @@ stats_template: |
   Size: {{ .Global.TotalWrittenBytes | humanize }}
   Est. Tokens: {{ .Global.TokenEstimate }}
 
+# -----------------------------------------------------------------------------
+# Options
+# -----------------------------------------------------------------------------
+
+# Where to send rendered output by default. CLI flags (-c, -C, -o) override.
+# values: stdout | copy
 output_mode: "stdout"
+
+# When to print the file/token summary footer. CLI: --stats / --no-stats / -q.
+# values: auto | always | never
 show_stats: "auto"
+
+# Default log level. CLI: -v, -vv, --verbose=<level>, -q.
+# values: debug | info | warn | error | silent  (or numeric 0|1|2+)
 verbosity: "warn"
 
+# Output format. CLI: --md, --xml, --html, --bare.
+# values: markdown | xml | html | bare
 output_format: "xml"
+
+# Directory containing reusable prompts loaded by -P/--prompt-file.
+# Override at runtime with --prompts-dir or $LX_PROMPTS_DIR.
+# prompts_dir: "~/.config/lx/prompts"
+
+# Extensions probed by -P when resolving "<value>" against prompts_dir.
+# prompt_extensions: [".md", ".txt", ".prompt"]
