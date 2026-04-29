@@ -197,7 +197,6 @@ func makeFuncs() template.FuncMap {
 					trimmed := strings.TrimLeft(line, " \t")
 					relIndent := line[:len(line)-len(trimmed)]
 					if relIndent != "" {
-						// Indented line: render individually preserving its indent.
 						if !firstBlock {
 							out.WriteString("\n")
 						}
@@ -209,8 +208,6 @@ func makeFuncs() template.FuncMap {
 						firstBlock = false
 						j++
 					} else {
-						// Non-indented: collect a run of consecutive non-indented
-						// lines and reflow them as one prose block.
 						var words []string
 						for j < len(lines) {
 							l := lines[j]

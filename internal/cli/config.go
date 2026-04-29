@@ -11,23 +11,19 @@ import (
 )
 
 type CliConfig struct {
-	// File-level Templates
 	FileContentTemplate string `yaml:"file_content_template"`
 	FileErrorTemplate   string `yaml:"file_error_template"`
 	FileBinaryTemplate  string `yaml:"file_binary_template"`
 	FileCompactTemplate string `yaml:"file_compact_template"`
 	FileHeaderTemplate  string `yaml:"file_header_template"`
 
-	// Item-level Templates
 	SectionTemplate string `yaml:"section_template"`
 	PromptTemplate  string `yaml:"prompt_template"`
 	TreeTemplate    string `yaml:"tree_template"`
 
-	// Group/Wrapper Templates
 	SectionHeaderTemplate string `yaml:"section_header_template"`
 	SectionFooterTemplate string `yaml:"section_footer_template"`
 
-	// Global Output Templates
 	OutputHeaderTemplate string `yaml:"output_header_template"`
 	OutputFooterTemplate string `yaml:"output_footer_template"`
 	StatsTemplate        string `yaml:"stats_template"`

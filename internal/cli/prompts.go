@@ -122,8 +122,6 @@ func (r *promptResolver) searchLib(libDir, value string) ([]string, error) {
 			return nil
 		}
 		if d.IsDir() {
-			// Skip dotfiles (e.g. .git) and node_modules so a prompts library
-			// cohabiting with other tooling stays cheap to scan.
 			name := d.Name()
 			if path != libDir && (strings.HasPrefix(name, ".") || name == "node_modules") {
 				return fs.SkipDir
