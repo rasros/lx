@@ -436,22 +436,23 @@ Example:
 		Usage:     "Load a prompt by name from the prompts library, or from a path",
 		Long: `Load a prompt from a file and inject it into the output stream.
 
-The value is resolved in this order:
-  1. Path-like inputs (absolute, ~, ./, ../) are read directly from disk.
-  2. <prompts-dir>/<value> if it exists.
-  3. <prompts-dir>/<value>.md, .txt, .prompt (configurable).
-  4. Recursive search of <prompts-dir>: any file whose relative path or
-     basename (without extension) equals the value. If multiple files match,
-     lx errors and lists them so you can disambiguate with a longer path.
+Value resolution (first match wins):
+  - path-like input (absolute, ~, ./, ../) is read directly from disk
+  - <prompts-dir>/<value> if it exists
+  - <prompts-dir>/<value>.md|.txt|.prompt (configurable)
+  - recursive search by relative path or basename (no extension)
 
-The prompts library directory resolves in this order:
-  1. --prompts-dir <path>
-  2. $LX_PROMPTS_DIR
-  3. prompts_dir: in the loaded config
-  4. ~/.config/lx/prompts
+Ambiguous basename matches error with the candidate paths so you can
+disambiguate using a longer relative path (e.g. "go/test").
 
-The flag can be repeated to stack multiple prompts. Use --list-prompts to
-see every prompt in the configured library.
+Library directory (first match wins):
+  - --prompts-dir <path>
+  - $LX_PROMPTS_DIR
+  - prompts_dir: in the loaded config
+  - ~/.config/lx/prompts
+
+Repeat -P to stack multiple prompts. See --list-prompts to enumerate
+the configured library.
 
 Examples:
   lx -P go/test src/foo.go -c
