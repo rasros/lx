@@ -1,0 +1,17 @@
+--- STDOUT ---
+<content>
+  <instruction>
+Write table-driven tests for the Greeter type.
+  </instruction>
+
+  <document index="1" language="go" rows="2">
+    <source>main.go</source>
+    <document_content>
+package main
+func main() {}
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---
