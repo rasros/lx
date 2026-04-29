@@ -94,24 +94,24 @@ func (r *promptResolver) resolve(value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	switch len(matches) {
-	case 1:
-		return matches[0], nil
-	case 0:
+	if len(matches) == 0 {
 		all, _ := r.listLib(libDir)
 		return "", fmt.Errorf("prompt %q not found in %s%s", value, libDir, suggestList(all))
-	default:
-		rels := make([]string, 0, len(matches))
-		for _, m := range matches {
-			if rel, err := filepath.Rel(libDir, m); err == nil {
-				rels = append(rels, rel)
-			} else {
-				rels = append(rels, m)
-			}
-		}
-		sort.Strings(rels)
-		return "", fmt.Errorf("prompt %q is ambiguous in %s; candidates:\n  %s", value, libDir, strings.Join(rels, "\n  "))
 	}
+	shallowest := pickShallowest(libDir, matches)
+	if len(shallowest) == 1 {
+		return shallowest[0], nil
+	}
+	rels := make([]string, 0, len(shallowest))
+	for _, m := range shallowest {
+		if rel, err := filepath.Rel(libDir, m); err == nil {
+			rels = append(rels, filepath.ToSlash(rel))
+		} else {
+			rels = append(rels, m)
+		}
+	}
+	sort.Strings(rels)
+	return "", fmt.Errorf("prompt %q is ambiguous in %s; candidates:\n  %s", value, libDir, strings.Join(rels, "\n  "))
 }
 
 func (r *promptResolver) searchLib(libDir, value string) ([]string, error) {
@@ -149,6 +149,32 @@ func (r *promptResolver) searchLib(libDir, value string) ([]string, error) {
 		return nil
 	})
 	return matches, err
+}
+
+func pickShallowest(libDir string, matches []string) []string {
+	if len(matches) <= 1 {
+		return matches
+	}
+	minDepth := -1
+	depths := make([]int, len(matches))
+	for i, m := range matches {
+		rel, err := filepath.Rel(libDir, m)
+		if err != nil {
+			rel = m
+		}
+		d := strings.Count(filepath.ToSlash(rel), "/")
+		depths[i] = d
+		if minDepth == -1 || d < minDepth {
+			minDepth = d
+		}
+	}
+	out := matches[:0:0]
+	for i, m := range matches {
+		if depths[i] == minDepth {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 func (r *promptResolver) listLib(libDir string) ([]string, error) {

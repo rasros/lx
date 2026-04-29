@@ -2,8 +2,13 @@
 
 
 --- STDERR ---
+  a/dup.md
+  area/note.md
+  area/sub/note.md
+  b/dup.md
   go/test.md
   plan.txt
   refactor.md
+  test.md
 CLI Error: prompt "missing" not found in /ROOT/prompts
 available prompts:
