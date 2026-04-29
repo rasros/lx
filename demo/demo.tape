@@ -21,76 +21,75 @@ Sleep 400ms
 Ctrl+L
 Show
 
-# 1. Basic bundle: walk the cwd, emit Markdown for an LLM.
+
 Type "# Bundle current dir as Markdown."
 Enter
-Sleep 400ms
+Sleep 300ms
 Type "lx"
-Sleep 400ms
+Sleep 300ms
 Enter
-Sleep 4s
+Sleep 2s
 
-Set PlaybackSpeed 0.0
-# 2. Tree view of the project structure.
-Ctrl+L
-Type "# Just the file tree."
-Enter
-Sleep 400ms
-Type "lx -t"
-Sleep 400ms
-Enter
-Sleep 3.5s
 
-# 3. Code skeleton — signatures only, no bodies.
 Ctrl+L
-Type "# Function signatures and types only with *.go filter."
-Enter
-Sleep 400ms
-Type "lx -Y -i '*.go' src/"
-Sleep 400ms
-Enter
-Sleep 4s
-
-Set PlaybackSpeed 1.0
-# 4. XML output for Claude-style prompts.
-Ctrl+L
-Type "# XML output — Claude prefers this structure."
-Enter
-Sleep 400ms
-Type "lx --xml src/"
-Sleep 400ms
-Enter
-Sleep 4s
-
-# 5. Mix sections: tree of the repo, then only Go files with line numbers.
-Ctrl+L
-Type "# Two sections in one command: tree first, then -l numbered Go files."
-Enter
-Sleep 400ms
-Type "lx -s 'Tree overview' -t . -s Code -l -i '*.go' src/"
-Sleep 400ms
-Enter
-Sleep 3.5s
-
-# 6. Reusable prompts from a directory ($LX_PROMPTS_DIR).
-Ctrl+L
-Type "# -P loads a prompt from your library ($LX_PROMPTS_DIR)."
-Enter
-Sleep 400ms
-Type "# It resolves go/test -> prompts/go/test.md and prepends it to the bundle."
-Enter
-Sleep 400ms
-Type "lx -P go/test src/"
-Sleep 400ms
-Enter
-Sleep 3.5s
-
-# 7. Pipe-friendly: copy straight to clipboard for LLM paste.
-Ctrl+L
-Type "# -c copies the rendered bundle straight to the system clipboard."
+Type "# -c copies straight to the system clipboard."
 Enter
 Sleep 400ms
 Type "lx -c"
 Sleep 400ms
 Enter
-Sleep 4s
+Sleep 2.5s
+
+
+Ctrl+L
+Type "# Just the file tree."
+Enter
+Sleep 300ms
+Type "lx -t"
+Sleep 300ms
+Enter
+Sleep 2.5s
+
+
+Ctrl+L
+Type "# Function signatures and types of go files."
+Enter
+Sleep 300ms
+Type "lx -Y -i '*.go' src/"
+Sleep 300ms
+Enter
+Sleep 3s
+
+
+Ctrl+L
+Type "# XML output for Claude-style prompts."
+Enter
+Sleep 400ms
+Type "lx --xml src/"
+Sleep 400ms
+Enter
+Sleep 3s
+
+
+Ctrl+L
+Type "# Two sections in one command:"
+Enter
+Type "# Tree first, then -l numbered Go files."
+Enter
+Sleep 400ms
+Type "lx -s 'Tree overview' -t . -s Code -l -i '*.go' src/"
+Sleep 400ms
+Enter
+Sleep 3s
+
+
+Ctrl+L
+Type "# -P loads a prompt from your library ($LX_PROMPTS_DIR)."
+Enter
+Type "# It resolves go/test -> prompts/go/test.md and prepends."
+Enter
+Sleep 400ms
+Type "lx -P go/test src/"
+Sleep 400ms
+Enter
+Sleep 3s
