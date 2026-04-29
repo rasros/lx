@@ -71,7 +71,7 @@ unset _lx_demo_dir
 lx() {
 	for a in "$@"; do
 		case "$a" in
-			-t|-Y|-u) command lx "$@"; return ;;
+			-t|-Y|-u|-c) command lx "$@"; return ;;
 		esac
 	done
 	command lx "$@" | awk '{ print; fflush(); system("sleep 0.02") }'
