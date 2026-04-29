@@ -111,6 +111,22 @@ Prepend a custom instruction before the code context:
 lx -p "Refactor the following code to use contexts:" main.go
 ```
 
+### Prompt library
+Reuse curated prompts from a directory (default `~/.config/lx/prompts`,
+override with `--prompts-dir` or `$LX_PROMPTS_DIR`). See
+[rasros/prompts](https://github.com/rasros/prompts) for an example library.
+Lookup works by relative path, basename, or any path-like value:
+```bash
+export LX_PROMPTS_DIR=~/Workspaces/prompts
+lx -P go/test src/foo.go -c          # nested by language/task
+lx -P refactor src/                  # unambiguous basename
+lx -P plan -P comments docs/ src/    # stack multiple prompts
+lx --list-prompts                    # list everything in the library
+```
+Resolution order: literal path (if it looks like one) → `<libdir>/<value>` →
+`<libdir>/<value>.{md,txt,prompt}` → recursive search by relative path or
+basename. Ambiguous matches error with the candidate paths.
+
 ### Custom sections
 Add custom headers to group specific files (also adjusts XML output):
 ```bash

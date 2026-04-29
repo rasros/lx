@@ -139,7 +139,10 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
        $ lx --xml -i "*.js" -e "*test*" .
 
   4. {{ "Prompt Injection" | underline }}
-     Load a prompt from a file, add a separator, then the source code:
+     Load a prompt by name from your prompts library (set via $LX_PROMPTS_DIR
+     or --prompts-dir), then attach the source code:
+       $ lx -P go/test src/ -c
+     Or inline a literal prompt with -p:
        $ lx -p "$(cat prompt.txt)" -s "Context" src/ -c
 
   5. {{ "Search Integration" | underline }}
