@@ -89,3 +89,21 @@ func TestStream_Prepare_Counts(t *testing.T) {
 		t.Errorf("TotalSize = %d, want 6", g.TotalSize)
 	}
 }
+
+func TestStream_TotalRows_AfterExecute(t *testing.T) {
+	cfg := core.NewConfig()
+	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1, Tail: -1})
+
+	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("one\ntwo\nthree")))
+	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("alpha\nbeta")))
+
+	var buf strings.Builder
+	if err := stream.Execute(context.Background(), &buf); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	g := stream.GetGlobalContext()
+	if g.TotalRows != 5 {
+		t.Errorf("TotalRows = %d, want 5", g.TotalRows)
+	}
+}

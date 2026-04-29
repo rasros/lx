@@ -10,6 +10,7 @@ type GlobalContext struct {
 	TotalFiles        int
 	TotalSize         int64
 	TotalWrittenBytes int64
+	TotalRows         int64
 	TokenEstimate     int64
 	TotalSections     int
 	WorkDir           string
@@ -131,7 +132,8 @@ type FooterContext struct {
 
 // StatsContext represents the data provided to the statistics summary template.
 type StatsContext struct {
-	Global GlobalContext
+	Global       GlobalContext
+	ColorEnabled bool
 }
 
 // TokenCounter estimates token count from content.

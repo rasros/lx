@@ -241,9 +241,28 @@ const defaultBareSection = ``
 const defaultBarePrompt = ``
 const defaultBareTree = ``
 
-const defaultStatsTemplate = `Files: {{ .Global.TotalFiles }}` + "\n" +
-	`Size: {{ .Global.TotalWrittenBytes | humanize }}` + "\n" +
-	`Est. Tokens: {{ .Global.TokenEstimate }}` + "\n"
+const (
+	ansiReset  = "\x1b[0m"
+	ansiBold   = "\x1b[1m"
+	ansiDim    = "\x1b[2m"
+	ansiCyan   = "\x1b[36m"
+	ansiGreen  = "\x1b[32m"
+	ansiYellow = "\x1b[33m"
+	ansiRed    = "\x1b[31m"
+)
+
+// 128k matches GPT-4o context, 200k matches Claude Opus.
+const (
+	tokenWarnThreshold   int64 = 128_000
+	tokenDangerThreshold int64 = 200_000
+)
+
+const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
+	`{{ commafy .Global.TotalFiles }} {{ plural .Global.TotalFiles "file" "files" }} {{ dim .ColorEnabled "·" }} ` +
+	`{{ commafy .Global.TotalRows }} {{ plural .Global.TotalRows "row" "rows" }} {{ dim .ColorEnabled "·" }} ` +
+	`{{ commafy .Global.TotalSections }} {{ plural .Global.TotalSections "section" "sections" }} {{ dim .ColorEnabled "·" }} ` +
+	`{{ humanize .Global.TotalSize }}` + "\n" +
+	`  {{ tokenLabel .Global.TokenEstimate .ColorEnabled }}` + "\n"
 
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
@@ -305,7 +324,88 @@ func templateFuncs() template.FuncMap {
 			}
 			return fmt.Sprintf("%v", s)
 		},
+		"commafy": func(n interface{}) string {
+			v, ok := asInt64(n)
+			if !ok {
+				return fmt.Sprintf("%v", n)
+			}
+			return commafy(v)
+		},
+		"plural": func(n interface{}, singular, plural string) string {
+			if v, ok := asInt64(n); ok && v == 1 {
+				return singular
+			}
+			return plural
+		},
+		"accent": func(enabled bool, s string) string {
+			if !enabled {
+				return s
+			}
+			return ansiCyan + s + ansiReset
+		},
+		"dim": func(enabled bool, s string) string {
+			if !enabled {
+				return s
+			}
+			return ansiDim + s + ansiReset
+		},
+		"tokenLabel": func(n int64, enabled bool) string {
+			label := fmt.Sprintf("~%s tokens", commafy(n))
+			if !enabled {
+				return label
+			}
+			color := ansiGreen
+			switch {
+			case n >= tokenDangerThreshold:
+				color = ansiRed
+			case n >= tokenWarnThreshold:
+				color = ansiYellow
+			}
+			return color + ansiBold + label + ansiReset
+		},
 	}
+}
+
+func asInt64(n interface{}) (int64, bool) {
+	switch x := n.(type) {
+	case int:
+		return int64(x), true
+	case int32:
+		return int64(x), true
+	case int64:
+		return x, true
+	}
+	return 0, false
+}
+
+func commafy(v int64) string {
+	neg := v < 0
+	if neg {
+		v = -v
+	}
+	s := fmt.Sprintf("%d", v)
+	if len(s) <= 3 {
+		if neg {
+			return "-" + s
+		}
+		return s
+	}
+	var b strings.Builder
+	pre := len(s) % 3
+	if pre > 0 {
+		b.WriteString(s[:pre])
+		b.WriteByte(',')
+	}
+	for i := pre; i < len(s); i += 3 {
+		b.WriteString(s[i : i+3])
+		if i+3 < len(s) {
+			b.WriteByte(',')
+		}
+	}
+	if neg {
+		return "-" + b.String()
+	}
+	return b.String()
 }
 
 // TemplateFuncs exposes the default template function map.

@@ -178,7 +178,8 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	if err := s.engine.OutputHeader.Execute(counter, core.HeaderContext{Global: global}); err != nil {
 		return err
 	}
-	if err := s.executePipeline(ctx, counter, global); err != nil {
+	totalRows, err := s.executePipeline(ctx, counter, global)
+	if err != nil {
 		return err
 	}
 	if err := s.engine.OutputFooter.Execute(counter, core.FooterContext{Global: global}); err != nil {
@@ -186,6 +187,7 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	}
 
 	global.TotalWrittenBytes = counter.count
+	global.TotalRows = totalRows
 	global.TokenEstimate = s.tokenizer.Estimate(counter.count, nil)
 	s.finalStats = &global
 	return nil

@@ -22,7 +22,7 @@ var readPool = sync.Pool{New: func() interface{} {
 	return &b
 }}
 
-func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global core.GlobalContext) error {
+func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global core.GlobalContext) (int64, error) {
 	numWorkers := s.concurrency
 	jobsCh := make(chan seqJob, numWorkers)
 	resultsCh := make(chan render.Result, numWorkers)
@@ -60,6 +60,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					Index:        j.seqID,
 					Buffer:       buf,
 					Stats:        localCounter.count,
+					Rows:         proc.LastRows(),
 					IsCompact:    proc.LastWasCompact(),
 					Err:          err,
 					SectionIndex: j.item.Section.Index,
@@ -91,11 +92,13 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 
 	nextSeq := 0
 	buffer := make(map[int]render.Result)
+	var totalRows int64
 
 	for res := range resultsCh {
 		if res.Err != nil {
-			return res.Err
+			return totalRows, res.Err
 		}
+		totalRows += int64(res.Rows)
 		buffer[res.Index] = res
 
 		for {
@@ -104,14 +107,14 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				break
 			}
 			if err := layout.WriteItem(next); err != nil {
-				return err
+				return totalRows, err
 			}
 			bufferPool.Put(next.Buffer)
 			delete(buffer, nextSeq)
 			nextSeq++
 		}
 	}
-	return nil
+	return totalRows, nil
 }
 
 type byteCounter struct {
