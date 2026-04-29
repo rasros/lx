@@ -22,34 +22,36 @@ Ctrl+L
 Show
 
 # 1. Basic bundle: walk the cwd, emit Markdown for an LLM.
-Type "# Bundle the current directory as Markdown."
+Type "# Bundle current dir as Markdown."
 Enter
 Sleep 400ms
 Type "lx"
 Sleep 400ms
 Enter
-Sleep 3s
+Sleep 4s
 
+Set PlaybackSpeed 0.0
 # 2. Tree view of the project structure.
 Ctrl+L
-Type "# Just the file tree — useful as a project overview."
+Type "# Just the file tree."
 Enter
 Sleep 400ms
 Type "lx -t"
 Sleep 400ms
 Enter
-Sleep 2.8s
+Sleep 3.5s
 
 # 3. Code skeleton — signatures only, no bodies.
 Ctrl+L
-Type "# Signatures and types only (skeleton mode), great for big repos."
+Type "# Function signatures and types only with *.go filter."
 Enter
 Sleep 400ms
 Type "lx -Y -i '*.go' src/"
 Sleep 400ms
 Enter
-Sleep 3s
+Sleep 4s
 
+Set PlaybackSpeed 1.0
 # 4. XML output for Claude-style prompts.
 Ctrl+L
 Type "# XML output — Claude prefers this structure."
@@ -58,7 +60,7 @@ Sleep 400ms
 Type "lx --xml src/"
 Sleep 400ms
 Enter
-Sleep 3s
+Sleep 4s
 
 # 5. Mix sections: tree of the repo, then only Go files with line numbers.
 Ctrl+L
@@ -68,7 +70,7 @@ Sleep 400ms
 Type "lx -s 'Tree overview' -t . -s Code -l -i '*.go' src/"
 Sleep 400ms
 Enter
-Sleep 2.8s
+Sleep 3.5s
 
 # 6. Reusable prompts from a directory ($LX_PROMPTS_DIR).
 Ctrl+L
@@ -81,7 +83,7 @@ Sleep 400ms
 Type "lx -P go/test src/"
 Sleep 400ms
 Enter
-Sleep 2.8s
+Sleep 3.5s
 
 # 7. Pipe-friendly: copy straight to clipboard for LLM paste.
 Ctrl+L
@@ -91,4 +93,4 @@ Sleep 400ms
 Type "lx -c"
 Sleep 400ms
 Enter
-Sleep 3s
+Sleep 4s
