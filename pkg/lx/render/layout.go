@@ -13,6 +13,7 @@ type Result struct {
 	Index        int
 	Buffer       *bytes.Buffer
 	Stats        int64
+	Rows         int
 	IsCompact    bool
 	Err          error
 	SectionIndex int

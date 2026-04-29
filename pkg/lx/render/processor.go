@@ -32,6 +32,7 @@ type Processor struct {
 	tokenCounter   core.TokenCounter
 	onFileError    FileErrorHandler
 	lastWasCompact bool
+	lastRows       int
 	format         string
 }
 
@@ -62,6 +63,8 @@ func (p *Processor) SetTokenCounter(tc core.TokenCounter) {
 
 func (p *Processor) LastWasCompact() bool { return p.lastWasCompact }
 
+func (p *Processor) LastRows() int { return p.lastRows }
+
 // RenderPrepared processes one item containing pre-calculated section and indices.
 func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []byte) error {
 	var isCompact bool
@@ -69,6 +72,7 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 	var ctx interface{}
 	var templateToUse *template.Template
 
+	p.lastRows = 0
 	switch v := item.Raw.(type) {
 	case sources.InputFile:
 		var fCtx core.FileContext
@@ -80,6 +84,7 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 		fCtx.SectionFileIndex = item.FileIndexSection
 
 		isCompact = fCtx.IsCompactView
+		p.lastRows = fCtx.TotalRows
 		ctx = &fCtx
 
 		if fCtx.IsError {

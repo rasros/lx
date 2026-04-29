@@ -552,12 +552,45 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 
 	if show {
 		err := stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
-			Global: stream.GetGlobalContext(),
+			Global:       stream.GetGlobalContext(),
+			ColorEnabled: shouldColorStats(debugOut),
 		})
 		if err != nil {
 			slog.Error("Failed to render stats", "error", err)
 		}
 	}
+}
+
+// shouldColorStats honors NO_COLOR / CLICOLOR / FORCE_COLOR / TERM so AI agents
+// and CI runners that capture stdout/stderr through pipes get clean output.
+func shouldColorStats(w io.Writer) bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	if os.Getenv("CLICOLOR") == "0" {
+		return false
+	}
+	term := os.Getenv("TERM")
+	if term == "" || term == "dumb" {
+		return false
+	}
+	if os.Getenv("CLICOLOR_FORCE") != "" || os.Getenv("FORCE_COLOR") != "" {
+		return true
+	}
+	var f *os.File
+	switch w {
+	case os.Stderr:
+		f = os.Stderr
+	case os.Stdout:
+		f = os.Stdout
+	default:
+		return false
+	}
+	stat, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) != 0
 }
 
 func determineLogLevel(parsed *ParsedArgs, configVerbosity string) (slog.Level, error) {

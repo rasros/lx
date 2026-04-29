@@ -8,6 +8,5 @@ func main() {}
 
 
 --- STDERR ---
-Est. Tokens: 15
-Files: 1
-Size: 60 B
+  ~15 tokens
+▎ 1 file · 2 rows · 1 section · 27 B
