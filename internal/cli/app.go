@@ -445,12 +445,10 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			case "prompt-file":
 				path, err := promptResolver.resolve(op.Value)
 				if err != nil {
-					slog.Error("Failed to resolve prompt", "value", op.Value, "error", err)
 					return err
 				}
 				data, err := os.ReadFile(path)
 				if err != nil {
-					slog.Error("Failed to read prompt file", "path", path, "error", err)
 					return fmt.Errorf("read prompt file %s: %w", path, err)
 				}
 				slog.Debug("Adding prompt from file", "path", path, "length", len(data))
