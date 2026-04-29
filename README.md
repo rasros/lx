@@ -51,11 +51,17 @@ instead of full file reads, glob filters to scope a directory in one call.
 It is plain Markdown with YAML frontmatter, so most harnesses can load it
 directly.
 
-Harnesses that support the skill format (Claude Code, OpenCode, and others)
-typically read from a per-user skills directory. Symlink the skill there:
+Harnesses that support the skill format typically read from a per-user
+skills directory. Symlink the skill there:
 
 ```bash
-ln -s "$(pwd)/skills/lx" <harness-skills-dir>/lx
+# Claude Code
+mkdir -p ~/.claude/skills
+ln -s "$(pwd)/skills/lx" ~/.claude/skills/lx
+
+# OpenCode
+mkdir -p ~/.config/opencode/skills
+ln -s "$(pwd)/skills/lx" ~/.config/opencode/skills/lx
 ```
 
 Harnesses that read a project-level rules file instead (AGENTS.md,
