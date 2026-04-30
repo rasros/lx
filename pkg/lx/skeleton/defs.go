@@ -171,8 +171,8 @@ var langDefs = map[string]langDef{
 
 	"zig": {
 		newLang:       grammars.ZigLanguage,
-		funcTypes:     []string{"Decl"},
-		bodyChildType: "Block",
+		funcTypes:     []string{"function_declaration"},
+		bodyChildType: "block",
 		funcVisible:   langs.ZigFuncVisible,
 	},
 

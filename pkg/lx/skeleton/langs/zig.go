@@ -5,9 +5,8 @@ import (
 )
 
 func ZigFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	start := int(n.StartByte())
-	if start < 4 {
+	if n.ChildCount() == 0 {
 		return false
 	}
-	return string(src[start-4:start]) == "pub "
+	return n.Child(0).Type(lang) == "pub"
 }
