@@ -60,6 +60,7 @@ Refactor for readability without changing behavior.
 EOF
 
 export LX_PROMPTS_DIR="$_lx_demo_dir/prompts"
+export NO_COLOR=1
 
 cd "$_lx_demo_dir"
 unset _lx_demo_dir
