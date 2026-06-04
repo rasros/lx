@@ -204,9 +204,11 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	cfg := file.Config
 
 	var skeletonMode string
+	originalRows := -1
 	if !isBinary && !isImage && (cfg.SkeletonFunctions || cfg.SkeletonTypes) && skeleton.Supported(lang) {
 		allData := make([]byte, size)
 		if _, err := reader.ReadAt(allData, 0); err == nil {
+			originalRows = internal.CountLines(allData)
 			filtered := skeleton.Extract(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes)
 			reader = bytes.NewReader(filtered)
 			size = int64(len(filtered))
@@ -227,6 +229,13 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
 	totalRows, exact, _ := internal.EstimateLineCount(reader, size, scratch)
+
+	// In skeleton mode the header should report the original file's row
+	// count, not the filtered output's; slicing still uses totalRows.
+	displayRows, displayExact := totalRows, exact
+	if originalRows >= 0 {
+		displayRows, displayExact = originalRows, true
+	}
 
 	var contentData interface{}
 	if !isBinary && !isCompact && size > 0 && !isImage {
@@ -256,8 +265,8 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		Path:          file.Path,
 		AbsPath:       file.AbsPath,
 		Size:          size,
-		TotalRows:     totalRows,
-		IsEstimate:    !exact,
+		TotalRows:     displayRows,
+		IsEstimate:    !displayExact,
 		Language:      lang,
 		Content:       contentData,
 		TokenEstimate: p.tokenCounter(size, contentData),

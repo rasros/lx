@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.cpp (13 rows, definitions)
+skeleton/main.cpp (24 rows, definitions)
 ---
 ```cpp
 // UI widget with a single integer value.

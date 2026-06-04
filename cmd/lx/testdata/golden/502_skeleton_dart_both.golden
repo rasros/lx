@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.dart (15 rows, definitions)
+skeleton/main.dart (30 rows, definitions)
 ---
 ```dart
 /// An animal with a name and species.

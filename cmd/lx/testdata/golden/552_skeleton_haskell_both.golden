@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.hs (11 rows, definitions)
+skeleton/main.hs (20 rows, definitions)
 ---
 ```haskell
 -- | Animals supported by the system.

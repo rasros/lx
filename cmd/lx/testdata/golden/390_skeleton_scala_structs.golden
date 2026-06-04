@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.scala (16 rows, type definitions)
+skeleton/main.scala (37 rows, type definitions)
 ---
 ```scala
 /** Geometric shape abstraction. */

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.go (8 rows, function signatures)
+skeleton/main.go (32 rows, function signatures)
 ---
 ```go
 // NewPerson creates a Person with the given name.

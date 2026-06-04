@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.php (23 rows, definitions)
+skeleton/main.php (41 rows, definitions)
 ---
 ```php
 /** Geometric shape contract. */

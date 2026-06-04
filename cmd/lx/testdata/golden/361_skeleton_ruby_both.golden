@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.rb (14 rows, definitions)
+skeleton/main.rb (37 rows, definitions)
 ---
 ```ruby
 # Animal with a name and a maximum count.

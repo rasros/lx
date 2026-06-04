@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.groovy (13 rows, definitions)
+skeleton/main.groovy (27 rows, definitions)
 ---
 ```groovy
 /** Animal with name and species. */

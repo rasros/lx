@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.kt (29 rows, definitions)
+skeleton/main.kt (47 rows, definitions)
 ---
 ```kotlin
 /** Immutable 2-D point. */

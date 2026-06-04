@@ -1,5 +1,5 @@
 --- STDOUT ---
-[1/2] skeleton/main.py (11 rows, definitions)
+[1/2] skeleton/main.py (31 rows, definitions)
 ---
 ```python
 class Animal:
@@ -15,7 +15,7 @@ def create(
 ) -> "Animal":
 ```
 
-[2/2] skeleton/main.py (6 rows, function signatures)
+[2/2] skeleton/main.py (31 rows, function signatures)
 ---
 ```python
 def top_level():

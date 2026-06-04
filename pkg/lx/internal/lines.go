@@ -68,7 +68,7 @@ func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
 	}
 
 	if len(lnf.Tail) > 0 {
-		tailCount := countLines(lnf.Tail)
+		tailCount := CountLines(lnf.Tail)
 		startRow := lnf.TotalRows - tailCount + 1
 		if startRow < 1 {
 			startRow = 1
@@ -88,7 +88,7 @@ func EstimateLineCount(r io.ReaderAt, fileSize int64, buf []byte) (int, bool, er
 	}
 
 	if int64(n) >= fileSize {
-		return countLines(buf[:n]), true, nil
+		return CountLines(buf[:n]), true, nil
 	}
 
 	newlineCount := bytes.Count(buf[:n], []byte("\n"))
@@ -213,7 +213,7 @@ func AppendLine(out []byte, lines [][]byte, row int) []byte {
 	return out
 }
 
-func countLines(data []byte) int {
+func CountLines(data []byte) int {
 	if len(data) == 0 {
 		return 0
 	}

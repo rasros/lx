@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.js (15 rows, definitions)
+skeleton/main.js (27 rows, definitions)
 ---
 ```javascript
 /** A simple greeter class. */

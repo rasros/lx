@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.rs (25 rows, definitions)
+skeleton/main.rs (44 rows, definitions)
 ---
 ```rust
 /// A registered user with a public name.

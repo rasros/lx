@@ -49,7 +49,7 @@ article > header {
 <article id="file-1">
 <header>
  <a href="#file-1" aria-label="Link to this file"><strong>skeleton/main.go</strong></a>
- <small>(16 rows)</small>
+ <small>(32 rows)</small>
 </header>
 <pre><code class="language-go">
 // Person represents a named individual.

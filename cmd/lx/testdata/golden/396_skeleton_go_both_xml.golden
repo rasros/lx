@@ -1,6 +1,6 @@
 --- STDOUT ---
 <content>
-  <document index="1" language="go" rows="16" skeleton="definitions">
+  <document index="1" language="go" rows="32" skeleton="definitions">
     <source>skeleton/main.go</source>
     <document_content>
 // Person represents a named individual.

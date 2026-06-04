@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.swift (12 rows, type definitions)
+skeleton/main.swift (41 rows, type definitions)
 ---
 ```swift
 /// Geometric shape contract.

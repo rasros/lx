@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.zig (7 rows, function signatures)
+skeleton/main.zig (20 rows, function signatures)
 ---
 ```zig
 /// Greet by printing a name.

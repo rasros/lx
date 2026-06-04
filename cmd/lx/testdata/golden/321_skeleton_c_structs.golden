@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.c (5 rows, type definitions)
+skeleton/main.c (21 rows, type definitions)
 ---
 ```c
 /* 2-D point type */

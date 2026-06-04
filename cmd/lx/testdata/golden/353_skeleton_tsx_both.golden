@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.tsx (20 rows, definitions)
+skeleton/main.tsx (38 rows, definitions)
 ---
 ```tsx
 /** Props accepted by Panel. */
