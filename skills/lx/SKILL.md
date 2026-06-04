@@ -1,6 +1,6 @@
 ---
 name: lx
-description: Read many files at once with clear per-file headers so it stays obvious which content came from which path. Ideal for exploring an unfamiliar directory or codebase. Combines glob include/exclude filters, function-and-type skeleton extraction (signatures only, no bodies), and line slicing (head, tail, or head+tail with a gap). Use it instead of issuing one read per file when exploring or comparing across a directory or file set, when only the shape of source code matters rather than the bodies, or when a file is too long to read whole. Output goes to stdout and composes with shell pipelines.
+description: Codebase exploration tool that reads many files or whole directories in a single call, with per-file headers, glob include/exclude filters, function/type skeleton extraction (signatures only, no bodies), and head/tail line slicing.
 ---
 
 # lx for exploration
