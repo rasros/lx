@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.go (16 rows, definitions)
+skeleton/main.go (32 rows, definitions)
 ---
 ```go
  1: // Person represents a named individual.

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.jsx (13 rows, definitions)
+skeleton/main.jsx (24 rows, definitions)
 ---
 ```jsx
 /* Card component with a title. */

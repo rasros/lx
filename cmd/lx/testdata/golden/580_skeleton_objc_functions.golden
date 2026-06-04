@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.m (2 rows, function signatures)
+skeleton/main.m (20 rows, function signatures)
 ---
 ```objectivec
 // Standalone C function.

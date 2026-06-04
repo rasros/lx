@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.cs (10 rows, type definitions)
+skeleton/main.cs (35 rows, type definitions)
 ---
 ```csharp
 /// <summary>Geometric shape contract.</summary>

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.ts (24 rows, definitions)
+skeleton/main.ts (45 rows, definitions)
 ---
 ```typescript
 /** Geometric shape contract. */

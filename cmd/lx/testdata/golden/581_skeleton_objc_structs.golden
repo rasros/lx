@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.m (12 rows, type definitions)
+skeleton/main.m (20 rows, type definitions)
 ---
 ```objectivec
 /** Animal with name and species. */

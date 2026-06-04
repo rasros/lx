@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.c (9 rows, function signatures)
+skeleton/main.c (21 rows, function signatures)
 ---
 ```c
 // Add two integers and return the sum.

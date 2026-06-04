@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.ml (19 rows, type definitions)
+skeleton/main.ml (36 rows, type definitions)
 ---
 ```ocaml
 (* Basic animal variants. *)
