@@ -71,8 +71,8 @@ func C() {
 	}
 
 	got := buf.String()
-	if !strings.Contains(got, "(3 rows, function signatures)") {
-		t.Fatalf("expected filtered row count in header, got:\n%s", got)
+	if !strings.Contains(got, "(13 rows, function signatures)") {
+		t.Fatalf("expected original row count in header, got:\n%s", got)
 	}
 	if !strings.Contains(got, "... (1 rows skipped)") {
 		t.Fatalf("expected gap based on filtered rows, got:\n%s", got)
