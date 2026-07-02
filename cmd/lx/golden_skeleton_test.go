@@ -15,6 +15,9 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "311_skeleton_python_structs", args: []string{"-Y", "skeleton/main.py"}},
 		{name: "312_skeleton_python_both", args: []string{"-u", "-Y", "skeleton/main.py"}},
 		{name: "313_skeleton_python_fstring", args: []string{"-u", "-Y", "skeleton/fstring.py"}},
+		{name: "314_skeleton_python_comment_body", args: []string{"-u", "-Y", "skeleton/commentbody.py"}},
+		{name: "315_skeleton_ruby_comment_body", args: []string{"-u", "skeleton/commentbody.rb"}},
+		{name: "316_skeleton_haskell_comment_body", args: []string{"-u", "skeleton/commentbody.hs"}},
 
 		// 320-329: C-family
 		{name: "320_skeleton_c_functions", args: []string{"-u", "skeleton/main.c"}},

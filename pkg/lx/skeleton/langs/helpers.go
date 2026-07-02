@@ -1,6 +1,8 @@
 package langs
 
 import (
+	"strings"
+
 	"github.com/odvcencio/gotreesitter"
 	"github.com/rasros/lx/pkg/lx/internal"
 )
@@ -72,9 +74,32 @@ func EmitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotrees
 
 	endRow := bodyStartRow
 	if indentBody {
-		endRow--
+		endRow = sigEndRow(n, body, lang, startRow)
 	}
 	return internal.AppendLines(out, lines, startRow, endRow)
+}
+
+// sigEndRow returns the last row of n's signature: the greatest end row among
+// n's non-comment children that start before the body. This keeps a comment
+// sitting between the signature and the body (e.g. a Python body whose first
+// line is a comment) from leaking into the emitted signature.
+func sigEndRow(n, body *gotreesitter.Node, lang *gotreesitter.Language, startRow int) int {
+	end := startRow
+	bodyStart := body.StartPoint()
+	for i := 0; i < n.ChildCount(); i++ {
+		c := n.Child(i)
+		cs := c.StartPoint()
+		if cs.Row > bodyStart.Row || (cs.Row == bodyStart.Row && cs.Column >= bodyStart.Column) {
+			continue
+		}
+		if strings.Contains(c.Type(lang), "comment") {
+			continue
+		}
+		if r := int(c.EndPoint().Row); r > end {
+			end = r
+		}
+	}
+	return end
 }
 
 func emitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string) []byte {

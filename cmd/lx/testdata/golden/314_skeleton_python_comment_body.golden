@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/commentbody.py (7 rows, definitions)
+---
+```python
+class Widget:
+    name: str
+    def render(self) -> str:
+```
+
+
+--- STDERR ---

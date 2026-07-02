@@ -1,0 +1,9 @@
+--- STDOUT ---
+skeleton/commentbody.rb (4 rows, function signatures)
+---
+```ruby
+def combine(x, y)
+```
+
+
+--- STDERR ---
