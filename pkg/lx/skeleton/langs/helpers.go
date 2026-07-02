@@ -104,6 +104,31 @@ func emitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotrees
 	return EmitFuncSig(out, lines, n, lang, indentBody, bodyChildType, false)
 }
 
+// EmitDecorators appends the decorator/annotation lines in [fromRow, sigRow-1],
+// i.e. the lines between an outer decorator-inclusive start and the signature.
+func EmitDecorators(out []byte, lines [][]byte, fromRow, sigRow int) []byte {
+	if fromRow < sigRow {
+		return internal.AppendLines(out, lines, fromRow, sigRow-1)
+	}
+	return out
+}
+
+// PrecedingAnnotationRow returns the earliest row of the contiguous
+// decorator/annotation siblings immediately preceding child (at index i in
+// body), or child's own start row when there is none.
+func PrecedingAnnotationRow(body, child *gotreesitter.Node, i int, lang *gotreesitter.Language) int {
+	row := int(child.StartPoint().Row)
+	for j := i - 1; j >= 0; j-- {
+		switch body.Child(j).Type(lang) {
+		case "decorator", "annotation":
+			row = int(body.Child(j).StartPoint().Row)
+		default:
+			return row
+		}
+	}
+	return row
+}
+
 func emitAllLines(out []byte, lines [][]byte, n *gotreesitter.Node) []byte {
 	return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 }

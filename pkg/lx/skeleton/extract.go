@@ -91,6 +91,7 @@ func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines 
 	case functions && containsStr(def.funcTypes, nodeType):
 		if def.funcVisible == nil || def.funcVisible(node, src, lang) {
 			out = prependDoc(out, lines, outerStart)
+			out = langs.EmitDecorators(out, lines, outerStart, int(node.StartPoint().Row))
 			if def.emitFunc != nil {
 				out = def.emitFunc(out, src, lines, node, lang)
 			} else {
@@ -102,6 +103,7 @@ func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines 
 		}
 	case structs && containsStr(def.structTypes, nodeType):
 		out = prependDoc(out, lines, outerStart)
+		out = langs.EmitDecorators(out, lines, outerStart, int(node.StartPoint().Row))
 		out = def.emitStruct(out, src, lines, node, lang, functions)
 	}
 	return out

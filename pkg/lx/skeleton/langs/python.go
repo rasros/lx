@@ -47,11 +47,13 @@ func pyProcessMember(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 			return out
 		}
 		out = EmitLeadingDoc(out, lines, outerStart)
+		out = EmitDecorators(out, lines, outerStart, int(actual.StartPoint().Row))
 		out = emitFuncSig(out, lines, actual, lang, true, "")
 		out = AppendPyDocstring(out, lines, actual, lang)
 		return out
 	case "class_definition":
 		out = EmitLeadingDoc(out, lines, outerStart)
+		out = EmitDecorators(out, lines, outerStart, int(actual.StartPoint().Row))
 		return PyEmitClass(out, src, lines, actual, lang, functions)
 	default:
 		if pyIsClassVar(n, lang) {
