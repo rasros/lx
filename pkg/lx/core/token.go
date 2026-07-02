@@ -137,7 +137,8 @@ func isWS(c byte) bool {
 }
 
 // combine implements: wordRuns + max(0,(wordChars-wordRuns*4)/4)
-//   + 0.55*symbols + 0.30*wsRuns + newlines + 0.50*nonAscii
+//   - 0.55*symbols + 0.30*wsRuns + newlines + 0.50*nonAscii
+//
 // Done in integer arithmetic via *100 / 100.
 func combine(wordRuns, wordChars, symbols, wsRuns, newlines, nonAscii int64) int64 {
 	extraWord := wordChars - wordRuns*4
