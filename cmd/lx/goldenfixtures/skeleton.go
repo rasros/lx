@@ -13,6 +13,7 @@ func SetupSkeletonFixture(t *testing.T) string {
 	languageFiles := []string{
 		"main.go",
 		"main.py",
+		"fstring.py",
 		"main.c",
 		"main.cpp",
 		"Main.java",
