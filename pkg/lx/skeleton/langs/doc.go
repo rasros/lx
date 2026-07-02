@@ -122,10 +122,7 @@ func isDocCommentLine(line []byte) bool {
 	case hasPrefix(s, "(*"), hasPrefix(s, "*)"):
 		return true
 	case hasPrefix(s, "=begin"):
-		// A lone "=begin" line is the opener of a Ruby block comment; the
-		// "=end" closer is handled by blockCommentClosers so the whole block
-		// is walked as a unit. (=end must NOT match here, or the block scan
-		// would consume it and stop before reaching =begin.)
+		// =end is handled by blockCommentClosers, not here.
 		return true
 	}
 	return false
