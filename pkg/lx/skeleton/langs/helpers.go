@@ -79,10 +79,8 @@ func EmitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotrees
 	return internal.AppendLines(out, lines, startRow, endRow)
 }
 
-// sigEndRow returns the last row of n's signature: the greatest end row among
-// n's non-comment children that start before the body. This keeps a comment
-// sitting between the signature and the body (e.g. a Python body whose first
-// line is a comment) from leaking into the emitted signature.
+// sigEndRow returns the last row of n's signature, skipping any comment
+// between the signature and the body.
 func sigEndRow(n, body *gotreesitter.Node, lang *gotreesitter.Language, startRow int) int {
 	end := startRow
 	bodyStart := body.StartPoint()
