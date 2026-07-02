@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/deco.ts (7 rows, definitions)
+---
+```typescript
+export class Widget {
+    @Input() title: string = "";
+    onClick(): void {
+}
+```
+
+
+--- STDERR ---

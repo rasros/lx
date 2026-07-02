@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/deco.tsx (7 rows, definitions)
+---
+```tsx
+export class Widget {
+    @Input() title: string = "";
+    onClick(): void {
+}
+```
+
+
+--- STDERR ---

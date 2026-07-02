@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/deco.swift (5 rows, definitions)
+---
+```swift
+@objc
+class Handler {
+    @available(iOS 13, *)
+    func handle() {}
+}
+```
+
+
+--- STDERR ---
