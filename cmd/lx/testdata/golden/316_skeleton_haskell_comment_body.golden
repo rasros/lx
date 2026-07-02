@@ -1,0 +1,9 @@
+--- STDOUT ---
+skeleton/commentbody.hs (4 rows, function signatures)
+---
+```haskell
+addOne x =
+```
+
+
+--- STDERR ---
