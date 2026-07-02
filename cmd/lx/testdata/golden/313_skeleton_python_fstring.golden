@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/fstring.py (7 rows, definitions)
+---
+```python
+class First:
+    a = f"x"
+    b = 1
+```
+
+
+--- STDERR ---

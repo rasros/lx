@@ -14,6 +14,9 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "310_skeleton_python_functions", args: []string{"-u", "skeleton/main.py"}},
 		{name: "311_skeleton_python_structs", args: []string{"-Y", "skeleton/main.py"}},
 		{name: "312_skeleton_python_both", args: []string{"-u", "-Y", "skeleton/main.py"}},
+		// 313: regression for issue #76 — an f-string followed by another
+		// statement in a class body must not drop the next class header.
+		{name: "313_skeleton_python_fstring", args: []string{"-u", "-Y", "skeleton/fstring.py"}},
 
 		// 320-329: C-family
 		{name: "320_skeleton_c_functions", args: []string{"-u", "skeleton/main.c"}},
