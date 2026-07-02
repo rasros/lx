@@ -119,7 +119,7 @@ var langDefs = map[string]langDef{
 	"kotlin": {
 		newLang:       grammars.KotlinLanguage,
 		funcTypes:     []string{"function_declaration"},
-		structTypes:   []string{"class_declaration", "infix_expression"},
+		structTypes:   []string{"class_declaration", "object_declaration", "infix_expression"},
 		bodyChildType: "function_body",
 		funcVisible:   langs.KtFuncVisible,
 		emitStruct:    langs.KotlinEmitClass,

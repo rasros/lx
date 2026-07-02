@@ -39,7 +39,7 @@ func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "function_body")
 			}
-		case "class_declaration":
+		case "class_declaration", "object_declaration":
 			out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
 			out = KotlinEmitClass(out, src, lines, child, lang, functions)
 		}
