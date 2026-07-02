@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/deco.scala (4 rows, definitions)
+---
+```scala
+class Service {
+    @tailrec
+    final def loop(n: Int): Int = loop(n)
+}
+```
+
+
+--- STDERR ---

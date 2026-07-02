@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/Deco.java (7 rows, definitions)
+---
+```java
+@Service
+public class UserService {
+    @Override
+    public String name() {
+}
+```
+
+
+--- STDERR ---

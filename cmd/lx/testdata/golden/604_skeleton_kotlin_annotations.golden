@@ -1,0 +1,13 @@
+--- STDOUT ---
+skeleton/deco.kt (7 rows, definitions)
+---
+```kotlin
+@Serializable
+class User(val name: String) {
+    @Deprecated("use name")
+    fun legacy(): String {
+}
+```
+
+
+--- STDERR ---

@@ -85,6 +85,18 @@ func TestGoldenSkeleton(t *testing.T) {
 		// 590-599: OCaml
 		{name: "590_skeleton_ocaml_structs", args: []string{"-Y", "skeleton/main.ml"}},
 		{name: "591_skeleton_ocaml_both", args: []string{"-u", "-Y", "skeleton/main.ml"}},
+
+		// 600-619: decorators / annotations
+		{name: "600_skeleton_python_decorators", args: []string{"-u", "-Y", "skeleton/deco.py"}},
+		{name: "601_skeleton_typescript_decorators", args: []string{"-u", "-Y", "skeleton/deco.ts"}},
+		{name: "602_skeleton_tsx_decorators", args: []string{"-u", "-Y", "skeleton/deco.tsx"}},
+		{name: "603_skeleton_java_annotations", args: []string{"-u", "-Y", "skeleton/Deco.java"}},
+		{name: "604_skeleton_kotlin_annotations", args: []string{"-u", "-Y", "skeleton/deco.kt"}},
+		{name: "605_skeleton_rust_attributes", args: []string{"-u", "-Y", "skeleton/deco.rs"}},
+		{name: "606_skeleton_csharp_attributes", args: []string{"-u", "-Y", "skeleton/deco.cs"}},
+		{name: "607_skeleton_scala_annotations", args: []string{"-u", "-Y", "skeleton/deco.scala"}},
+		{name: "608_skeleton_swift_attributes", args: []string{"-u", "-Y", "skeleton/deco.swift"}},
+		{name: "609_skeleton_dart_annotations", args: []string{"-u", "-Y", "skeleton/deco.dart"}},
 	})
 }
 

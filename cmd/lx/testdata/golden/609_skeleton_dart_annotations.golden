@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/deco.dart (7 rows, definitions)
+---
+```dart
+@immutable
+class Widget {
+    String build() {
+}
+```
+
+
+--- STDERR ---

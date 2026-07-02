@@ -1,0 +1,14 @@
+--- STDOUT ---
+skeleton/deco.rs (9 rows, definitions)
+---
+```rust
+#[derive(Debug, Clone)]
+pub struct Point {
+    pub x: i32,
+}
+#[inline]
+pub fn origin() -> Point {
+```
+
+
+--- STDERR ---

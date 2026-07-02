@@ -1,0 +1,12 @@
+--- STDOUT ---
+skeleton/deco.py (12 rows, definitions)
+---
+```python
+class Config:
+    name: str
+    def label(self) -> str:
+def load() -> Config:
+```
+
+
+--- STDERR ---
