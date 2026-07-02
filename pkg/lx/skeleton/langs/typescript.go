@@ -33,7 +33,9 @@ func tsEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *go
 			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
 		case "method_definition":
 			if functions {
-				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
+				decoRow := PrecedingAnnotationRow(body, child, i, lang)
+				out = EmitLeadingDoc(out, lines, decoRow)
+				out = EmitDecorators(out, lines, decoRow, int(child.StartPoint().Row))
 				out = emitFuncSig(out, lines, child, lang, false, "")
 			}
 		}

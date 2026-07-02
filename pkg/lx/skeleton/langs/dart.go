@@ -22,10 +22,10 @@ func DartEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		}
 		switch child.Type(lang) {
 		case "declaration":
-			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+			out = EmitWithDoc(out, lines, PrecedingAnnotationRow(body, child, i, lang), int(child.EndPoint().Row))
 		case "method_signature":
 			if functions {
-				out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
+				out = EmitWithDoc(out, lines, PrecedingAnnotationRow(body, child, i, lang), int(child.EndPoint().Row))
 			}
 		}
 	}

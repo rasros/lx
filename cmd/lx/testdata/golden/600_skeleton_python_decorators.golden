@@ -2,9 +2,12 @@
 skeleton/deco.py (12 rows, definitions)
 ---
 ```python
+@dataclass
 class Config:
     name: str
+    @property
     def label(self) -> str:
+@cache
 def load() -> Config:
 ```
 

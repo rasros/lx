@@ -2,8 +2,10 @@
 skeleton/deco.tsx (7 rows, definitions)
 ---
 ```tsx
+@Component({ selector: "app" })
 export class Widget {
     @Input() title: string = "";
+    @HostListener("click")
     onClick(): void {
 }
 ```

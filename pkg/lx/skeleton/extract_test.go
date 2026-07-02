@@ -424,7 +424,7 @@ func TestPython_Both(t *testing.T) {
 	}
 }
 
-func TestPython_DecoratorSkipped(t *testing.T) {
+func TestPython_DecoratorPreserved(t *testing.T) {
 	src := []byte(`class SwitchTenantRequest(BaseModel):
     tenant_id: UUID
 
@@ -443,11 +443,11 @@ async def get_logo() -> None:
 	if !strings.Contains(out, "class SwitchTenantRequest(BaseModel):") {
 		t.Errorf("expected class, got:\n%s", out)
 	}
-	if strings.Contains(out, "@router") {
-		t.Errorf("decorator should not appear:\n%s", out)
+	if !strings.Contains(out, `@router.put("/logo", status_code=status.HTTP_204_NO_CONTENT)`) {
+		t.Errorf("single-line decorator should appear:\n%s", out)
 	}
-	if strings.Contains(out, "status_code") {
-		t.Errorf("decorator args should not appear:\n%s", out)
+	if !strings.Contains(out, "@router.get(\n    \"/logo\",\n    status_code=status.HTTP_200_OK,\n)") {
+		t.Errorf("multi-line decorator should appear in full:\n%s", out)
 	}
 	if !strings.Contains(out, "async def update_logo() -> None:") {
 		t.Errorf("expected update_logo, got:\n%s", out)
