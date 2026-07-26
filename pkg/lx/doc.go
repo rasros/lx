@@ -18,6 +18,7 @@
 // RunnerConfig controls per-file slicing, filtering, and discovery:
 //
 //   - Head / Tail choose how many lines to include from start/end.
+//   - MaxSize skips files larger than the given byte count; zero disables it.
 //   - LineNumbers enables numbered output.
 //   - SkeletonFunctions / SkeletonTypes reduce source files to signatures/defs.
 //   - ExpandArchives opens compressed files and directories for .zip/.tar.gz, etc..

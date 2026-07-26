@@ -1,0 +1,14 @@
+--- STDOUT ---
+```
+├── bin/
+│   └── data.bin
+├── pkg/
+│   └── util.go
+├── src/
+│   └── script.py
+├── README.md
+└── main.go
+```
+
+
+--- STDERR ---

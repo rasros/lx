@@ -21,6 +21,7 @@ type GlobalContext struct {
 type RunnerConfig struct {
 	Head              int
 	Tail              int
+	MaxSize           int64
 	LineNumbers       bool
 	SkeletonFunctions bool
 	SkeletonTypes     bool

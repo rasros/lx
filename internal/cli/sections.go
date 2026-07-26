@@ -80,6 +80,10 @@ func applyInterleaved(op Op, s *Section) {
 		val, _ := strconv.Atoi(op.Value)
 		slog.Debug("Setting lines limit", "value", val)
 		s.RunCfg.Head, s.RunCfg.Tail = (val+1)/2, val/2
+	case "max-size":
+		val, _ := parseSizeLimit(op.Value)
+		slog.Debug("Setting max file size", "bytes", val)
+		s.RunCfg.MaxSize = val
 	case "line-numbers":
 		slog.Debug("Enabling line numbers")
 		s.RunCfg.LineNumbers = true

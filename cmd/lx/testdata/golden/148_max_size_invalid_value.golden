@@ -1,0 +1,5 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: argument parsing failed: flag --max-size expects a size like 512k or 2M, got "notasize"

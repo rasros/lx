@@ -249,6 +249,8 @@ func makeFuncs() template.FuncMap {
 				sb.WriteString(" <value>")
 			case ValueNumber:
 				sb.WriteString(" <n>")
+			case ValueSize:
+				sb.WriteString(" <size>")
 			case ValueOptional:
 				sb.WriteString(" [value]")
 			}
@@ -269,6 +271,8 @@ func makeFuncs() template.FuncMap {
 				flagPart += " <value>"
 			case ValueNumber:
 				flagPart += " <n>"
+			case ValueSize:
+				flagPart += " <size>"
 			case ValueOptional:
 				flagPart += " [value]"
 			case ValueNone:

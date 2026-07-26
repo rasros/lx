@@ -107,3 +107,52 @@ func TestStream_TotalRows_AfterExecute(t *testing.T) {
 		t.Errorf("TotalRows = %d, want 5", g.TotalRows)
 	}
 }
+
+func TestStream_MaxSizeSkipsOversizedFiles(t *testing.T) {
+	cfg := core.NewConfig()
+	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1, MaxSize: 10})
+
+	stream.AddFile(sources.NewBufferInputFile("small.txt", []byte("tiny")))
+	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 64))))
+
+	var buf strings.Builder
+	if err := stream.Execute(context.Background(), &buf); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	got := buf.String()
+	if !strings.Contains(got, "small.txt") {
+		t.Error("Output missing small.txt, want it kept under the limit")
+	}
+	if strings.Contains(got, "large.txt") {
+		t.Error("Output contains large.txt, want it skipped by MaxSize")
+	}
+	if n := stream.GetGlobalContext().TotalFiles; n != 1 {
+		t.Errorf("TotalFiles = %d, want 1", n)
+	}
+}
+
+func TestStream_MaxSizeKeepsUnknownSizeInputs(t *testing.T) {
+	cfg := core.NewConfig()
+	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1, MaxSize: 10})
+
+	// Remote inputs report a negative size until they are fetched.
+	f := sources.NewBufferInputFile("remote.txt", []byte("fetched later"))
+	f.Size = -1
+	stream.AddFile(f)
+
+	if n := stream.GetGlobalContext().TotalFiles; n != 1 {
+		t.Errorf("TotalFiles = %d, want 1 (unknown size must not be skipped)", n)
+	}
+}
+
+func TestStream_MaxSizeUnsetKeepsEverything(t *testing.T) {
+	cfg := core.NewConfig()
+	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1})
+
+	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 4096))))
+
+	if n := stream.GetGlobalContext().TotalFiles; n != 1 {
+		t.Errorf("TotalFiles = %d, want 1", n)
+	}
+}

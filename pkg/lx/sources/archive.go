@@ -42,18 +42,28 @@ type FileSink interface {
 	Add(InputFile)
 }
 
-func ExpandArchivePaths(ctx context.Context, absPath, displayPath string, w *walker.Walker, includes []string) ([]string, error) {
+// ExpandArchivePaths lists archive entry paths. Entries larger than maxSize are
+// omitted; a maxSize of zero or less disables the limit.
+func ExpandArchivePaths(ctx context.Context, absPath, displayPath string, w *walker.Walker, includes []string, maxSize int64) ([]string, error) {
 	var paths []string
-	sink := &pathCollectorSink{out: &paths}
+	sink := &pathCollectorSink{out: &paths, maxSize: maxSize}
 	if err := ExpandArchive(ctx, absPath, displayPath, w, includes, "", sink); err != nil {
 		return nil, err
 	}
 	return paths, nil
 }
 
-type pathCollectorSink struct{ out *[]string }
+type pathCollectorSink struct {
+	out     *[]string
+	maxSize int64
+}
 
-func (s *pathCollectorSink) Add(f InputFile) { *s.out = append(*s.out, f.Path) }
+func (s *pathCollectorSink) Add(f InputFile) {
+	if s.maxSize > 0 && f.Size > s.maxSize {
+		return
+	}
+	*s.out = append(*s.out, f.Path)
+}
 
 type archiveCandidate struct {
 	key           string

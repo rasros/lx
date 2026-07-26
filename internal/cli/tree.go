@@ -92,7 +92,7 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 			if isForced {
 				archiveIncludes = nil
 			}
-			return collectURLArchiveTreePaths(ctx, rawPath, runCfg.ShowHidden, isForced, archiveIncludes)
+			return collectURLArchiveTreePaths(ctx, rawPath, runCfg.ShowHidden, isForced, archiveIncludes, runCfg.MaxSize)
 		}
 		if !isForced && !lx.IsKept(rawPath, includes, excludes) {
 			return paths
@@ -131,12 +131,15 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 			if isForced {
 				archiveIncludes = nil
 			}
-			archivePaths, err := lx.ExpandArchivePaths(ctx, absPath, effectivePath, archiveWalker, archiveIncludes)
+			archivePaths, err := lx.ExpandArchivePaths(ctx, absPath, effectivePath, archiveWalker, archiveIncludes, runCfg.MaxSize)
 			if err != nil {
 				slog.Debug("Failed to expand archive for tree", "path", rawPath, "error", err)
 				return paths
 			}
 			return append(paths, archivePaths...)
+		}
+		if runCfg.MaxSize > 0 && stat.Size() > runCfg.MaxSize {
+			return paths
 		}
 		return append(paths, rawPathClean)
 	}
@@ -183,7 +186,7 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 			if isForced {
 				archiveIncludes = nil
 			}
-			archivePaths, err := lx.ExpandArchivePaths(ctx, archiveAbsPath, effectivePath, archiveWalker, archiveIncludes)
+			archivePaths, err := lx.ExpandArchivePaths(ctx, archiveAbsPath, effectivePath, archiveWalker, archiveIncludes, runCfg.MaxSize)
 			if err != nil {
 				slog.Debug("Failed to expand archive for tree", "path", effectivePath, "error", err)
 				return nil
@@ -198,6 +201,16 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 			}
 		}
 
+		if runCfg.MaxSize > 0 {
+			info, err := d.Info()
+			if err != nil {
+				return nil
+			}
+			if info.Size() > runCfg.MaxSize {
+				return nil
+			}
+		}
+
 		paths = append(paths, effectivePath)
 		return nil
 	})
@@ -205,7 +218,7 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 	return paths
 }
 
-func collectURLArchiveTreePaths(ctx context.Context, rawPath string, showHidden bool, isForced bool, includes []string) []string {
+func collectURLArchiveTreePaths(ctx context.Context, rawPath string, showHidden bool, isForced bool, includes []string, maxSize int64) []string {
 	tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
 	if err != nil {
 		slog.Debug("Failed to download URL archive for tree", "url", rawPath, "error", err)
@@ -214,7 +227,7 @@ func collectURLArchiveTreePaths(ctx context.Context, rawPath string, showHidden 
 	defer cleanup()
 
 	archiveWalker := newArchiveWalker(showHidden, isForced)
-	paths, err := lx.ExpandArchivePaths(ctx, tempPath, rawPath, archiveWalker, includes)
+	paths, err := lx.ExpandArchivePaths(ctx, tempPath, rawPath, archiveWalker, includes, maxSize)
 	if err != nil {
 		slog.Debug("Failed to expand URL archive for tree", "url", rawPath, "error", err)
 		return nil
