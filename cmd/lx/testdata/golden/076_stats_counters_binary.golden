@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[2/2] data.bin - binary file skipped (4 B)
+
+
+--- STDERR ---
+  1 binary
+  ~46 tokens
+▎ 2 files · 3 rows · 1 section · 31 B

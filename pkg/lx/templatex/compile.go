@@ -98,10 +98,6 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stats template: %w", err)
 	}
-	tReport, err := parse("report", pick(cfg.ReportTemplate, defaultReportTemplate))
-	if err != nil {
-		return nil, fmt.Errorf("report template: %w", err)
-	}
 
 	return &core.TemplateEngine{
 		FileContent:   tContent,
@@ -117,6 +113,5 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		OutputHeader:  tHeader,
 		OutputFooter:  tFooter,
 		Stats:         tStats,
-		Report:        tReport,
 	}, nil
 }

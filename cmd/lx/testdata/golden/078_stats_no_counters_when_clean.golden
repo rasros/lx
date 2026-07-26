@@ -1,0 +1,12 @@
+--- STDOUT ---
+main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---
+  ~26 tokens
+▎ 1 file · 2 rows · 1 section · 27 B

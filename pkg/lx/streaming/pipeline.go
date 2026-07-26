@@ -22,7 +22,13 @@ var readPool = sync.Pool{New: func() interface{} {
 	return &b
 }}
 
-func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global core.GlobalContext) (int64, error) {
+type pipelineTotals struct {
+	rows   int64
+	binary int
+	failed int
+}
+
+func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global core.GlobalContext) (pipelineTotals, error) {
 	numWorkers := s.concurrency
 	jobsCh := make(chan seqJob, numWorkers)
 	resultsCh := make(chan render.Result, numWorkers)
@@ -62,6 +68,8 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					Stats:        localCounter.count,
 					Rows:         proc.LastRows(),
 					IsCompact:    proc.LastWasCompact(),
+					IsBinary:     proc.LastWasBinary(),
+					IsError:      proc.LastWasError(),
 					Err:          err,
 					SectionIndex: j.item.Section.Index,
 				}:
@@ -92,13 +100,19 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 
 	nextSeq := 0
 	buffer := make(map[int]render.Result)
-	var totalRows int64
+	var totals pipelineTotals
 
 	for res := range resultsCh {
 		if res.Err != nil {
-			return totalRows, res.Err
+			return totals, res.Err
 		}
-		totalRows += int64(res.Rows)
+		totals.rows += int64(res.Rows)
+		if res.IsBinary {
+			totals.binary++
+		}
+		if res.IsError {
+			totals.failed++
+		}
 		buffer[res.Index] = res
 
 		for {
@@ -107,14 +121,14 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				break
 			}
 			if err := layout.WriteItem(next); err != nil {
-				return totalRows, err
+				return totals, err
 			}
 			bufferPool.Put(next.Buffer)
 			delete(buffer, nextSeq)
 			nextSeq++
 		}
 	}
-	return totalRows, nil
+	return totals, nil
 }
 
 // byteCounter counts bytes written, plus token estimates when a tokenizer is

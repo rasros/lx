@@ -15,6 +15,8 @@ type Result struct {
 	Stats        int64
 	Rows         int
 	IsCompact    bool
+	IsBinary     bool
+	IsError      bool
 	Err          error
 	SectionIndex int
 }

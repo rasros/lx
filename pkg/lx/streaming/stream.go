@@ -192,7 +192,7 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	if err := s.engine.OutputHeader.Execute(counter, core.HeaderContext{Global: global}); err != nil {
 		return err
 	}
-	totalRows, err := s.executePipeline(ctx, counter, global)
+	totals, err := s.executePipeline(ctx, counter, global)
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,9 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	}
 
 	global.TotalWrittenBytes = counter.count
-	global.TotalRows = totalRows
+	global.TotalRows = totals.rows
+	global.BinaryFiles = totals.binary
+	global.FailedFiles = totals.failed
 	global.TokenEstimate = counter.tokens
 	s.finalStats = &global
 	return nil
