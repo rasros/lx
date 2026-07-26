@@ -117,13 +117,20 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 	return totalRows, nil
 }
 
+// byteCounter counts bytes written, plus token estimates when a tokenizer is
+// set. Estimating per Write covers separators and wrappers too, not just items.
 type byteCounter struct {
-	w     io.Writer
-	count int64
+	w         io.Writer
+	count     int64
+	tokens    int64
+	tokenizer core.Tokenizer
 }
 
 func (b *byteCounter) Write(p []byte) (n int, err error) {
 	n, err = b.w.Write(p)
 	b.count += int64(n)
+	if b.tokenizer != nil && n > 0 {
+		b.tokens += b.tokenizer.Estimate(int64(n), p[:n])
+	}
 	return
 }

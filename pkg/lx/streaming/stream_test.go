@@ -2,6 +2,7 @@ package streaming
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -154,5 +155,104 @@ func TestStream_MaxSizeUnsetKeepsEverything(t *testing.T) {
 
 	if n := stream.GetGlobalContext().TotalFiles; n != 1 {
 		t.Errorf("TotalFiles = %d, want 1", n)
+	}
+}
+
+// One token per byte, so totals can be compared against bytes exactly.
+type sizeTokenizer struct{}
+
+func (sizeTokenizer) Estimate(size int64, _ interface{}) int64 { return size }
+
+func tokenEstimateFor(t *testing.T, content string) int64 {
+	t.Helper()
+	stream, err := NewStream(core.NewConfig(), core.RunnerConfig{Head: -1})
+	if err != nil {
+		t.Fatalf("NewStream failed: %v", err)
+	}
+	stream.AddFile(sources.NewBufferInputFile("sample.txt", []byte(content)))
+
+	var buf strings.Builder
+	if err := stream.Execute(context.Background(), &buf); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	return stream.GetGlobalContext().TokenEstimate
+}
+
+func TestStream_TokenEstimateReflectsContentShape(t *testing.T) {
+	prose := strings.Repeat("hello world ", 60)
+	symbols := strings.Repeat(`{"a":1},`, 90)
+	if len(prose) != len(symbols) {
+		t.Fatalf("fixture sizes differ: %d vs %d", len(prose), len(symbols))
+	}
+
+	proseTokens := tokenEstimateFor(t, prose)
+	symbolTokens := tokenEstimateFor(t, symbols)
+
+	if symbolTokens <= proseTokens {
+		t.Errorf("symbol-dense estimate %d <= prose estimate %d, want greater for equal byte counts",
+			symbolTokens, proseTokens)
+	}
+
+	sizeOnly := int64(len(prose)) / 4
+	if proseTokens == sizeOnly && symbolTokens == sizeOnly {
+		t.Error("estimates match bytes/4 exactly, want a content-derived estimate")
+	}
+}
+
+func TestStream_TokenEstimateCoversAllEmittedBytes(t *testing.T) {
+	stream, err := NewStream(core.NewConfig(), core.RunnerConfig{Head: -1})
+	if err != nil {
+		t.Fatalf("NewStream failed: %v", err)
+	}
+	stream.WithTokenizer(sizeTokenizer{})
+
+	stream.AddSection("First")
+	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("content a")))
+	stream.AddPrompt("Analyze this")
+	stream.AddSection("Second")
+	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("content b")))
+
+	var buf strings.Builder
+	if err := stream.Execute(context.Background(), &buf); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	global := stream.GetGlobalContext()
+	if global.TokenEstimate != global.TotalWrittenBytes {
+		t.Errorf("TokenEstimate = %d, TotalWrittenBytes = %d; want equal with a one-token-per-byte tokenizer",
+			global.TokenEstimate, global.TotalWrittenBytes)
+	}
+	if global.TotalWrittenBytes != int64(buf.Len()) {
+		t.Errorf("TotalWrittenBytes = %d, want %d", global.TotalWrittenBytes, buf.Len())
+	}
+}
+
+func TestStream_PerFileTokenEstimateIsContentDerived(t *testing.T) {
+	cfg := core.NewConfig()
+	cfg.FileContentTemplate = "{{ .TokenEstimate }}"
+	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1})
+	if err != nil {
+		t.Fatalf("NewStream failed: %v", err)
+	}
+
+	content := strings.Repeat(`{"a":1},`, 60)
+	stream.AddFile(sources.NewBufferInputFile("dense.json", []byte(content)))
+
+	var buf strings.Builder
+	if err := stream.Execute(context.Background(), &buf); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	got, err := strconv.ParseInt(strings.TrimSpace(buf.String()), 10, 64)
+	if err != nil {
+		t.Fatalf("parse rendered estimate %q: %v", buf.String(), err)
+	}
+
+	sizeOnly := int64(len(content)) / 4
+	if got == sizeOnly {
+		t.Errorf("per-file TokenEstimate = %d, which is exactly bytes/4; want a content-derived estimate", got)
+	}
+	if got <= sizeOnly {
+		t.Errorf("per-file TokenEstimate = %d, want greater than bytes/4 (%d) for symbol-dense content", got, sizeOnly)
 	}
 }
