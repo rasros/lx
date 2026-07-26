@@ -28,7 +28,6 @@ type CliConfig struct {
 	OutputHeaderTemplate string `yaml:"output_header_template"`
 	OutputFooterTemplate string `yaml:"output_footer_template"`
 	StatsTemplate        string `yaml:"stats_template"`
-	ReportTemplate       string `yaml:"report_template"`
 
 	OutputFormat string `yaml:"output_format"`
 
@@ -92,7 +91,6 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		overrideIfSet(&lxCfg.OutputHeaderTemplate, loaded.OutputHeaderTemplate)
 		overrideIfSet(&lxCfg.OutputFooterTemplate, loaded.OutputFooterTemplate)
 		overrideIfSet(&lxCfg.StatsTemplate, loaded.StatsTemplate)
-		overrideIfSet(&lxCfg.ReportTemplate, loaded.ReportTemplate)
 
 		overrideIfSet(&lxCfg.OutputFormat, loaded.OutputFormat)
 

@@ -25,8 +25,6 @@ type MetaContext = core.MetaContext
 type HeaderContext = core.HeaderContext
 type FooterContext = core.FooterContext
 type StatsContext = core.StatsContext
-type ReportContext = core.ReportContext
-type FileReport = core.FileReport
 type TokenCounter = core.TokenCounter
 type Tokenizer = core.Tokenizer
 

@@ -126,6 +126,8 @@ func SetupStatsFixture(t *testing.T) string {
 	dir := t.TempDir()
 
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
+	writeFile(t, dir, "data.bin", string([]byte{0x00, 0x01, 0xFF, 0xFE}), 0644)
+	buildLargeFile(t, dir, "large.txt")
 
 	return dir
 }

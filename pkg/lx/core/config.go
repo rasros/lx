@@ -54,9 +54,6 @@ func Merge(dst *Config, src *Config) {
 	if src.StatsTemplate != "" {
 		dst.StatsTemplate = src.StatsTemplate
 	}
-	if src.ReportTemplate != "" {
-		dst.ReportTemplate = src.ReportTemplate
-	}
 
 	if src.OutputFormat != "" {
 		dst.OutputFormat = src.OutputFormat

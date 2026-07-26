@@ -67,7 +67,6 @@ All keys are optional. Templates not listed here aren't recognized.
 | `output_header_template`  | template | format default | Rendered once before the first section.                                                           |
 | `output_footer_template`  | template | format default | Rendered once after the last section.                                                             |
 | `stats_template`          | template | format default | Renders the file/token summary footer.                                                            |
-| `report_template`         | template | built-in       | Renders the detailed report from `--report`. One default across all formats.                       |
 
 ### Precedence for the prompts library
 
@@ -152,22 +151,12 @@ HeaderContext and FooterContext are bound to `output_header_template` and `outpu
 field, Global (a GlobalContext).
 
 StatsContext is bound to `stats_template` and carries Global plus ColorEnabled (a bool, false when output is piped or
-`NO_COLOR` is set).
-
-ReportContext is bound to `report_template`:
-
-| Field          | Type         | Notes                                                    |
-|----------------|--------------|----------------------------------------------------------|
-| `Files`        | []FileReport | One entry per rendered file, in output order.            |
-| `Top`          | []FileReport | Same entries ordered by descending token count.          |
-| `ColorEnabled` | bool         | As for StatsContext.                                     |
-| `Global`       | GlobalContext |                                                         |
-
-Each FileReport carries Path, OriginalSize, RenderedSize, Tokens, Rows, Language, and IsBinary.
+`NO_COLOR` is set). The default template adds a third line listing SkippedBySize, BinaryFiles, and FailedFiles, showing
+only the counters that are non-zero.
 
 GlobalContext is reachable from every other context as `.Global`. Its fields are TotalFiles, TotalSize,
 TotalWrittenBytes, TotalRows, TokenEstimate, TotalSections, WorkDir, Metadata (a map of string to string), and the
-report breakdown counters SkippedBySize, BinaryFiles, and FailedFiles.
+counters SkippedBySize, BinaryFiles, and FailedFiles.
 
 ### Helper functions
 

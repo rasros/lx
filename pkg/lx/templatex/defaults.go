@@ -272,23 +272,13 @@ const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
 	`{{ commafy .Global.TotalRows }} {{ plural .Global.TotalRows "row" "rows" }} {{ dim .ColorEnabled "·" }} ` +
 	`{{ commafy .Global.TotalSections }} {{ plural .Global.TotalSections "section" "sections" }} {{ dim .ColorEnabled "·" }} ` +
 	`{{ humanize .Global.TotalSize }}` + "\n" +
-	`  {{ tokenLabel .Global.TokenEstimate .ColorEnabled }}` + "\n"
-
-// The report is a diagnostic summary rather than bundle content, so it has one
-// default across formats, like the stats summary.
-const defaultReportTemplate = `{{ if .Files }}` +
-	"| File | Original | Rendered | Tokens |\n" +
-	"|------|----------|----------|--------|\n" +
-	`{{ range .Files }}| {{ .Path }} | {{ humanize .OriginalSize }} | {{ humanize .RenderedSize }} | {{ commafy .Tokens }} |` + "\n" +
-	`{{ end }}` + "\n" +
-	`{{ end }}` +
-	`{{ if .Top }}Largest: {{ range $i, $f := .Top }}{{ if $i }}, {{ end }}{{ $f.Path }}{{ end }}` + "\n" +
-	`{{ end }}` +
-	`{{ commafy .Global.TotalFiles }} processed {{ dim .ColorEnabled "·" }} ` +
-	`{{ commafy .Global.SkippedBySize }} skipped (size) {{ dim .ColorEnabled "·" }} ` +
-	`{{ commafy .Global.BinaryFiles }} binary {{ dim .ColorEnabled "·" }} ` +
-	`{{ commafy .Global.FailedFiles }} failed` + "\n" +
-	`  {{ tokenLabel .Global.TokenEstimate .ColorEnabled }}` + "\n"
+	`  {{ tokenLabel .Global.TokenEstimate .ColorEnabled }}` + "\n" +
+	`{{ if or .Global.SkippedBySize .Global.BinaryFiles .Global.FailedFiles }}  ` +
+	`{{ $sep := "" }}` +
+	`{{ if .Global.SkippedBySize }}{{ commafy .Global.SkippedBySize }} skipped (size){{ $sep = printf " %s " (dim .ColorEnabled "·") }}{{ end }}` +
+	`{{ if .Global.BinaryFiles }}{{ $sep }}{{ commafy .Global.BinaryFiles }} binary{{ $sep = printf " %s " (dim .ColorEnabled "·") }}{{ end }}` +
+	`{{ if .Global.FailedFiles }}{{ $sep }}{{ commafy .Global.FailedFiles }} failed{{ end }}` +
+	"\n" + `{{ end }}`
 
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{

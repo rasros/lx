@@ -18,14 +18,10 @@ func compileForFormat(t *testing.T, format string) *core.TemplateEngine {
 	return engine
 }
 
-func TestCompileProvidesMetaAndReportForEveryFormat(t *testing.T) {
+func TestCompileProvidesMetaForEveryFormat(t *testing.T) {
 	for _, format := range []string{"markdown", "xml", "html", "bare"} {
-		engine := compileForFormat(t, format)
-		if engine.Meta == nil {
+		if engine := compileForFormat(t, format); engine.Meta == nil {
 			t.Errorf("format %s: Meta template is nil", format)
-		}
-		if engine.Report == nil {
-			t.Errorf("format %s: Report template is nil", format)
 		}
 	}
 }
@@ -74,83 +70,48 @@ func TestMetaTemplateExposesFields(t *testing.T) {
 	}
 }
 
-func TestReportTemplateRendersRowsAndBreakdown(t *testing.T) {
+func renderStats(t *testing.T, g core.GlobalContext) string {
+	t.Helper()
 	engine := compileForFormat(t, "markdown")
-
-	ctx := core.ReportContext{
-		Files: []core.FileReport{
-			{Path: "docs/manual.pdf", OriginalSize: 12_400_000, RenderedSize: 180_000, Tokens: 45_000},
-			{Path: "src/main.go", OriginalSize: 45_000, RenderedSize: 45_000, Tokens: 11_200},
-		},
-		Top: []core.FileReport{{Path: "docs/manual.pdf"}, {Path: "src/main.go"}},
-		Global: core.GlobalContext{
-			TotalFiles:    2,
-			SkippedBySize: 3,
-			BinaryFiles:   1,
-			FailedFiles:   0,
-			TokenEstimate: 56_200,
-		},
-	}
-
 	var sb strings.Builder
-	if err := engine.Report.Execute(&sb, ctx); err != nil {
+	if err := engine.Stats.Execute(&sb, core.StatsContext{Global: g}); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
+	return sb.String()
+}
 
-	got := sb.String()
-	for _, want := range []string{
-		"docs/manual.pdf",
-		"12.4 MB",
-		"180.0 kB",
-		"45,000",
-		"src/main.go",
-		"Largest: docs/manual.pdf, src/main.go",
-		"2 processed",
-		"3 skipped (size)",
-		"1 binary",
-		"0 failed",
-		"~56,200 tokens",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("report output missing %q:\n%s", want, got)
+func TestStatsOmitsCounterLineWhenNothingLeftOut(t *testing.T) {
+	got := renderStats(t, core.GlobalContext{TotalFiles: 3, TotalRows: 40, TotalSections: 1, TotalSize: 900})
+	for _, unwanted := range []string{"skipped", "binary", "failed"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("stats mentions %q with all counters zero:\n%s", unwanted, got)
 		}
 	}
 }
 
-// An empty report must not emit a headerless table.
-func TestReportTemplateOmitsTableWhenNoFiles(t *testing.T) {
-	engine := compileForFormat(t, "markdown")
-
-	var sb strings.Builder
-	if err := engine.Report.Execute(&sb, core.ReportContext{}); err != nil {
-		t.Fatalf("Execute failed: %v", err)
+func TestStatsShowsOnlyNonZeroCounters(t *testing.T) {
+	got := renderStats(t, core.GlobalContext{TotalFiles: 3, SkippedBySize: 2})
+	if !strings.Contains(got, "2 skipped (size)") {
+		t.Errorf("stats missing skipped count:\n%s", got)
 	}
-
-	got := sb.String()
-	if strings.Contains(got, "| File |") {
-		t.Errorf("empty report rendered a table header:\n%s", got)
-	}
-	if !strings.Contains(got, "0 processed") {
-		t.Errorf("empty report missing breakdown:\n%s", got)
+	if strings.Contains(got, "binary") || strings.Contains(got, "failed") {
+		t.Errorf("stats shows zero-valued counters:\n%s", got)
 	}
 }
 
-func TestCustomReportTemplateOverridesDefault(t *testing.T) {
-	cfg := core.NewConfig()
-	cfg.ReportTemplate = "{{ len .Files }} files"
-	engine, err := Compile(cfg)
-	if err != nil {
-		t.Fatalf("Compile failed: %v", err)
-	}
-
-	var sb strings.Builder
-	err = engine.Report.Execute(&sb, core.ReportContext{
-		Files: []core.FileReport{{Path: "a.go"}, {Path: "b.go"}},
+func TestStatsSeparatesMultipleCounters(t *testing.T) {
+	got := renderStats(t, core.GlobalContext{
+		TotalFiles: 9, SkippedBySize: 2, BinaryFiles: 4, FailedFiles: 1,
 	})
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
+	want := "2 skipped (size) · 4 binary · 1 failed"
+	if !strings.Contains(got, want) {
+		t.Errorf("stats counter line = %q, want it to contain %q", got, want)
 	}
-	if got := sb.String(); got != "2 files" {
-		t.Errorf("got %q, want %q", got, "2 files")
+}
+
+func TestStatsCounterLineHasNoLeadingSeparator(t *testing.T) {
+	got := renderStats(t, core.GlobalContext{TotalFiles: 5, BinaryFiles: 3})
+	if !strings.Contains(got, "  3 binary\n") {
+		t.Errorf("stats counter line malformed:\n%q", got)
 	}
 }
