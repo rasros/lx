@@ -17,7 +17,9 @@ type FileErrorHandler = render.FileErrorHandler
 
 type defaultTokenizer struct{}
 
-func (defaultTokenizer) Estimate(size int64, _ interface{}) int64 { return size / 4 }
+func (defaultTokenizer) Estimate(size int64, content interface{}) int64 {
+	return core.DefaultTokenCounter(size, content)
+}
 
 // Stream manages a collection of files, sections, and prompts for rendering.
 type Stream struct {
@@ -152,6 +154,7 @@ func (s *Stream) Prepare() core.GlobalContext {
 			currentSection.TotalSize += f.Size
 			global.TotalFiles++
 			global.TotalSize += f.Size
+			// Size-only: no content read yet. Execute replaces this.
 			global.TokenEstimate += s.tokenizer.Estimate(f.Size, nil)
 
 			s.prepared = append(s.prepared, render.PreparedItem{
@@ -180,7 +183,7 @@ func (s *Stream) GetGlobalContext() core.GlobalContext { return s.Prepare() }
 
 func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	global := s.Prepare()
-	counter := &byteCounter{w: w}
+	counter := &byteCounter{w: w, tokenizer: s.tokenizer}
 
 	if err := s.engine.OutputHeader.Execute(counter, core.HeaderContext{Global: global}); err != nil {
 		return err
@@ -195,7 +198,7 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 
 	global.TotalWrittenBytes = counter.count
 	global.TotalRows = totalRows
-	global.TokenEstimate = s.tokenizer.Estimate(counter.count, nil)
+	global.TokenEstimate = counter.tokens
 	s.finalStats = &global
 	return nil
 }
