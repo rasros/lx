@@ -439,6 +439,31 @@ The second -s resets -l so web/ gets full content, with only -i active.`,
 	},
 	{
 		Category:  CatActions,
+		Name:      "system-context",
+		Short:     "E",
+		Type:      CmdAction,
+		ValueType: ValueNone,
+		Usage:     "Insert a block describing the machine and invocation",
+		Long: `Insert a block describing the machine and the command that produced the
+output.
+
+The block is placed where the flag appears, like -p and -T, so it can open the
+bundle or close it. It records the OS and architecture, the current time in
+ISO 8601, the hostname, the lx version, and the command line.
+
+This is for reproducibility: when you revisit a saved bundle weeks later, or
+collect context on several machines, the block says which environment the paths
+and tooling belong to. Platform-specific paths such as /nix/store/... are
+otherwise ambiguous.
+
+Example:
+  lx --system-context -t ./project -o context.md
+
+Every field is also available individually to a custom meta_template as
+{{ .Fields.os }}, {{ .Fields.time }}, and so on. See CONFIG.md.`,
+	},
+	{
+		Category:  CatActions,
 		Name:      "prompt",
 		Short:     "p",
 		Type:      CmdAction,

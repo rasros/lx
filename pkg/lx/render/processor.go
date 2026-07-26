@@ -130,6 +130,12 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 		ctx = &v
 		templateToUse = p.engine.Tree
 
+	case core.MetaContext:
+		v.Global = p.global
+		v.Section = *item.Section
+		ctx = &v
+		templateToUse = p.engine.Meta
+
 	default:
 		return nil
 	}
@@ -376,6 +382,8 @@ func EstimatePreparedBufferSize(item PreparedItem) int {
 		}
 		return hint
 	case core.TreeContext:
+		return clampBodyHint(v.Body)
+	case core.MetaContext:
 		return clampBodyHint(v.Body)
 	case core.PromptContext:
 		return clampBodyHint(v.Body)

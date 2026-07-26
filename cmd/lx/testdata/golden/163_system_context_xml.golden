@@ -1,0 +1,22 @@
+--- STDOUT ---
+<content>
+  <system_context>
+OS: GOOS
+Arch: GOARCH
+Time: FIXED
+Host: HOST
+Tool: lx VERSION
+Command: lx --xml --system-context main.go --no-stats
+  </system_context>
+
+  <document index="1" language="go" rows="2">
+    <source>main.go</source>
+    <document_content>
+package main
+func main() {}
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---

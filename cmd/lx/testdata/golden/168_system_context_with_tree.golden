@@ -1,0 +1,17 @@
+--- STDOUT ---
+```
+OS: GOOS
+Arch: GOARCH
+Time: FIXED
+Host: HOST
+Tool: lx VERSION
+Command: lx --system-context -t src --no-stats
+```
+
+```
+src/
+└── script.py
+```
+
+
+--- STDERR ---

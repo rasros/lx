@@ -156,6 +156,11 @@ func (s *Stream) AddTree(body string) *Stream {
 	return s
 }
 
+func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
+	s.inner.AddMeta(body, fields)
+	return s
+}
+
 func (s *Stream) Prepare() GlobalContext { return s.inner.Prepare() }
 
 func (s *Stream) GetGlobalContext() GlobalContext { return s.inner.GetGlobalContext() }
