@@ -175,6 +175,6 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Wal
 	return sources.ExpandArchive(ctx, absPath, displayPath, walker, includes, outPath, streamSink{s: stream})
 }
 
-func ExpandArchivePaths(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string) ([]string, error) {
-	return sources.ExpandArchivePaths(ctx, absPath, displayPath, walker, includes)
+func ExpandArchivePaths(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string, maxSize int64) ([]string, error) {
+	return sources.ExpandArchivePaths(ctx, absPath, displayPath, walker, includes, maxSize)
 }

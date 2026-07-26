@@ -214,6 +214,30 @@ Examples:
 	},
 	{
 		Category:  CatInterleaved,
+		Name:      "max-size",
+		Short:     "m",
+		Type:      CmdInterleaved,
+		ValueType: ValueSize,
+		Usage:     "Skip files larger than the given size for subsequent paths",
+		Long: `Skip files larger than the given size for subsequent paths.
+
+Oversized files are dropped during discovery, before any content is read or
+converted, so a stray multi-gigabyte log or disk image cannot inflate the
+output. Skipped files are also omitted from the tree (-T/-t), so the tree keeps
+matching the actual output.
+
+The value is a byte count with an optional unit suffix. Suffixes are decimal
+and case-insensitive, matching how lx reports sizes elsewhere:
+  -m 4096     (4096 bytes)
+  -m 512k     (512 kB)
+  -m 2MB      (2 MB)
+  -m 1G       (1 GB)
+
+The limit applies to every input, including paths forced with -f. Inputs whose
+size is not known ahead of time, such as remote URLs, are never skipped.`,
+	},
+	{
+		Category:  CatInterleaved,
 		Name:      "documents",
 		Short:     "D",
 		Type:      CmdInterleaved,

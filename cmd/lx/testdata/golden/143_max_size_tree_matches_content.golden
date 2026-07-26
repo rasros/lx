@@ -1,0 +1,42 @@
+--- STDOUT ---
+```
+├── bin/
+│   └── data.bin
+├── pkg/
+│   └── util.go
+├── src/
+│   └── script.py
+├── README.md
+└── main.go
+```
+
+[1/5] README.md (2 rows)
+---
+```markdown
+# Project
+Documentation here.
+```
+
+[2/5] bin/data.bin - binary file skipped (4 B)
+
+[3/5] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[4/5] pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
+
+[5/5] src/script.py (1 rows)
+---
+```python
+print('hello')
+```
+
+
+--- STDERR ---

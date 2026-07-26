@@ -3,6 +3,7 @@ package streaming
 import (
 	"context"
 	"io"
+	"log/slog"
 	"runtime"
 
 	"github.com/rasros/lx/pkg/lx/core"
@@ -78,8 +79,14 @@ func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
 	return s
 }
 
+// AddFile enqueues a file, unless it exceeds the configured MaxSize. Inputs
+// with an unknown size (negative, as for remote URLs) are always kept.
 func (s *Stream) AddFile(f sources.InputFile) *Stream {
 	f.Config = s.renderCfg
+	if s.renderCfg.MaxSize > 0 && f.Size > s.renderCfg.MaxSize {
+		slog.Debug("Skipped by size limit (-m)", "path", f.Path, "size", f.Size, "max_size", s.renderCfg.MaxSize)
+		return s
+	}
 	s.items = append(s.items, f)
 	return s
 }

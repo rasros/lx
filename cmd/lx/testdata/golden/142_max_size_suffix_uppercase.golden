@@ -1,0 +1,136 @@
+--- STDOUT ---
+[1/6] README.md (2 rows)
+---
+```markdown
+# Project
+Documentation here.
+```
+
+[2/6] bin/data.bin - binary file skipped (4 B)
+
+[3/6] main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+[4/6] pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
+
+[5/6] src/large.txt (100 rows)
+---
+```text
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+```
+
+[6/6] src/script.py (1 rows)
+---
+```python
+print('hello')
+```
+
+
+--- STDERR ---

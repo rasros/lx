@@ -1,0 +1,122 @@
+--- STDOUT ---
+[1/4] bin/data.bin - binary file skipped (4 B)
+
+[2/4] pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
+
+[3/4] src/script.py (1 rows)
+---
+```python
+print('hello')
+```
+
+[4/4] src/large.txt (100 rows)
+---
+```text
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+Line xxxxxxxxxx
+```
+
+
+--- STDERR ---

@@ -21,6 +21,7 @@ const (
 	ValueAny
 	ValueNumber
 	ValueOptional
+	ValueSize
 )
 
 type CommandDef struct {
@@ -209,13 +210,19 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 }
 
 func addOp(res *ParsedArgs, def CommandDef, val string, isShort bool) error {
-	if def.ValueType == ValueNumber {
+	prefix := "--"
+	if len(def.Name) == 1 {
+		prefix = "-"
+	}
+
+	switch def.ValueType {
+	case ValueNumber:
 		if _, err := strconv.Atoi(val); err != nil {
-			prefix := "--"
-			if len(def.Name) == 1 {
-				prefix = "-"
-			}
 			return fmt.Errorf("flag %s%s expects a number, got %q", prefix, def.Name, val)
+		}
+	case ValueSize:
+		if _, err := parseSizeLimit(val); err != nil {
+			return fmt.Errorf("flag %s%s expects a size like 512k or 2M, got %q", prefix, def.Name, val)
 		}
 	}
 
