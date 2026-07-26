@@ -61,11 +61,13 @@ All keys are optional. Templates not listed here aren't recognized.
 | `section_template`        | template | format default | Renders a logical section break (from `-s`).                                                      |
 | `prompt_template`         | template | format default | Renders text injected via `-p` or `-P`.                                                           |
 | `tree_template`           | template | format default | Renders the tree block from `-t`/`-T`.                                                            |
+| `meta_template`           | template | format default | Renders the metadata block from `--system-context`.                                               |
 | `section_header_template` | template | format default | Wraps the start of every section (XML uses this for `<content>`/`<section>`).                     |
 | `section_footer_template` | template | format default | Wraps the end of every section.                                                                   |
 | `output_header_template`  | template | format default | Rendered once before the first section.                                                           |
 | `output_footer_template`  | template | format default | Rendered once after the last section.                                                             |
 | `stats_template`          | template | format default | Renders the file/token summary footer.                                                            |
+| `report_template`         | template | built-in       | Renders the detailed report from `--report`. One default across all formats.                       |
 
 ### Precedence for the prompts library
 
@@ -94,7 +96,8 @@ FileContext is bound to the five file templates (`file_content_template`, `file_
 |--------------------|----------------|----------------------------------------------------|
 | `Path`             | string         | Display path (relative when possible).             |
 | `AbsPath`          | string         | Absolute path on disk.                             |
-| `Size`             | int64          | Bytes. Pair with `humanize`.                       |
+| `Size`             | int64          | Bytes as rendered. Pair with `humanize`.           |
+| `OriginalSize`     | int64          | Bytes on disk, before any conversion.              |
 | `ModTime`          | time.Time      | Pair with `date "2006-01-02"`.                     |
 | `TotalRows`        | int            | Lines after slicing.                               |
 | `IsEstimate`       | bool           | True if rows are an estimate (e.g. binary skip).   |
@@ -106,7 +109,8 @@ FileContext is bound to the five file templates (`file_content_template`, `file_
 | `IsError`          | bool           |                                                    |
 | `ReadError`        | string         | Set when `IsError`.                                |
 | `TokenEstimate`    | int64          |                                                    |
-| `SkeletonMode`     | string         | `functions`, `types`, or empty.                    |
+| `SkeletonMode`     | string         | `function signatures`, `type definitions`, `definitions`, or empty. |
+| `ConvertedFrom`    | string         | Source format when content was converted, else empty. |
 | `FileIndex`        | int            | 1-based index across the whole run.                |
 | `SectionFileIndex` | int            | 1-based index within the current section.          |
 | `Section`          | SectionContext | Outer section info (notably `Section.TotalFiles`). |
@@ -134,13 +138,36 @@ PromptContext is bound to `prompt_template`:
 TreeContext is bound to `tree_template` and has the same shape as PromptContext, except Body holds the rendered tree
 text rather than an injected prompt string.
 
+MetaContext is bound to `meta_template`. Body is the pre-rendered block, and Fields carries the same values
+individually so a custom template can select and label them:
+
+| Field     | Type              | Notes                                                        |
+|-----------|-------------------|--------------------------------------------------------------|
+| `Body`    | string            | The default rendered block.                                  |
+| `Fields`  | map[string]string | Keys: `os`, `arch`, `time`, `host`, `version`, `command`.     |
+| `Section` | SectionContext    |                                                              |
+| `Global`  | GlobalContext     |                                                              |
+
 HeaderContext and FooterContext are bound to `output_header_template` and `output_footer_template`, and carry a single
 field, Global (a GlobalContext).
 
-StatsContext is bound to `stats_template` and carries Global only.
+StatsContext is bound to `stats_template` and carries Global plus ColorEnabled (a bool, false when output is piped or
+`NO_COLOR` is set).
+
+ReportContext is bound to `report_template`:
+
+| Field          | Type         | Notes                                                    |
+|----------------|--------------|----------------------------------------------------------|
+| `Files`        | []FileReport | One entry per rendered file, in output order.            |
+| `Top`          | []FileReport | Same entries ordered by descending token count.          |
+| `ColorEnabled` | bool         | As for StatsContext.                                     |
+| `Global`       | GlobalContext |                                                         |
+
+Each FileReport carries Path, OriginalSize, RenderedSize, Tokens, Rows, Language, and IsBinary.
 
 GlobalContext is reachable from every other context as `.Global`. Its fields are TotalFiles, TotalSize,
-TotalWrittenBytes, TokenEstimate, TotalSections, WorkDir, and Metadata (a map of string to string).
+TotalWrittenBytes, TotalRows, TokenEstimate, TotalSections, WorkDir, Metadata (a map of string to string), and the
+report breakdown counters SkippedBySize, BinaryFiles, and FailedFiles.
 
 ### Helper functions
 

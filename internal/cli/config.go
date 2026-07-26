@@ -20,6 +20,7 @@ type CliConfig struct {
 	SectionTemplate string `yaml:"section_template"`
 	PromptTemplate  string `yaml:"prompt_template"`
 	TreeTemplate    string `yaml:"tree_template"`
+	MetaTemplate    string `yaml:"meta_template"`
 
 	SectionHeaderTemplate string `yaml:"section_header_template"`
 	SectionFooterTemplate string `yaml:"section_footer_template"`
@@ -27,6 +28,7 @@ type CliConfig struct {
 	OutputHeaderTemplate string `yaml:"output_header_template"`
 	OutputFooterTemplate string `yaml:"output_footer_template"`
 	StatsTemplate        string `yaml:"stats_template"`
+	ReportTemplate       string `yaml:"report_template"`
 
 	OutputFormat string `yaml:"output_format"`
 
@@ -82,6 +84,7 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		overrideIfSet(&lxCfg.SectionTemplate, loaded.SectionTemplate)
 		overrideIfSet(&lxCfg.PromptTemplate, loaded.PromptTemplate)
 		overrideIfSet(&lxCfg.TreeTemplate, loaded.TreeTemplate)
+		overrideIfSet(&lxCfg.MetaTemplate, loaded.MetaTemplate)
 
 		overrideIfSet(&lxCfg.SectionHeaderTemplate, loaded.SectionHeaderTemplate)
 		overrideIfSet(&lxCfg.SectionFooterTemplate, loaded.SectionFooterTemplate)
@@ -89,6 +92,7 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		overrideIfSet(&lxCfg.OutputHeaderTemplate, loaded.OutputHeaderTemplate)
 		overrideIfSet(&lxCfg.OutputFooterTemplate, loaded.OutputFooterTemplate)
 		overrideIfSet(&lxCfg.StatsTemplate, loaded.StatsTemplate)
+		overrideIfSet(&lxCfg.ReportTemplate, loaded.ReportTemplate)
 
 		overrideIfSet(&lxCfg.OutputFormat, loaded.OutputFormat)
 

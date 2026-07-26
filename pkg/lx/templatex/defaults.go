@@ -22,6 +22,7 @@ type formatDefaults struct {
 	Section       string
 	Prompt        string
 	Tree          string
+	Meta          string
 	OutputHeader  string
 	OutputFooter  string
 	SectionHeader string
@@ -41,6 +42,7 @@ func getFormatDefaults(fmtType string) formatDefaults {
 			SectionFooter: defaultXMLSectionFooter,
 			Prompt:        defaultXMLPrompt,
 			Tree:          defaultXMLTree,
+			Meta:          defaultXMLMeta,
 			OutputFooter:  defaultXMLOutputFooter,
 		}
 	case "html":
@@ -54,6 +56,7 @@ func getFormatDefaults(fmtType string) formatDefaults {
 			SectionFooter: defaultHTMLSectionFooter,
 			Prompt:        defaultHTMLPrompt,
 			Tree:          defaultHTMLTree,
+			Meta:          defaultHTMLMeta,
 			OutputHeader:  defaultHTMLOutputHeader,
 			OutputFooter:  defaultHTMLOutputFooter,
 		}
@@ -67,6 +70,7 @@ func getFormatDefaults(fmtType string) formatDefaults {
 			Section:     defaultBareSection,
 			Prompt:      defaultBarePrompt,
 			Tree:        defaultBareTree,
+			Meta:        defaultBareMeta,
 		}
 	default: // markdown
 		return formatDefaults{
@@ -78,6 +82,7 @@ func getFormatDefaults(fmtType string) formatDefaults {
 			Section:      defaultMarkdownSection,
 			Prompt:       defaultPrompt,
 			Tree:         defaultMarkdownTree,
+			Meta:         defaultMarkdownMeta,
 			OutputFooter: defaultMarkdownOutputFooter,
 		}
 	}
@@ -95,6 +100,7 @@ const defaultMarkdownCompact = `{{ template "file_header" . }} ({{ if .IsEstimat
 const defaultMarkdownSection = `## {{ .Body | endNewline }}---`
 const defaultPrompt = `{{ .Body | endNewline }}`
 const defaultMarkdownTree = "```\n" + `{{ .Body | endNewline -}}` + "```"
+const defaultMarkdownMeta = "```\n" + `{{ .Body | endNewline -}}` + "```"
 const defaultMarkdownOutputFooter = "\n\n"
 
 const defaultXMLContent = `  <document index="{{ .FileIndex }}"{{ if .Language }} language="{{ .Language }}"{{ end }} rows="{{ .TotalRows }}"{{ if .SkeletonMode }} skeleton="{{ .SkeletonMode }}"{{ end }}>
@@ -125,6 +131,8 @@ const defaultXMLPrompt = `  <instruction>` + "\n" +
 	`  </instruction>`
 const defaultXMLTree = `  <tree>
 {{ .Body | endNewline }}  </tree>`
+const defaultXMLMeta = `  <system_context>
+{{ .Body | endNewline }}  </system_context>`
 const defaultXMLOutputFooter = "\n\n"
 
 const defaultHTMLOutputHeader = `<!DOCTYPE html>
@@ -231,6 +239,7 @@ const defaultHTMLSection = `<section id="section-{{ .Index }}"><h2><a href="#sec
 const defaultHTMLSectionFooter = `</section>`
 const defaultHTMLPrompt = `<blockquote>{{ .Body | endNewline }}</blockquote>`
 const defaultHTMLTree = `<pre class="file-tree">{{ .Body | escape | endNewline }}</pre>`
+const defaultHTMLMeta = `<pre class="system-context">{{ .Body | escape | endNewline }}</pre>`
 
 const defaultBareFileHeader = ``
 const defaultBareContent = `{{ .Content | endNewline -}}`
@@ -240,6 +249,7 @@ const defaultBareCompact = ``
 const defaultBareSection = ``
 const defaultBarePrompt = ``
 const defaultBareTree = ``
+const defaultBareMeta = ``
 
 const (
 	ansiReset  = "\x1b[0m"
@@ -262,6 +272,22 @@ const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
 	`{{ commafy .Global.TotalRows }} {{ plural .Global.TotalRows "row" "rows" }} {{ dim .ColorEnabled "·" }} ` +
 	`{{ commafy .Global.TotalSections }} {{ plural .Global.TotalSections "section" "sections" }} {{ dim .ColorEnabled "·" }} ` +
 	`{{ humanize .Global.TotalSize }}` + "\n" +
+	`  {{ tokenLabel .Global.TokenEstimate .ColorEnabled }}` + "\n"
+
+// The report is a diagnostic summary rather than bundle content, so it has one
+// default across formats, like the stats summary.
+const defaultReportTemplate = `{{ if .Files }}` +
+	"| File | Original | Rendered | Tokens |\n" +
+	"|------|----------|----------|--------|\n" +
+	`{{ range .Files }}| {{ .Path }} | {{ humanize .OriginalSize }} | {{ humanize .RenderedSize }} | {{ commafy .Tokens }} |` + "\n" +
+	`{{ end }}` + "\n" +
+	`{{ end }}` +
+	`{{ if .Top }}Largest: {{ range $i, $f := .Top }}{{ if $i }}, {{ end }}{{ $f.Path }}{{ end }}` + "\n" +
+	`{{ end }}` +
+	`{{ commafy .Global.TotalFiles }} processed {{ dim .ColorEnabled "·" }} ` +
+	`{{ commafy .Global.SkippedBySize }} skipped (size) {{ dim .ColorEnabled "·" }} ` +
+	`{{ commafy .Global.BinaryFiles }} binary {{ dim .ColorEnabled "·" }} ` +
+	`{{ commafy .Global.FailedFiles }} failed` + "\n" +
 	`  {{ tokenLabel .Global.TokenEstimate .ColorEnabled }}` + "\n"
 
 func templateFuncs() template.FuncMap {

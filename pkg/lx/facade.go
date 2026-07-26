@@ -21,9 +21,12 @@ type FileContext = core.FileContext
 type SectionContext = core.SectionContext
 type PromptContext = core.PromptContext
 type TreeContext = core.TreeContext
+type MetaContext = core.MetaContext
 type HeaderContext = core.HeaderContext
 type FooterContext = core.FooterContext
 type StatsContext = core.StatsContext
+type ReportContext = core.ReportContext
+type FileReport = core.FileReport
 type TokenCounter = core.TokenCounter
 type Tokenizer = core.Tokenizer
 

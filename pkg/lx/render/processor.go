@@ -139,14 +139,15 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 			p.onFileError(file, err)
 		}
 		return core.FileContext{
-			Path:      file.Path,
-			AbsPath:   file.AbsPath,
-			Size:      file.Size,
-			ModTime:   file.ModTime,
-			FileIndex: index,
-			Global:    p.global,
-			ReadError: err.Error(),
-			IsError:   true,
+			Path:         file.Path,
+			AbsPath:      file.AbsPath,
+			Size:         file.Size,
+			OriginalSize: file.Size,
+			ModTime:      file.ModTime,
+			FileIndex:    index,
+			Global:       p.global,
+			ReadError:    err.Error(),
+			IsError:      true,
 		}, nil
 	}
 	defer rc.Close()
@@ -154,14 +155,15 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	if f, ok := rc.(*os.File); ok {
 		if stat, err := f.Stat(); err == nil && stat.IsDir() {
 			return core.FileContext{
-				Path:      file.Path,
-				AbsPath:   file.AbsPath,
-				Size:      file.Size,
-				ModTime:   file.ModTime,
-				FileIndex: index,
-				Global:    p.global,
-				ReadError: "is a directory",
-				IsError:   true,
+				Path:         file.Path,
+				AbsPath:      file.AbsPath,
+				Size:         file.Size,
+				OriginalSize: file.Size,
+				ModTime:      file.ModTime,
+				FileIndex:    index,
+				Global:       p.global,
+				ReadError:    "is a directory",
+				IsError:      true,
 			}, nil
 		}
 	}
@@ -248,14 +250,15 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, effectiveCfg)
 		if err != nil {
 			return core.FileContext{
-				Path:      file.Path,
-				AbsPath:   file.AbsPath,
-				Size:      file.Size,
-				ModTime:   file.ModTime,
-				FileIndex: index,
-				Global:    p.global,
-				ReadError: err.Error(),
-				IsError:   true,
+				Path:         file.Path,
+				AbsPath:      file.AbsPath,
+				Size:         file.Size,
+				OriginalSize: file.Size,
+				ModTime:      file.ModTime,
+				FileIndex:    index,
+				Global:       p.global,
+				ReadError:    err.Error(),
+				IsError:      true,
 			}, nil
 		}
 		contentData = p.formatContent(head, tail, gap, totalRows, effectiveCfg)
@@ -265,6 +268,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		Path:          file.Path,
 		AbsPath:       file.AbsPath,
 		Size:          size,
+		OriginalSize:  file.Size,
 		TotalRows:     displayRows,
 		IsEstimate:    !displayExact,
 		Language:      lang,

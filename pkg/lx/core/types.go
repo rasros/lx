@@ -15,6 +15,10 @@ type GlobalContext struct {
 	TotalSections     int
 	WorkDir           string
 	Metadata          map[string]string
+
+	SkippedBySize int
+	BinaryFiles   int
+	FailedFiles   int
 }
 
 // RunnerConfig defines slicing and formatting state for the rendering processor.
@@ -43,6 +47,7 @@ type TemplateEngine struct {
 	Section *template.Template
 	Prompt  *template.Template
 	Tree    *template.Template
+	Meta    *template.Template
 
 	SectionHeader *template.Template
 	SectionFooter *template.Template
@@ -50,6 +55,7 @@ type TemplateEngine struct {
 	OutputHeader *template.Template
 	OutputFooter *template.Template
 	Stats        *template.Template
+	Report       *template.Template
 }
 
 // Config represents the core library configuration.
@@ -63,6 +69,7 @@ type Config struct {
 	SectionTemplate string
 	PromptTemplate  string
 	TreeTemplate    string
+	MetaTemplate    string
 
 	SectionHeaderTemplate string
 	SectionFooterTemplate string
@@ -70,15 +77,19 @@ type Config struct {
 	OutputHeaderTemplate string
 	OutputFooterTemplate string
 	StatsTemplate        string
+	ReportTemplate       string
 
 	OutputFormat string
 }
 
 // FileContext represents the data provided to file-level templates.
 type FileContext struct {
-	Path             string
-	AbsPath          string
+	Path    string
+	AbsPath string
+	// Size is the size of the content as rendered. When a converter or
+	// skeleton filter ran, OriginalSize holds the file's size on disk.
 	Size             int64
+	OriginalSize     int64
 	ModTime          time.Time
 	TotalRows        int
 	ReadError        string
@@ -95,6 +106,9 @@ type FileContext struct {
 	Global           GlobalContext
 	Section          SectionContext
 	SkeletonMode     string
+	// ConvertedFrom names the source format when a converter replaced the
+	// content, so Language can describe what is actually rendered.
+	ConvertedFrom string
 }
 
 // SectionContext represents the data provided to section templates.
@@ -121,6 +135,16 @@ type TreeContext struct {
 	Section SectionContext
 }
 
+// MetaContext represents the data provided to metadata block templates.
+// Body is the pre-rendered block; Fields exposes the same values individually
+// so custom templates can select and label them.
+type MetaContext struct {
+	Body    string
+	Fields  map[string]string
+	Global  GlobalContext
+	Section SectionContext
+}
+
 // HeaderContext represents the data provided to the overall output header.
 type HeaderContext struct {
 	Global GlobalContext
@@ -133,6 +157,27 @@ type FooterContext struct {
 
 // StatsContext represents the data provided to the statistics summary template.
 type StatsContext struct {
+	Global       GlobalContext
+	ColorEnabled bool
+}
+
+// FileReport is one file's row in the detailed report.
+type FileReport struct {
+	Path         string
+	OriginalSize int64
+	RenderedSize int64
+	Tokens       int64
+	Rows         int
+	Language     string
+	IsBinary     bool
+}
+
+// ReportContext represents the data provided to the detailed report template.
+// Files is in output order; Top is the same set ordered by descending token
+// count, so templates do not have to sort.
+type ReportContext struct {
+	Files        []FileReport
+	Top          []FileReport
 	Global       GlobalContext
 	ColorEnabled bool
 }

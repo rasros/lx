@@ -72,6 +72,11 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		return nil, fmt.Errorf("tree template: %w", err)
 	}
 
+	tMeta, err := parse("meta", pick(cfg.MetaTemplate, defaults.Meta))
+	if err != nil {
+		return nil, fmt.Errorf("meta template: %w", err)
+	}
+
 	tSecHeader, err := parse("section_header", pick(cfg.SectionHeaderTemplate, defaults.SectionHeader))
 	if err != nil {
 		return nil, fmt.Errorf("section_header template: %w", err)
@@ -93,6 +98,10 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stats template: %w", err)
 	}
+	tReport, err := parse("report", pick(cfg.ReportTemplate, defaultReportTemplate))
+	if err != nil {
+		return nil, fmt.Errorf("report template: %w", err)
+	}
 
 	return &core.TemplateEngine{
 		FileContent:   tContent,
@@ -102,10 +111,12 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		Section:       tSection,
 		Prompt:        tPrompt,
 		Tree:          tTree,
+		Meta:          tMeta,
 		SectionHeader: tSecHeader,
 		SectionFooter: tSecFooter,
 		OutputHeader:  tHeader,
 		OutputFooter:  tFooter,
 		Stats:         tStats,
+		Report:        tReport,
 	}, nil
 }

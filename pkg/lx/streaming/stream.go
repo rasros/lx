@@ -34,6 +34,8 @@ type Stream struct {
 	onFileError FileErrorHandler
 	concurrency int
 	prepared    []render.PreparedItem
+
+	skippedBySize int
 }
 
 func NewStream(cfg *core.Config, runnerCfg core.RunnerConfig) (*Stream, error) {
@@ -87,6 +89,7 @@ func (s *Stream) AddFile(f sources.InputFile) *Stream {
 	f.Config = s.renderCfg
 	if s.renderCfg.MaxSize > 0 && f.Size > s.renderCfg.MaxSize {
 		slog.Debug("Skipped by size limit (-m)", "path", f.Path, "size", f.Size, "max_size", s.renderCfg.MaxSize)
+		s.skippedBySize++
 		return s
 	}
 	s.items = append(s.items, f)
@@ -115,8 +118,9 @@ func (s *Stream) Prepare() core.GlobalContext {
 	}
 
 	global := core.GlobalContext{
-		WorkDir:  s.workDir,
-		Metadata: make(map[string]string),
+		WorkDir:       s.workDir,
+		Metadata:      make(map[string]string),
+		SkippedBySize: s.skippedBySize,
 	}
 
 	s.sections = make([]*core.SectionContext, 0)
