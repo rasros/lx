@@ -1,0 +1,19 @@
+--- STDOUT ---
+main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+```
+OS: GOOS
+Arch: GOARCH
+Time: FIXED
+Host: HOST
+Tool: lx VERSION
+Command: lx main.go --system-context --no-stats
+```
+
+
+--- STDERR ---

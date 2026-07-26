@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/atotto/clipboard"
 	"github.com/rasros/lx/pkg/lx"
@@ -41,7 +42,7 @@ func Run(ctx context.Context, args []string) error {
 		return fmt.Errorf("input gathering failed: %w", err)
 	}
 
-	return processStream(ctx, parsed)
+	return processStream(ctx, parsed, args)
 }
 
 func handleGlobals(parsed *ParsedArgs) bool {
@@ -74,7 +75,7 @@ func handleGlobals(parsed *ParsedArgs) bool {
 func gatherInputs(parsed *ParsedArgs) error {
 	hasFilesOrGenerators := false
 	for _, op := range parsed.Ops {
-		if op.Action == "FILE" || op.Action == "file" || op.Action == "section" || op.Action == "prompt" || op.Action == "prompt-file" {
+		if op.Action == "FILE" || op.Action == "file" || op.Action == "section" || op.Action == "prompt" || op.Action == "prompt-file" || op.Action == "system-context" {
 			slog.Debug("Detected input from actions")
 			hasFilesOrGenerators = true
 			break
@@ -105,7 +106,7 @@ func gatherInputs(parsed *ParsedArgs) error {
 	return nil
 }
 
-func processStream(ctx context.Context, parsed *ParsedArgs) error {
+func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) error {
 	initialLevel, err := determineLogLevel(parsed, "warn")
 	if err != nil {
 		return err
@@ -172,6 +173,15 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 	applyWorkloadConcurrency(stream, sections, runtime.NumCPU())
 	precomputeTrees(ctx, sections, globalIgnoreRules)
 	debugLoggingEnabled := slog.Default().Enabled(ctx, slog.LevelDebug)
+
+	var metaFields map[string]string
+	var metaBody string
+	resolveSystemContext := func() (map[string]string, string) {
+		if metaFields == nil {
+			metaFields, metaBody = systemContext(rawArgs, time.Now())
+		}
+		return metaFields, metaBody
+	}
 
 	for si, section := range sections {
 		slog.Debug("Processing section", "index", si, "ops", len(section.Ops))
@@ -446,6 +456,10 @@ func processStream(ctx context.Context, parsed *ParsedArgs) error {
 			case "section":
 				slog.Debug("Adding section", "title", op.Value)
 				stream.AddSection(op.Value)
+			case "system-context":
+				fields, body := resolveSystemContext()
+				slog.Debug("Adding system context", "fields", len(fields))
+				stream.AddMeta(body, fields)
 			case "prompt":
 				slog.Debug("Adding prompt", "length", len(op.Value))
 				stream.AddPrompt(op.Value)

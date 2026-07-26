@@ -217,6 +217,13 @@ func normalizeOutput(stdout, stderr string, roots ...string) string {
 		s = regexp.MustCompile(`time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(?:[+-]\d{2}:\d{2}|Z)`).ReplaceAllString(s, "time=FIXED")
 		s = regexp.MustCompile(`msg="Loaded global ignore file" path=.*`).ReplaceAllString(s, `msg="Loaded global ignore file" path=GLOBAL_IGNORE`)
 
+		// --system-context reports the host machine and the current time.
+		s = regexp.MustCompile(`(?m)^OS: .*$`).ReplaceAllString(s, "OS: GOOS")
+		s = regexp.MustCompile(`(?m)^Arch: .*$`).ReplaceAllString(s, "Arch: GOARCH")
+		s = regexp.MustCompile(`(?m)^Time: .*$`).ReplaceAllString(s, "Time: FIXED")
+		s = regexp.MustCompile(`(?m)^Host: .*$`).ReplaceAllString(s, "Host: HOST")
+		s = regexp.MustCompile(`(?m)^Tool: lx .*$`).ReplaceAllString(s, "Tool: lx VERSION")
+
 		return s
 	}
 

@@ -111,6 +111,11 @@ func (s *Stream) AddTree(body string) *Stream {
 	return s
 }
 
+func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
+	s.items = append(s.items, core.MetaContext{Body: body, Fields: fields})
+	return s
+}
+
 // Prepare calculates metadata and organizes items into sections before rendering.
 func (s *Stream) Prepare() core.GlobalContext {
 	if s.finalStats != nil {
