@@ -2,6 +2,7 @@ package streaming
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -254,5 +255,53 @@ func TestStream_PerFileTokenEstimateIsContentDerived(t *testing.T) {
 	}
 	if got <= sizeOnly {
 		t.Errorf("per-file TokenEstimate = %d, want greater than bytes/4 (%d) for symbol-dense content", got, sizeOnly)
+	}
+}
+
+func TestStream_SkippedBySizeIsCounted(t *testing.T) {
+	stream, err := NewStream(core.NewConfig(), core.RunnerConfig{Head: -1, MaxSize: 10})
+	if err != nil {
+		t.Fatalf("NewStream failed: %v", err)
+	}
+
+	stream.AddFile(sources.NewBufferInputFile("small.txt", []byte("tiny")))
+	stream.AddFile(sources.NewBufferInputFile("big1.txt", []byte(strings.Repeat("x", 64))))
+	stream.AddFile(sources.NewBufferInputFile("big2.txt", []byte(strings.Repeat("y", 99))))
+
+	g := stream.GetGlobalContext()
+	if g.SkippedBySize != 2 {
+		t.Errorf("SkippedBySize = %d, want 2", g.SkippedBySize)
+	}
+	if g.TotalFiles != 1 {
+		t.Errorf("TotalFiles = %d, want 1", g.TotalFiles)
+	}
+}
+
+func TestStream_OriginalSizeIsPreConversionSize(t *testing.T) {
+	cfg := core.NewConfig()
+	cfg.FileContentTemplate = "{{ .OriginalSize }} {{ .Size }}"
+	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1, SkeletonFunctions: true})
+	if err != nil {
+		t.Fatalf("NewStream failed: %v", err)
+	}
+
+	src := "package main\n\nfunc Alpha() int {\n\treturn 1\n}\n\nfunc Beta() int {\n\treturn 2\n}\n"
+	stream.AddFile(sources.NewBufferInputFile("main.go", []byte(src)))
+
+	var buf strings.Builder
+	if err := stream.Execute(context.Background(), &buf); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	var original, rendered int64
+	if _, err := fmt.Sscanf(strings.TrimSpace(buf.String()), "%d %d", &original, &rendered); err != nil {
+		t.Fatalf("parse %q: %v", buf.String(), err)
+	}
+
+	if original != int64(len(src)) {
+		t.Errorf("OriginalSize = %d, want %d (size on disk)", original, len(src))
+	}
+	if rendered >= original {
+		t.Errorf("Size = %d, want less than OriginalSize %d after the skeleton filter", rendered, original)
 	}
 }

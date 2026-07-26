@@ -34,6 +34,9 @@ func Merge(dst *Config, src *Config) {
 	if src.TreeTemplate != "" {
 		dst.TreeTemplate = src.TreeTemplate
 	}
+	if src.MetaTemplate != "" {
+		dst.MetaTemplate = src.MetaTemplate
+	}
 
 	if src.SectionHeaderTemplate != "" {
 		dst.SectionHeaderTemplate = src.SectionHeaderTemplate
@@ -50,6 +53,9 @@ func Merge(dst *Config, src *Config) {
 	}
 	if src.StatsTemplate != "" {
 		dst.StatsTemplate = src.StatsTemplate
+	}
+	if src.ReportTemplate != "" {
+		dst.ReportTemplate = src.ReportTemplate
 	}
 
 	if src.OutputFormat != "" {
