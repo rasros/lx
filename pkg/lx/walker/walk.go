@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"io/fs"
+	"os"
 	"path"
 	"strings"
 )
@@ -59,10 +60,46 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 
 	initialRules := make([]Rule, 0, len(w.BaseRules))
 	initialRules = append(initialRules, w.BaseRules...)
-	return w.recursiveWalk(fsys, root, initialRules, walkFn, false)
+	return w.recursiveWalk(fsys, root, initialRules, walkFn, false, []fs.FileInfo{info})
 }
 
-func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkFn fs.WalkDirFunc, parentIgnored bool) error {
+// resolveEntry reports how an entry should be treated, applying symlink policy.
+// A symlink whose target cannot be stat'd is left as a file so the callback can
+// surface the error.
+func (w *Walker) resolveEntry(fsys fs.FS, path string, d fs.DirEntry, ancestors []fs.FileInfo) (isDir bool, target fs.FileInfo, skip bool, reason string) {
+	if d.Type()&fs.ModeSymlink == 0 {
+		return d.IsDir(), nil, false, ""
+	}
+
+	info, err := fs.Stat(fsys, path)
+	if err != nil {
+		// Broken link. It resolves to nothing, so file-symlink policy governs
+		// it; otherwise leave it for the callback to report.
+		if w.SkipFileSymlinks {
+			return false, nil, true, "file symlink"
+		}
+		return false, nil, false, ""
+	}
+
+	if !info.IsDir() {
+		if w.SkipFileSymlinks {
+			return false, nil, true, "file symlink"
+		}
+		return false, nil, false, ""
+	}
+
+	if !w.FollowDirSymlinks {
+		return false, nil, true, "directory symlink"
+	}
+	for _, a := range ancestors {
+		if os.SameFile(a, info) {
+			return true, info, true, "symlink cycle"
+		}
+	}
+	return true, info, false, ""
+}
+
+func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkFn fs.WalkDirFunc, parentIgnored bool, ancestors []fs.FileInfo) error {
 	var localRules []Rule
 	if w.IgnoreEnabled {
 		localRules = w.loadIgnoreFiles(fsys, dir)
@@ -104,12 +141,34 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 			continue
 		}
 
-		isIgnored, reason := checkIgnore(childPath, d.IsDir(), effectiveRules, parentIgnored, w.OnIgnore != nil)
+		isDir, target, skip, skipReason := w.resolveEntry(fsys, childPath, d, ancestors)
+		if skip {
+			if w.OnIgnore != nil {
+				w.OnIgnore(childPath, skipReason)
+			}
+			continue
+		}
 
-		if d.IsDir() {
+		// Cycle detection needs every directory on the current path, not just
+		// the followed links. Skipped entirely when not following, so ordinary
+		// walks pay no extra stat.
+		childAncestors := ancestors
+		if isDir && w.FollowDirSymlinks {
+			info := target
+			if info == nil {
+				info, _ = d.Info()
+			}
+			if info != nil {
+				childAncestors = append(ancestors, info)
+			}
+		}
+
+		isIgnored, reason := checkIgnore(childPath, isDir, effectiveRules, parentIgnored, w.OnIgnore != nil)
+
+		if isDir {
 			if isIgnored {
 				if hasNestedException(childPath, effectiveRules) {
-					if err := w.recursiveWalk(fsys, childPath, mergedRules, walkFn, true); err != nil {
+					if err := w.recursiveWalk(fsys, childPath, mergedRules, walkFn, true, childAncestors); err != nil {
 						return err
 					}
 					continue
@@ -120,14 +179,18 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 				continue
 			}
 
-			if err := walkFn(childPath, d, nil); err != nil {
+			entry := d
+			if target != nil {
+				entry = followedDirEntry{DirEntry: d, info: target}
+			}
+			if err := walkFn(childPath, entry, nil); err != nil {
 				if err == fs.SkipDir {
 					continue
 				}
 				return err
 			}
 
-			if err := w.recursiveWalk(fsys, childPath, mergedRules, walkFn, false); err != nil {
+			if err := w.recursiveWalk(fsys, childPath, mergedRules, walkFn, false, childAncestors); err != nil {
 				return err
 			}
 			continue
@@ -172,6 +235,18 @@ func (w *Walker) loadIgnoreFiles(fsys fs.FS, dir string) []Rule {
 	}
 	return rules
 }
+
+// followedDirEntry presents a followed directory symlink as a directory, so
+// callbacks branch on it the same way they branch on a real one. The embedded
+// entry keeps the link's own name.
+type followedDirEntry struct {
+	fs.DirEntry
+	info fs.FileInfo
+}
+
+func (f followedDirEntry) IsDir() bool                { return true }
+func (f followedDirEntry) Type() fs.FileMode          { return fs.ModeDir }
+func (f followedDirEntry) Info() (fs.FileInfo, error) { return f.info, nil }
 
 type dirEntryAdapter struct {
 	info fs.FileInfo

@@ -158,6 +158,8 @@ func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includ
 	w := lx.NewWalker(baseRules, overrideRules)
 	w.IgnoreEnabled = !runCfg.NoIgnore
 	w.SkipHidden = !runCfg.ShowHidden && !isForced
+	w.FollowDirSymlinks = runCfg.FollowDirSymlinks
+	w.SkipFileSymlinks = runCfg.SkipFileSymlinks
 
 	_ = w.Walk(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

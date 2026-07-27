@@ -1,9 +1,15 @@
 --- STDOUT ---
-links/link_to_main.go (~1 rows)
+[1/2] links/link_to_main.go (~1 rows)
 ---
 ```go
 package main
 func main() {}
+```
+
+[2/2] links/link_to_pkg/util.go (1 rows)
+---
+```go
+package pkg
 ```
 
 

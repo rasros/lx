@@ -338,6 +338,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 				walker := lx.NewWalker(baseRules, overrideRules)
 				walker.IgnoreEnabled = !section.RunCfg.NoIgnore
 				walker.SkipHidden = !section.RunCfg.ShowHidden && !isForced
+				walker.FollowDirSymlinks = section.RunCfg.FollowDirSymlinks
+				walker.SkipFileSymlinks = section.RunCfg.SkipFileSymlinks
 				if debugLoggingEnabled {
 					walker.OnIgnore = func(p, reason string) {
 						slog.Debug("Ignored", "path", p, "reason", reason)
@@ -370,19 +372,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 							effectivePath = displayPrefix
 						} else {
 							effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
-						}
-					}
-
-					if (d.Type() & fs.ModeSymlink) != 0 {
-						if section.RunCfg.SkipFileSymlinks {
-							return nil
-						}
-						targetInfo, err := fs.Stat(fsys, path)
-						if err == nil && targetInfo.IsDir() {
-							if !section.RunCfg.FollowDirSymlinks {
-								slog.Debug("Skipping directory symlink", "path", effectivePath)
-								return nil
-							}
 						}
 					}
 

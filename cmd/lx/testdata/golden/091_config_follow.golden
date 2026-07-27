@@ -1,7 +1,11 @@
 --- STDOUT ---
 [1/9] links/broken_link - error: open broken_link: FILE_NOT_FOUND
 
-[2/9] links/cycle_a/to_b - error: is a directory
+[2/9] links/cycle_a/to_b/visible.txt (1 rows)
+---
+```text
+b
+```
 
 [3/9] links/cycle_a/visible.txt (1 rows)
 ---
@@ -9,7 +13,11 @@
 a
 ```
 
-[4/9] links/cycle_b/to_a - error: is a directory
+[4/9] links/cycle_b/to_a/visible.txt (1 rows)
+---
+```text
+a
+```
 
 [5/9] links/cycle_b/visible.txt (1 rows)
 ---
@@ -26,7 +34,11 @@ func main() {}
 
 [7/9] links/link_to_pkg - error: open link_to_pkg: FILE_NOT_FOUND
 
-[8/9] links/loop - error: is a directory
+[8/9] links/loop/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
 
 [9/9] links/safe_target/recursion.txt (1 rows)
 ---

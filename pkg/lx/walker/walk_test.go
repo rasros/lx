@@ -4,8 +4,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestWalker_NestedIgnores(t *testing.T) {
@@ -427,4 +430,110 @@ func TestWalker_IgnoreDisabled(t *testing.T) {
 
 	files := collectPaths(t, w, tmp)
 	assertContains(t, files, "keep.log")
+}
+
+func symlinkTree(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	mustMkdir := func(p string) {
+		if err := os.MkdirAll(filepath.Join(dir, p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustWrite := func(p, content string) {
+		if err := os.WriteFile(filepath.Join(dir, p), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustLink := func(target, name string) {
+		if err := os.Symlink(target, filepath.Join(dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	mustMkdir("real")
+	mustWrite("real/inside.txt", "x")
+	mustWrite("top.txt", "y")
+	mustLink("real", "dirlink")
+	mustLink("top.txt", "filelink")
+	mustLink("nowhere", "brokenlink")
+	return dir
+}
+
+func walkPaths(t *testing.T, dir string, configure func(*Walker)) []string {
+	t.Helper()
+	w := NewWalker(nil, nil)
+	if configure != nil {
+		configure(w)
+	}
+	var got []string
+	err := w.Walk(os.DirFS(dir), ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		got = append(got, p)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk failed: %v", err)
+	}
+	sort.Strings(got)
+	return got
+}
+
+func TestWalkSkipsDirectorySymlinksByDefault(t *testing.T) {
+	got := walkPaths(t, symlinkTree(t), nil)
+	want := []string{"brokenlink", "filelink", "real/inside.txt", "top.txt"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestWalkFollowsDirectorySymlinksWhenEnabled(t *testing.T) {
+	got := walkPaths(t, symlinkTree(t), func(w *Walker) { w.FollowDirSymlinks = true })
+	want := []string{"brokenlink", "dirlink/inside.txt", "filelink", "real/inside.txt", "top.txt"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// A broken link resolves to nothing, so file-symlink policy governs it.
+func TestWalkSkipFileSymlinksDropsFileAndBrokenLinks(t *testing.T) {
+	got := walkPaths(t, symlinkTree(t), func(w *Walker) { w.SkipFileSymlinks = true })
+	want := []string{"real/inside.txt", "top.txt"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestWalkFollowTerminatesOnSymlinkCycle(t *testing.T) {
+	dir := t.TempDir()
+	for _, d := range []string{"a", "b"} {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, d, "f.txt"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink("../b", filepath.Join(dir, "a", "to_b")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../a", filepath.Join(dir, "b", "to_a")); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan []string, 1)
+	go func() { done <- walkPaths(t, dir, func(w *Walker) { w.FollowDirSymlinks = true }) }()
+
+	select {
+	case got := <-done:
+		for _, p := range got {
+			if strings.Count(p, "to_") > 1 {
+				t.Errorf("walk recursed through the cycle repeatedly: %q", p)
+			}
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("walk did not terminate on a symlink cycle")
+	}
 }

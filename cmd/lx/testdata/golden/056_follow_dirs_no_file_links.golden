@@ -1,17 +1,41 @@
 --- STDOUT ---
-[1/3] links/cycle_a/visible.txt (1 rows)
----
-```text
-a
-```
-
-[2/3] links/cycle_b/visible.txt (1 rows)
+[1/7] links/cycle_a/to_b/visible.txt (1 rows)
 ---
 ```text
 b
 ```
 
-[3/3] links/safe_target/recursion.txt (1 rows)
+[2/7] links/cycle_a/visible.txt (1 rows)
+---
+```text
+a
+```
+
+[3/7] links/cycle_b/to_a/visible.txt (1 rows)
+---
+```text
+a
+```
+
+[4/7] links/cycle_b/visible.txt (1 rows)
+---
+```text
+b
+```
+
+[5/7] links/link_to_pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
+
+[6/7] links/loop/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
+
+[7/7] links/safe_target/recursion.txt (1 rows)
 ---
 ```text
 I am safe
