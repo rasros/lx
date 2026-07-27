@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/rasros/lx/pkg/lx/core"
@@ -148,64 +150,87 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 	return nil
 }
 
+// errorContext describes a file that could not be read.
+func (p *Processor) errorContext(file sources.InputFile, index int, msg string) core.FileContext {
+	return core.FileContext{
+		Path:         file.Path,
+		AbsPath:      file.AbsPath,
+		Size:         file.Size,
+		OriginalSize: file.Size,
+		ModTime:      file.ModTime,
+		FileIndex:    index,
+		Global:       p.global,
+		ReadError:    msg,
+		IsError:      true,
+	}
+}
+
+// readerFor adapts an opened file to random access, buffering the content only
+// when the reader cannot provide it directly. Cases are ordered most to least
+// specific.
+func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
+	switch v := rc.(type) {
+	case *os.File:
+		return v, sizeHint
+	case byteReaderProvider:
+		br := v.ByteReader()
+		return br, br.Size()
+	case readerAtWithSize:
+		return v, v.Size()
+	case io.ReaderAt:
+		return v, sizeHint
+	}
+	data, _ := io.ReadAll(rc)
+	return bytes.NewReader(data), int64(len(data))
+}
+
+// convert replaces file content with a text rendering of it when a converter
+// applies, and reports the format converted from. A converter that fails leaves
+// the content untouched.
+func convert(file sources.InputFile, reader io.ReaderAt, size int64) (io.ReaderAt, int64, string) {
+	if file.Config.ExtractDocuments && sources.IsDocumentPath(file.Path) {
+		text, err := sources.ExtractDocumentText(file.Path, reader, size)
+		if err != nil {
+			return reader, size, ""
+		}
+		return bytes.NewReader(text), int64(len(text)), fileFormat(file.Path)
+	}
+	return reader, size, ""
+}
+
+func fileFormat(path string) string {
+	return strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
+}
+
+func skeletonModeLabel(functions, types bool) string {
+	switch {
+	case functions && types:
+		return "definitions"
+	case functions:
+		return "function signatures"
+	default:
+		return "type definitions"
+	}
+}
+
 func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratch []byte) (core.FileContext, error) {
 	rc, err := file.Open()
 	if err != nil {
 		if p.onFileError != nil {
 			p.onFileError(file, err)
 		}
-		return core.FileContext{
-			Path:         file.Path,
-			AbsPath:      file.AbsPath,
-			Size:         file.Size,
-			OriginalSize: file.Size,
-			ModTime:      file.ModTime,
-			FileIndex:    index,
-			Global:       p.global,
-			ReadError:    err.Error(),
-			IsError:      true,
-		}, nil
+		return p.errorContext(file, index, err.Error()), nil
 	}
 	defer rc.Close()
 
 	if f, ok := rc.(*os.File); ok {
 		if stat, err := f.Stat(); err == nil && stat.IsDir() {
-			return core.FileContext{
-				Path:         file.Path,
-				AbsPath:      file.AbsPath,
-				Size:         file.Size,
-				OriginalSize: file.Size,
-				ModTime:      file.ModTime,
-				FileIndex:    index,
-				Global:       p.global,
-				ReadError:    "is a directory",
-				IsError:      true,
-			}, nil
+			return p.errorContext(file, index, "is a directory"), nil
 		}
 	}
 
-	var reader io.ReaderAt
-	var size int64
-	if f, ok := rc.(*os.File); ok {
-		reader, size = f, file.Size
-	} else if brp, ok := rc.(byteReaderProvider); ok {
-		br := brp.ByteReader()
-		reader, size = br, br.Size()
-	} else if ras, ok := rc.(readerAtWithSize); ok {
-		reader, size = ras, ras.Size()
-	} else if ra, ok := rc.(io.ReaderAt); ok {
-		reader, size = ra, file.Size
-	} else {
-		data, _ := io.ReadAll(rc)
-		reader, size = bytes.NewReader(data), int64(len(data))
-	}
-
-	if file.Config.ExtractDocuments && sources.IsDocumentPath(file.Path) {
-		if text, err := sources.ExtractDocumentText(file.Path, reader, size); err == nil {
-			reader = bytes.NewReader(text)
-			size = int64(len(text))
-		}
-	}
+	reader, size := readerFor(rc, file.Size)
+	reader, size, convertedFrom := convert(file, reader, size)
 
 	if scratch == nil {
 		scratch = make([]byte, 1024)
@@ -234,14 +259,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 				headerLen = int(size)
 			}
 			n, _ = reader.ReadAt(scratch[:headerLen], 0)
-			switch {
-			case cfg.SkeletonFunctions && cfg.SkeletonTypes:
-				skeletonMode = "definitions"
-			case cfg.SkeletonFunctions:
-				skeletonMode = "function signatures"
-			default:
-				skeletonMode = "type definitions"
-			}
+			skeletonMode = skeletonModeLabel(cfg.SkeletonFunctions, cfg.SkeletonTypes)
 		}
 	}
 
@@ -265,17 +283,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 
 		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, effectiveCfg)
 		if err != nil {
-			return core.FileContext{
-				Path:         file.Path,
-				AbsPath:      file.AbsPath,
-				Size:         file.Size,
-				OriginalSize: file.Size,
-				ModTime:      file.ModTime,
-				FileIndex:    index,
-				Global:       p.global,
-				ReadError:    err.Error(),
-				IsError:      true,
-			}, nil
+			return p.errorContext(file, index, err.Error()), nil
 		}
 		contentData = p.formatContent(head, tail, gap, totalRows, effectiveCfg)
 	}
@@ -296,6 +304,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		FileIndex:     index,
 		Global:        p.global,
 		SkeletonMode:  skeletonMode,
+		ConvertedFrom: convertedFrom,
 	}, nil
 }
 

@@ -88,3 +88,41 @@ func TestStream_ExtractDocuments_EnabledViaRunnerConfig(t *testing.T) {
 		t.Errorf("extraction should be enabled by default, got:\n%s", got)
 	}
 }
+
+func TestStream_ConvertedFromNamesTheSourceFormat(t *testing.T) {
+	cfg := core.NewConfig()
+	cfg.FileContentTemplate = "[{{ .ConvertedFrom }}]"
+	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1, ExtractDocuments: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream.AddFile(sources.NewBufferInputFile("doc.docx", makeTestDOCX(t, "Content")))
+
+	var buf strings.Builder
+	if err := stream.Execute(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(buf.String()); got != "[docx]" {
+		t.Errorf("ConvertedFrom rendered as %q, want %q", got, "[docx]")
+	}
+}
+
+func TestStream_ConvertedFromEmptyWithoutAConverter(t *testing.T) {
+	cfg := core.NewConfig()
+	cfg.FileContentTemplate = "[{{ .ConvertedFrom }}]"
+	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream.AddFile(sources.NewBufferInputFile("main.go", []byte("package main\n")))
+
+	var buf strings.Builder
+	if err := stream.Execute(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(buf.String()); got != "[]" {
+		t.Errorf("ConvertedFrom rendered as %q, want empty", got)
+	}
+}

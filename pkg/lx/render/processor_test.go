@@ -199,3 +199,50 @@ func TestRender_LineNumbers(t *testing.T) {
 		t.Errorf("Expected line numbers in output, got:\n%s", got)
 	}
 }
+
+func TestSkeletonModeLabel(t *testing.T) {
+	cases := []struct {
+		functions, types bool
+		want             string
+	}{
+		{true, true, "definitions"},
+		{true, false, "function signatures"},
+		{false, true, "type definitions"},
+	}
+	for _, c := range cases {
+		if got := skeletonModeLabel(c.functions, c.types); got != c.want {
+			t.Errorf("skeletonModeLabel(%v, %v) = %q, want %q", c.functions, c.types, got, c.want)
+		}
+	}
+}
+
+func TestReaderForBuffersNonSeekableReaders(t *testing.T) {
+	// A plain ReadCloser exposes neither ReaderAt nor Size, so it must be read
+	// into memory and reported at its true length rather than the hint.
+	rc := io.NopCloser(strings.NewReader("hello world"))
+	reader, size := readerFor(rc, 999)
+
+	if size != 11 {
+		t.Errorf("size = %d, want 11", size)
+	}
+	buf := make([]byte, size)
+	if _, err := reader.ReadAt(buf, 0); err != nil {
+		t.Fatalf("ReadAt failed: %v", err)
+	}
+	if string(buf) != "hello world" {
+		t.Errorf("content = %q", buf)
+	}
+}
+
+func TestFileFormat(t *testing.T) {
+	cases := map[string]string{
+		"a/b/manual.PDF": "pdf",
+		"notes.docx":     "docx",
+		"Makefile":       "",
+	}
+	for path, want := range cases {
+		if got := fileFormat(path); got != want {
+			t.Errorf("fileFormat(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
