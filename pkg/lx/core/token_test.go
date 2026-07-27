@@ -50,9 +50,6 @@ func TestDefaultTokenCounter_CodeDenserThanProse(t *testing.T) {
 	if codeRatio > 3.6 {
 		t.Errorf("code chars/token = %.2f, want < 3.6 (denser than prose)", codeRatio)
 	}
-	if codeTokens <= proseTokens*int64(len(code))/int64(len(prose)) {
-		// nothing — handled by ratio checks
-	}
 }
 
 func TestDefaultTokenCounter_JSONDenseSymbols(t *testing.T) {

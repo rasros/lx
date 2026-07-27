@@ -44,12 +44,6 @@ func ExtractDocumentText(path string, r io.ReaderAt, size int64) ([]byte, error)
 	return nil, fmt.Errorf("unsupported document type: %s", ext)
 }
 
-func ExtractPDFText(r io.ReaderAt, size int64) ([]byte, error)  { return extractPDFText(r, size) }
-func ExtractDOCXText(r io.ReaderAt, size int64) ([]byte, error) { return extractDOCXText(r, size) }
-func ExtractXLSXText(r io.ReaderAt, size int64) ([]byte, error) { return extractXLSXText(r, size) }
-func ExtractPPTXText(r io.ReaderAt, size int64) ([]byte, error) { return extractPPTXText(r, size) }
-func XMLToText(r io.Reader) string                              { return xmlToText(r) }
-
 func extractPDFText(r io.ReaderAt, size int64) ([]byte, error) {
 	reader, err := pdflib.NewReader(r, size)
 	if err != nil {

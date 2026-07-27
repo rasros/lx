@@ -126,7 +126,3 @@ func PrecedingAnnotationRow(body, child *gotreesitter.Node, i int, lang *gotrees
 	}
 	return row
 }
-
-func emitAllLines(out []byte, lines [][]byte, n *gotreesitter.Node) []byte {
-	return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-}

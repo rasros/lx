@@ -64,11 +64,6 @@ func compileSpec(rawPattern string) CompiledSpec {
 	return actual.(CompiledSpec)
 }
 
-// CompileSpec parses and compiles one filter pattern.
-func CompileSpec(rawPattern string) CompiledSpec {
-	return compileSpec(rawPattern)
-}
-
 // CompileSpecs compiles all filter patterns.
 func CompileSpecs(rawPatterns []string) []CompiledSpec {
 	if len(rawPatterns) == 0 {
@@ -107,12 +102,6 @@ func normalizePattern(raw string) string {
 func normalizePathForMatch(raw string) string {
 	raw = strings.ReplaceAll(raw, "\\", "/")
 	return path.Clean(raw)
-}
-
-// IsMatchCompiled checks whether relPath matches an already-compiled pattern.
-func IsMatchCompiled(spec CompiledSpec, relPath string) bool {
-	ctx := buildPathMatchInfo(normalizePathForMatch(relPath))
-	return matchCompiledSpec(spec, ctx)
 }
 
 // IsMatchAnyCompiled checks whether relPath matches at least one compiled pattern.

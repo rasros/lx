@@ -413,6 +413,3 @@ func commafy(v int64) string {
 	}
 	return b.String()
 }
-
-// TemplateFuncs exposes the default template function map.
-func TemplateFuncs() template.FuncMap { return templateFuncs() }
