@@ -1,16 +1,15 @@
 package templatex
 
 import (
-	"encoding/base64"
 	"fmt"
 	"html"
 	"math"
-	"mime"
 	"os"
-	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 type formatDefaults struct {
@@ -203,7 +202,7 @@ const defaultHTMLContent = `<article id="file-{{ .FileIndex }}">
 {{- end }}
 </header>
 {{- if .IsImage }}
-<img src="{{ .AbsPath | dataURI }}" alt="{{ .Path }}" />
+<img src="{{ .DataURI }}" alt="{{ .Path }}" />
 {{- else }}
 <pre><code{{ if .Language }} class="language-{{ .Language }}"{{ end }}>
 {{ .Content | escape | endNewline }}</code></pre>
@@ -326,26 +325,7 @@ func templateFuncs() template.FuncMap {
 			if err != nil {
 				return ""
 			}
-			ext := strings.ToLower(filepath.Ext(path))
-			mimeType := mime.TypeByExtension(ext)
-			if mimeType == "" {
-				switch ext {
-				case ".svg":
-					mimeType = "image/svg+xml"
-				case ".jpg", ".jpeg":
-					mimeType = "image/jpeg"
-				case ".png":
-					mimeType = "image/png"
-				case ".gif":
-					mimeType = "image/gif"
-				case ".webp":
-					mimeType = "image/webp"
-				default:
-					mimeType = "application/octet-stream"
-				}
-			}
-			b64 := base64.StdEncoding.EncodeToString(data)
-			return fmt.Sprintf("data:%s;base64,%s", mimeType, b64)
+			return internal.DataURI(path, data)
 		},
 		"escape": func(s interface{}) string {
 			return html.EscapeString(contentString(s))

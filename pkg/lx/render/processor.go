@@ -259,6 +259,17 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		}
 	}
 
+	// Encode images from the bytes already open here. Reading them back by
+	// path in a template would fail for archive entries and URLs, which have
+	// no readable AbsPath.
+	var dataURI string
+	if isImage && p.format == "html" && size > 0 {
+		data := make([]byte, size)
+		if _, err := reader.ReadAt(data, 0); err == nil {
+			dataURI = internal.DataURI(file.Path, data)
+		}
+	}
+
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
 	totalRows, exact, _ := internal.EstimateLineCount(reader, size, scratch)
 
@@ -296,6 +307,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		TokenEstimate: p.tokenCounter(size, contentData),
 		IsBinary:      isBinary,
 		IsImage:       isImage,
+		DataURI:       dataURI,
 		IsCompactView: isCompact,
 		FileIndex:     index,
 		Global:        p.global,
