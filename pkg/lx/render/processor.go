@@ -179,35 +179,51 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 type converter struct {
 	name    string
 	applies func(sources.InputFile) bool
-	convert func(path string, r io.ReaderAt, size int64) ([]byte, error)
+	convert func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error)
+	// language of the produced content; empty means detect as usual.
+	language func(f sources.InputFile) string
 }
 
 var converters = []converter{
 	{
 		name: "document",
 		applies: func(f sources.InputFile) bool {
-			return f.Config.ExtractDocuments && sources.IsDocumentPath(f.Path)
+			if !f.Config.ExtractDocuments {
+				return false
+			}
+			return sources.IsDocumentPath(f.Path) || sources.IsHTMLInput(f)
 		},
-		convert: sources.ExtractDocumentText,
+		convert: sources.ConvertInput,
+		language: func(f sources.InputFile) string {
+			// The other formats yield plain text, which detection leaves unlabelled.
+			if sources.IsHTMLInput(f) {
+				return "markdown"
+			}
+			return ""
+		},
 	},
 }
 
 // applyConverters reports the format it converted from, or "" if none applied.
 // A converter that fails leaves the content untouched.
-func applyConverters(file sources.InputFile, reader io.ReaderAt, size int64) (io.ReaderAt, int64, string) {
+func applyConverters(file sources.InputFile, reader io.ReaderAt, size int64) (io.ReaderAt, int64, string, string) {
 	for _, c := range converters {
 		if !c.applies(file) {
 			continue
 		}
-		text, err := c.convert(file.Path, reader, size)
+		text, err := c.convert(file, reader, size)
 		if err != nil {
 			slog.Debug("Converter failed, keeping raw content",
 				"converter", c.name, "path", file.Path, "error", err)
-			return reader, size, ""
+			return reader, size, "", ""
 		}
-		return bytes.NewReader(text), int64(len(text)), fileFormat(file.Path)
+		lang := ""
+		if c.language != nil {
+			lang = c.language(file)
+		}
+		return bytes.NewReader(text), int64(len(text)), fileFormat(file.Path), lang
 	}
-	return reader, size, ""
+	return reader, size, "", ""
 }
 
 // detectContent sniffs the header for binary content and a language hint.
@@ -284,13 +300,16 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	}
 
 	reader, size := readerFor(rc, file.Size)
-	reader, size, convertedFrom := applyConverters(file, reader, size)
+	reader, size, convertedFrom, convertedLang := applyConverters(file, reader, size)
 
 	if scratch == nil {
 		scratch = make([]byte, 1024)
 	}
 
 	isBinary, lang := detectContent(file.Path, reader, scratch)
+	if convertedLang != "" {
+		lang = convertedLang
+	}
 	isImage := internal.IsImage(file.Path)
 	cfg := file.Config
 

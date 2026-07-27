@@ -30,6 +30,10 @@ func SetupArchiveFixture(t *testing.T) string {
 		{"hello.txt", "Hello from tar bz2!\n"},
 		{"nested/world.go", "package nested\n"},
 	})
+	createTestZip(filepath.Join(dir, "docs.zip"), [][2]string{
+		{"guide.html", "<h1>Guide</h1><p>Inside an archive.</p>"},
+		{"notes.txt", "plain\n"},
+	})
 	createTestGz(filepath.Join(dir, "notes.txt.gz"), "compressed on its own\nsecond line\n")
 	createTestZip(filepath.Join(dir, "images.zip"), [][2]string{
 		{"logo.png", "\x89PNG\r\n\x1a\n\x00\x00\x00\x0D"},
@@ -47,6 +51,11 @@ func SetupDocumentsFixture(t *testing.T) string {
 	t.Helper()
 	setupMockConfig(t)
 	dir := t.TempDir()
+
+	writeFile(t, dir, "sample.html", htmlFixture, 0644)
+	writeFile(t, dir, "sample.htm", "<h1>Legacy</h1><p>htm extension</p>", 0644)
+	writeFile(t, dir, "sample.xhtml", "<h1>Strict</h1><p>xhtml extension</p>", 0644)
+	writeFile(t, dir, "suffixless", htmlFixture, 0644)
 
 	fixtures := []string{
 		"sample.pdf", "sample.docx", "sample.xlsx",
@@ -177,3 +186,27 @@ func createTestZip(path string, files [][2]string) {
 		}
 	}
 }
+
+const htmlFixture = `<!doctype html>
+<html><head><title>API Reference</title>
+<style>body { color: red }</style>
+<script>var tracked = 1;</script>
+</head>
+<body>
+<nav><a href="/">Home</a></nav>
+<h1>Authentication</h1>
+<p>All endpoints require a <code>Bearer</code> token. See <a href="/auth">auth docs</a>.</p>
+<hr>
+<h2>Example</h2>
+<pre><code class="language-go">func main() {
+	fmt.Println("hi")
+}</code></pre>
+<ul><li>First</li><li>Second<ul><li>Nested</li></ul></li></ul>
+<blockquote><p>Rate limits apply.</p></blockquote>
+<table><thead><tr><th>Field</th><th>Type</th></tr></thead>
+<tbody><tr><td>id</td><td>int</td></tr></tbody></table>
+<p><img src="data:image/png;base64,AAAABBBBCCCC" alt="inline blob"></p>
+<p><img src="/logo.png" alt="Logo"></p>
+<footer>Copyright 2026</footer>
+</body></html>
+`

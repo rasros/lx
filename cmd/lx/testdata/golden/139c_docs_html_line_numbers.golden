@@ -1,0 +1,35 @@
+--- STDOUT ---
+sample.html (27 rows)
+---
+```markdown
+ 1: # Authentication
+ 2: 
+ 3: All endpoints require a `Bearer` token. See [auth docs](/auth).
+ 4: 
+ 5: ---
+ 6: 
+ 7: ## Example
+ 8: 
+ 9: ```go
+10: func main() {
+11: 	fmt.Println("hi")
+12: }
+13: ```
+14: 
+15: - First
+16: - Second
+17:   - Nested
+18: 
+19: > Rate limits apply.
+20: 
+21: | Field | Type |
+22: |---|---|
+23: | id | int |
+24: 
+25: ![inline blob]
+26: 
+27: ![Logo](/logo.png)
+```
+
+
+--- STDERR ---

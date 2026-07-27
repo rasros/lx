@@ -1,0 +1,17 @@
+--- STDOUT ---
+[1/2] docs.zip/guide.html (3 rows)
+---
+```markdown
+# Guide
+
+Inside an archive.
+```
+
+[2/2] docs.zip/notes.txt (1 rows)
+---
+```text
+plain
+```
+
+
+--- STDERR ---

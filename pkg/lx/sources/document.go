@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"mime"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -12,10 +13,46 @@ import (
 
 	pdflib "github.com/ledongthuc/pdf"
 	"github.com/nguyenthenguyen/docx"
+	"github.com/rasros/lx/pkg/lx/internal"
 	"github.com/xuri/excelize/v2"
 )
 
-var documentSuffixes = []string{".pdf", ".docx", ".xlsx", ".pptx"}
+var documentSuffixes = []string{".pdf", ".docx", ".xlsx", ".pptx", ".html", ".htm", ".xhtml"}
+
+// isHTMLPath reports whether the path is an HTML document.
+func isHTMLPath(path string) bool {
+	lower := strings.ToLower(path)
+	return strings.HasSuffix(lower, ".html") || strings.HasSuffix(lower, ".htm") ||
+		strings.HasSuffix(lower, ".xhtml")
+}
+
+// IsHTMLInput reports whether an input should be treated as HTML. A suffix
+// settles it for files; URLs frequently have none, so the media type their
+// source reported decides those. A local file with neither — no HTML suffix and
+// no declared type — is left as-is, since nothing here inspects content.
+func IsHTMLInput(f InputFile) bool {
+	if isHTMLPath(f.Path) {
+		return true
+	}
+	return f.mediaType != nil && isHTMLMediaType(*f.mediaType)
+}
+
+func isHTMLMediaType(value string) bool {
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return false
+	}
+	return mediaType == "text/html" || mediaType == "application/xhtml+xml"
+}
+
+// ConvertInput converts a document input to text, choosing the HTML path by
+// suffix or media type and falling back to the suffix-driven extractors.
+func ConvertInput(f InputFile, r io.ReaderAt, size int64) ([]byte, error) {
+	if IsHTMLInput(f) {
+		return internal.HTMLToMarkdown(io.NewSectionReader(r, 0, size))
+	}
+	return ExtractDocumentText(f.Path, r, size)
+}
 
 // IsDocumentPath reports whether the path has a document file extension.
 func IsDocumentPath(path string) bool {
@@ -40,6 +77,8 @@ func ExtractDocumentText(path string, r io.ReaderAt, size int64) ([]byte, error)
 		return extractXLSXText(r, size)
 	case ".pptx":
 		return extractPPTXText(r, size)
+	case ".html", ".htm", ".xhtml":
+		return internal.HTMLToMarkdown(io.NewSectionReader(r, 0, size))
 	}
 	return nil, fmt.Errorf("unsupported document type: %s", ext)
 }

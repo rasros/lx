@@ -22,7 +22,8 @@
 //   - LineNumbers enables numbered output.
 //   - SkeletonFunctions / SkeletonTypes reduce source files to signatures/defs.
 //   - ExpandArchives opens compressed files and directories for .zip/.tar.gz, etc..
-//   - ExtractDocuments enables text extraction for .pdf/.docx/.xlsx/.pptx.
+//   - ExtractDocuments converts .pdf/.docx/.xlsx/.pptx to text and HTML to
+//     Markdown.
 //   - ShowHidden, FollowDirSymlinks, SkipFileSymlinks control discovery options.
 //   - NoIgnore disables adhering to .ignore files.
 //
@@ -42,7 +43,8 @@
 // Archive and document helpers:
 //
 //   - IsArchivePath / ExpandArchive handle archive expansion into stream files.
-//   - IsDocumentPath / ExtractDocumentText handle document text extraction.
+//   - IsDocumentPath / ConvertInput convert documents to text, or to Markdown
+//     for HTML.
 //
 // Typical flow:
 //

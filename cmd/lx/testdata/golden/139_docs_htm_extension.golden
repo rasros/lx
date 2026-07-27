@@ -1,0 +1,11 @@
+--- STDOUT ---
+sample.htm (3 rows)
+---
+```markdown
+# Legacy
+
+htm extension
+```
+
+
+--- STDERR ---

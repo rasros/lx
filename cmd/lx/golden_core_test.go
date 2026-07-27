@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -193,7 +195,19 @@ func TestGoldenArchive(t *testing.T) {
 		{name: "118_expand_archive_tar_bz2", args: []string{"-Z", "archive.tar.bz2"}},
 		{name: "119_expand_archive_tar", args: []string{"-Z", "archive.tar"}},
 		{name: "119b_archive_image_html", args: []string{"--html", "-Z", "images.zip"}},
+		{name: "119c_archive_html_converted", args: []string{"-Z", "-D", "docs.zip"}},
 	})
+}
+
+func TestGoldenDocumentURLMediaType(t *testing.T) {
+	dir := setupDocumentsFixture(t)
+	server := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	defer server.Close()
+
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "139e_url_html_by_media_type", args: []string{"-D", server.URL + "/suffixless"}},
+		{name: "139f_url_html_no_extract_flag", args: []string{server.URL + "/suffixless"}},
+	}, server.URL)
 }
 
 func TestGoldenDocuments(t *testing.T) {
@@ -214,5 +228,13 @@ func TestGoldenDocuments(t *testing.T) {
 		{name: "132_docs_xlsx_head", args: []string{"-D", "--head", "2", "sample.xlsx"}},
 		{name: "133_docs_pptx_lines", args: []string{"-D", "--lines", "3", "sample.pptx"}},
 		{name: "134_docs_pdf_xml", args: []string{"--xml", "-D", "sample.pdf"}},
+		{name: "135_docs_html_markdown", args: []string{"-D", "sample.html"}},
+		{name: "136_docs_html_no_extract_flag", args: []string{"sample.html"}},
+		{name: "137_docs_html_xml", args: []string{"--xml", "-D", "sample.html"}},
+		{name: "138_docs_html_head", args: []string{"-D", "--head", "6", "sample.html"}},
+		{name: "139_docs_htm_extension", args: []string{"-D", "sample.htm"}},
+		{name: "139b_docs_xhtml_extension", args: []string{"-D", "sample.xhtml"}},
+		{name: "139c_docs_html_line_numbers", args: []string{"-D", "-l", "sample.html"}},
+		{name: "139d_docs_html_into_html_output", args: []string{"--html", "-D", "sample.html"}},
 	})
 }
