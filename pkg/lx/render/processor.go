@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,15 +30,19 @@ type PreparedItem struct {
 
 // Processor renders prepared items into an output writer.
 type Processor struct {
-	engine         *core.TemplateEngine
-	global         core.GlobalContext
-	tokenCounter   core.TokenCounter
-	onFileError    FileErrorHandler
-	lastWasCompact bool
-	lastWasBinary  bool
-	lastWasError   bool
-	lastRows       int
-	format         string
+	engine       *core.TemplateEngine
+	global       core.GlobalContext
+	tokenCounter core.TokenCounter
+	onFileError  FileErrorHandler
+}
+
+// RenderStats reports what one rendered item turned out to be. A non-file item
+// yields the zero value.
+type RenderStats struct {
+	Rows      int
+	IsCompact bool
+	IsBinary  bool
+	IsError   bool
 }
 
 type readerAtWithSize interface {
@@ -49,13 +54,12 @@ type byteReaderProvider interface {
 	ByteReader() *bytes.Reader
 }
 
-func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext, onError FileErrorHandler, format string) *Processor {
+func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext, onError FileErrorHandler) *Processor {
 	return &Processor{
 		engine:       engine,
 		global:       global,
 		onFileError:  onError,
 		tokenCounter: core.DefaultTokenCounter,
-		format:       format,
 	}
 }
 
@@ -65,48 +69,33 @@ func (p *Processor) SetTokenCounter(tc core.TokenCounter) {
 	}
 }
 
-func (p *Processor) LastWasCompact() bool { return p.lastWasCompact }
-
-func (p *Processor) LastRows() int { return p.lastRows }
-
-func (p *Processor) LastWasBinary() bool { return p.lastWasBinary }
-
-func (p *Processor) LastWasError() bool { return p.lastWasError }
-
 // RenderPrepared processes one item containing pre-calculated section and indices.
-func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []byte) error {
-	var isCompact bool
-	var err error
+func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []byte) (RenderStats, error) {
+	var stats RenderStats
 	var ctx interface{}
 	var templateToUse *template.Template
 
-	p.lastRows = 0
-	p.lastWasBinary = false
-	p.lastWasError = false
 	switch v := item.Raw.(type) {
 	case sources.InputFile:
-		var fCtx core.FileContext
-		fCtx, err = p.prepareFileContext(v, item.FileIndexGlobal, scratchBuf)
+		fCtx, err := p.prepareFileContext(v, item.FileIndexGlobal, scratchBuf)
 		if err != nil {
-			return err
+			return stats, err
 		}
 		fCtx.Section = *item.Section
 		fCtx.SectionFileIndex = item.FileIndexSection
 
-		isCompact = fCtx.IsCompactView
-		p.lastRows = fCtx.TotalRows
-		p.lastWasBinary = fCtx.IsBinary
-		p.lastWasError = fCtx.IsError
+		stats = RenderStats{
+			Rows:      fCtx.TotalRows,
+			IsCompact: fCtx.IsCompactView,
+			IsBinary:  fCtx.IsBinary,
+			IsError:   fCtx.IsError,
+		}
 		ctx = &fCtx
 
 		if fCtx.IsError {
 			templateToUse = p.engine.FileError
 		} else if fCtx.IsImage {
-			if p.format == "html" {
-				templateToUse = p.engine.FileContent
-			} else {
-				templateToUse = p.engine.FileBinary
-			}
+			templateToUse = p.engine.FileImage
 		} else if fCtx.IsBinary {
 			templateToUse = p.engine.FileBinary
 		} else if fCtx.IsCompactView {
@@ -139,15 +128,13 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 		templateToUse = p.engine.Meta
 
 	default:
-		return nil
+		return stats, nil
 	}
 
 	if err := templateToUse.Execute(w, ctx); err != nil {
-		return err
+		return stats, err
 	}
-
-	p.lastWasCompact = isCompact
-	return nil
+	return stats, nil
 }
 
 // errorContext describes a file that could not be read.
@@ -184,18 +171,85 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 	return bytes.NewReader(data), int64(len(data))
 }
 
-// convert replaces file content with a text rendering of it when a converter
-// applies, and reports the format converted from. A converter that fails leaves
-// the content untouched.
-func convert(file sources.InputFile, reader io.ReaderAt, size int64) (io.ReaderAt, int64, string) {
-	if file.Config.ExtractDocuments && sources.IsDocumentPath(file.Path) {
-		text, err := sources.ExtractDocumentText(file.Path, reader, size)
+// converter replaces a file's bytes with a text rendering of them. Converters
+// run before binary and language detection, so detection describes what will
+// actually be rendered, and they select on the path rather than the content, so
+// choosing one needs no detection. Order matters only if two ever match the
+// same path; the first match wins.
+type converter struct {
+	name    string
+	applies func(sources.InputFile) bool
+	convert func(path string, r io.ReaderAt, size int64) ([]byte, error)
+}
+
+var converters = []converter{
+	{
+		name: "document",
+		applies: func(f sources.InputFile) bool {
+			return f.Config.ExtractDocuments && sources.IsDocumentPath(f.Path)
+		},
+		convert: sources.ExtractDocumentText,
+	},
+}
+
+// applyConverters reports the format it converted from, or "" if none applied.
+// A converter that fails leaves the content untouched.
+func applyConverters(file sources.InputFile, reader io.ReaderAt, size int64) (io.ReaderAt, int64, string) {
+	for _, c := range converters {
+		if !c.applies(file) {
+			continue
+		}
+		text, err := c.convert(file.Path, reader, size)
 		if err != nil {
+			slog.Debug("Converter failed, keeping raw content",
+				"converter", c.name, "path", file.Path, "error", err)
 			return reader, size, ""
 		}
 		return bytes.NewReader(text), int64(len(text)), fileFormat(file.Path)
 	}
 	return reader, size, ""
+}
+
+// detectContent sniffs the header for binary content and a language hint.
+func detectContent(path string, reader io.ReaderAt, scratch []byte) (isBinary bool, lang string) {
+	headerLen := len(scratch)
+	if headerLen > 1024 {
+		headerLen = 1024
+	}
+	n, _ := reader.ReadAt(scratch[:headerLen], 0)
+	return internal.IsBinary(scratch[:n]), internal.DetectLanguage(path, scratch[:n])
+}
+
+// applySkeleton reduces source to signatures and definitions. Unlike a
+// converter it runs after detection, because it needs the detected language. It
+// also reports the pre-filter row count, so headers can describe the whole file.
+func applySkeleton(cfg core.RunnerConfig, lang string, reader io.ReaderAt, size int64, isBinary, isImage bool) (io.ReaderAt, int64, string, int) {
+	if isBinary || isImage || (!cfg.SkeletonFunctions && !cfg.SkeletonTypes) || !skeleton.Supported(lang) {
+		return reader, size, "", -1
+	}
+
+	allData := make([]byte, size)
+	if _, err := reader.ReadAt(allData, 0); err != nil {
+		return reader, size, "", -1
+	}
+
+	filtered := skeleton.Extract(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes)
+	return bytes.NewReader(filtered), int64(len(filtered)),
+		skeletonModeLabel(cfg.SkeletonFunctions, cfg.SkeletonTypes), internal.CountLines(allData)
+}
+
+// imageDataURI encodes the image from the bytes already open here. Reading them
+// back by path in a template would fail for archive entries and URLs, which
+// have no readable AbsPath.
+func imageDataURI(path string, reader io.ReaderAt, size int64) string {
+	if size <= 0 {
+		return ""
+	}
+	data := make([]byte, size)
+	if _, err := reader.ReadAt(data, 0); err != nil {
+		return ""
+	}
+	return internal.DataURI(path, data)
 }
 
 func fileFormat(path string) string {
@@ -230,44 +284,21 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	}
 
 	reader, size := readerFor(rc, file.Size)
-	reader, size, convertedFrom := convert(file, reader, size)
+	reader, size, convertedFrom := applyConverters(file, reader, size)
 
 	if scratch == nil {
 		scratch = make([]byte, 1024)
 	}
-	headerLen := 1024
-	if len(scratch) < headerLen {
-		headerLen = len(scratch)
-	}
 
-	n, _ := reader.ReadAt(scratch[:headerLen], 0)
-	isBinary := internal.IsBinary(scratch[:n])
-	lang := internal.DetectLanguage(file.Path, scratch[:n])
+	isBinary, lang := detectContent(file.Path, reader, scratch)
 	isImage := internal.IsImage(file.Path)
 	cfg := file.Config
 
-	var skeletonMode string
-	originalRows := -1
-	if !isBinary && !isImage && (cfg.SkeletonFunctions || cfg.SkeletonTypes) && skeleton.Supported(lang) {
-		allData := make([]byte, size)
-		if _, err := reader.ReadAt(allData, 0); err == nil {
-			originalRows = internal.CountLines(allData)
-			filtered := skeleton.Extract(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes)
-			reader = bytes.NewReader(filtered)
-			size = int64(len(filtered))
-			skeletonMode = skeletonModeLabel(cfg.SkeletonFunctions, cfg.SkeletonTypes)
-		}
-	}
+	reader, size, skeletonMode, originalRows := applySkeleton(cfg, lang, reader, size, isBinary, isImage)
 
-	// Encode images from the bytes already open here. Reading them back by
-	// path in a template would fail for archive entries and URLs, which have
-	// no readable AbsPath.
 	var dataURI string
-	if isImage && p.format == "html" && size > 0 {
-		data := make([]byte, size)
-		if _, err := reader.ReadAt(data, 0); err == nil {
-			dataURI = internal.DataURI(file.Path, data)
-		}
+	if isImage && p.engine.EmbedImages {
+		dataURI = imageDataURI(file.Path, reader, size)
 	}
 
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0

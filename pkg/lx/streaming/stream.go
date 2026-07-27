@@ -28,7 +28,6 @@ type Stream struct {
 	engine      *core.TemplateEngine
 	renderCfg   core.RunnerConfig
 	workDir     string
-	format      string
 	finalStats  *core.GlobalContext
 	sections    []*core.SectionContext
 	onFileError FileErrorHandler
@@ -44,17 +43,11 @@ func NewStream(cfg *core.Config, runnerCfg core.RunnerConfig) (*Stream, error) {
 		return nil, err
 	}
 
-	fmtType := cfg.OutputFormat
-	if fmtType == "" {
-		fmtType = "markdown"
-	}
-
 	return &Stream{
 		engine:      engine,
 		renderCfg:   runnerCfg,
 		tokenizer:   defaultTokenizer{},
 		workDir:     ".",
-		format:      fmtType,
 		concurrency: runtime.NumCPU(),
 	}, nil
 }
