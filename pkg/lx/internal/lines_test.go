@@ -73,7 +73,7 @@ func TestReadHead(t *testing.T) {
 
 	// Test read past EOF
 	r.Reset(input)
-	got, lines, err = ReadHead(r, 10)
+	_, lines, err = ReadHead(r, 10)
 	if err != nil {
 		t.Fatal(err)
 	}

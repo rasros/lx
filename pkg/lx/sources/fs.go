@@ -10,11 +10,10 @@ import (
 )
 
 type InputFile struct {
-	Path      string
-	AbsPath   string
-	Size      int64
-	ModTime   time.Time
-	LoadError error
+	Path    string
+	AbsPath string
+	Size    int64
+	ModTime time.Time
 
 	Config core.RunnerConfig
 
