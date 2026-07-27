@@ -1,0 +1,13 @@
+--- STDOUT ---
+Deeper nested note.
+
+
+main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---

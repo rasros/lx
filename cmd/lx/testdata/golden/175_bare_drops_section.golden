@@ -1,0 +1,5 @@
+--- STDOUT ---
+package main
+func main() {}
+
+--- STDERR ---

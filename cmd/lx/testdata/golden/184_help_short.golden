@@ -1,0 +1,57 @@
+--- STDOUT ---
+A program to discover and format files for LLM prompting
+
+[1m[4mUsage:[24m[22m [1mlx[22m [OPTIONS] [path|action]...
+
+[1m[4mArguments:[24m[22m
+  [path]...   the file or directory to process (defaults to current dir)
+  [action]... interleaved options and action flags; only -s starts a new section,
+              resetting interleaved options to their defaults
+
+[1m[4mOptions:[24m[22m
+  [4mGlobal option:[24m
+[1m  -c, --copy                [22mCopy the final output to the system clipboard
+[1m  -o, --output <value>      [22mWrite the result to a file path instead of stdout
+[1m      --md                  [22mFormat output as Markdown (default)
+[1m      --xml                 [22mFormat output using XML tags (Claude optimized)
+[1m      --html                [22mFormat output as a standalone HTML 5 file
+[1m      --bare                [22mFormat output as plain concatenated text (no wrappers)
+[1m  -C, --stdout              [22mWrite output to stdout (default)
+[1m  -0, --null                [22mExpect NUL-terminated filenames from stdin
+[1m      --prompts-dir <value> [22mDirectory containing prompt files for -P/--prompt-file
+[1m      --list-prompts        [22mList every prompt in the library (relative<TAB>absolute) and exit
+[1m  -y, --config <value>      [22mLoad configuration from a specific YAML file
+[1m  -q, --quiet               [22mSuppress the stats summary and logging
+[1m  -v, --verbose [value]     [22mSet log level [possible values: debug, info, warn, error, silent]
+[1m      --stats               [22mForce display of file/token summary to stderr
+[1m      --no-stats            [22mDisable file/token summary footer entirely
+[1m  -V, --version             [22mPrint version information and exit
+[1m  -h, --help                [22mShow help (use --help for detailed documentation)
+
+  [4mInterleaved option:[24m
+[1m  -l, --line-numbers        [22mEnable line numbers for subsequent files
+[1m  -n, --lines <n>           [22mLimit subsequent files to N lines (0 for compact)
+[1m      --head <n>            [22mRead only the first N lines of subsequent files
+[1m      --tail <n>            [22mRead only the last N lines of subsequent files
+[1m  -i, --include <value>     [22mAdd a glob whitelist pattern to subsequent files
+[1m  -e, --exclude <value>     [22mAdd a glob blacklist pattern to subsequent files
+[1m  -m, --max-size <size>     [22mSkip files larger than the given size for subsequent paths
+[1m  -D, --documents           [22mExtract text from document files for subsequent paths
+[1m  -Z, --expand              [22mExpand archive files inline for subsequent paths
+[1m  -H, --hidden              [22mInclude hidden files (dotfiles) for subsequent paths
+[1m  -S, --follow              [22mFollow directory symlinks for subsequent paths
+[1m      --no-links            [22mSkip symbolic links to files for subsequent paths
+[1m  -I, --no-ignore           [22mDisable .gitignore filtering for subsequent paths
+[1m  -u, --functions           [22mShow only function/method signatures for subsequent files
+[1m  -Y, --types               [22mShow only type/class definitions for subsequent files
+
+  [4mAction:[24m
+[1m  -T, --tree                [22mPrint file tree for the section (with content)
+[1m  -t, --tree-only           [22mPrint a file tree for the section (no content)
+[1m  -f, --file <value>        [22mForce process a specific path (bypasses ignores/filters)
+[1m  -s, --section <value>     [22mInsert a logical separator with a header
+[1m  -E, --system-context      [22mInsert a block describing the machine and invocation
+[1m  -p, --prompt <value>      [22mInject a custom text prompt into the output
+[1m  -P, --prompt-file <value> [22mLoad a prompt by name from the prompts library, or from a path
+
+--- STDERR ---

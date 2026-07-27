@@ -1,0 +1,6 @@
+--- STDOUT ---
+▎ 6 files · 9 rows · 1 section · 120 B
+  ~166 tokens
+
+--- STDERR ---
+[1;33mWarning:[0m Skipping output file to avoid infinite recursion (path=bundle.md)

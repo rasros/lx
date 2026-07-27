@@ -22,7 +22,21 @@ file_content_template: "File: {{ .Path }}\nContent:\n{{ .Content }}"
     </document_content>
   </document>
 
-  <document index="4" language="go" rows="2">
+  <document index="4" language="yaml" rows="1">
+    <source>configs/verbose.yaml</source>
+    <document_content>
+verbosity: info
+    </document_content>
+  </document>
+
+  <document index="5" language="yaml" rows="1">
+    <source>configs/xml_format.yaml</source>
+    <document_content>
+output_format: xml
+    </document_content>
+  </document>
+
+  <document index="6" language="go" rows="2">
     <source>main.go</source>
     <document_content>
 package main
