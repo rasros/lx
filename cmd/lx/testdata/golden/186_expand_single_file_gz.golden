@@ -1,0 +1,10 @@
+--- STDOUT ---
+notes.txt.gz/notes.txt.gz (2 rows)
+---
+```
+compressed on its own
+second line
+```
+
+
+--- STDERR ---

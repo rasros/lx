@@ -1,0 +1,11 @@
+--- STDOUT ---
+a/dup.md	/ROOT/prompts/a/dup.md
+area/note.md	/ROOT/prompts/area/note.md
+area/sub/note.md	/ROOT/prompts/area/sub/note.md
+b/dup.md	/ROOT/prompts/b/dup.md
+go/test.md	/ROOT/prompts/go/test.md
+plan.txt	/ROOT/prompts/plan.txt
+refactor.md	/ROOT/prompts/refactor.md
+test.md	/ROOT/prompts/test.md
+
+--- STDERR ---

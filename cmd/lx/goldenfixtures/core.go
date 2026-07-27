@@ -32,6 +32,8 @@ func SetupFormattingFixture(t *testing.T) string {
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
 	writeFile(t, dir, "configs/custom_template.yaml", "file_content_template: \"File: {{ .Path }}\\nContent:\\n{{ .Content }}\"\n", 0644)
 	writeFile(t, dir, "configs/custom_sections.yaml", "section_header_template: \"*** {{ .Body }} ***\\n\"\n", 0644)
+	writeFile(t, dir, "configs/xml_format.yaml", "output_format: xml\n", 0644)
+	writeFile(t, dir, "configs/verbose.yaml", "verbosity: info\n", 0644)
 
 	return dir
 }
