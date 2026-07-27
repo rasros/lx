@@ -181,6 +181,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 	precomputeTrees(ctx, sections, globalIgnoreRules)
 	debugLoggingEnabled := slog.Default().Enabled(ctx, slog.LevelDebug)
 
+	unresolved := 0
 	var metaFields map[string]string
 	var metaBody string
 	resolveSystemContext := func() (map[string]string, string) {
@@ -277,6 +278,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 				absPath, err := filepath.Abs(rawPath)
 				if err != nil {
 					slog.Error("Failed to resolve absolute path", "path", rawPath, "error", err)
+					unresolved++
 					continue
 				}
 
@@ -287,6 +289,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 						continue
 					}
 					slog.Error("Failed to stat path", "path", absPath, "error", err)
+					unresolved++
 					continue
 				}
 
@@ -494,7 +497,13 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 		slog.Info("Clipboard copy successful")
 	}
 
-	handleStatsDisplay(parsed, cliOpts, stream, debugOut)
+	global := stream.GetGlobalContext()
+	if global.TotalFiles == 0 && global.SkippedBySize > 0 {
+		slog.Warn("Every input was skipped by the size limit (-m)",
+			"skipped", global.SkippedBySize)
+	}
+
+	handleStatsDisplay(parsed, cliOpts, stream, debugOut, unresolved)
 	return nil
 }
 
@@ -537,7 +546,7 @@ func workloadConcurrency(sections []Section, cpuCount int) (int, bool) {
 	return 0, false
 }
 
-func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer) {
+func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer, unresolved int) {
 	showStatsFlag := cliOpts.ShowStats
 	if _, ok := parsed.Globals["stats"]; ok {
 		showStatsFlag = "always"
@@ -561,8 +570,13 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 	}
 
 	if show {
+		// Paths that never resolved fail before reaching the stream, so the
+		// stream cannot count them itself.
+		global := stream.GetGlobalContext()
+		global.FailedFiles += unresolved
+
 		err := stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
-			Global:       stream.GetGlobalContext(),
+			Global:       global,
 			ColorEnabled: shouldColorStats(debugOut),
 		})
 		if err != nil {
