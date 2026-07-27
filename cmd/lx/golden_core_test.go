@@ -123,6 +123,7 @@ func TestGoldenStats(t *testing.T) {
 		{name: "076_stats_counters_binary", args: []string{"--stats", "main.go", "data.bin"}},
 		{name: "077_stats_counters_size_skip", args: []string{"--stats", "-m", "1k", "."}},
 		{name: "078_stats_no_counters_when_clean", args: []string{"--stats", "main.go"}},
+		{name: "079_stats_counts_unresolved_path", args: []string{"--stats", "main.go", "nope.go"}},
 	})
 }
 

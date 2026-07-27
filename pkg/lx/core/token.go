@@ -9,8 +9,10 @@ const (
 )
 
 // DefaultTokenCounter estimates BPE tokens from content using a character-class
-// scanner. Auto-adapts to content shape (prose ~bytes/4, code ~bytes/3.2,
-// JSON ~bytes/2.7) without needing a language hint or embedded vocabulary.
+// scanner, with no language hint or embedded vocabulary. Density follows the
+// share of symbols rather than the file format: measured bytes/token runs ~3.8
+// for prose, ~3.2 for source, and 2.0 for symbol-dense JSON, but JSON built
+// from long string values lands near 3.0 because it is mostly words.
 func DefaultTokenCounter(size int64, content interface{}) int64 {
 	switch v := content.(type) {
 	case string:

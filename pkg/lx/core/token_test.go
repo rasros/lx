@@ -132,3 +132,34 @@ func TestDefaultTokenCounterUsesStringerContent(t *testing.T) {
 		t.Errorf("Stringer estimate %d != equivalent string estimate %d", got, want)
 	}
 }
+
+// Absolute ratios drift with the sample, so this pins the ordering: density is
+// driven by how much of the content is symbols rather than words. Long string
+// values make JSON read almost like prose.
+func TestDefaultTokenCounter_DensityFollowsSymbolShare(t *testing.T) {
+	ratio := func(text string) float64 {
+		return float64(len(text)) / float64(DefaultTokenCounter(int64(len(text)), text))
+	}
+
+	prose := ratio(strings.Repeat("the quick brown fox jumps over the lazy dog ", 20))
+	code := ratio(strings.Repeat("func handleRequest(ctx context.Context) error {\n\treturn nil\n}\n", 20))
+	jsonSymbols := ratio(strings.Repeat(`{"a":1,"b":[true,false,null],"c":"x"},`, 20))
+	jsonWords := ratio(strings.Repeat(`{"email":"user42@example.com","name":"Alexander Hamilton"},`, 20))
+
+	if prose < 3.4 || prose > 4.2 {
+		t.Errorf("prose chars/token = %.2f, want between 3.4 and 4.2", prose)
+	}
+	if code < 2.9 || code > 3.5 {
+		t.Errorf("code chars/token = %.2f, want between 2.9 and 3.5", code)
+	}
+	if jsonSymbols >= code {
+		t.Errorf("symbol-dense JSON (%.2f) should be denser than code (%.2f)", jsonSymbols, code)
+	}
+	if jsonWords <= jsonSymbols {
+		t.Errorf("JSON of long string values (%.2f) should be sparser than symbol-dense JSON (%.2f)",
+			jsonWords, jsonSymbols)
+	}
+	if jsonWords >= prose {
+		t.Errorf("JSON of long string values (%.2f) should still beat prose (%.2f)", jsonWords, prose)
+	}
+}

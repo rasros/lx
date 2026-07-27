@@ -3,3 +3,4 @@
 
 
 --- STDERR ---
+[1;33mWarning:[0m Every input was skipped by the size limit (-m) (skipped=1)
