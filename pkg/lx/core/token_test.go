@@ -118,3 +118,20 @@ func TestDefaultTokenCounter_LargeContentSampling(t *testing.T) {
 		t.Errorf("sampled=%d exact=%d diff=%d > tolerance=%d", sampled, exact, diff, tolerance)
 	}
 }
+
+type stringerContent struct{ s string }
+
+func (s stringerContent) String() string { return s.s }
+
+func TestDefaultTokenCounterUsesStringerContent(t *testing.T) {
+	content := stringerContent{s: strings.Repeat(`{"a":1},`, 90)}
+	size := int64(len(content.s))
+
+	got := DefaultTokenCounter(size, content)
+	if got == size/4 {
+		t.Errorf("estimate %d equals the size/4 fallback; Stringer content was not scanned", got)
+	}
+	if want := DefaultTokenCounter(size, content.s); got != want {
+		t.Errorf("Stringer estimate %d != equivalent string estimate %d", got, want)
+	}
+}

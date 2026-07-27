@@ -280,6 +280,21 @@ const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
 	`{{ if .Global.FailedFiles }}{{ $sep }}{{ commafy .Global.FailedFiles }} failed{{ end }}` +
 	"\n" + `{{ end }}`
 
+// contentString renders template content as text. FileContext.Content is either
+// a string or a LineNumberFormatter, and helpers must treat both alike —
+// reaching for %v instead silently skipped escaping for the latter.
+func contentString(v interface{}) string {
+	switch s := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return s
+	case fmt.Stringer:
+		return s.String()
+	}
+	return fmt.Sprintf("%v", v)
+}
+
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"date": func(layout string, t time.Time) string {
@@ -300,13 +315,11 @@ func templateFuncs() template.FuncMap {
 			return fmt.Sprintf("%.1f %s", val, suffix)
 		},
 		"endNewline": func(s interface{}) string {
-			if str, ok := s.(string); ok {
-				if str != "" && !strings.HasSuffix(str, "\n") {
-					return str + "\n"
-				}
-				return str
+			str := contentString(s)
+			if str != "" && !strings.HasSuffix(str, "\n") {
+				return str + "\n"
 			}
-			return fmt.Sprintf("%v", s)
+			return str
 		},
 		"dataURI": func(path string) string {
 			data, err := os.ReadFile(path)
@@ -335,10 +348,7 @@ func templateFuncs() template.FuncMap {
 			return fmt.Sprintf("data:%s;base64,%s", mimeType, b64)
 		},
 		"escape": func(s interface{}) string {
-			if str, ok := s.(string); ok {
-				return html.EscapeString(str)
-			}
-			return fmt.Sprintf("%v", s)
+			return html.EscapeString(contentString(s))
 		},
 		"commafy": func(n interface{}) string {
 			v, ok := asInt64(n)

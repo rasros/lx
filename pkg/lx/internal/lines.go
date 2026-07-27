@@ -18,6 +18,19 @@ type LineNumberFormatter struct {
 }
 
 func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
+	lnf.writeTo(f)
+}
+
+// String lets consumers that only understand text — template helpers, the token
+// counter — see the numbered content instead of falling back to %v.
+func (lnf LineNumberFormatter) String() string {
+	var buf bytes.Buffer
+	buf.Grow(len(lnf.Head) + len(lnf.Gap) + len(lnf.Tail))
+	lnf.writeTo(&buf)
+	return buf.String()
+}
+
+func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 	width := 1
 	if lnf.TotalRows > 9 {
 		width = int(math.Log10(float64(lnf.TotalRows))) + 1
@@ -30,7 +43,7 @@ func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
 	printChunk := func(data []byte, startRow int) {
 		currentRow := startRow
 		offset := 0
-		write := func(b []byte) { f.Write(b) }
+		write := func(b []byte) { out.Write(b) }
 
 		for offset < len(data) {
 			idx := bytes.IndexByte(data[offset:], '\n')
@@ -64,7 +77,7 @@ func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
 	}
 
 	if len(lnf.Gap) > 0 {
-		f.Write(lnf.Gap)
+		out.Write(lnf.Gap)
 	}
 
 	if len(lnf.Tail) > 0 {
