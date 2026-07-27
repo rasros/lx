@@ -1,0 +1,71 @@
+--- STDOUT ---
+[1/8] notes.txt (1 rows)
+---
+```text
+beside the media
+```
+
+[2/8] sample.flac (4 rows)
+---
+```
+Container: flac
+Duration: 00:00:01.000
+Bitrate: 97 kbps
+Audio: flac, 8000 Hz, mono, 16-bit
+```
+
+[3/8] sample.m4a (4 rows)
+---
+```
+Container: m4a
+Duration: 00:00:01.000
+Bitrate: 35 kbps
+Audio: aac, 8000 Hz, mono
+```
+
+[4/8] sample.mov (5 rows)
+---
+```
+Container: mov
+Duration: 00:00:01.000
+Bitrate: 55 kbps
+Video: h264, 32x32, 10.00 fps
+Audio: aac, 8000 Hz, mono
+```
+
+[5/8] sample.mp4 (5 rows)
+---
+```
+Container: mp4
+Duration: 00:00:01.000
+Bitrate: 55 kbps
+Video: h264, 32x32, 10.00 fps
+Audio: aac, 8000 Hz, mono
+```
+
+[6/8] sample.wav (4 rows)
+---
+```
+Container: wav
+Duration: 00:00:01.000
+Bitrate: 128 kbps
+Audio: pcm_s16le, 8000 Hz, mono, 16-bit
+```
+
+[7/8] silent.mp4 (4 rows)
+---
+```
+Container: mp4
+Duration: 00:00:01.000
+Bitrate: 20 kbps
+Video: h264, 32x32, 10.00 fps
+```
+
+[8/8] truncated.mp4 (1 rows)
+---
+```
+Container: mp4
+```
+
+
+--- STDERR ---

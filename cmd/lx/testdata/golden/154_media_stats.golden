@@ -1,0 +1,21 @@
+--- STDOUT ---
+[1/2] sample.mp4 (5 rows)
+---
+```
+Container: mp4
+Duration: 00:00:01.000
+Bitrate: 55 kbps
+Video: h264, 32x32, 10.00 fps
+Audio: aac, 8000 Hz, mono
+```
+
+[2/2] notes.txt (1 rows)
+---
+```text
+beside the media
+```
+
+
+--- STDERR ---
+  ~81 tokens
+▎ 2 files · 6 rows · 1 section · 6.9 kB

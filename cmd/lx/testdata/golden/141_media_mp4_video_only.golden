@@ -1,0 +1,12 @@
+--- STDOUT ---
+silent.mp4 (4 rows)
+---
+```
+Container: mp4
+Duration: 00:00:01.000
+Bitrate: 20 kbps
+Video: h264, 32x32, 10.00 fps
+```
+
+
+--- STDERR ---

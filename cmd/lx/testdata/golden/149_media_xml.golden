@@ -1,0 +1,15 @@
+--- STDOUT ---
+<content>
+  <document index="1" rows="4">
+    <source>sample.wav</source>
+    <document_content>
+Container: wav
+Duration: 00:00:01.000
+Bitrate: 128 kbps
+Audio: pcm_s16le, 8000 Hz, mono, 16-bit
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---

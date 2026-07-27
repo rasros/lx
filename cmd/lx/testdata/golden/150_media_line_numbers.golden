@@ -1,0 +1,13 @@
+--- STDOUT ---
+sample.mp4 (5 rows)
+---
+```
+1: Container: mp4
+2: Duration: 00:00:01.000
+3: Bitrate: 55 kbps
+4: Video: h264, 32x32, 10.00 fps
+5: Audio: aac, 8000 Hz, mono
+```
+
+
+--- STDERR ---

@@ -1,0 +1,12 @@
+--- STDOUT ---
+sample.flac (4 rows)
+---
+```
+Container: flac
+Duration: 00:00:01.000
+Bitrate: 97 kbps
+Audio: flac, 8000 Hz, mono, 16-bit
+```
+
+
+--- STDERR ---

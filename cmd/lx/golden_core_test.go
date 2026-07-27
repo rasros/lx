@@ -238,3 +238,24 @@ func TestGoldenDocuments(t *testing.T) {
 		{name: "139d_docs_html_into_html_output", args: []string{"--html", "-D", "sample.html"}},
 	})
 }
+
+func TestGoldenMedia(t *testing.T) {
+	dir := setupMediaFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "140_media_mp4_video_and_audio", args: []string{"-M", "sample.mp4"}},
+		{name: "141_media_mp4_video_only", args: []string{"-M", "silent.mp4"}},
+		{name: "142_media_mov", args: []string{"-M", "sample.mov"}},
+		{name: "143_media_m4a_audio_only", args: []string{"-M", "sample.m4a"}},
+		{name: "144_media_wav", args: []string{"-M", "sample.wav"}},
+		{name: "145_media_flac", args: []string{"-M", "sample.flac"}},
+		{name: "146_media_truncated_header", args: []string{"-M", "truncated.mp4"}},
+		{name: "147_media_no_extract_flag", args: []string{"sample.mp4", "sample.wav"}},
+		{name: "148_media_directory", args: []string{"-M", "-e", "*.zip", "."}},
+		{name: "149_media_xml", args: []string{"--xml", "-M", "sample.wav"}},
+		{name: "150_media_line_numbers", args: []string{"-M", "-l", "sample.mp4"}},
+		{name: "151_media_head", args: []string{"-M", "--head", "2", "sample.mp4"}},
+		{name: "152_media_in_archive", args: []string{"-Z", "-M", "media.zip"}},
+		{name: "153_media_with_documents", args: []string{"-D", "-M", "sample.wav"}},
+		{name: "154_media_stats", args: []string{"-M", "--stats", "sample.mp4", "notes.txt"}},
+	})
+}

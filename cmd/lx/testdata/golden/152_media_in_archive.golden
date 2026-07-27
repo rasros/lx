@@ -1,0 +1,12 @@
+--- STDOUT ---
+media.zip/clip.wav (4 rows)
+---
+```
+Container: wav
+Duration: 00:00:01.000
+Bitrate: 128 kbps
+Audio: pcm_s16le, 8000 Hz, mono, 16-bit
+```
+
+
+--- STDERR ---

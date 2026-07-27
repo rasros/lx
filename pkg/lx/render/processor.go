@@ -202,6 +202,13 @@ var converters = []converter{
 			return ""
 		},
 	},
+	{
+		name: "media",
+		applies: func(f sources.InputFile) bool {
+			return f.Config.ExtractMedia && sources.IsMediaPath(f.Path)
+		},
+		convert: sources.ExtractMediaMetadata,
+	},
 }
 
 // applyConverters reports the format it converted from, or "" if none applied.
