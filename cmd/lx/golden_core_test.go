@@ -106,6 +106,8 @@ func TestGoldenErrors(t *testing.T) {
 		{name: "065_stdin_content", args: []string{"-"}, stdin: "Some content from pipe\nLine 2"},
 		{name: "066_stdin_and_files", args: []string{"main.go", "-"}, stdin: "Piped content"},
 		{name: "067_stdin_file_list", args: []string{}, stdin: "main.go\nREADME.md"},
+		{name: "068_stdin_file_list_with_prompt", args: []string{"-p", "Review these"}, stdin: "main.go\nREADME.md"},
+		{name: "069_stdin_file_list_with_system_context", args: []string{"-E"}, stdin: "main.go"},
 	})
 }
 

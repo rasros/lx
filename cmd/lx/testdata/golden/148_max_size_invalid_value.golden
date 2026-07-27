@@ -2,4 +2,4 @@
 
 
 --- STDERR ---
-CLI Error: argument parsing failed: flag --max-size expects a size like 512k or 2M, got "notasize"
+CLI Error: argument parsing failed: flag --max-size: invalid size "notasize", expected a byte count like 512k or 2M

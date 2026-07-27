@@ -73,16 +73,23 @@ func handleGlobals(parsed *ParsedArgs) bool {
 }
 
 func gatherInputs(parsed *ParsedArgs) error {
-	hasFilesOrGenerators := false
+	// Stdin depends only on explicit file arguments; the "." fallback also
+	// depends on generators, which already give the run something to emit.
+	hasFiles := false
+	hasGenerators := false
 	for _, op := range parsed.Ops {
-		if op.Action == "FILE" || op.Action == "file" || op.Action == "section" || op.Action == "prompt" || op.Action == "prompt-file" || op.Action == "system-context" {
-			slog.Debug("Detected input from actions")
-			hasFilesOrGenerators = true
-			break
+		switch op.Action {
+		case "FILE", "file":
+			hasFiles = true
+		case "section", "prompt", "prompt-file", "system-context":
+			hasGenerators = true
 		}
 	}
+	if hasFiles {
+		slog.Debug("Detected input from file actions")
+	}
 
-	if !hasFilesOrGenerators {
+	if !hasFiles {
 		_, useNull := parsed.Globals["null"]
 		stdinFiles, isPipe, err := readFilenamesFromStdin(useNull)
 		if err != nil {
@@ -93,13 +100,13 @@ func gatherInputs(parsed *ParsedArgs) error {
 			for _, f := range stdinFiles {
 				parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f, Type: CmdAction})
 			}
-			hasFilesOrGenerators = true
+			hasFiles = true
 		} else {
 			slog.Debug("No stdin pipe detected")
 		}
 	}
 
-	if !hasFilesOrGenerators {
+	if !hasFiles && !hasGenerators {
 		slog.Debug("No inputs detected, defaulting to current directory '.'")
 		parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: ".", Type: CmdAction})
 	}
@@ -444,7 +451,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 				if err != nil {
 					slog.Error("Walker traversal failed", "error", err)
 				}
-				slog.Debug("Walker finished", "root", rawPath, "files_found", count)
+				slog.Debug("Walker finished", "root", rawPath, "files_matched", count)
 
 			case "tree", "tree-only":
 				if ts, ok := section.treeStrings[oi]; ok {

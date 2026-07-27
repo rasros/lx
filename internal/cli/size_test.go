@@ -11,7 +11,6 @@ func TestParseSizeLimit(t *testing.T) {
 		in   string
 		want int64
 	}{
-		{"0", 0},
 		{"1", 1},
 		{"4096", 4096},
 		{"512k", 512_000},
@@ -48,6 +47,8 @@ func TestParseSizeLimitErrors(t *testing.T) {
 		"notasize",
 		"k",
 		"kb",
+		"0",
+		"0k",
 		"-1",
 		"-5k",
 		"1.5M",

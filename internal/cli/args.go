@@ -222,7 +222,7 @@ func addOp(res *ParsedArgs, def CommandDef, val string, isShort bool) error {
 		}
 	case ValueSize:
 		if _, err := parseSizeLimit(val); err != nil {
-			return fmt.Errorf("flag %s%s expects a size like 512k or 2M, got %q", prefix, def.Name, val)
+			return fmt.Errorf("flag %s%s: %w", prefix, def.Name, err)
 		}
 	}
 

@@ -255,10 +255,6 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 			filtered := skeleton.Extract(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes)
 			reader = bytes.NewReader(filtered)
 			size = int64(len(filtered))
-			if int64(headerLen) > size {
-				headerLen = int(size)
-			}
-			n, _ = reader.ReadAt(scratch[:headerLen], 0)
 			skeletonMode = skeletonModeLabel(cfg.SkeletonFunctions, cfg.SkeletonTypes)
 		}
 	}
