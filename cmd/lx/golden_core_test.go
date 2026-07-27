@@ -138,6 +138,8 @@ func TestGoldenDetection(t *testing.T) {
 		{name: "086_render_image_md", args: []string{"assets/logo.png"}},
 		{name: "087_render_image_html", args: []string{"--html", "assets/logo.png"}},
 		{name: "088_render_image_compact", args: []string{"-n0", "assets/logo.png"}},
+		{name: "089_html_escapes_markup", args: []string{"--html", "langs/page.html"}},
+		{name: "089b_html_escapes_markup_line_numbers", args: []string{"--html", "-l", "langs/page.html"}},
 	})
 }
 

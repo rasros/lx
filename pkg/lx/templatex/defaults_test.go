@@ -54,7 +54,7 @@ func TestTemplateFuncs_EndNewline(t *testing.T) {
 		{"hello", "hello\n"},
 		{"already\n", "already\n"},
 		{"", ""},
-		{42, "42"}, // non-string falls back to Sprintf
+		{42, "42\n"}, // every value gets the newline, not just strings
 	}
 
 	for _, tt := range tests {

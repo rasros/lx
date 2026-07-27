@@ -144,6 +144,7 @@ func SetupDetectionFixture(t *testing.T) string {
 	writeFile(t, dir, "langs/script_no_ext", "#!/bin/bash\necho hi", 0755)
 	writeFile(t, dir, "src/script.py", "print('hello')", 0755)
 	writeFile(t, dir, "assets/logo.png", "\x89PNG\r\n\x1a\n\x00\x00\x00\x0D", 0644)
+	writeFile(t, dir, "langs/page.html", "<script>alert(1)</script>\n<p>hi &amp; bye</p>", 0644)
 
 	return dir
 }

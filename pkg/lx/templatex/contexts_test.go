@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rasros/lx/pkg/lx/core"
+	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func compileForFormat(t *testing.T, format string) *core.TemplateEngine {
@@ -113,5 +114,36 @@ func TestStatsCounterLineHasNoLeadingSeparator(t *testing.T) {
 	got := renderStats(t, core.GlobalContext{TotalFiles: 5, BinaryFiles: 3})
 	if !strings.Contains(got, "  3 binary\n") {
 		t.Errorf("stats counter line malformed:\n%q", got)
+	}
+}
+
+// Content is either a string or a LineNumberFormatter; helpers must treat both
+// alike. Reaching for %v on the formatter silently skipped escaping.
+func TestEscapeHandlesLineNumberedContent(t *testing.T) {
+	escape := templateFuncs()["escape"].(func(interface{}) string)
+
+	plain := escape("<script>alert(1)</script>\n")
+	numbered := escape(internal.LineNumberFormatter{
+		Head:      []byte("<script>alert(1)</script>\n"),
+		TotalRows: 1,
+	})
+
+	if strings.Contains(plain, "<script>") {
+		t.Errorf("string content not escaped: %q", plain)
+	}
+	if strings.Contains(numbered, "<script>") {
+		t.Errorf("line-numbered content not escaped: %q", numbered)
+	}
+	if !strings.Contains(numbered, "1: &lt;script&gt;") {
+		t.Errorf("line-numbered content lost its numbering or escaping: %q", numbered)
+	}
+}
+
+func TestEndNewlineHandlesLineNumberedContent(t *testing.T) {
+	endNewline := templateFuncs()["endNewline"].(func(interface{}) string)
+
+	got := endNewline(internal.LineNumberFormatter{Head: []byte("alpha"), TotalRows: 1})
+	if got != "1: alpha\n" {
+		t.Errorf("endNewline = %q, want %q", got, "1: alpha\n")
 	}
 }
