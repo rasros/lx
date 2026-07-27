@@ -1,0 +1,10 @@
+--- STDOUT ---
+sample.webp (2 rows)
+---
+```
+Container: webp
+Image: 32x32, ycbcr
+```
+
+
+--- STDERR ---

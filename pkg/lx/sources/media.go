@@ -17,8 +17,22 @@ var mediaSuffixes = map[string]string{
 	".m4v":  "mp4",
 	".m4a":  "m4a",
 	".mov":  "mov",
+	".mkv":  "mkv",
+	".webm": "webm",
+	".mp3":  "mp3",
 	".wav":  "wav",
 	".flac": "flac",
+	".png":  "png",
+	".jpg":  "jpeg",
+	".jpeg": "jpeg",
+	".gif":  "gif",
+	".webp": "webp",
+	".bmp":  "bmp",
+	".ico":  "ico",
+	".tif":  "tiff",
+	".tiff": "tiff",
+	".avif": "avif",
+	".heic": "avif",
 }
 
 // IsMediaPath reports whether the path names an audio or video container whose

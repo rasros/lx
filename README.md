@@ -123,6 +123,9 @@ Video: h264, 1920x1080, 25.00 fps
 Audio: aac, 48000 Hz, stereo
 ```
 
+It covers mp4, mov, mkv, webm, mp3, m4a, wav and flac, plus stills and animations: png, jpeg, gif, webp, bmp, tiff, ico,
+avif and heic. Only headers are read, so the cost does not grow with the length of the file.
+
 ## Output formats
 
 Markdown is the default. The rest are one flag each:

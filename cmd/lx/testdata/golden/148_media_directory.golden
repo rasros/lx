@@ -1,11 +1,25 @@
 --- STDOUT ---
-[1/8] notes.txt (1 rows)
+[1/18] notes.txt (1 rows)
 ---
 ```text
 beside the media
 ```
 
-[2/8] sample.flac (4 rows)
+[2/18] sample.avif (2 rows)
+---
+```
+Container: avif
+Image: 32x32
+```
+
+[3/18] sample.bmp (2 rows)
+---
+```
+Container: bmp
+Image: 32x32, rgb, 24-bit
+```
+
+[4/18] sample.flac (4 rows)
 ---
 ```
 Container: flac
@@ -14,7 +28,22 @@ Bitrate: 97 kbps
 Audio: flac, 8000 Hz, mono, 16-bit
 ```
 
-[3/8] sample.m4a (4 rows)
+[5/18] sample.gif (3 rows)
+---
+```
+Container: gif
+Duration: 00:00:01.000
+Image: 32x32, indexed, 8-bit, 10 frames
+```
+
+[6/18] sample.jpg (2 rows)
+---
+```
+Container: jpeg
+Image: 32x32, ycbcr, 8-bit
+```
+
+[7/18] sample.m4a (4 rows)
 ---
 ```
 Container: m4a
@@ -23,7 +52,17 @@ Bitrate: 35 kbps
 Audio: aac, 8000 Hz, mono
 ```
 
-[4/8] sample.mov (5 rows)
+[8/18] sample.mkv (5 rows)
+---
+```
+Container: mkv
+Duration: 00:00:01.128
+Bitrate: 45 kbps
+Video: h264, 32x32
+Audio: aac, 8000 Hz, mono
+```
+
+[9/18] sample.mov (5 rows)
 ---
 ```
 Container: mov
@@ -33,7 +72,16 @@ Video: h264, 32x32, 10.00 fps
 Audio: aac, 8000 Hz, mono
 ```
 
-[5/8] sample.mp4 (5 rows)
+[10/18] sample.mp3 (4 rows)
+---
+```
+Container: mp3
+Duration: 00:00:01.152
+Bitrate: 32 kbps
+Audio: mp3, 8000 Hz, mono
+```
+
+[11/18] sample.mp4 (5 rows)
 ---
 ```
 Container: mp4
@@ -43,7 +91,21 @@ Video: h264, 32x32, 10.00 fps
 Audio: aac, 8000 Hz, mono
 ```
 
-[6/8] sample.wav (4 rows)
+[12/18] sample.png (2 rows)
+---
+```
+Container: png
+Image: 32x32, rgb, 8-bit
+```
+
+[13/18] sample.tiff (2 rows)
+---
+```
+Container: tiff
+Image: 32x32, rgb, 8-bit
+```
+
+[14/18] sample.wav (4 rows)
 ---
 ```
 Container: wav
@@ -52,7 +114,24 @@ Bitrate: 128 kbps
 Audio: pcm_s16le, 8000 Hz, mono, 16-bit
 ```
 
-[7/8] silent.mp4 (4 rows)
+[15/18] sample.webm (5 rows)
+---
+```
+Container: webm
+Duration: 00:00:01.008
+Bitrate: 82 kbps
+Video: vp9, 32x32
+Audio: opus, 8000 Hz, mono
+```
+
+[16/18] sample.webp (2 rows)
+---
+```
+Container: webp
+Image: 32x32, ycbcr
+```
+
+[17/18] silent.mp4 (4 rows)
 ---
 ```
 Container: mp4
@@ -61,7 +140,7 @@ Bitrate: 20 kbps
 Video: h264, 32x32, 10.00 fps
 ```
 
-[8/8] truncated.mp4 (1 rows)
+[18/18] truncated.mp4 (1 rows)
 ---
 ```
 Container: mp4

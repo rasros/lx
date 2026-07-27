@@ -1,0 +1,10 @@
+--- STDOUT ---
+sample.png (2 rows)
+---
+```
+Container: png
+Image: 32x32, rgb, 8-bit
+```
+
+
+--- STDERR ---

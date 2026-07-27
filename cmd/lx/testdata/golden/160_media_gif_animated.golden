@@ -1,0 +1,11 @@
+--- STDOUT ---
+sample.gif (3 rows)
+---
+```
+Container: gif
+Duration: 00:00:01.000
+Image: 32x32, indexed, 8-bit, 10 frames
+```
+
+
+--- STDERR ---

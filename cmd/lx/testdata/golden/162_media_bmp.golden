@@ -1,0 +1,10 @@
+--- STDOUT ---
+sample.bmp (2 rows)
+---
+```
+Container: bmp
+Image: 32x32, rgb, 24-bit
+```
+
+
+--- STDERR ---

@@ -257,5 +257,17 @@ func TestGoldenMedia(t *testing.T) {
 		{name: "152_media_in_archive", args: []string{"-Z", "-M", "media.zip"}},
 		{name: "153_media_with_documents", args: []string{"-D", "-M", "sample.wav"}},
 		{name: "154_media_stats", args: []string{"-M", "--stats", "sample.mp4", "notes.txt"}},
+		{name: "155_media_mkv", args: []string{"-M", "sample.mkv"}},
+		{name: "156_media_webm", args: []string{"-M", "sample.webm"}},
+		{name: "157_media_mp3", args: []string{"-M", "sample.mp3"}},
+		{name: "158_media_png", args: []string{"-M", "sample.png"}},
+		{name: "159_media_jpeg", args: []string{"-M", "sample.jpg"}},
+		{name: "160_media_gif_animated", args: []string{"-M", "sample.gif"}},
+		{name: "161_media_webp", args: []string{"-M", "sample.webp"}},
+		{name: "162_media_bmp", args: []string{"-M", "sample.bmp"}},
+		{name: "163_media_tiff", args: []string{"-M", "sample.tiff"}},
+		{name: "164_media_avif", args: []string{"-M", "sample.avif"}},
+		{name: "165_media_images_no_flag", args: []string{"sample.png", "sample.gif"}},
+		{name: "166_media_image_html_embeds", args: []string{"--html", "-M", "sample.png"}},
 	})
 }
