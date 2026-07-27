@@ -483,3 +483,38 @@ func TestExtractDocumentText_CaseInsensitiveExtension(t *testing.T) {
 		t.Errorf("expected 'case test', got %q", string(text))
 	}
 }
+
+func TestIsHTMLPath(t *testing.T) {
+	for _, p := range []string{"a.html", "a.HTM", "dir/b.xhtml"} {
+		if !isHTMLPath(p) {
+			t.Errorf("isHTMLPath(%q) = false, want true", p)
+		}
+	}
+	for _, p := range []string{"a.pdf", "a.htmlx", "a.txt", "html"} {
+		if isHTMLPath(p) {
+			t.Errorf("isHTMLPath(%q) = true, want false", p)
+		}
+	}
+}
+
+func TestIsDocumentPathIncludesHTML(t *testing.T) {
+	for _, p := range []string{"a.html", "a.htm", "a.xhtml", "a.pdf", "a.docx", "a.xlsx", "a.pptx"} {
+		if !IsDocumentPath(p) {
+			t.Errorf("IsDocumentPath(%q) = false, want true", p)
+		}
+	}
+}
+
+func TestExtractDocumentTextConvertsHTML(t *testing.T) {
+	for _, name := range []string{"page.html", "page.htm", "page.xhtml"} {
+		src := []byte("<h1>Title</h1><p>Body <code>x</code></p>")
+		got, err := ExtractDocumentText(name, bytes.NewReader(src), int64(len(src)))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		want := "# Title\n\nBody `x`\n"
+		if string(got) != want {
+			t.Errorf("%s: got %q, want %q", name, got, want)
+		}
+	}
+}

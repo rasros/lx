@@ -1,0 +1,11 @@
+--- STDOUT ---
+sample.xhtml (3 rows)
+---
+```markdown
+# Strict
+
+xhtml extension
+```
+
+
+--- STDERR ---

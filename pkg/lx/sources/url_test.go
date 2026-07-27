@@ -196,3 +196,56 @@ func makeArchiveBytes(t *testing.T, files map[string]string) []byte {
 	}
 	return buf.Bytes()
 }
+
+func TestNewURLInputFileRecordsMediaType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte("<h1>Hi</h1>"))
+	}))
+	defer srv.Close()
+
+	f, err := NewURLInputFile(srv.URL + "/docs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if IsHTMLInput(f) {
+		t.Error("IsHTMLInput = true before Open, when no media type is known yet")
+	}
+
+	rc, err := f.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rc.Close()
+
+	if got := *f.mediaType; got != "text/html; charset=utf-8" {
+		t.Errorf("recorded media type = %q", got)
+	}
+	if !IsHTMLInput(f) {
+		t.Error("IsHTMLInput = false for a text/html response")
+	}
+}
+
+func TestIsHTMLInputIgnoresOtherMediaTypes(t *testing.T) {
+	for _, ct := range []string{"text/plain", "application/octet-stream", "", "not a media type"} {
+		f := InputFile{Path: "https://example.com/docs", mediaType: &ct}
+		if IsHTMLInput(f) {
+			t.Errorf("IsHTMLInput = true for Content-Type %q", ct)
+		}
+	}
+	for _, ct := range []string{"text/html", "text/html; charset=utf-8", "application/xhtml+xml"} {
+		f := InputFile{Path: "https://example.com/docs", mediaType: &ct}
+		if !IsHTMLInput(f) {
+			t.Errorf("IsHTMLInput = false for Content-Type %q", ct)
+		}
+	}
+}
+
+func TestIsHTMLInputFallsBackToSuffix(t *testing.T) {
+	if !IsHTMLInput(InputFile{Path: "page.html"}) {
+		t.Error("IsHTMLInput = false for page.html")
+	}
+	if IsHTMLInput(InputFile{Path: "main.go"}) {
+		t.Error("IsHTMLInput = true for main.go")
+	}
+}

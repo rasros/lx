@@ -1,0 +1,38 @@
+--- STDOUT ---
+<content>
+  <document index="1" language="markdown" rows="27">
+    <source>sample.html</source>
+    <document_content>
+# Authentication
+
+All endpoints require a `Bearer` token. See [auth docs](/auth).
+
+---
+
+## Example
+
+```go
+func main() {
+	fmt.Println("hi")
+}
+```
+
+- First
+- Second
+  - Nested
+
+> Rate limits apply.
+
+| Field | Type |
+|---|---|
+| id | int |
+
+![inline blob]
+
+![Logo](/logo.png)
+    </document_content>
+  </document>
+</content>
+
+
+--- STDERR ---

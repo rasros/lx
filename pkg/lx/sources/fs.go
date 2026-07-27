@@ -18,6 +18,11 @@ type InputFile struct {
 	Config core.RunnerConfig
 
 	Open func() (io.ReadCloser, error)
+
+	// mediaType is filled in by Open for sources that learn it while fetching,
+	// such as an HTTP response's Content-Type. It is shared by pointer so the
+	// value copies the pipeline makes all observe what Open recorded.
+	mediaType *string
 }
 
 type byteReaderReadCloser struct {

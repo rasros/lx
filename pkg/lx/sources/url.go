@@ -37,10 +37,12 @@ func NewURLInputFile(raw string) (InputFile, error) {
 	}
 
 	uri := u.String()
+	mediaType := new(string)
 	return InputFile{
-		Path:    uri,
-		AbsPath: uri,
-		Size:    -1,
+		Path:      uri,
+		AbsPath:   uri,
+		Size:      -1,
+		mediaType: mediaType,
 		Open: func() (io.ReadCloser, error) {
 			req, err := http.NewRequest(http.MethodGet, uri, nil)
 			if err != nil {
@@ -54,6 +56,7 @@ func NewURLInputFile(raw string) (InputFile, error) {
 				resp.Body.Close()
 				return nil, fmt.Errorf("GET %q: unexpected status %s", uri, resp.Status)
 			}
+			*mediaType = resp.Header.Get("Content-Type")
 			return resp.Body, nil
 		},
 	}, nil

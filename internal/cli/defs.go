@@ -246,14 +246,28 @@ size is not known ahead of time, such as remote URLs, are never skipped.`,
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
 		Usage:     "Extract text from document files for subsequent paths",
-		Long: `Extract plain text from document files for the next section.
+		Long: `Convert document files to text for the next section.
 
 By default, document files are treated as binary. When set, the following
-formats are converted to plain text instead:
-  - .pdf  - via PDF text extraction
-  - .docx - via Word document parsing
-  - .xlsx - via spreadsheet cell values (one sheet per section)
-  - .pptx - via presentation text extraction`,
+formats are converted instead:
+  - .pdf   - via PDF text extraction
+  - .docx  - via Word document parsing
+  - .xlsx  - via spreadsheet cell values (one sheet per section)
+  - .pptx  - via presentation text extraction
+  - .html, .htm, .xhtml - to structural Markdown
+
+HTML is the one format whose structure survives, because it is present in the
+input: headings become #, horizontal rules become ---, and lists, blockquotes,
+tables, links and fenced code blocks are preserved, with the code language taken
+from a highlight.js or prism class when present. Scripts, styles, navigation,
+headers, footers and asides are dropped, as are data: URIs, which is where the
+base64 payloads that bloat a bundle live.
+
+Inline emphasis is deliberately not converted: it carries little signal for a
+model, and keeping it would mean escaping every literal * and _ in body text.
+
+The other formats yield plain text, which is as much as their extraction
+libraries expose.`,
 	},
 	{
 		Category:  CatInterleaved,

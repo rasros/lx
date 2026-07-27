@@ -1,0 +1,14 @@
+--- STDOUT ---
+sample.html (27 rows)
+---
+```markdown
+# Authentication
+
+All endpoints require a `Bearer` token. See [auth docs](/auth).
+
+---
+
+```
+
+
+--- STDERR ---

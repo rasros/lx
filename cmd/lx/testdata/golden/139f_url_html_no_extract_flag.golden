@@ -1,0 +1,30 @@
+--- STDOUT ---
+/ROOT/suffixless (22 rows)
+---
+```
+<!doctype html>
+<html><head><title>API Reference</title>
+<style>body { color: red }</style>
+<script>var tracked = 1;</script>
+</head>
+<body>
+<nav><a href="/">Home</a></nav>
+<h1>Authentication</h1>
+<p>All endpoints require a <code>Bearer</code> token. See <a href="/auth">auth docs</a>.</p>
+<hr>
+<h2>Example</h2>
+<pre><code class="language-go">func main() {
+	fmt.Println("hi")
+}</code></pre>
+<ul><li>First</li><li>Second<ul><li>Nested</li></ul></li></ul>
+<blockquote><p>Rate limits apply.</p></blockquote>
+<table><thead><tr><th>Field</th><th>Type</th></tr></thead>
+<tbody><tr><td>id</td><td>int</td></tr></tbody></table>
+<p><img src="data:image/png;base64,AAAABBBBCCCC" alt="inline blob"></p>
+<p><img src="/logo.png" alt="Logo"></p>
+<footer>Copyright 2026</footer>
+</body></html>
+```
+
+
+--- STDERR ---

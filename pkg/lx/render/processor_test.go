@@ -251,7 +251,7 @@ func TestApplyConvertersLeavesContentWhenNoneApply(t *testing.T) {
 	src := []byte("package main\n")
 	file := sources.NewBufferInputFile("main.go", src)
 
-	reader, size, from := applyConverters(file, bytes.NewReader(src), int64(len(src)))
+	reader, size, from, _ := applyConverters(file, bytes.NewReader(src), int64(len(src)))
 	if from != "" {
 		t.Errorf("convertedFrom = %q, want empty", from)
 	}
@@ -269,14 +269,14 @@ func TestApplyConvertersRunsMatchingConverter(t *testing.T) {
 	converters = append(converters, converter{
 		name:    "test",
 		applies: func(f sources.InputFile) bool { return strings.HasSuffix(f.Path, ".zzz") },
-		convert: func(path string, r io.ReaderAt, size int64) ([]byte, error) {
+		convert: func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error) {
 			return []byte("converted"), nil
 		},
 	})
 	t.Cleanup(func() { converters = converters[:len(converters)-1] })
 
 	file := sources.NewBufferInputFile("doc.zzz", []byte("raw"))
-	reader, size, from := applyConverters(file, bytes.NewReader([]byte("raw")), 3)
+	reader, size, from, _ := applyConverters(file, bytes.NewReader([]byte("raw")), 3)
 
 	if from != "zzz" {
 		t.Errorf("convertedFrom = %q, want %q", from, "zzz")
@@ -293,14 +293,14 @@ func TestApplyConvertersKeepsContentOnFailure(t *testing.T) {
 	converters = append(converters, converter{
 		name:    "failing",
 		applies: func(f sources.InputFile) bool { return strings.HasSuffix(f.Path, ".zzz") },
-		convert: func(path string, r io.ReaderAt, size int64) ([]byte, error) {
+		convert: func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error) {
 			return nil, io.ErrUnexpectedEOF
 		},
 	})
 	t.Cleanup(func() { converters = converters[:len(converters)-1] })
 
 	src := []byte("raw content")
-	reader, size, from := applyConverters(
+	reader, size, from, _ := applyConverters(
 		sources.NewBufferInputFile("doc.zzz", src), bytes.NewReader(src), int64(len(src)))
 
 	if from != "" {
@@ -399,5 +399,29 @@ func TestRenderPreparedNonFileItemHasZeroStats(t *testing.T) {
 	}
 	if stats != (RenderStats{}) {
 		t.Errorf("prompt item reported %+v, want zero stats", stats)
+	}
+}
+
+func TestApplyConvertersReportsProducedLanguage(t *testing.T) {
+	src := []byte("<h1>Hi</h1>")
+	file := sources.NewBufferInputFile("page.html", src)
+	file.Config = core.RunnerConfig{Head: -1, ExtractDocuments: true}
+
+	_, _, from, lang := applyConverters(file, bytes.NewReader(src), int64(len(src)))
+	if from != "html" {
+		t.Errorf("convertedFrom = %q, want html", from)
+	}
+	if lang != "markdown" {
+		t.Errorf("language = %q, want markdown", lang)
+	}
+}
+
+func TestApplyConvertersReportsNoLanguageWhenNoneApply(t *testing.T) {
+	src := []byte("package main\n")
+	file := sources.NewBufferInputFile("main.go", src)
+
+	_, _, from, lang := applyConverters(file, bytes.NewReader(src), int64(len(src)))
+	if from != "" || lang != "" {
+		t.Errorf("got from=%q lang=%q, want both empty", from, lang)
 	}
 }
