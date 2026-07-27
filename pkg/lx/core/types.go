@@ -63,27 +63,29 @@ type TemplateEngine struct {
 	UseSeparators bool
 }
 
-// Config represents the core library configuration.
+// Config represents the core library configuration. The yaml tags are the
+// documented config-file keys, so this struct is the single definition of that
+// schema.
 type Config struct {
-	FileContentTemplate string
-	FileErrorTemplate   string
-	FileBinaryTemplate  string
-	FileCompactTemplate string
-	FileHeaderTemplate  string
+	FileContentTemplate string `yaml:"file_content_template"`
+	FileErrorTemplate   string `yaml:"file_error_template"`
+	FileBinaryTemplate  string `yaml:"file_binary_template"`
+	FileCompactTemplate string `yaml:"file_compact_template"`
+	FileHeaderTemplate  string `yaml:"file_header_template"`
 
-	SectionTemplate string
-	PromptTemplate  string
-	TreeTemplate    string
-	MetaTemplate    string
+	SectionTemplate string `yaml:"section_template"`
+	PromptTemplate  string `yaml:"prompt_template"`
+	TreeTemplate    string `yaml:"tree_template"`
+	MetaTemplate    string `yaml:"meta_template"`
 
-	SectionHeaderTemplate string
-	SectionFooterTemplate string
+	SectionHeaderTemplate string `yaml:"section_header_template"`
+	SectionFooterTemplate string `yaml:"section_footer_template"`
 
-	OutputHeaderTemplate string
-	OutputFooterTemplate string
-	StatsTemplate        string
+	OutputHeaderTemplate string `yaml:"output_header_template"`
+	OutputFooterTemplate string `yaml:"output_footer_template"`
+	StatsTemplate        string `yaml:"stats_template"`
 
-	OutputFormat string
+	OutputFormat string `yaml:"output_format"`
 }
 
 // FileContext represents the data provided to file-level templates.

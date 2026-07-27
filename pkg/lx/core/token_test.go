@@ -104,7 +104,7 @@ func TestDefaultTokenCounter_LargeContentSampling(t *testing.T) {
 
 	// Same content scanned without sampling: feed it as a slice that's exactly
 	// the content but invoke the inner scanner directly via a sub-threshold split.
-	exact := scanString(full)
+	exact := scan(full)
 
 	diff := sampled - exact
 	if diff < 0 {
@@ -161,5 +161,27 @@ func TestDefaultTokenCounter_DensityFollowsSymbolShare(t *testing.T) {
 	}
 	if jsonWords >= prose {
 		t.Errorf("JSON of long string values (%.2f) should still beat prose (%.2f)", jsonWords, prose)
+	}
+}
+
+// The two representations shared duplicated scanners before; this pins that one
+// implementation now serves both.
+func TestDefaultTokenCounterAgreesAcrossRepresentations(t *testing.T) {
+	samples := []string{
+		"",
+		"hello world",
+		strings.Repeat(`{"a":1,"b":[true,false]},`, 40),
+		strings.Repeat("func Alpha() int {\n\treturn 1\n}\n", 40),
+		strings.Repeat("naïve café — résumé ", 40),
+		strings.Repeat("x", sampleThreshold+sampleHead+sampleTail+1),
+	}
+
+	for i, s := range samples {
+		size := int64(len(s))
+		fromString := DefaultTokenCounter(size, s)
+		fromBytes := DefaultTokenCounter(size, []byte(s))
+		if fromString != fromBytes {
+			t.Errorf("sample %d: string gave %d, []byte gave %d", i, fromString, fromBytes)
+		}
 	}
 }

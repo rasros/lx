@@ -27,6 +27,8 @@ type FileErrorHandler = streamingpkg.FileErrorHandler
 
 func NewConfig() *Config { return core.NewConfig() }
 
+func Merge(dst *Config, src *Config) { core.Merge(dst, src) }
+
 func NewWalker(basePatterns, overridePatterns []string) *Walker {
 	return walkerpkg.NewWalker(basePatterns, overridePatterns)
 }
