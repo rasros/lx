@@ -16,6 +16,7 @@ type Section struct {
 
 	treeStrings map[int]string
 	skipFileOps map[int]bool
+	resolved    map[int][]lx.InputFile
 }
 
 func parseSections(ops []Op, defaultRunCfg lx.RunnerConfig) []Section {
