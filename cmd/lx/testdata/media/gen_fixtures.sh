@@ -23,12 +23,28 @@ ff "${VIDEO[@]}" -c:v libx264 -pix_fmt yuv420p silent.mp4
 # QuickTime, which shares the box layout but not the extension.
 ff -i sample.mp4 -c copy sample.mov
 
+# Matroska, and WebM with codecs the format prefers.
+ff -i sample.mp4 -c copy sample.mkv
+ff "${VIDEO[@]}" "${AUDIO[@]}" -c:v libvpx-vp9 -b:v 50k -c:a libopus sample.webm
+
 # Audio-only containers.
 ff "${AUDIO[@]}" -c:a aac -b:a 32k sample.m4a
+ff "${AUDIO[@]}" -c:a libmp3lame -b:a 32k sample.mp3
 ff "${AUDIO[@]}" -c:a pcm_s16le sample.wav
 ff "${AUDIO[@]}" -c:a flac sample.flac
+
+# Stills, one per header layout.
+ff "${VIDEO[@]}" -frames:v 1 sample.png
+ff "${VIDEO[@]}" -frames:v 1 sample.jpg
+ff "${VIDEO[@]}" -frames:v 1 sample.webp
+ff "${VIDEO[@]}" -frames:v 1 sample.bmp
+ff "${VIDEO[@]}" -frames:v 1 sample.tiff
+ff "${VIDEO[@]}" -frames:v 1 -c:v libaom-av1 -still-picture 1 sample.avif
+
+# An animation, whose length is the sum of its frame delays.
+ff "${VIDEO[@]}" -frames:v 10 sample.gif
 
 # A header that stops mid-box, to pin the fall back to the container alone.
 head -c 32 sample.mp4 > truncated.mp4
 
-ls -l ./*.mp4 ./*.mov ./*.m4a ./*.wav ./*.flac
+ls -l

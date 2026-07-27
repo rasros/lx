@@ -1,0 +1,10 @@
+--- STDOUT ---
+sample.jpg (2 rows)
+---
+```
+Container: jpeg
+Image: 32x32, ycbcr, 8-bit
+```
+
+
+--- STDERR ---

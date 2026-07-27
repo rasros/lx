@@ -280,16 +280,28 @@ libraries expose.`,
 
 By default, media files are binary and contribute nothing but a placeholder.
 When set, the container header of the following formats is read instead:
-  - .mp4, .m4v, .mov - duration, codecs, resolution, frame rate
-  - .m4a             - duration, codec, sample rate, channels
-  - .wav, .flac      - duration, codec, sample rate, channels, bit depth
+  - .mp4, .m4v, .mov     - duration, codecs, resolution, frame rate
+  - .mkv, .webm          - the same, from the EBML header
+  - .m4a, .mp3           - duration, codec, sample rate, channels
+  - .wav, .flac          - the same, plus bit depth
+  - .png, .jpg, .jpeg    - dimensions, colour model, bit depth
+  - .gif                 - the same, plus frame count and animation length
+  - .webp, .bmp, .tiff   - dimensions, colour model
+  - .ico                 - the dimensions of its largest image
+  - .avif, .heic         - dimensions
 
-The metadata is read from the container header, so no decoding happens and the
-cost does not grow with the length of the file.
+Values are those the container states. That differs from what a decoder would
+report in a few places: a Matroska track holding Opus names the rate the audio
+was encoded from rather than the 48 kHz Opus always decodes at, and a
+constant-bitrate MP3 with no Xing header can only have its duration estimated
+from the bitrate, which is marked when it happens.
 
 Nothing is transcribed or captioned: the point is that the file's existence and
 shape reach the bundle, not its content. A file whose header cannot be parsed
-still reports its container.`,
+still reports its container.
+
+In HTML output, images are embedded whole, and that takes precedence: the
+picture says more than a description of it would.`,
 	},
 	{
 		Category:  CatInterleaved,

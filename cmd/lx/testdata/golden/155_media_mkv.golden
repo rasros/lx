@@ -1,0 +1,13 @@
+--- STDOUT ---
+sample.mkv (5 rows)
+---
+```
+Container: mkv
+Duration: 00:00:01.128
+Bitrate: 45 kbps
+Video: h264, 32x32
+Audio: aac, 8000 Hz, mono
+```
+
+
+--- STDERR ---

@@ -1,0 +1,12 @@
+--- STDOUT ---
+sample.mp3 (4 rows)
+---
+```
+Container: mp3
+Duration: 00:00:01.152
+Bitrate: 32 kbps
+Audio: mp3, 8000 Hz, mono
+```
+
+
+--- STDERR ---

@@ -1,0 +1,10 @@
+--- STDOUT ---
+sample.avif (2 rows)
+---
+```
+Container: avif
+Image: 32x32
+```
+
+
+--- STDERR ---

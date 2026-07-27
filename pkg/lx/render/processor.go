@@ -213,7 +213,13 @@ var converters = []converter{
 
 // applyConverters reports the format it converted from, or "" if none applied.
 // A converter that fails leaves the content untouched.
-func applyConverters(file sources.InputFile, reader io.ReaderAt, size int64) (io.ReaderAt, int64, string, string) {
+//
+// An image that is about to be embedded is left alone: the picture itself says
+// more than a description of it would.
+func applyConverters(file sources.InputFile, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string) {
+	if embedImages && internal.IsImage(file.Path) {
+		return reader, size, "", ""
+	}
 	for _, c := range converters {
 		if !c.applies(file) {
 			continue
@@ -307,7 +313,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	}
 
 	reader, size := readerFor(rc, file.Size)
-	reader, size, convertedFrom, convertedLang := applyConverters(file, reader, size)
+	reader, size, convertedFrom, convertedLang := applyConverters(file, reader, size, p.engine.EmbedImages)
 
 	if scratch == nil {
 		scratch = make([]byte, 1024)
@@ -317,7 +323,9 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	if convertedLang != "" {
 		lang = convertedLang
 	}
-	isImage := internal.IsImage(file.Path)
+	// A converted image is no longer an image but the text describing it, which
+	// the content templates render and the image template would discard.
+	isImage := internal.IsImage(file.Path) && convertedFrom == ""
 	cfg := file.Config
 
 	reader, size, skeletonMode, originalRows := applySkeleton(cfg, lang, reader, size, isBinary, isImage)

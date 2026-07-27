@@ -1,0 +1,10 @@
+--- STDOUT ---
+sample.tiff (2 rows)
+---
+```
+Container: tiff
+Image: 32x32, rgb, 8-bit
+```
+
+
+--- STDERR ---

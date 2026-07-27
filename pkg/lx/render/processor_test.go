@@ -251,7 +251,7 @@ func TestApplyConvertersLeavesContentWhenNoneApply(t *testing.T) {
 	src := []byte("package main\n")
 	file := sources.NewBufferInputFile("main.go", src)
 
-	reader, size, from, _ := applyConverters(file, bytes.NewReader(src), int64(len(src)))
+	reader, size, from, _ := applyConverters(file, bytes.NewReader(src), int64(len(src)), false)
 	if from != "" {
 		t.Errorf("convertedFrom = %q, want empty", from)
 	}
@@ -276,7 +276,7 @@ func TestApplyConvertersRunsMatchingConverter(t *testing.T) {
 	t.Cleanup(func() { converters = converters[:len(converters)-1] })
 
 	file := sources.NewBufferInputFile("doc.zzz", []byte("raw"))
-	reader, size, from, _ := applyConverters(file, bytes.NewReader([]byte("raw")), 3)
+	reader, size, from, _ := applyConverters(file, bytes.NewReader([]byte("raw")), 3, false)
 
 	if from != "zzz" {
 		t.Errorf("convertedFrom = %q, want %q", from, "zzz")
@@ -301,7 +301,7 @@ func TestApplyConvertersKeepsContentOnFailure(t *testing.T) {
 
 	src := []byte("raw content")
 	reader, size, from, _ := applyConverters(
-		sources.NewBufferInputFile("doc.zzz", src), bytes.NewReader(src), int64(len(src)))
+		sources.NewBufferInputFile("doc.zzz", src), bytes.NewReader(src), int64(len(src)), false)
 
 	if from != "" {
 		t.Errorf("convertedFrom = %q, want empty after a failure", from)
@@ -407,7 +407,7 @@ func TestApplyConvertersReportsProducedLanguage(t *testing.T) {
 	file := sources.NewBufferInputFile("page.html", src)
 	file.Config = core.RunnerConfig{Head: -1, ExtractDocuments: true}
 
-	_, _, from, lang := applyConverters(file, bytes.NewReader(src), int64(len(src)))
+	_, _, from, lang := applyConverters(file, bytes.NewReader(src), int64(len(src)), false)
 	if from != "html" {
 		t.Errorf("convertedFrom = %q, want html", from)
 	}
@@ -416,11 +416,26 @@ func TestApplyConvertersReportsProducedLanguage(t *testing.T) {
 	}
 }
 
+// An image bound for embedding keeps its bytes: the picture carries more than a
+// description of it would.
+func TestApplyConvertersLeavesImagesBeingEmbedded(t *testing.T) {
+	src := []byte("\x89PNG\r\n\x1a\n")
+	file := sources.NewBufferInputFile("logo.png", src)
+	file.Config = core.RunnerConfig{Head: -1, ExtractMedia: true}
+
+	if _, _, from, _ := applyConverters(file, bytes.NewReader(src), int64(len(src)), true); from != "" {
+		t.Errorf("convertedFrom = %q, want empty while embedding", from)
+	}
+	if _, _, from, _ := applyConverters(file, bytes.NewReader(src), int64(len(src)), false); from != "png" {
+		t.Errorf("convertedFrom = %q, want png when not embedding", from)
+	}
+}
+
 func TestApplyConvertersReportsNoLanguageWhenNoneApply(t *testing.T) {
 	src := []byte("package main\n")
 	file := sources.NewBufferInputFile("main.go", src)
 
-	_, _, from, lang := applyConverters(file, bytes.NewReader(src), int64(len(src)))
+	_, _, from, lang := applyConverters(file, bytes.NewReader(src), int64(len(src)), false)
 	if from != "" || lang != "" {
 		t.Errorf("got from=%q lang=%q, want both empty", from, lang)
 	}

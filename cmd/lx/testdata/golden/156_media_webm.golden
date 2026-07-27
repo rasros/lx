@@ -1,0 +1,13 @@
+--- STDOUT ---
+sample.webm (5 rows)
+---
+```
+Container: webm
+Duration: 00:00:01.008
+Bitrate: 82 kbps
+Video: vp9, 32x32
+Audio: opus, 8000 Hz, mono
+```
+
+
+--- STDERR ---

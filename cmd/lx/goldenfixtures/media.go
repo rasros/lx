@@ -12,12 +12,22 @@ import (
 // the point: it carries the padding, edit lists and seek tables that a
 // hand-built container would not.
 var mediaFixtures = []string{
-	"sample.mp4",   // h264 and aac muxed together
-	"silent.mp4",   // video with no audio track
-	"sample.mov",   // the same boxes under a different extension
-	"sample.m4a",   // audio only
+	"sample.mp4", // h264 and aac muxed together
+	"silent.mp4", // video with no audio track
+	"sample.mov", // the same boxes under a different extension
+	"sample.mkv",
+	"sample.webm",
+	"sample.m4a", // audio only
+	"sample.mp3",
 	"sample.wav",
 	"sample.flac",
+	"sample.png",
+	"sample.jpg",
+	"sample.webp",
+	"sample.bmp",
+	"sample.tiff",
+	"sample.avif",
+	"sample.gif",    // an animation rather than a still
 	"truncated.mp4", // a header that stops mid-box
 }
 
