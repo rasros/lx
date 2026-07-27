@@ -31,6 +31,7 @@ type RunnerConfig struct {
 	SkeletonTypes     bool
 	ExpandArchives    bool
 	ExtractDocuments  bool
+	ExtractMedia      bool
 	ShowHidden        bool
 	FollowDirSymlinks bool
 	SkipFileSymlinks  bool

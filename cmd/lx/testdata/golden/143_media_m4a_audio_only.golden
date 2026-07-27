@@ -1,0 +1,12 @@
+--- STDOUT ---
+sample.m4a (4 rows)
+---
+```
+Container: m4a
+Duration: 00:00:01.000
+Bitrate: 35 kbps
+Audio: aac, 8000 Hz, mono
+```
+
+
+--- STDERR ---

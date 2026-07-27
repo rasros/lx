@@ -24,6 +24,7 @@
 //   - ExpandArchives opens compressed files and directories for .zip/.tar.gz, etc..
 //   - ExtractDocuments converts .pdf/.docx/.xlsx/.pptx to text and HTML to
 //     Markdown.
+//   - ExtractMedia replaces audio and video files with their container metadata.
 //   - ShowHidden, FollowDirSymlinks, SkipFileSymlinks control discovery options.
 //   - NoIgnore disables adhering to .ignore files.
 //
@@ -45,6 +46,7 @@
 //   - IsArchivePath / ExpandArchive handle archive expansion into stream files.
 //   - IsDocumentPath / ConvertInput convert documents to text, or to Markdown
 //     for HTML.
+//   - IsMediaPath / ExtractMediaMetadata describe media files by their headers.
 //
 // Typical flow:
 //

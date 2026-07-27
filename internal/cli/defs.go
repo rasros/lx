@@ -271,6 +271,28 @@ libraries expose.`,
 	},
 	{
 		Category:  CatInterleaved,
+		Name:      "media",
+		Short:     "M",
+		Type:      CmdInterleaved,
+		ValueType: ValueNone,
+		Usage:     "Describe media files by their metadata for subsequent paths",
+		Long: `Replace media files with a description of their metadata.
+
+By default, media files are binary and contribute nothing but a placeholder.
+When set, the container header of the following formats is read instead:
+  - .mp4, .m4v, .mov - duration, codecs, resolution, frame rate
+  - .m4a             - duration, codec, sample rate, channels
+  - .wav, .flac      - duration, codec, sample rate, channels, bit depth
+
+The metadata is read from the container header, so no decoding happens and the
+cost does not grow with the length of the file.
+
+Nothing is transcribed or captioned: the point is that the file's existence and
+shape reach the bundle, not its content. A file whose header cannot be parsed
+still reports its container.`,
+	},
+	{
+		Category:  CatInterleaved,
 		Name:      "expand",
 		Short:     "Z",
 		Type:      CmdInterleaved,

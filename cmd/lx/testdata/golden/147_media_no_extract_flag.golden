@@ -1,0 +1,6 @@
+--- STDOUT ---
+[1/2] sample.mp4 - binary file skipped (6.9 kB)
+[2/2] sample.wav - binary file skipped (16.1 kB)
+
+
+--- STDERR ---

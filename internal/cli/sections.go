@@ -97,6 +97,9 @@ func applyInterleaved(op Op, s *Section) {
 	case "documents":
 		slog.Debug("Enabling document extraction")
 		s.RunCfg.ExtractDocuments = true
+	case "media":
+		slog.Debug("Enabling media metadata extraction")
+		s.RunCfg.ExtractMedia = true
 	case "expand":
 		slog.Debug("Enabling archive expansion")
 		s.RunCfg.ExpandArchives = true

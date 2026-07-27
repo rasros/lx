@@ -109,6 +109,20 @@ binary:
 lx -D docs/
 ```
 
+Media files stay binary, but `-M` describes them from their container header, so the model at least knows what is there:
+
+```bash
+lx -M assets/
+```
+
+```
+Container: mp4
+Duration: 00:04:12.480
+Bitrate: 2.4 Mbps
+Video: h264, 1920x1080, 25.00 fps
+Audio: aac, 48000 Hz, stereo
+```
+
 ## Output formats
 
 Markdown is the default. The rest are one flag each:

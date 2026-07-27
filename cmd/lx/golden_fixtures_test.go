@@ -19,6 +19,7 @@ func setupConfigFixture(t *testing.T) string     { return gf.SetupConfigFixture(
 func setupComplexFixture(t *testing.T) string    { return gf.SetupComplexFixture(t) }
 func setupArchiveFixture(t *testing.T) string    { return gf.SetupArchiveFixture(t) }
 func setupDocumentsFixture(t *testing.T) string  { return gf.SetupDocumentsFixture(t) }
+func setupMediaFixture(t *testing.T) string      { return gf.SetupMediaFixture(t) }
 func setupSkeletonFixture(t *testing.T) string   { return gf.SetupSkeletonFixture(t) }
 func setupRelativePathsFixture(t *testing.T) (string, string) {
 	return gf.SetupRelativePathsFixture(t)

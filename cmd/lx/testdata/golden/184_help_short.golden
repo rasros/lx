@@ -37,6 +37,7 @@ A program to discover and format files for LLM prompting
 [1m  -e, --exclude <value>     [22mAdd a glob blacklist pattern to subsequent files
 [1m  -m, --max-size <size>     [22mSkip files larger than the given size for subsequent paths
 [1m  -D, --documents           [22mExtract text from document files for subsequent paths
+[1m  -M, --media               [22mDescribe media files by their metadata for subsequent paths
 [1m  -Z, --expand              [22mExpand archive files inline for subsequent paths
 [1m  -H, --hidden              [22mInclude hidden files (dotfiles) for subsequent paths
 [1m  -S, --follow              [22mFollow directory symlinks for subsequent paths

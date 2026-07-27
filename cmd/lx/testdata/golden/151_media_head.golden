@@ -1,0 +1,10 @@
+--- STDOUT ---
+sample.mp4 (5 rows)
+---
+```
+Container: mp4
+Duration: 00:00:01.000
+```
+
+
+--- STDERR ---
