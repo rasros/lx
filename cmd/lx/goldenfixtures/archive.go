@@ -29,6 +29,10 @@ func SetupArchiveFixture(t *testing.T) string {
 		{"hello.txt", "Hello from tar bz2!\n"},
 		{"nested/world.go", "package nested\n"},
 	})
+	createTestZip(filepath.Join(dir, "images.zip"), [][2]string{
+		{"logo.png", "\x89PNG\r\n\x1a\n\x00\x00\x00\x0D"},
+		{"notes.txt", "beside the image\n"},
+	})
 	createTestTar(filepath.Join(dir, "archive.tar"), [][2]string{
 		{"hello.txt", "Hello from tar plain!\n"},
 		{"nested/world.go", "package nested\n"},

@@ -25,3 +25,25 @@ func TestIsImage(t *testing.T) {
 		})
 	}
 }
+
+func TestMIMEType(t *testing.T) {
+	cases := map[string]string{
+		"a/logo.PNG":  "image/png",
+		"photo.jpeg":  "image/jpeg",
+		"icon.svg":    "image/svg+xml",
+		"archive.bin": "application/octet-stream",
+	}
+	for path, want := range cases {
+		if got := MIMEType(path); got != want {
+			t.Errorf("MIMEType(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
+
+func TestDataURIEncodesGivenBytes(t *testing.T) {
+	got := DataURI("logo.png", []byte("hi"))
+	want := "data:image/png;base64,aGk="
+	if got != want {
+		t.Errorf("DataURI = %q, want %q", got, want)
+	}
+}

@@ -189,6 +189,7 @@ func TestGoldenArchive(t *testing.T) {
 		{name: "117_expand_archive_hidden_filter_go", args: []string{"-Z", "-H", "-i", "*.go", "archive.zip"}},
 		{name: "118_expand_archive_tar_bz2", args: []string{"-Z", "archive.tar.bz2"}},
 		{name: "119_expand_archive_tar", args: []string{"-Z", "archive.tar"}},
+		{name: "119b_archive_image_html", args: []string{"--html", "-Z", "images.zip"}},
 	})
 }
 

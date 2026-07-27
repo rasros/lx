@@ -96,6 +96,7 @@ type FileContext struct {
 	Content          interface{}
 	IsBinary         bool
 	IsImage          bool
+	DataURI          string
 	IsCompactView    bool
 	FileIndex        int
 	SectionFileIndex int
