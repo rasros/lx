@@ -11,25 +11,9 @@ import (
 )
 
 type CliConfig struct {
-	FileContentTemplate string `yaml:"file_content_template"`
-	FileErrorTemplate   string `yaml:"file_error_template"`
-	FileBinaryTemplate  string `yaml:"file_binary_template"`
-	FileCompactTemplate string `yaml:"file_compact_template"`
-	FileHeaderTemplate  string `yaml:"file_header_template"`
-
-	SectionTemplate string `yaml:"section_template"`
-	PromptTemplate  string `yaml:"prompt_template"`
-	TreeTemplate    string `yaml:"tree_template"`
-	MetaTemplate    string `yaml:"meta_template"`
-
-	SectionHeaderTemplate string `yaml:"section_header_template"`
-	SectionFooterTemplate string `yaml:"section_footer_template"`
-
-	OutputHeaderTemplate string `yaml:"output_header_template"`
-	OutputFooterTemplate string `yaml:"output_footer_template"`
-	StatsTemplate        string `yaml:"stats_template"`
-
-	OutputFormat string `yaml:"output_format"`
+	// The library config keys are inlined from their single definition in
+	// core.Config, so adding a template needs no change here.
+	lx.Config `yaml:",inline"`
 
 	OutputMode string `yaml:"output_mode"`
 	ShowStats  string `yaml:"show_stats"`
@@ -74,25 +58,7 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 			return err
 		}
 
-		overrideIfSet(&lxCfg.FileContentTemplate, loaded.FileContentTemplate)
-		overrideIfSet(&lxCfg.FileErrorTemplate, loaded.FileErrorTemplate)
-		overrideIfSet(&lxCfg.FileBinaryTemplate, loaded.FileBinaryTemplate)
-		overrideIfSet(&lxCfg.FileCompactTemplate, loaded.FileCompactTemplate)
-		overrideIfSet(&lxCfg.FileHeaderTemplate, loaded.FileHeaderTemplate)
-
-		overrideIfSet(&lxCfg.SectionTemplate, loaded.SectionTemplate)
-		overrideIfSet(&lxCfg.PromptTemplate, loaded.PromptTemplate)
-		overrideIfSet(&lxCfg.TreeTemplate, loaded.TreeTemplate)
-		overrideIfSet(&lxCfg.MetaTemplate, loaded.MetaTemplate)
-
-		overrideIfSet(&lxCfg.SectionHeaderTemplate, loaded.SectionHeaderTemplate)
-		overrideIfSet(&lxCfg.SectionFooterTemplate, loaded.SectionFooterTemplate)
-
-		overrideIfSet(&lxCfg.OutputHeaderTemplate, loaded.OutputHeaderTemplate)
-		overrideIfSet(&lxCfg.OutputFooterTemplate, loaded.OutputFooterTemplate)
-		overrideIfSet(&lxCfg.StatsTemplate, loaded.StatsTemplate)
-
-		overrideIfSet(&lxCfg.OutputFormat, loaded.OutputFormat)
+		lx.Merge(lxCfg, &loaded.Config)
 
 		overrideIfSet(&mergedCli.OutputMode, loaded.OutputMode)
 		overrideIfSet(&mergedCli.ShowStats, loaded.ShowStats)

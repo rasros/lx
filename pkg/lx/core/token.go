@@ -16,92 +16,50 @@ const (
 func DefaultTokenCounter(size int64, content interface{}) int64 {
 	switch v := content.(type) {
 	case string:
-		return estimateString(v, size)
+		return estimate(v, size)
 	case []byte:
-		return estimateBytes(v, size)
+		return estimate(v, size)
 	case fmt.Stringer:
-		return estimateString(v.String(), size)
+		return estimate(v.String(), size)
 	}
 	return size / 4
 }
 
-func estimateString(s string, size int64) int64 {
-	n := int64(len(s))
+// byteseq is the pair of representations content arrives in. Scanning them with
+// one implementation keeps the two from drifting apart.
+type byteseq interface {
+	~string | ~[]byte
+}
+
+// estimate scans the whole content when it is small enough, and otherwise
+// extrapolates from a head and tail sample.
+func estimate[T byteseq](d T, size int64) int64 {
+	n := int64(len(d))
 	if n == 0 {
 		return size / 4
 	}
 	if n <= sampleThreshold {
-		return scanString(s)
+		return scan(d)
 	}
+
 	headEnd := sampleHead
-	tailStart := len(s) - sampleTail
+	tailStart := len(d) - sampleTail
 	if tailStart < headEnd {
-		return scanString(s)
+		return scan(d)
 	}
-	sampleTokens := scanString(s[:headEnd]) + scanString(s[tailStart:])
+
+	sampleTokens := scan(d[:headEnd]) + scan(d[tailStart:])
 	sampleBytes := int64(headEnd + sampleTail)
 	return sampleTokens * n / sampleBytes
 }
 
-func estimateBytes(b []byte, size int64) int64 {
-	n := int64(len(b))
-	if n == 0 {
-		return size / 4
-	}
-	if n <= sampleThreshold {
-		return scanBytes(b)
-	}
-	headEnd := sampleHead
-	tailStart := len(b) - sampleTail
-	if tailStart < headEnd {
-		return scanBytes(b)
-	}
-	sampleTokens := scanBytes(b[:headEnd]) + scanBytes(b[tailStart:])
-	sampleBytes := int64(headEnd + sampleTail)
-	return sampleTokens * n / sampleBytes
-}
-
-func scanString(s string) int64 {
+func scan[T byteseq](d T) int64 {
 	var (
 		wordRuns, wordChars, symbols, wsRuns, newlines, nonAscii int64
 		inWord, inWS                                             bool
 	)
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch {
-		case c >= 0x80:
-			nonAscii++
-			inWord, inWS = false, false
-		case isWord(c):
-			if !inWord {
-				wordRuns++
-				inWord = true
-			}
-			wordChars++
-			inWS = false
-		case c == '\n':
-			newlines++
-			inWord, inWS = false, false
-		case isWS(c):
-			if !inWS {
-				wsRuns++
-				inWS = true
-			}
-			inWord = false
-		default:
-			symbols++
-			inWord, inWS = false, false
-		}
-	}
-	return combine(wordRuns, wordChars, symbols, wsRuns, newlines, nonAscii)
-}
-
-func scanBytes(b []byte) int64 {
-	var (
-		wordRuns, wordChars, symbols, wsRuns, newlines, nonAscii int64
-		inWord, inWS                                             bool
-	)
-	for _, c := range b {
+	for i := 0; i < len(d); i++ {
+		c := d[i]
 		switch {
 		case c >= 0x80:
 			nonAscii++
