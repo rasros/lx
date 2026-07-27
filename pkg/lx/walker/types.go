@@ -17,7 +17,12 @@ type Walker struct {
 	OverrideRules []Rule
 	IgnoreEnabled bool
 	SkipHidden    bool
-	OnIgnore      func(path string, reason string)
+
+	// FollowDirSymlinks descends into symlinks that resolve to directories.
+	// SkipFileSymlinks drops symlinks that resolve to files.
+	FollowDirSymlinks bool
+	SkipFileSymlinks  bool
+	OnIgnore          func(path string, reason string)
 }
 
 // NewWalker initializes the walker.

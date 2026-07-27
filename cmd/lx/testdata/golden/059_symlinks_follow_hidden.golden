@@ -7,7 +7,11 @@ i am hidden in links
 
 [2/10] links/broken_link - error: open broken_link: FILE_NOT_FOUND
 
-[3/10] links/cycle_a/to_b - error: is a directory
+[3/10] links/cycle_a/to_b/visible.txt (1 rows)
+---
+```text
+b
+```
 
 [4/10] links/cycle_a/visible.txt (1 rows)
 ---
@@ -15,7 +19,11 @@ i am hidden in links
 a
 ```
 
-[5/10] links/cycle_b/to_a - error: is a directory
+[5/10] links/cycle_b/to_a/visible.txt (1 rows)
+---
+```text
+a
+```
 
 [6/10] links/cycle_b/visible.txt (1 rows)
 ---
@@ -30,9 +38,17 @@ package main
 func main() {}
 ```
 
-[8/10] links/link_to_pkg - error: is a directory
+[8/10] links/link_to_pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
 
-[9/10] links/loop - error: is a directory
+[9/10] links/loop/recursion.txt (1 rows)
+---
+```text
+I am safe
+```
 
 [10/10] links/safe_target/recursion.txt (1 rows)
 ---
