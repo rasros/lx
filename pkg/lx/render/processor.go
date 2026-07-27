@@ -205,7 +205,7 @@ var converters = []converter{
 	{
 		name: "media",
 		applies: func(f sources.InputFile) bool {
-			return f.Config.ExtractMedia && sources.IsMediaPath(f.Path)
+			return f.Config.ExtractMedia && sources.IsMediaCandidate(f.Path)
 		},
 		convert: sources.ExtractMediaMetadata,
 	},

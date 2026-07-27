@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -32,7 +33,7 @@ var mediaSuffixes = map[string]string{
 	".tif":  "tiff",
 	".tiff": "tiff",
 	".avif": "avif",
-	".heic": "avif",
+	".heic": "heic",
 }
 
 // IsMediaPath reports whether the path names an audio or video container whose
@@ -42,11 +43,25 @@ func IsMediaPath(path string) bool {
 	return ok
 }
 
+// IsMediaCandidate reports whether a path is worth offering to media
+// extraction. A recognised suffix settles it, and a path with no suffix at all
+// is offered too: URLs frequently have none, and the header is what identifies
+// those. Extraction rejects what turns out not to be media.
+func IsMediaCandidate(path string) bool {
+	return IsMediaPath(path) || filepath.Ext(path) == ""
+}
+
 // ExtractMediaMetadata describes a media file's container, duration and streams.
 // Media is otherwise skipped as binary, so the point is that the file's
-// existence and shape reach the bundle at all; an unparsable file still reports
-// its container rather than failing.
+// existence and shape reach the bundle at all.
+//
+// It fails only for a file that is not media, which leaves the content untouched
+// for the binary handling to describe as it would have anyway.
 func ExtractMediaMetadata(f InputFile, r io.ReaderAt, size int64) ([]byte, error) {
 	container := mediaSuffixes[strings.ToLower(filepath.Ext(f.Path))]
-	return internal.MediaMetadata(container, r, size), nil
+	data, ok := internal.MediaMetadata(container, r, size)
+	if !ok {
+		return nil, fmt.Errorf("no media container found in %s", f.Path)
+	}
+	return data, nil
 }

@@ -45,10 +45,29 @@ type ImageInfo struct {
 
 // MediaMetadata describes a media file as a block of text, so that files which
 // would otherwise be skipped as binary contribute their existence and shape to
-// the bundle. It never fails: an unparsable file still reports its container.
-func MediaMetadata(container string, r io.ReaderAt, size int64) []byte {
-	info := parseMedia(container, r, size)
+// the bundle.
+//
+// The container may be empty, for an input whose name gives nothing away; the
+// header is then what identifies it. The result reports whether the file turned
+// out to be media at all, which is false only when neither the name nor the
+// bytes said so. A named container that will not parse still describes itself,
+// since the name is evidence enough that the file was meant to be one.
+func MediaMetadata(container string, r io.ReaderAt, size int64) ([]byte, bool) {
+	b := &byteReader{r: r, size: size}
+
+	info := parseMedia(container, b)
 	if info == nil {
+		// Either there was no name to go on, or it was wrong. The bytes are not.
+		if sniffed := sniffContainer(b); sniffed != "" && sniffed != container {
+			if info = parseMedia(sniffed, b); info != nil {
+				container = sniffed
+			}
+		}
+	}
+	if info == nil {
+		if container == "" {
+			return nil, false
+		}
 		info = &MediaInfo{}
 	}
 	info.Container = container
@@ -57,15 +76,14 @@ func MediaMetadata(container string, r io.ReaderAt, size int64) []byte {
 	if info.Bitrate == 0 && info.Duration > 0 && info.Image == nil {
 		info.Bitrate = int64(float64(size*8) / info.Duration.Seconds())
 	}
-	return []byte(info.render())
+	return []byte(info.render()), true
 }
 
-func parseMedia(container string, r io.ReaderAt, size int64) *MediaInfo {
-	b := &byteReader{r: r, size: size}
+func parseMedia(container string, b *byteReader) *MediaInfo {
 	switch container {
 	// AVIF and HEIC are the same boxes as an mp4, holding a still rather than a
 	// track.
-	case "mp4", "m4a", "mov", "avif":
+	case "mp4", "m4a", "mov", "avif", "heic":
 		return parseMP4(b)
 	case "mkv", "webm":
 		return parseMatroska(b)

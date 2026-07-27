@@ -77,7 +77,8 @@ func stbl(parts ...[]byte) []byte {
 
 func describe(t *testing.T, container string, data []byte) string {
 	t.Helper()
-	return strings.TrimSpace(string(MediaMetadata(container, bytes.NewReader(data), int64(len(data)))))
+	out, _ := MediaMetadata(container, bytes.NewReader(data), int64(len(data)))
+	return strings.TrimSpace(string(out))
 }
 
 func TestMediaMetadataMP4VideoAndAudio(t *testing.T) {
