@@ -70,42 +70,72 @@ func TestBuildASCIITree_URLPreservesScheme(t *testing.T) {
 	}
 }
 
-func TestCollectTreePaths_StdinAndURLHandling(t *testing.T) {
-	ctx := context.Background()
-	runCfg := lx.RunnerConfig{}
+func testResolveContext(section Section) resolveContext {
+	var cleanups []func()
+	return resolveContext{section: section, cleanups: &cleanups}
+}
 
-	stdinPaths := collectTreePaths(ctx, Op{Action: "FILE", Value: "-", Type: CmdAction}, runCfg, nil, nil, nil)
-	if len(stdinPaths) != 0 {
-		t.Fatalf("stdin should not contribute paths, got: %v", stdinPaths)
+func resolvedPaths(files []lx.InputFile) []string {
+	paths := make([]string, 0, len(files))
+	for _, f := range files {
+		paths = append(paths, f.Path)
+	}
+	return paths
+}
+
+func TestResolveOp_StdinAndURLHandling(t *testing.T) {
+	ctx := context.Background()
+	rc := testResolveContext(Section{})
+
+	stdin, _ := resolveOp(ctx, Op{Action: "FILE", Value: "-", Type: CmdAction}, rc)
+	if len(stdin) != 0 {
+		t.Fatalf("stdin should not resolve to inputs, got: %v", resolvedPaths(stdin))
 	}
 
 	url := "https://example.com/repo.zip"
-	urlPaths := collectTreePaths(ctx, Op{Action: "FILE", Value: url, Type: CmdAction}, runCfg, nil, nil, nil)
-	if len(urlPaths) != 1 || urlPaths[0] != url {
-		t.Fatalf("url should be included as a file when not expanded, got: %v", urlPaths)
+	urls, _ := resolveOp(ctx, Op{Action: "FILE", Value: url, Type: CmdAction}, rc)
+	if got := resolvedPaths(urls); len(got) != 1 || got[0] != url {
+		t.Fatalf("url should resolve to one input, got: %v", got)
 	}
 }
 
-func TestCollectTreePaths_ExpandsLocalArchiveWithEntryIncludes(t *testing.T) {
+func TestResolveOp_ExpandsLocalArchiveWithEntryIncludes(t *testing.T) {
 	ctx := context.Background()
 	tmp := t.TempDir()
 	t.Chdir(tmp)
 
-	archivePath := filepath.Join(tmp, "archive.zip")
-	createTestZip(t, archivePath, map[string]string{
+	createTestZip(t, filepath.Join(tmp, "archive.zip"), map[string]string{
 		"hello.txt":       "hello\n",
 		"nested/world.go": "package nested\n",
 	})
 
-	paths := collectTreePaths(ctx, Op{Action: "FILE", Value: "archive.zip", Type: CmdAction}, lx.RunnerConfig{ExpandArchives: true}, []string{"*.go"}, nil, nil)
+	rc := testResolveContext(Section{
+		RunCfg:   lx.RunnerConfig{ExpandArchives: true},
+		Includes: []string{"*.go"},
+	})
+	files, _ := resolveOp(ctx, Op{Action: "FILE", Value: "archive.zip", Type: CmdAction}, rc)
+
 	want := []string{"archive.zip/nested/world.go"}
-	if !slices.Equal(paths, want) {
-		t.Fatalf("collectTreePaths archive include mismatch\nwant: %v\ngot:  %v", want, paths)
+	if got := resolvedPaths(files); !slices.Equal(got, want) {
+		t.Fatalf("archive include mismatch\nwant: %v\ngot:  %v", want, got)
+	}
+}
+
+// A missing path is reported so the stats summary can count it.
+func TestResolveOp_ReportsUnresolvedPaths(t *testing.T) {
+	t.Chdir(t.TempDir())
+	files, unresolved := resolveOp(context.Background(),
+		Op{Action: "FILE", Value: "nope.go", Type: CmdAction}, testResolveContext(Section{}))
+
+	if len(files) != 0 {
+		t.Errorf("got %v, want no inputs", resolvedPaths(files))
+	}
+	if unresolved != 1 {
+		t.Errorf("unresolved = %d, want 1", unresolved)
 	}
 }
 
 func TestPrecomputeTrees_TreeOnlyMarksFileOps(t *testing.T) {
-	ctx := context.Background()
 	groups := []Section{
 		{
 			Ops: []Op{
@@ -115,7 +145,7 @@ func TestPrecomputeTrees_TreeOnlyMarksFileOps(t *testing.T) {
 		},
 	}
 
-	precomputeTrees(ctx, groups, nil)
+	precomputeTrees(groups)
 	if !groups[0].skipFileOps[1] {
 		t.Fatalf("expected file op at index 1 to be skipped in tree-only section")
 	}

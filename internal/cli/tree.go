@@ -1,25 +1,19 @@
 package cli
 
 import (
-	"context"
-	"io/fs"
-	"log/slog"
 	"net/url"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/rasros/lx/pkg/lx"
 )
 
-func precomputeTrees(ctx context.Context, groups []Section, globalIgnoreRules []string) {
+func precomputeTrees(groups []Section) {
 	for i := range groups {
-		computeSectionTrees(ctx, &groups[i], globalIgnoreRules)
+		computeSectionTrees(&groups[i])
 	}
 }
 
-func computeSectionTrees(ctx context.Context, g *Section, globalIgnoreRules []string) {
+func computeSectionTrees(g *Section) {
 	var subFileIdxs []int
 	var subTreeIdxs []int
 	subTreeOnly := false
@@ -28,7 +22,12 @@ func computeSectionTrees(ctx context.Context, g *Section, globalIgnoreRules []st
 		if len(subTreeIdxs) > 0 && len(subFileIdxs) > 0 {
 			var paths []string
 			for _, idx := range subFileIdxs {
-				paths = append(paths, collectTreePaths(ctx, g.Ops[idx], g.RunCfg, g.Includes, g.Excludes, globalIgnoreRules)...)
+				for _, f := range g.resolved[idx] {
+					if overMaxSize(g.RunCfg, f.Size) {
+						continue
+					}
+					paths = append(paths, f.Path)
+				}
 			}
 			if len(paths) > 0 {
 				ts := buildASCIITree(paths)
@@ -70,171 +69,6 @@ func computeSectionTrees(ctx context.Context, g *Section, globalIgnoreRules []st
 		}
 	}
 	flush()
-}
-
-func collectTreePaths(ctx context.Context, op Op, runCfg lx.RunnerConfig, includes, excludes []string, globalIgnoreRules []string) []string {
-	var paths []string
-	includeSpecs := lx.CompileSpecs(includes)
-
-	rawPath := op.Value
-	isForced := op.Action == "file"
-
-	if rawPath == "-" {
-		return paths
-	}
-
-	if lx.IsHTTPURL(rawPath) {
-		if runCfg.ExpandArchives && lx.IsHTTPArchiveURL(rawPath) {
-			if !isForced && !lx.IsKept(rawPath, nil, excludes) {
-				return paths
-			}
-			archiveIncludes := includes
-			if isForced {
-				archiveIncludes = nil
-			}
-			return collectURLArchiveTreePaths(ctx, rawPath, runCfg.ShowHidden, isForced, archiveIncludes, runCfg.MaxSize)
-		}
-		if !isForced && !lx.IsKept(rawPath, includes, excludes) {
-			return paths
-		}
-		return append(paths, rawPath)
-	}
-
-	absPath, err := filepath.Abs(rawPath)
-	if err != nil {
-		return paths
-	}
-
-	stat, err := os.Stat(absPath)
-	if err != nil {
-		return paths
-	}
-
-	if !stat.IsDir() {
-		isExpandableArchive := runCfg.ExpandArchives && lx.IsArchivePath(rawPath)
-		if !isForced && !isExpandableArchive && !lx.IsKept(rawPath, includes, excludes) {
-			return paths
-		}
-		if !isForced && isExpandableArchive && !lx.IsKept(rawPath, nil, excludes) {
-			return paths
-		}
-
-		rawPathClean := filepath.Clean(rawPath)
-		effectivePath := filepath.ToSlash(rawPathClean)
-		if filepath.IsAbs(rawPathClean) {
-			effectivePath = filepath.ToSlash(absPath)
-		}
-
-		if isExpandableArchive {
-			archiveWalker := newArchiveWalker(runCfg.ShowHidden, isForced)
-			archiveIncludes := includes
-			if isForced {
-				archiveIncludes = nil
-			}
-			archivePaths, err := lx.ExpandArchivePaths(ctx, absPath, effectivePath, archiveWalker, archiveIncludes, runCfg.MaxSize)
-			if err != nil {
-				slog.Debug("Failed to expand archive for tree", "path", rawPath, "error", err)
-				return paths
-			}
-			return append(paths, archivePaths...)
-		}
-		if runCfg.MaxSize > 0 && stat.Size() > runCfg.MaxSize {
-			return paths
-		}
-		return append(paths, rawPathClean)
-	}
-
-	fsys := os.DirFS(absPath)
-	displayPrefix := filepath.Clean(rawPath)
-
-	var baseRules, overrideRules []string
-	if !runCfg.NoIgnore {
-		baseRules = append(baseRules, globalIgnoreRules...)
-	}
-	if !isForced {
-		overrideRules = append(overrideRules, excludes...)
-	}
-
-	w := lx.NewWalker(baseRules, overrideRules)
-	w.IgnoreEnabled = !runCfg.NoIgnore
-	w.SkipHidden = !runCfg.ShowHidden && !isForced
-	w.FollowDirSymlinks = runCfg.FollowDirSymlinks
-	w.SkipFileSymlinks = runCfg.SkipFileSymlinks
-
-	_ = w.Walk(fsys, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if !isForced && len(includeSpecs) > 0 && path != "." && !lx.CouldMatchAnyDescendant(includeSpecs, path) {
-				return fs.SkipDir
-			}
-			return nil
-		}
-
-		var effectivePath string
-		if path == "." {
-			effectivePath = displayPrefix
-		} else if displayPrefix == "." {
-			effectivePath = filepath.FromSlash(path)
-		} else {
-			effectivePath = filepath.Join(displayPrefix, filepath.FromSlash(path))
-		}
-
-		if runCfg.ExpandArchives && lx.IsArchivePath(path) {
-			archiveAbsPath := filepath.Join(absPath, filepath.FromSlash(path))
-			archiveWalker := newArchiveWalker(runCfg.ShowHidden, isForced)
-			archiveIncludes := includes
-			if isForced {
-				archiveIncludes = nil
-			}
-			archivePaths, err := lx.ExpandArchivePaths(ctx, archiveAbsPath, effectivePath, archiveWalker, archiveIncludes, runCfg.MaxSize)
-			if err != nil {
-				slog.Debug("Failed to expand archive for tree", "path", effectivePath, "error", err)
-				return nil
-			}
-			paths = append(paths, archivePaths...)
-			return nil
-		}
-
-		if !isForced && len(includeSpecs) > 0 {
-			if !lx.IsMatchAnyCompiled(includeSpecs, path) {
-				return nil
-			}
-		}
-
-		if runCfg.MaxSize > 0 {
-			info, err := d.Info()
-			if err != nil {
-				return nil
-			}
-			if info.Size() > runCfg.MaxSize {
-				return nil
-			}
-		}
-
-		paths = append(paths, effectivePath)
-		return nil
-	})
-
-	return paths
-}
-
-func collectURLArchiveTreePaths(ctx context.Context, rawPath string, showHidden bool, isForced bool, includes []string, maxSize int64) []string {
-	tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
-	if err != nil {
-		slog.Debug("Failed to download URL archive for tree", "url", rawPath, "error", err)
-		return nil
-	}
-	defer cleanup()
-
-	archiveWalker := newArchiveWalker(showHidden, isForced)
-	paths, err := lx.ExpandArchivePaths(ctx, tempPath, rawPath, archiveWalker, includes, maxSize)
-	if err != nil {
-		slog.Debug("Failed to expand URL archive for tree", "url", rawPath, "error", err)
-		return nil
-	}
-	return paths
 }
 
 type treeNode struct {

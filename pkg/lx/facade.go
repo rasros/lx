@@ -24,6 +24,7 @@ type Walker = walkerpkg.Walker
 type CompiledSpec = walkerpkg.CompiledSpec
 
 type FileErrorHandler = streamingpkg.FileErrorHandler
+type FileSink = sources.FileSink
 
 func NewConfig() *Config { return core.NewConfig() }
 
@@ -127,14 +128,9 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error { return s.inne
 
 func (s *Stream) GetEngine() *TemplateEngine { return s.inner.GetEngine() }
 
-type streamSink struct{ s *Stream }
+// Add lets a Stream be used directly as a FileSink.
+func (s *Stream) Add(f InputFile) { s.AddFile(f) }
 
-func (ss streamSink) Add(f InputFile) { ss.s.AddFile(f) }
-
-func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string, outPath string, stream *Stream) error {
-	return sources.ExpandArchive(ctx, absPath, displayPath, walker, includes, outPath, streamSink{s: stream})
-}
-
-func ExpandArchivePaths(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string, maxSize int64) ([]string, error) {
-	return sources.ExpandArchivePaths(ctx, absPath, displayPath, walker, includes, maxSize)
+func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string, outPath string, sink FileSink) error {
+	return sources.ExpandArchive(ctx, absPath, displayPath, walker, includes, outPath, sink)
 }
