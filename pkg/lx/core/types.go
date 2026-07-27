@@ -43,6 +43,7 @@ type TemplateEngine struct {
 	FileError   *template.Template
 	FileBinary  *template.Template
 	FileCompact *template.Template
+	FileImage   *template.Template
 
 	Section *template.Template
 	Prompt  *template.Template
@@ -55,6 +56,11 @@ type TemplateEngine struct {
 	OutputHeader *template.Template
 	OutputFooter *template.Template
 	Stats        *template.Template
+
+	// Policy the output format implies, resolved once at compile time so
+	// renderers do not branch on the format name.
+	EmbedImages   bool
+	UseSeparators bool
 }
 
 // Config represents the core library configuration.

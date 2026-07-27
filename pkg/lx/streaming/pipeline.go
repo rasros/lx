@@ -41,13 +41,15 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
+			// One processor per worker: it no longer carries per-item state.
+			proc := render.NewProcessor(s.engine, global, s.onFileError)
+			proc.SetTokenCounter(s.tokenizer.Estimate)
+
 			for j := range jobsCh {
 				if ctx.Err() != nil {
 					return
 				}
-
-				proc := render.NewProcessor(s.engine, global, s.onFileError, s.format)
-				proc.SetTokenCounter(s.tokenizer.Estimate)
 
 				readBufPtr := readPool.Get().(*[]byte)
 				readBuf := *readBufPtr
@@ -58,7 +60,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				}
 				localCounter := &byteCounter{w: buf}
 
-				err := proc.RenderPrepared(localCounter, j.item, readBuf)
+				itemStats, err := proc.RenderPrepared(localCounter, j.item, readBuf)
 				readPool.Put(readBufPtr)
 
 				select {
@@ -66,10 +68,10 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					Index:        j.seqID,
 					Buffer:       buf,
 					Stats:        localCounter.count,
-					Rows:         proc.LastRows(),
-					IsCompact:    proc.LastWasCompact(),
-					IsBinary:     proc.LastWasBinary(),
-					IsError:      proc.LastWasError(),
+					Rows:         itemStats.Rows,
+					IsCompact:    itemStats.IsCompact,
+					IsBinary:     itemStats.IsBinary,
+					IsError:      itemStats.IsError,
 					Err:          err,
 					SectionIndex: j.item.Section.Index,
 				}:
@@ -94,8 +96,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		close(resultsCh)
 	}()
 
-	useSeparators := s.format != "html" && s.format != "bare"
-	layout := render.NewLayoutWriter(dest, s.engine, s.sections, useSeparators)
+	layout := render.NewLayoutWriter(dest, s.engine, s.sections, s.engine.UseSeparators)
 	defer layout.Close()
 
 	nextSeq := 0
