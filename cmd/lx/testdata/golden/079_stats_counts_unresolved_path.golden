@@ -1,0 +1,14 @@
+--- STDOUT ---
+main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---
+[1;31mError:[0m Failed to stat path: stat /ROOT/nope.go: FILE_NOT_FOUND (path=/ROOT/nope.go)
+  1 failed
+  ~26 tokens
+▎ 1 file · 2 rows · 1 section · 27 B

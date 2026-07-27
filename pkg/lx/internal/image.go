@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// SVG is deliberately absent: it is XML, and reads better as text than as an
+// embedded blob. MIMEType still knows it, for templates that pass an svg path
+// to dataURI on purpose.
 var imageExtensions = map[string]bool{
 	".png":  true,
 	".jpg":  true,
