@@ -41,10 +41,13 @@ func parseSizeLimit(raw string) (int64, error) {
 
 	n, err := strconv.ParseInt(lower, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid size %q", raw)
+		return 0, fmt.Errorf("invalid size %q, expected a byte count like 512k or 2M", raw)
 	}
 	if n < 0 {
 		return 0, fmt.Errorf("size cannot be negative: %q", raw)
+	}
+	if n == 0 {
+		return 0, fmt.Errorf("size must be greater than zero")
 	}
 	if mult > 1 && n > (1<<62)/mult {
 		return 0, fmt.Errorf("size out of range: %q", raw)

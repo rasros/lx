@@ -19,6 +19,7 @@ func TestGoldenMaxSize(t *testing.T) {
 		{name: "147_max_size_per_section_override", args: []string{"-m", "20", ".", "-m", "2k", "src/large.txt"}},
 		{name: "148_max_size_invalid_value", args: []string{"-m", "notasize", "."}},
 		{name: "149_max_size_attached_short_form", args: []string{"-m1k", "."}},
+		{name: "152_max_size_zero_rejected", args: []string{"-m", "0", "."}},
 	})
 }
 

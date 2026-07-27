@@ -17,5 +17,5 @@ time=FIXED level=DEBUG msg="Output set to stdout"
 time=FIXED level=DEBUG msg="Processing op" action=FILE value=main.go
 time=FIXED level=DEBUG msg="Processing operations" total_ops=3
 time=FIXED level=DEBUG msg="Processing section" index=0 ops=1
-time=FIXED level=DEBUG msg="Walker finished" root=main.go files_found=1
+time=FIXED level=DEBUG msg="Walker finished" root=main.go files_matched=1
 time=FIXED level=INFO msg="Executing stream pipeline..."

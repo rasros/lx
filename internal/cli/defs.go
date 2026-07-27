@@ -233,6 +233,9 @@ and case-insensitive, matching how lx reports sizes elsewhere:
   -m 2MB      (2 MB)
   -m 1G       (1 GB)
 
+The value must be greater than zero; there is no "unlimited" spelling, simply
+omit the flag.
+
 The limit applies to every input, including paths forced with -f. Inputs whose
 size is not known ahead of time, such as remote URLs, are never skipped.`,
 	},

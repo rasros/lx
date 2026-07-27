@@ -1,0 +1,5 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: argument parsing failed: flag --max-size: size must be greater than zero
