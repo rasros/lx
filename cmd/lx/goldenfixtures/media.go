@@ -49,7 +49,24 @@ func SetupMediaFixture(t *testing.T) string {
 	writeFile(t, dir, "notes.txt", "beside the media\n", 0644)
 	createMediaZip(t, filepath.Join(dir, "media.zip"))
 
+	// A copy with the suffix removed, and one with the wrong suffix, so that what
+	// the header says can be told apart from what the name claims.
+	copyFixture(t, dir, "sample.mkv", "suffixless")
+	copyFixture(t, dir, "sample.png", "mislabelled.jpg")
+	writeFile(t, dir, "notes", "suffixless and not media at all\n", 0644)
+
 	return dir
+}
+
+func copyFixture(t *testing.T, dir, from, to string) {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", "media", from))
+	if err != nil {
+		t.Fatalf("read fixture %s: %v", from, err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, to), data, 0644); err != nil {
+		t.Fatalf("write fixture %s: %v", to, err)
+	}
 }
 
 // createMediaZip covers extraction from an archive entry, which is read through

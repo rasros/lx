@@ -1,0 +1,9 @@
+--- STDOUT ---
+notes (1 rows)
+---
+```
+suffixless and not media at all
+```
+
+
+--- STDERR ---

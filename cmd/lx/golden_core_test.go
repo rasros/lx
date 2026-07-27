@@ -269,5 +269,9 @@ func TestGoldenMedia(t *testing.T) {
 		{name: "164_media_avif", args: []string{"-M", "sample.avif"}},
 		{name: "165_media_images_no_flag", args: []string{"sample.png", "sample.gif"}},
 		{name: "166_media_image_html_embeds", args: []string{"--html", "-M", "sample.png"}},
+		{name: "167_media_suffixless_sniffed", args: []string{"-M", "suffixless"}},
+		{name: "168_media_suffixless_no_flag", args: []string{"suffixless"}},
+		{name: "169_media_wrong_suffix", args: []string{"-M", "mislabelled.jpg"}},
+		{name: "170_media_suffixless_not_media", args: []string{"-M", "notes"}},
 	})
 }

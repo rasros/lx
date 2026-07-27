@@ -284,6 +284,10 @@
           image. Values are those the container states, which is not always what
           a decoder would report; an estimated duration is marked as one.
           
+          The format is identified from the header, so a file with no suffix,
+          such as most URLs, is recognised anyway, and one carrying the wrong
+          suffix is read as what it actually is.
+          
           Nothing is transcribed or captioned: the point is that the file's
           existence and shape reach the bundle, not its content. A file whose
           header cannot be parsed still reports its container. In HTML output,

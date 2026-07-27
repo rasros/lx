@@ -10,6 +10,7 @@ import (
 // all, so they can be compared without decoding.
 const (
 	ebmlHeader    = 0x1a45dfa3
+	mkvDocType    = 0x4282
 	mkvSegment    = 0x18538067
 	mkvInfo       = 0x1549a966
 	mkvTimeScale  = 0x2ad7b1
