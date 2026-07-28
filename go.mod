@@ -10,14 +10,7 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/mholt/archives v0.1.5
 	github.com/nguyenthenguyen/docx v0.0.0-20230621112118-9c8e795a11db
-	// Held at v0.20.9, the last release that parses Go at a sane cost.
-	// normalizeGoNewMakeTypeArgument walks a result tree that revisits its own
-	// nodes, so the walk runs away on ordinary Go source: v0.21.0 and v0.24.0
-	// through v0.47.0 overflow the stack outright, and v0.23.x survives only by
-	// being some twenty times slower. A stack overflow is a fatal runtime error
-	// rather than a panic, so it cannot be recovered from and takes the whole
-	// process with it. Upgrading needs the walk fixed upstream first.
-	github.com/odvcencio/gotreesitter v0.20.9
+	github.com/odvcencio/gotreesitter v0.47.1
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/net v0.57.0
 )
