@@ -53,16 +53,6 @@ Sleep 4s
 
 
 Ctrl+L
-Type "# Media stays binary, but -M reads what its container header declares."
-Enter
-Sleep 1.5s
-Type "lx -M assets/"
-Sleep 400ms
-Enter
-Sleep 3.5s
-
-
-Ctrl+L
 Type "# A URL works wherever a path does."
 Enter
 Sleep 1.5s

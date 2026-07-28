@@ -42,11 +42,6 @@ cat >"$_lx_demo_dir/README.md" <<'EOF'
 A tiny project to show off lx.
 EOF
 
-# A clip and a still for the -M scene, borrowed from the media fixtures.
-mkdir -p "$_lx_demo_dir/assets"
-cp cmd/lx/testdata/media/sample.mp4 "$_lx_demo_dir/assets/clip.mp4"
-cp cmd/lx/testdata/media/sample.png "$_lx_demo_dir/assets/logo.png"
-
 cd "$_lx_demo_dir"
 unset _lx_demo_dir
 
