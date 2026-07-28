@@ -5,21 +5,15 @@
 
 lx turns a pile of files into one prompt you can paste into an LLM.
 
-Point it at a directory and it walks the tree, honours your ignore files, leaves binaries alone, and prints the result as Markdown, XML, HTML, or plain text. It adds a token estimate so you know what you're about to spend.
+Point it at a directory and it walks the tree, honours your ignore files, leaves binaries alone, and prints the result as
+Markdown, XML, HTML, or plain text — with a token estimate, so you know what you're about to spend.
 
 ![demo](demo/demo.gif)
-
-[Install](#install) · [Everyday use](#everyday-use) · [Where files come from](#where-files-come-from) · [Stream processing](#stream-processing) · [Configuration](#configuration)
 
 ## Install
 
 ```bash
-go install github.com/rasros/lx/cmd/lx@latest
-```
-
-Or grab a pre-built binary:
-
-```bash
+go install github.com/rasros/lx/cmd/lx@latest       # or:
 curl -fsSL https://raw.github.com/rasros/lx/main/install.sh | bash
 ```
 
@@ -28,147 +22,63 @@ need.
 
 ## Everyday use
 
-The common case is "bundle this project and put it on my clipboard":
+With no arguments `lx` bundles the current directory to stdout, respecting `.gitignore`, `.ignore`, and `.lxignore`,
+skipping hidden files, and dropping binaries. Name any paths you like, and add `-c` to copy instead:
 
 ```bash
-lx -c
-```
-
-With no arguments `lx` starts from the current directory, but you can name any paths you like:
-
-```bash
+lx -c                          # this project, on the clipboard
 lx src/ docs/
 ```
 
-It respects `.gitignore`, `.ignore`, and `.lxignore`, skips hidden files, and drops binaries, so you usually get
-sensible output without asking for it.
-
-**Get your bearings first.** `-t` prints just the directory tree; `-T` prints the tree *and* the files under it:
-
 ```bash
-lx -t src/
+lx -t src/                     # just the tree (-T for tree plus files)
+lx -u -Y src/                  # signatures and type definitions, no bodies
+lx -i "*.py" -e "*test*" src/  # include/exclude globs
+lx -n 20 src/                  # first 20 lines of each file
 ```
 
-**Skip the bodies.** `-u` and `-Y` extract function signatures and type definitions instead of full source, which is
-often all a model needs to reason about a codebase:
-
-```bash
-lx -u -Y src/
-```
-
-**Narrow things down** with include/exclude globs. Here, Python without the tests:
-
-```bash
-lx -i "*.py" -e "*test*" src/
-```
-
-Since `lx` reads paths from stdin, it composes with whatever you already use to pick files:
+Paths can come from stdin, so `lx` composes with whatever you already use to pick files:
 
 ```bash
 git diff --name-only main | lx -c                  # everything you changed
 fd -t f | fzf -m --preview 'lx -n 20 {}' | lx -c   # pick interactively
 ```
 
-**Attach a prompt** and pipe it straight into a tool like [llm](https://github.com/simonw/llm):
+Attach a prompt with `-p` and pipe it into a tool like [llm](https://github.com/simonw/llm):
 
 ```bash
 lx -p "Explain this project structure" src/ | llm
-lx -p "Refactor this to use contexts:" main.go
 ```
 
-Without `-c` or `-o`, output goes to stdout.
+Markdown is the default output; the other formats are one flag each — `--xml` for models that like tags, `--html` for a
+standalone page, `--bare` for plain text with almost no wrapping.
 
 ## Where files come from
 
-Local paths are the default, but they aren't the only option.
-
-A URL can sit anywhere a path can:
+A URL can sit anywhere a path can, and short repository URLs are pulled down as archives, so you can bundle a project
+you haven't cloned (GitHub, GitLab, Bitbucket, and Codeberg):
 
 ```bash
 lx https://example.com/config.yaml src/
-```
-
-Short repository URLs are pulled down as archives, so you can bundle a project you haven't cloned. GitHub, GitLab,
-Bitbucket, and Codeberg all work:
-
-```bash
 lx github.com/owner/repo
 lx https://gitlab.com/owner/repo/-/tree/dev
 ```
 
-Local archives expand with `-Z` (zip, tar, 7z, rar, and friends):
+Three flags reach into files that would otherwise be skipped:
 
 ```bash
-lx -Z archive.zip
+lx -Z archive.zip   # expand an archive (zip, tar, 7z, rar, and friends)
+lx -D docs/         # text out of PDFs, Word docs, spreadsheets, slide decks
+lx -M assets/       # codec, duration, and dimensions of audio, video, and images
 ```
 
-And `-D` pulls readable text out of PDFs, Word docs, spreadsheets, and slide decks that would otherwise be skipped as
-binary:
-
-```bash
-lx -D docs/
-```
-
-Media files stay binary, but `-M` describes them from their container header, so the model at least knows what is there:
-
-```bash
-lx -M assets/
-```
-
-```
-Container: mp4
-Duration: 00:04:12.480
-Bitrate: 2.4 Mbps
-Video: h264, 1920x1080, 25.00 fps
-Audio: aac, 48000 Hz, stereo
-```
-
-It covers mp4, mov, mkv, webm, mp3, m4a, wav and flac, plus stills and animations: png, jpeg, gif, webp, bmp, tiff, ico,
-avif and heic. Only headers are read, so the cost does not grow with the length of the file.
-
-## Output formats
-
-Markdown is the default. The rest are one flag each:
-
-```bash
-lx --xml .            # XML, handy for models that like tags
-lx --html src/ docs/  # a standalone HTML page
-lx --bare file.txt    # plain text, almost no wrapping
-```
-
-## Prompts and sections
-
-Reusable prompts live in `~/.config/lx/prompts` (override with `$LX_PROMPTS_DIR` or `--prompts-dir`). Reference them by
-path, filename, or any unambiguous basename. An ambiguous name just prints the candidates so you can be more specific.
-
-```bash
-lx -P refactor src/
-lx -P go/test src/foo.go -c
-lx -P plan -P comments docs/ src/   # stack as many as you want
-lx --list-prompts
-```
-
-[rasros/prompts](https://github.com/rasros/prompts) is an example library to start from.
-
-Use `-s` to label groups of files, which also become section names in XML output:
-
-```bash
-lx -s "Code under test" src/database/users \
-   -s "Test fixtures"   src/tests/fixtures
-```
+`-M` reads container headers only, so its cost doesn't grow with the length of the file.
 
 ## Stream processing
 
 This is the one idea worth understanding: `lx` reads arguments left to right, and an option applies to the files that
-come *after* it.
-
-```bash
-lx --tail 50 app.log -l src/
-```
-
-That takes the last 50 lines of `app.log`, then `src/` with line numbers: two different treatments in one command. When
-an option (or `-s`) appears after a file, `lx` opens a fresh section and resets the per-section options, so settings
-don't leak from one group into the next:
+come *after* it. When an option (or `-s`) appears after a file, `lx` opens a fresh section and resets the per-section
+options, so settings don't leak from one group into the next.
 
 ```bash
 lx --tail 50 app.log \
@@ -176,7 +86,25 @@ lx --tail 50 app.log \
    -i "*.md" docs/
 ```
 
-The tail of a log, code skeletons from `src/`, and the Markdown under `docs/`, each on its own terms.
+The tail of a log, code skeletons from `src/`, and the Markdown under `docs/`, each on its own terms. `-s` labels a
+group, which also becomes the section name in XML output:
+
+```bash
+lx -s "Code under test" src/database/users \
+   -s "Test fixtures"   src/tests/fixtures
+```
+
+## Prompts
+
+Reusable prompts live in `~/.config/lx/prompts` (override with `$LX_PROMPTS_DIR` or `--prompts-dir`). Reference them by
+path, filename, or any unambiguous basename; an ambiguous name prints the candidates.
+[rasros/prompts](https://github.com/rasros/prompts) is an example library to start from.
+
+```bash
+lx -P go/test src/foo.go -c
+lx -P plan -P comments docs/ src/   # stack as many as you want
+lx --list-prompts
+```
 
 ## Configuration
 
@@ -188,15 +116,10 @@ output_format: "xml"   # markdown | xml | html | bare
 prompts_dir: "~/Workspaces/prompts"
 ```
 
-Two ready-made profiles ship with the repo: [`default_config.yaml`](default_config.yaml) and 
-[`xml_config.yaml`](xml_config.yaml). Point at one for a single run with `-y`, or set `$LX_CONFIG` to make it the
-default:
-
-```bash
-lx -y xml_config.yaml src/
-```
-
-[CONFIG.md](CONFIG.md) has the full reference, including template context and helpers.
+Two ready-made profiles ship with the repo: [`default_config.yaml`](default_config.yaml) and
+[`xml_config.yaml`](xml_config.yaml). Point at one for a single run with `lx -y xml_config.yaml src/`, or set
+`$LX_CONFIG` to make it the default. [CONFIG.md](CONFIG.md) has the full reference, including template context and
+helpers.
 
 ## Coding-agent skill
 
