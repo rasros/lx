@@ -6,11 +6,12 @@ Output demo/demo.gif
 Require lx
 
 Set Shell "bash"
-Set FontSize 20
-Set Width 920
-Set Height 600
+Set FontSize 18
+Set Width 900
+Set Height 420
+Set Padding 10
 Set Theme "Catppuccin Mocha"
-Set TypingSpeed 60ms
+Set TypingSpeed 40ms
 Set PlaybackSpeed 1.0
 
 # Spin up a self-contained sandbox project (see demo/setup.sh).
@@ -22,74 +23,50 @@ Ctrl+L
 Show
 
 
-Type "# Bundle current dir as Markdown."
+Type "# Bundle the current directory as Markdown."
 Enter
-Sleep 300ms
+Sleep 200ms
 Type "lx"
-Sleep 300ms
+Sleep 200ms
+Enter
+Sleep 3s
+
+
+Ctrl+L
+Type "# Just the tree."
+Enter
+Sleep 200ms
+Type "lx -t"
+Sleep 200ms
 Enter
 Sleep 2s
 
 
 Ctrl+L
-Type "# Copy straight to the system clipboard."
+Type "# Signatures and types instead of whole bodies."
 Enter
+Sleep 200ms
+Type "lx -u -Y src/greet.go"
+Sleep 200ms
+Enter
+Sleep 4s
+
+
+Ctrl+L
+Type "# A URL works wherever a path does."
+Enter
+Sleep 1.5s
+Type "lx -n 8 https://raw.githubusercontent.com/rasros/vectrify/main/README.md"
 Sleep 400ms
+Enter
+Sleep 4s
+
+
+Ctrl+L
+Type "# And -c puts it on the clipboard."
+Enter
+Sleep 200ms
 Type "lx -c"
-Sleep 400ms
+Sleep 200ms
 Enter
-Sleep 2.5s
-
-
-Ctrl+L
-Type "# Just the file tree."
-Enter
-Sleep 300ms
-Type "lx -t"
-Sleep 300ms
-Enter
-Sleep 2.5s
-
-
-Ctrl+L
-Type "# Function signatures and types of go files."
-Enter
-Sleep 300ms
-Type "lx -Y -i '*.go' src/"
-Sleep 300ms
-Enter
-Sleep 3s
-
-
-Ctrl+L
-Type "# XML output for Claude-style prompts."
-Enter
-Sleep 400ms
-Type "lx --xml src/"
-Sleep 400ms
-Enter
-Sleep 3s
-
-
-Ctrl+L
-Type "# Two sections in one command:"
-Enter
-Type "# Tree first, then -l numbered Go files."
-Enter
-Sleep 400ms
-Type "lx -s 'Tree overview' -t . -s Code -l -i '*.go' src/"
-Sleep 400ms
-Enter
-Sleep 3s
-
-
-Ctrl+L
-Type "# -P loads a prompt from your library ($LX_PROMPTS_DIR)."
-Enter
-Type "# It resolves go/test -> prompts/go/test.md and prepends."
-Enter
-Sleep 400ms
-Type "lx -P go/test src/"
-Sleep 400ms
-Enter
-Sleep 3s
+Sleep 2s

@@ -22,24 +22,17 @@ package main
 
 // Greeter builds greeting strings with a configurable prefix.
 type Greeter struct {
-	// Prefix is prepended to every name passed to Greet.
 	Prefix string
 }
 
-// Speaker is anything that can produce a greeting for a given name.
+// Speaker is anything that can produce a greeting.
 type Speaker interface {
-	// Greet returns a greeting addressed to name.
 	Greet(name string) string
 }
 
-// Greet returns "<Prefix>, <name>" using the receiver's configured prefix.
+// Greet returns "<Prefix>, <name>".
 func (g Greeter) Greet(name string) string {
 	return g.Prefix + ", " + name
-}
-
-// NewGreeter returns a Greeter that uses the given prefix for every greeting.
-func NewGreeter(prefix string) *Greeter {
-	return &Greeter{Prefix: prefix}
 }
 EOF
 
@@ -48,18 +41,6 @@ cat >"$_lx_demo_dir/README.md" <<'EOF'
 
 A tiny project to show off lx.
 EOF
-
-mkdir -p "$_lx_demo_dir/prompts/go"
-cat >"$_lx_demo_dir/prompts/go/test.md" <<'EOF'
-# Go test prompt
-Write table-driven tests for the Greeter type.
-EOF
-cat >"$_lx_demo_dir/prompts/refactor.md" <<'EOF'
-# Refactor prompt
-Refactor for readability without changing behavior.
-EOF
-
-export LX_PROMPTS_DIR="$_lx_demo_dir/prompts"
 
 cd "$_lx_demo_dir"
 unset _lx_demo_dir
