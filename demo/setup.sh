@@ -22,24 +22,17 @@ package main
 
 // Greeter builds greeting strings with a configurable prefix.
 type Greeter struct {
-	// Prefix is prepended to every name passed to Greet.
 	Prefix string
 }
 
-// Speaker is anything that can produce a greeting for a given name.
+// Speaker is anything that can produce a greeting.
 type Speaker interface {
-	// Greet returns a greeting addressed to name.
 	Greet(name string) string
 }
 
-// Greet returns "<Prefix>, <name>" using the receiver's configured prefix.
+// Greet returns "<Prefix>, <name>".
 func (g Greeter) Greet(name string) string {
 	return g.Prefix + ", " + name
-}
-
-// NewGreeter returns a Greeter that uses the given prefix for every greeting.
-func NewGreeter(prefix string) *Greeter {
-	return &Greeter{Prefix: prefix}
 }
 EOF
 

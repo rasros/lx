@@ -6,7 +6,7 @@
 lx turns a pile of files into one prompt you can paste into an LLM.
 
 Point it at a directory and it walks the tree, honours your ignore files, leaves binaries alone, and prints the result as
-Markdown, XML, HTML, or plain text — with a token estimate, so you know what you're about to spend.
+Markdown, XML, HTML, or plain text, with a token estimate so you know what you're about to spend.
 
 ![demo](demo/demo.gif)
 
@@ -22,7 +22,7 @@ need.
 
 ## Everyday use
 
-With no arguments `lx` bundles the current directory to stdout, respecting `.gitignore`, `.ignore`, and `.lxignore`,
+With no arguments lx bundles the current directory to stdout, respecting .gitignore, .ignore, and .lxignore,
 skipping hidden files, and dropping binaries. Name any paths you like, and add `-c` to copy instead:
 
 ```bash
@@ -37,7 +37,7 @@ lx -i "*.py" -e "*test*" src/  # include/exclude globs
 lx -n 20 src/                  # first 20 lines of each file
 ```
 
-Paths can come from stdin, so `lx` composes with whatever you already use to pick files:
+Paths can come from stdin, so lx composes with whatever you already use to pick files:
 
 ```bash
 git diff --name-only main | lx -c                  # everything you changed
@@ -48,9 +48,10 @@ Attach a prompt with `-p` and pipe it into a tool like [llm](https://github.com/
 
 ```bash
 lx -p "Explain this project structure" src/ | llm
+lx -P go/test src/foo.go | llm          # a saved prompt from ~/.config/lx/prompts
 ```
 
-Markdown is the default output; the other formats are one flag each — `--xml` for models that like tags, `--html` for a
+Markdown is the default output; the other formats are one flag each: `--xml` for models that like tags, `--html` for a
 standalone page, `--bare` for plain text with almost no wrapping.
 
 ## Where files come from
@@ -60,7 +61,6 @@ you haven't cloned (GitHub, GitLab, Bitbucket, and Codeberg):
 
 ```bash
 lx https://example.com/config.yaml src/
-lx github.com/owner/repo
 lx https://gitlab.com/owner/repo/-/tree/dev
 ```
 
@@ -76,8 +76,8 @@ lx -M assets/       # codec, duration, and dimensions of audio, video, and image
 
 ## Stream processing
 
-This is the one idea worth understanding: `lx` reads arguments left to right, and an option applies to the files that
-come *after* it. When an option (or `-s`) appears after a file, `lx` opens a fresh section and resets the per-section
+This is the one idea worth understanding: lx reads arguments left to right, and an option applies to the files that
+come *after* it. When an option (or `-s`) appears after a file, lx opens a fresh section and resets the per-section
 options, so settings don't leak from one group into the next.
 
 ```bash
@@ -86,24 +86,12 @@ lx --tail 50 app.log \
    -i "*.md" docs/
 ```
 
-The tail of a log, code skeletons from `src/`, and the Markdown under `docs/`, each on its own terms. `-s` labels a
+The tail of a log, code skeletons from src/, and the Markdown under docs/, each on its own terms. `-s` labels a
 group, which also becomes the section name in XML output:
 
 ```bash
 lx -s "Code under test" src/database/users \
    -s "Test fixtures"   src/tests/fixtures
-```
-
-## Prompts
-
-Reusable prompts live in `~/.config/lx/prompts` (override with `$LX_PROMPTS_DIR` or `--prompts-dir`). Reference them by
-path, filename, or any unambiguous basename; an ambiguous name prints the candidates.
-[rasros/prompts](https://github.com/rasros/prompts) is an example library to start from.
-
-```bash
-lx -P go/test src/foo.go -c
-lx -P plan -P comments docs/ src/   # stack as many as you want
-lx --list-prompts
 ```
 
 ## Configuration
@@ -116,14 +104,14 @@ output_format: "xml"   # markdown | xml | html | bare
 prompts_dir: "~/Workspaces/prompts"
 ```
 
-Two ready-made profiles ship with the repo: [`default_config.yaml`](default_config.yaml) and
-[`xml_config.yaml`](xml_config.yaml). Point at one for a single run with `lx -y xml_config.yaml src/`, or set
+Two ready-made profiles ship with the repo: [default_config.yaml](default_config.yaml) and
+[xml_config.yaml](xml_config.yaml). Point at one for a single run with `lx -y xml_config.yaml src/`, or set
 `$LX_CONFIG` to make it the default. [CONFIG.md](CONFIG.md) has the full reference, including template context and
 helpers.
 
 ## Coding-agent skill
 
-[`skills/lx/SKILL.md`](skills/lx/SKILL.md) teaches coding agents to reach for `lx` when they explore a codebase. Symlink
+[skills/lx/SKILL.md](skills/lx/SKILL.md) teaches coding agents to reach for lx when they explore a codebase. Symlink
 it wherever your agent looks for skills:
 
 ```bash

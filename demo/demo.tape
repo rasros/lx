@@ -9,7 +9,7 @@ Set Shell "bash"
 Set FontSize 18
 Set Width 900
 Set Height 420
-Set Padding 20
+Set Padding 10
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 40ms
 Set PlaybackSpeed 1.0
@@ -49,17 +49,17 @@ Sleep 200ms
 Type "lx -u -Y src/greet.go"
 Sleep 200ms
 Enter
-Sleep 2.5s
+Sleep 4s
 
 
 Ctrl+L
 Type "# Options apply to the files after them: two sections, one command."
 Enter
-Sleep 200ms
+Sleep 1.5s
 Type "lx -s Overview -t . -s Code -l -i '*.go' src/"
-Sleep 200ms
+Sleep 400ms
 Enter
-Sleep 2.5s
+Sleep 3.5s
 
 
 Ctrl+L
