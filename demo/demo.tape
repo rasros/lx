@@ -53,10 +53,10 @@ Sleep 4s
 
 
 Ctrl+L
-Type "# Options apply to the files after them: two sections, one command."
+Type "# Media stays binary, but -M reads what its container header declares."
 Enter
 Sleep 1.5s
-Type "lx -s Overview -t . -s Code -l -i '*.go' src/"
+Type "lx -M assets/"
 Sleep 400ms
 Enter
 Sleep 3.5s
