@@ -60,7 +60,7 @@ A URL can sit anywhere a path can, and short repository URLs are pulled down as 
 you haven't cloned (GitHub, GitLab, Bitbucket, and Codeberg):
 
 ```bash
-lx https://example.com/config.yaml src/
+lx -D -n 10 https://github.com/rasros/vectrify   # 99 files, 10 lines each
 lx https://gitlab.com/owner/repo/-/tree/dev
 ```
 
