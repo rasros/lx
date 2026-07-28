@@ -63,6 +63,16 @@ Sleep 3.5s
 
 
 Ctrl+L
+Type "# A URL works wherever a path does."
+Enter
+Sleep 1.5s
+Type "lx -n 8 https://raw.githubusercontent.com/rasros/vectrify/main/README.md"
+Sleep 400ms
+Enter
+Sleep 4s
+
+
+Ctrl+L
 Type "# And -c puts it on the clipboard."
 Enter
 Sleep 200ms
