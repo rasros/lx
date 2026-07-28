@@ -76,9 +76,8 @@ lx -M assets/       # codec, duration, and dimensions of audio, video, and image
 
 ## Stream processing
 
-This is the one idea worth understanding: lx reads arguments left to right, and an option applies to the files that
-come *after* it. When an option (or `-s`) appears after a file, lx opens a fresh section and resets the per-section
-options, so settings don't leak from one group into the next.
+lx reads its arguments left to right, and an option only applies to the paths after it. An option (or `-s`) following a
+path starts a new section with the per-section options reset, so they don't leak into the next group.
 
 ```bash
 lx --tail 50 app.log \
@@ -86,8 +85,8 @@ lx --tail 50 app.log \
    -i "*.md" docs/
 ```
 
-The tail of a log, code skeletons from src/, and the Markdown under docs/, each on its own terms. `-s` labels a
-group, which also becomes the section name in XML output:
+That's three sections: the last 50 lines of the log, skeletons from src/, and only the Markdown under docs/. `-s` names a
+group, and the name is used as the section title in XML output:
 
 ```bash
 lx -s "Code under test" src/database/users \

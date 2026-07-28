@@ -29,7 +29,7 @@ Sleep 200ms
 Type "lx"
 Sleep 200ms
 Enter
-Sleep 1.5s
+Sleep 3s
 
 
 Ctrl+L
