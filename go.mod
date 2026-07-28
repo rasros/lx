@@ -10,12 +10,6 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/mholt/archives v0.1.5
 	github.com/nguyenthenguyen/docx v0.0.0-20230621112118-9c8e795a11db
-	// v0.47.1 fixes the runaway walk that made every release from v0.21.0 on
-	// overflow the stack on ordinary Go source (upstream issue 490). What is left
-	// of it still costs: Go files past a couple of thousand lines parse an order
-	// of magnitude slower than they did on v0.20.9, and a few of them stop
-	// yielding definitions partway through, so a skeleton of a very large file
-	// can be missing its tail.
 	github.com/odvcencio/gotreesitter v0.47.1
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/net v0.57.0
