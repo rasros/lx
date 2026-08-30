@@ -71,9 +71,7 @@ func IsDocumentPath(path string) bool {
 	return false
 }
 
-// documentSuffixForMediaType maps a Content-Type to the suffix
-// ExtractDocumentText dispatches on, so a URL response can still be
-// classified when its path carries no extension (e.g. arxiv.org/pdf/1234).
+// documentSuffixForMediaType maps a Content-Type to the suffix ExtractDocumentText dispatches on.
 func documentSuffixForMediaType(value string) string {
 	mediaType, _, err := mime.ParseMediaType(value)
 	if err != nil {
