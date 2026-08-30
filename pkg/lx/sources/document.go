@@ -51,7 +51,13 @@ func ConvertInput(f InputFile, r io.ReaderAt, size int64) ([]byte, error) {
 	if IsHTMLInput(f) {
 		return internal.HTMLToMarkdown(io.NewSectionReader(r, 0, size))
 	}
-	return ExtractDocumentText(f.Path, r, size)
+	path := f.Path
+	if !IsDocumentPath(path) && f.mediaType != nil {
+		if suffix := documentSuffixForMediaType(*f.mediaType); suffix != "" {
+			path += suffix
+		}
+	}
+	return ExtractDocumentText(path, r, size)
 }
 
 // IsDocumentPath reports whether the path has a document file extension.
@@ -63,6 +69,37 @@ func IsDocumentPath(path string) bool {
 		}
 	}
 	return false
+}
+
+// documentSuffixForMediaType maps a Content-Type to the suffix
+// ExtractDocumentText dispatches on, so a URL response can still be
+// classified when its path carries no extension (e.g. arxiv.org/pdf/1234).
+func documentSuffixForMediaType(value string) string {
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return ""
+	}
+	switch mediaType {
+	case "application/pdf":
+		return ".pdf"
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+		return ".docx"
+	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		return ".xlsx"
+	case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+		return ".pptx"
+	}
+	return ""
+}
+
+// IsDocumentInput reports whether f should be converted by the document
+// converter, consulting the media type its source reported when the path
+// itself carries no recognized extension.
+func IsDocumentInput(f InputFile) bool {
+	if IsDocumentPath(f.Path) || IsHTMLInput(f) {
+		return true
+	}
+	return f.mediaType != nil && documentSuffixForMediaType(*f.mediaType) != ""
 }
 
 // ExtractDocumentText extracts plain text from a document file.
