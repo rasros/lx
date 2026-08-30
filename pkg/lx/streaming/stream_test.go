@@ -3,6 +3,7 @@ package streaming
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"testing"
@@ -89,6 +90,26 @@ func TestStream_Prepare_Counts(t *testing.T) {
 	}
 	if g.TotalSize != 6 {
 		t.Errorf("TotalSize = %d, want 6", g.TotalSize)
+	}
+}
+
+func TestStream_Prepare_SizeUnknownForNegativeSizeFile(t *testing.T) {
+	cfg := core.NewConfig()
+	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1})
+
+	stream.AddFile(sources.NewBufferInputFile("known.txt", []byte("abc")))
+	stream.AddFile(sources.InputFile{
+		Path: "https://example.com/doc",
+		Size: -1,
+		Open: func() (io.ReadCloser, error) { return io.NopCloser(strings.NewReader("")), nil },
+	})
+
+	g := stream.GetGlobalContext()
+	if !g.SizeUnknown {
+		t.Error("SizeUnknown = false, want true when a file's size is unavailable")
+	}
+	if g.TotalSize != 3 {
+		t.Errorf("TotalSize = %d, want 3 (only the known-size file counted)", g.TotalSize)
 	}
 }
 

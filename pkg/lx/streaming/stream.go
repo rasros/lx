@@ -153,9 +153,13 @@ func (s *Stream) Prepare() core.GlobalContext {
 
 		if f, ok := item.(sources.InputFile); ok {
 			currentSection.TotalFiles++
-			currentSection.TotalSize += f.Size
 			global.TotalFiles++
-			global.TotalSize += f.Size
+			if f.Size < 0 {
+				global.SizeUnknown = true
+			} else {
+				currentSection.TotalSize += f.Size
+				global.TotalSize += f.Size
+			}
 			// Size-only: no content read yet. Execute replaces this.
 			global.TokenEstimate += s.tokenizer.Estimate(f.Size, nil)
 

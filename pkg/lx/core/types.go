@@ -7,8 +7,11 @@ import (
 
 // GlobalContext holds metadata about the entire execution.
 type GlobalContext struct {
-	TotalFiles        int
-	TotalSize         int64
+	TotalFiles int
+	TotalSize  int64
+	// SizeUnknown is set when at least one input's size wasn't known ahead of
+	// content being read, such as a remote URL, making TotalSize a partial sum.
+	SizeUnknown       bool
 	TotalWrittenBytes int64
 	TotalRows         int64
 	TokenEstimate     int64
