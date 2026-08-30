@@ -90,9 +90,7 @@ func documentSuffixForMediaType(value string) string {
 	return ""
 }
 
-// IsDocumentInput reports whether f should be converted by the document
-// converter, consulting the media type its source reported when the path
-// itself carries no recognized extension.
+// IsDocumentInput reports whether f should be converted by the document converter.
 func IsDocumentInput(f InputFile) bool {
 	if IsDocumentPath(f.Path) || IsHTMLInput(f) {
 		return true
