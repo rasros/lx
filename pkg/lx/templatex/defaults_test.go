@@ -205,6 +205,23 @@ func TestDefaultStatsTemplate_Render(t *testing.T) {
 		}
 	})
 
+	t.Run("size hidden when unavailable", func(t *testing.T) {
+		out := render(core.StatsContext{
+			Global: core.GlobalContext{
+				TotalFiles: 1, TotalRows: 50, TotalSections: 1, TotalSize: 0,
+				SizeUnknown: true, TokenEstimate: 10982,
+			},
+		})
+		lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+		want1 := "▎ 1 file · 50 rows · 1 section"
+		if lines[0] != want1 {
+			t.Errorf("line 1 = %q, want %q", lines[0], want1)
+		}
+		if strings.Contains(out, "-1") {
+			t.Errorf("rendered stats must never show a negative size: %q", out)
+		}
+	})
+
 	t.Run("color path bolds and colors token count", func(t *testing.T) {
 		out := render(core.StatsContext{
 			ColorEnabled: true,

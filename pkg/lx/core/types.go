@@ -9,6 +9,7 @@ import (
 type GlobalContext struct {
 	TotalFiles        int
 	TotalSize         int64
+	SizeUnknown       bool
 	TotalWrittenBytes int64
 	TotalRows         int64
 	TokenEstimate     int64

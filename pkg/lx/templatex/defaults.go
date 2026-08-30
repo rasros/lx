@@ -175,7 +175,7 @@ article > header {
 <h1>lx output</h1>
 <p>
   Files: {{ .Global.TotalFiles }} &bull; 
-  Size: {{ .Global.TotalSize | humanize }} &bull; 
+  {{ if not .Global.SizeUnknown }}Size: {{ .Global.TotalSize | humanize }} &bull; {{ end }}
   Path: {{ .Global.WorkDir }}
 </p>
 </hgroup>
@@ -269,8 +269,8 @@ const (
 const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
 	`{{ commafy .Global.TotalFiles }} {{ plural .Global.TotalFiles "file" "files" }} {{ dim .ColorEnabled "·" }} ` +
 	`{{ commafy .Global.TotalRows }} {{ plural .Global.TotalRows "row" "rows" }} {{ dim .ColorEnabled "·" }} ` +
-	`{{ commafy .Global.TotalSections }} {{ plural .Global.TotalSections "section" "sections" }} {{ dim .ColorEnabled "·" }} ` +
-	`{{ humanize .Global.TotalSize }}` + "\n" +
+	`{{ commafy .Global.TotalSections }} {{ plural .Global.TotalSections "section" "sections" }}` +
+	`{{ if not .Global.SizeUnknown }} {{ dim .ColorEnabled "·" }} {{ humanize .Global.TotalSize }}{{ end }}` + "\n" +
 	`  {{ tokenLabel .Global.TokenEstimate .ColorEnabled }}` + "\n" +
 	`{{ if or .Global.SkippedBySize .Global.BinaryFiles .Global.FailedFiles }}  ` +
 	`{{ $sep := "" }}` +
