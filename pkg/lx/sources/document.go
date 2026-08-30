@@ -51,7 +51,13 @@ func ConvertInput(f InputFile, r io.ReaderAt, size int64) ([]byte, error) {
 	if IsHTMLInput(f) {
 		return internal.HTMLToMarkdown(io.NewSectionReader(r, 0, size))
 	}
-	return ExtractDocumentText(f.Path, r, size)
+	path := f.Path
+	if !IsDocumentPath(path) && f.mediaType != nil {
+		if suffix := documentSuffixForMediaType(*f.mediaType); suffix != "" {
+			path += suffix
+		}
+	}
+	return ExtractDocumentText(path, r, size)
 }
 
 // IsDocumentPath reports whether the path has a document file extension.
@@ -63,6 +69,33 @@ func IsDocumentPath(path string) bool {
 		}
 	}
 	return false
+}
+
+// documentSuffixForMediaType maps a Content-Type to the suffix ExtractDocumentText dispatches on.
+func documentSuffixForMediaType(value string) string {
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		return ""
+	}
+	switch mediaType {
+	case "application/pdf":
+		return ".pdf"
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+		return ".docx"
+	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		return ".xlsx"
+	case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+		return ".pptx"
+	}
+	return ""
+}
+
+// IsDocumentInput reports whether f should be converted by the document converter.
+func IsDocumentInput(f InputFile) bool {
+	if IsDocumentPath(f.Path) || IsHTMLInput(f) {
+		return true
+	}
+	return f.mediaType != nil && documentSuffixForMediaType(*f.mediaType) != ""
 }
 
 // ExtractDocumentText extracts plain text from a document file.

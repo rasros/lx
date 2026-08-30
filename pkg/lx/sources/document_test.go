@@ -170,6 +170,42 @@ func TestIsDocumentPath(t *testing.T) {
 	}
 }
 
+func TestIsDocumentInput_PDFMediaTypeWithoutExtension(t *testing.T) {
+	mediaType := "application/pdf"
+	f := InputFile{Path: "https://arxiv.org/pdf/2608.26263", mediaType: &mediaType}
+	if !IsDocumentInput(f) {
+		t.Errorf("IsDocumentInput(%q with media type %q) = false, want true", f.Path, mediaType)
+	}
+}
+
+func TestIsDocumentInput_UnrelatedMediaTypeWithoutExtension(t *testing.T) {
+	mediaType := "application/octet-stream"
+	f := InputFile{Path: "https://example.com/download", mediaType: &mediaType}
+	if IsDocumentInput(f) {
+		t.Errorf("IsDocumentInput(%q with media type %q) = true, want false", f.Path, mediaType)
+	}
+}
+
+func TestIsDocumentInput_PathExtensionWithNoMediaType(t *testing.T) {
+	f := InputFile{Path: "report.pdf"}
+	if !IsDocumentInput(f) {
+		t.Error("IsDocumentInput(report.pdf) = false, want true")
+	}
+}
+
+func TestConvertInput_PDFMediaTypeWithoutExtension(t *testing.T) {
+	data := makeTestPDF(t, "URLPdfContent")
+	mediaType := "application/pdf; charset=binary"
+	f := InputFile{Path: "https://arxiv.org/pdf/2608.26263", mediaType: &mediaType}
+	text, err := ConvertInput(f, bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(text), "URLPdfContent") {
+		t.Errorf("expected extracted PDF text, got: %q", string(text))
+	}
+}
+
 func TestDocxXMLToText_SingleParagraph(t *testing.T) {
 	xml := `<w:body><w:p><w:r><w:t>Hello World</w:t></w:r></w:p></w:body>`
 	got := xmlToText(strings.NewReader(xml))

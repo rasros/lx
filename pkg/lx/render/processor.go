@@ -191,7 +191,7 @@ var converters = []converter{
 			if !f.Config.ExtractDocuments {
 				return false
 			}
-			return sources.IsDocumentPath(f.Path) || sources.IsHTMLInput(f)
+			return sources.IsDocumentInput(f)
 		},
 		convert: sources.ConvertInput,
 		language: func(f sources.InputFile) string {
