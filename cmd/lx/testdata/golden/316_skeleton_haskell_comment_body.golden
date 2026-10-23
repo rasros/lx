@@ -2,6 +2,7 @@
 skeleton/commentbody.hs (4 rows, function signatures)
 ---
 ```haskell
+addOne :: Int -> Int
 addOne x =
 ```
 
