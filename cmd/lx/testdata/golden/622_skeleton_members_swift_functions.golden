@@ -1,0 +1,24 @@
+--- STDOUT ---
+skeleton/members.swift (24 rows, function signatures)
+---
+```swift
+public struct Grid {
+...
+    public subscript(i: Int) -> Int {
+...
+}
+...
+public class Resource {
+    deinit {
+...
+}
+...
+public enum Direction {
+...
+    public func flipped() -> Direction {
+...
+}
+```
+
+
+--- STDERR ---

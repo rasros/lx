@@ -1,0 +1,22 @@
+--- STDOUT ---
+skeleton/members.swift (24 rows, type definitions)
+---
+```swift
+public struct Grid {
+    public var width: Int = 0
+...
+}
+...
+public class Resource {
+...
+}
+...
+public enum Direction {
+    case north
+    case south
+...
+}
+```
+
+
+--- STDERR ---

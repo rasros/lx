@@ -1,0 +1,17 @@
+--- STDOUT ---
+skeleton/members.m (14 rows, type definitions)
+---
+```objectivec
+/** A counter with instance variables. */
+@interface Counter : NSObject {
+    NSUInteger count;
+...
+    BOOL enabled;
+...
+@property (nonatomic) NSUInteger step;
+...
+@end
+```
+
+
+--- STDERR ---

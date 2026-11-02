@@ -16,6 +16,9 @@ type point = {
 module Geometry = struct
   type shape = Circle | Square
 ...
+  (* Area of a unit circle. *)
+  let pi = 3.14159
+...
 end
 ...
 (* Signature for printable types. *)

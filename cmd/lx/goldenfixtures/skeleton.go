@@ -47,6 +47,17 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"deco.scala",
 		"deco.swift",
 		"deco.dart",
+		"members.cpp",
+		"members.cs",
+		"Members.java",
+		"members.kt",
+		"members.swift",
+		"members.rs",
+		"members.ts",
+		"members.dart",
+		"members.php",
+		"members.ml",
+		"members.m",
 	}
 	for _, name := range languageFiles {
 		content := readFixtureFile(t, filepath.Join("languages", name))

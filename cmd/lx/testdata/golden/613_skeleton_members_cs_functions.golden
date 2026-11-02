@@ -1,0 +1,40 @@
+--- STDOUT ---
+skeleton/members.cs (52 rows, function signatures)
+---
+```csharp
+namespace Shapes
+{
+    /// <summary>A shape.</summary>
+    public class Shape
+    {
+...
+        public Shape(int sides)
+        {
+...
+        ~Shape()
+        {
+...
+        public int this[int i]
+        {
+...
+        public static Shape operator +(Shape a, Shape b)
+        {
+...
+        public static implicit operator int(Shape s)
+        {
+...
+        protected internal void Shared()
+        {
+...
+    }
+...
+    public interface IArea
+    {
+        double Area();
+    }
+...
+}
+```
+
+
+--- STDERR ---

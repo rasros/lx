@@ -31,6 +31,13 @@ type langDef struct {
 	definitionField string
 
 	iterateChildren []string
+	// namespaces are node types whose "body" holds declarations walked like
+	// top-level ones, kept between the namespace's header and closing row.
+	namespaces []string
+	// unwrap returns the declaration a top-level node wraps (a C++
+	// template_declaration's class or function), or the node itself. Rows
+	// of the wrapper before the declaration are kept like decorators.
+	unwrap func(c *langs.Ctx, n *gotreesitter.Node) *gotreesitter.Node
 
 	funcVisible func(node *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool
 
@@ -40,21 +47,29 @@ type langDef struct {
 }
 
 var (
+	javaTypes = []string{"class_declaration", "interface_declaration", "enum_declaration", "record_declaration", "annotation_type_declaration"}
+
 	javaMembers = &langs.Members{
-		Bodies:  []string{"class_body", "interface_body", "enum_body"},
-		Fields:  []string{"field_declaration"},
-		Methods: []string{"method_declaration", "constructor_declaration"},
-		Nested:  []string{"class_declaration", "interface_declaration", "enum_declaration", "record_declaration"},
+		Bodies:  []string{"class_body", "interface_body", "enum_body", "annotation_type_body"},
+		Groups:  []string{"enum_body_declarations"},
+		Fields:  []string{"field_declaration", "constant_declaration", "enum_constant"},
+		Methods: []string{"method_declaration", "constructor_declaration", "compact_constructor_declaration", "annotation_type_element_declaration"},
+		Nested:  javaTypes,
 		Private: langs.JavaPrivate,
 	}
+
+	csharpTypes = []string{"class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"}
 
 	csharpMembers = &langs.Members{
 		BodyField: "body",
 		Bodies:    []string{"declaration_list"},
-		Fields:    []string{"field_declaration", "property_declaration"},
-		Methods:   []string{"method_declaration", "constructor_declaration"},
-		Nested:    []string{"class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"},
-		Private:   langs.CSharpPrivate,
+		Fields: []string{"field_declaration", "property_declaration", "event_field_declaration", "event_declaration",
+			"delegate_declaration", "enum_member_declaration"},
+		Methods: []string{"method_declaration", "constructor_declaration", "destructor_declaration", "operator_declaration",
+			"conversion_operator_declaration", "indexer_declaration"},
+		Nested:       csharpTypes,
+		MethodBodies: []string{"accessor_list"},
+		Private:      langs.CSharpPrivate,
 	}
 
 	scalaMembers = &langs.Members{
@@ -66,50 +81,58 @@ var (
 	}
 
 	kotlinMembers = &langs.Members{
-		Bodies:     []string{"class_body"},
-		Fields:     []string{"property_declaration"},
-		Methods:    []string{"function_declaration"},
-		Nested:     []string{"class_declaration", "object_declaration"},
-		MethodBody: "function_body",
-		Private:    langs.KotlinPrivate,
+		Bodies:  []string{"class_body", "enum_class_body"},
+		Fields:  []string{"property_declaration", "enum_entry"},
+		Methods: []string{"function_declaration", "secondary_constructor"},
+		Nested:  []string{"class_declaration", "object_declaration", "companion_object"},
+		// A secondary constructor's body is bare braces around statements.
+		MethodBodies: []string{"function_body", "{"},
+		Private:      langs.KotlinPrivate,
 	}
 
 	swiftMembers = &langs.Members{
-		Bodies:  []string{"class_body", "protocol_body"},
-		Fields:  []string{"property_declaration", "protocol_property_declaration"},
-		Methods: []string{"function_declaration", "init_declaration", "protocol_function_declaration"},
-		Nested:  []string{"class_declaration"},
-		Private: langs.SwiftPrivate,
+		Bodies: []string{"class_body", "protocol_body", "enum_class_body"},
+		Fields: []string{"property_declaration", "protocol_property_declaration", "enum_entry"},
+		Methods: []string{"function_declaration", "init_declaration", "deinit_declaration", "subscript_declaration",
+			"protocol_function_declaration"},
+		Nested:       []string{"class_declaration"},
+		MethodBodies: []string{"computed_property"},
+		Private:      langs.SwiftPrivate,
 	}
 
 	phpMembers = &langs.Members{
-		Bodies:  []string{"declaration_list"},
-		Fields:  []string{"property_declaration", "const_declaration"},
+		Bodies:  []string{"declaration_list", "enum_declaration_list"},
+		Fields:  []string{"property_declaration", "const_declaration", "enum_case"},
 		Methods: []string{"method_declaration"},
 		Private: langs.PHPPrivate,
 	}
 
 	dartMembers = &langs.Members{
 		BodyField:   "body",
+		Bodies:      []string{"class_body", "extension_body", "enum_body"},
 		Kind:        langs.DartMember,
 		Annotations: []string{"annotation", "decorator"},
 		Private:     langs.DartPrivate,
 	}
 
 	groovyMembers = &langs.Members{
-		Bodies:     []string{"closure"},
-		Fields:     []string{"declaration"},
-		Methods:    []string{"function_definition"},
-		MethodBody: "closure",
-		Private:    langs.GroovyPrivate,
+		Bodies:       []string{"closure"},
+		Fields:       []string{"declaration"},
+		Methods:      []string{"function_definition"},
+		MethodBodies: []string{"closure"},
+		Private:      langs.GroovyPrivate,
 	}
 
-	// tsMembers covers classes and interfaces of TypeScript and JavaScript.
+	tsTypes = []string{"class_declaration", "abstract_class_declaration", "interface_declaration", "enum_declaration"}
+
+	// tsMembers covers classes, interfaces and enums of TypeScript and
+	// JavaScript.
 	tsMembers = &langs.Members{
-		BodyField:   "body",
-		Bodies:      []string{"class_body", "interface_body"},
-		Fields:      []string{"public_field_definition", "field_definition", "property_signature", "index_signature"},
-		Methods:     []string{"method_definition", "method_signature", "call_signature", "construct_signature"},
+		BodyField: "body",
+		Bodies:    []string{"class_body", "interface_body", "enum_body"},
+		Fields: []string{"public_field_definition", "field_definition", "property_signature", "index_signature",
+			"property_identifier", "enum_assignment"},
+		Methods:     []string{"method_definition", "method_signature", "abstract_method_signature", "call_signature", "construct_signature"},
 		Annotations: []string{"decorator"},
 		Private:     langs.TSPrivate,
 	}
@@ -124,12 +147,26 @@ var (
 	}
 
 	cppMembers = &langs.Members{
-		Bodies:           []string{"field_declaration_list"},
+		Bodies:           []string{"field_declaration_list", "enumerator_list"},
 		SkipBodiless:     true,
+		Unwrap:           langs.CppUnwrap,
 		Kind:             langs.CppMember,
 		Section:          "access_specifier",
 		SectionPrivate:   langs.CppSectionPrivate,
 		PrivateByDefault: []string{"class_specifier"},
+	}
+
+	// objcMembers walks an @interface or @protocol, whose members are its
+	// own children between the header row and @end. Instance variables in
+	// the `{ ... }` block are fields, hidden after @private or @package.
+	objcMembers = &langs.Members{
+		BodyIsNode:     true,
+		Groups:         []string{"instance_variables"},
+		Unwrap:         langs.ObjCUnwrap,
+		Fields:         []string{"property_declaration", "struct_declaration"},
+		Methods:        []string{"method_declaration"},
+		Section:        "visibility_specification",
+		SectionPrivate: langs.ObjCSectionPrivate,
 	}
 )
 
@@ -170,12 +207,14 @@ var langDefs = map[string]langDef{
 		structTypes: []string{"type_definition", "struct_specifier", "class_specifier", "union_specifier", "enum_specifier"},
 		comments:    &langs.CComments,
 		funcVisible: langs.CppFuncVisible,
+		namespaces:  []string{"namespace_definition"},
+		unwrap:      langs.CppUnwrap,
 		emitStruct:  langs.CppEmitter(cppMembers),
 	},
 
 	"java": {
 		newLang:     grammars.JavaLanguage,
-		structTypes: []string{"class_declaration", "interface_declaration", "enum_declaration", "record_declaration"},
+		structTypes: javaTypes,
 		comments:    &langs.CComments,
 		members:     javaMembers,
 	},
@@ -192,7 +231,7 @@ var langDefs = map[string]langDef{
 	"typescript": {
 		newLang:         grammars.TypescriptLanguage,
 		funcTypes:       []string{"function_declaration", "lexical_declaration"},
-		structTypes:     []string{"class_declaration", "interface_declaration"},
+		structTypes:     tsTypes,
 		comments:        &langs.CComments,
 		decoratedType:   "export_statement",
 		definitionField: "declaration",
@@ -203,7 +242,7 @@ var langDefs = map[string]langDef{
 	"tsx": {
 		newLang:         grammars.TsxLanguage,
 		funcTypes:       []string{"function_declaration", "lexical_declaration"},
-		structTypes:     []string{"class_declaration", "interface_declaration"},
+		structTypes:     tsTypes,
 		comments:        &langs.CComments,
 		decoratedType:   "export_statement",
 		definitionField: "declaration",
@@ -245,7 +284,8 @@ var langDefs = map[string]langDef{
 
 	"csharp": {
 		newLang:     grammars.CSharpLanguage,
-		structTypes: []string{"class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"},
+		structTypes: csharpTypes,
+		namespaces:  []string{"namespace_declaration"},
 		comments:    &langs.CComments,
 		members:     csharpMembers,
 	},
@@ -280,7 +320,7 @@ var langDefs = map[string]langDef{
 	"php": {
 		newLang:     grammars.PhpLanguage,
 		funcTypes:   []string{"function_definition"},
-		structTypes: []string{"class_declaration", "interface_declaration"},
+		structTypes: []string{"class_declaration", "interface_declaration", "trait_declaration", "enum_declaration"},
 		comments:    &langs.PHPComments,
 		members:     phpMembers,
 	},
@@ -288,7 +328,7 @@ var langDefs = map[string]langDef{
 	"dart": {
 		newLang:     grammars.DartLanguage,
 		funcTypes:   []string{"function_signature"},
-		structTypes: []string{"class_definition"},
+		structTypes: []string{"class_definition", "mixin_declaration", "extension_declaration", "enum_declaration"},
 		comments:    &langs.CComments,
 		members:     dartMembers,
 	},
@@ -326,6 +366,7 @@ var langDefs = map[string]langDef{
 		structTypes:   []string{"class_interface", "protocol_declaration"},
 		comments:      &langs.CComments,
 		bodyChildType: "compound_statement",
+		members:       objcMembers,
 	},
 
 	"ocaml": {

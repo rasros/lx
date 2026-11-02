@@ -42,6 +42,10 @@ type Members struct {
 	// unless SkipBodiless is set (C++ forward declarations).
 	Bodies       []string
 	SkipBodiless bool
+	// BodyIsNode is for grammars whose members are children of the
+	// declaration itself (Objective-C @interface ... @end): the header is the
+	// declaration's first row and the closing row its last.
+	BodyIsNode bool
 
 	Fields  []string
 	Methods []string
@@ -51,9 +55,23 @@ type Members struct {
 	// field_declaration that declares a function is a method).
 	Kind func(c *Ctx, n *gotreesitter.Node) MemberKind
 
-	// MethodBody is the child type of a method's body when the grammar has
-	// no "body" field for it (Kotlin's function_body, Groovy's closure).
-	MethodBody string
+	// Unwrap, when set, returns the declaration a member wraps (a C++
+	// template_declaration's function or class, the struct specifier of a
+	// C++ `struct Inner { ... };` member, what an Objective-C instance_variable
+	// holds), or the member itself. Section labels and groups are recognized
+	// after unwrapping. The wrapper's rows before the declaration are kept
+	// with it like annotations.
+	Unwrap func(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node
+	// Groups are member node types whose children are members of the same
+	// body (Java's enum_body_declarations after the enum constants,
+	// Objective-C's instance variable block). An access section inside a
+	// group ends with it.
+	Groups []string
+
+	// MethodBodies are the child types of a method's body when the grammar
+	// has no "body" field for it (Kotlin's function_body, Groovy's closure),
+	// tried in order.
+	MethodBodies []string
 	// Annotations are sibling node types that belong to the member after
 	// them (TypeScript decorators, Dart annotations).
 	Annotations []string
@@ -71,6 +89,9 @@ type Members struct {
 
 // Emit appends the skeleton of the type declaration n.
 func (m *Members) Emit(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+	if m.BodyIsNode {
+		return m.Walk(c, out, n, n, n)
+	}
 	body := m.body(c, n)
 	if body == nil {
 		if m.SkipBodiless || !c.Structs {
@@ -99,51 +120,85 @@ func (m *Members) body(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node {
 // of body and whose members are the children of items (usually body itself).
 func (m *Members) Walk(c *Ctx, out []internal.LineRange, n, body, items *gotreesitter.Node) []internal.LineRange {
 	headerEnd := startRow(body)
-	private := slices.Contains(m.PrivateByDefault, c.Type(n))
+	w := memberWalk{m: m, c: c, parent: n, private: slices.Contains(m.PrivateByDefault, c.Type(n))}
+	w.walk(items)
+	if !c.Structs && len(w.out) == 0 {
+		return out
+	}
 
-	var inner []internal.LineRange
+	out = internal.KeepLines(out, c.Lines, startRow(n), headerEnd)
+	out = append(out, w.out...)
+	if closingRow := endRow(body); closingRow > headerEnd {
+		out = internal.KeepLine(out, c.Lines, closingRow)
+	}
+	return out
+}
+
+// memberWalk is one pass over the members of a type body.
+type memberWalk struct {
+	m       *Members
+	c       *Ctx
+	parent  *gotreesitter.Node
+	private bool // inside a private access section
+	out     []internal.LineRange
+}
+
+func (w *memberWalk) walk(items *gotreesitter.Node) {
+	m, c := w.m, w.c
 	for i := 0; i < items.ChildCount(); i++ {
 		child := items.Child(i)
-		if m.Section != "" && c.Type(child) == m.Section {
-			private = m.SectionPrivate(c, child)
+		decl := child
+		if m.Unwrap != nil {
+			decl = m.Unwrap(c, child)
+		}
+		t := c.Type(decl)
+		if m.Section != "" && t == m.Section {
+			w.private = m.SectionPrivate(c, decl)
 			continue
 		}
-		if private || (m.Private != nil && m.Private(c, n, child)) {
+		if slices.Contains(m.Groups, t) {
+			// Access sections inside a group end with it.
+			private := w.private
+			w.walk(decl)
+			w.private = private
+			continue
+		}
+		if w.private || (m.Private != nil && m.Private(c, w.parent, child)) {
 			continue
 		}
 		from := startRow(child)
 		if len(m.Annotations) > 0 {
 			from = precedingSiblingsRow(items, child, i, m.Annotations, c.Lang)
 		}
-		switch m.kind(c, child) {
+		switch m.kind(c, decl) {
 		case Field:
 			if c.Structs {
-				inner = c.EmitWithDoc(inner, from, endRow(child))
+				w.out = c.EmitWithDoc(w.out, from, endRow(child))
 			}
 		case Method:
 			if c.Functions {
-				inner = c.EmitLeadingDoc(inner, from)
-				inner = EmitDecorators(inner, c.Lines, from, startRow(child))
-				inner = EmitFuncSig(inner, c.Lines, child, c.Lang, false, m.MethodBody)
+				w.out = c.EmitLeadingDoc(w.out, from)
+				w.out = EmitDecorators(w.out, c.Lines, from, startRow(decl))
+				w.out = EmitFuncSig(w.out, c.Lines, decl, c.Lang, false, m.methodBody(c, decl))
 			}
 		case Nested:
-			if sub := m.Emit(c, nil, child); len(sub) > 0 {
-				inner = c.EmitLeadingDoc(inner, from)
-				inner = EmitDecorators(inner, c.Lines, from, startRow(child))
-				inner = append(inner, sub...)
+			if sub := m.Emit(c, nil, decl); len(sub) > 0 {
+				w.out = c.EmitLeadingDoc(w.out, from)
+				w.out = EmitDecorators(w.out, c.Lines, from, startRow(decl))
+				w.out = append(w.out, sub...)
 			}
 		}
 	}
-	if !c.Structs && len(inner) == 0 {
-		return out
-	}
+}
 
-	out = internal.KeepLines(out, c.Lines, startRow(n), headerEnd)
-	out = append(out, inner...)
-	if closingRow := endRow(body); closingRow > headerEnd {
-		out = internal.KeepLine(out, c.Lines, closingRow)
+// methodBody returns the first of MethodBodies that n has a child of.
+func (m *Members) methodBody(c *Ctx, n *gotreesitter.Node) string {
+	for _, t := range m.MethodBodies {
+		if findChildByType(n, t, c.Lang) != nil {
+			return t
+		}
 	}
-	return out
+	return ""
 }
 
 func (m *Members) kind(c *Ctx, n *gotreesitter.Node) MemberKind {

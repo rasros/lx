@@ -1,0 +1,27 @@
+--- STDOUT ---
+skeleton/Members.java (38 rows, type definitions)
+---
+```java
+/** Color enum. */
+public enum Color {
+    RED,
+    GREEN;
+...
+}
+...
+public record Pt(int x, int y) {
+...
+}
+...
+public @interface Marker {
+...
+}
+...
+public interface Consts {
+    int MAX = 10;
+...
+}
+```
+
+
+--- STDERR ---

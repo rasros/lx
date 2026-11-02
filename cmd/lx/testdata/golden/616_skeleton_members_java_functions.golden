@@ -1,0 +1,32 @@
+--- STDOUT ---
+skeleton/Members.java (38 rows, function signatures)
+---
+```java
+/** Color enum. */
+public enum Color {
+...
+    /** Hex value. */
+    public String hex() {
+...
+}
+...
+public record Pt(int x, int y) {
+    public Pt {
+...
+    public int sum() {
+...
+}
+...
+public @interface Marker {
+    String value() default "";
+}
+...
+public interface Consts {
+...
+    default int twice(int a) {
+...
+}
+```
+
+
+--- STDERR ---

@@ -1,0 +1,23 @@
+--- STDOUT ---
+skeleton/members.ts (19 rows, definitions)
+---
+```typescript
+/** Base shape. */
+export abstract class Shape {
+...
+    protected sides = 3;
+...
+    abstract area(): number;
+...
+    describe(): string {
+...
+}
+...
+export enum Kind {
+    Square,
+    Circle = 2,
+}
+```
+
+
+--- STDERR ---

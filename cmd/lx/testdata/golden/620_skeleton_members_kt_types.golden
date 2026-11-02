@@ -1,0 +1,23 @@
+--- STDOUT ---
+skeleton/members.kt (28 rows, type definitions)
+---
+```kotlin
+class K(val a: Int) {
+    val prop: Int = 1
+...
+    companion object {
+        const val X = 1
+...
+    }
+...
+}
+...
+enum class Dir {
+    N,
+    S;
+...
+}
+```
+
+
+--- STDERR ---

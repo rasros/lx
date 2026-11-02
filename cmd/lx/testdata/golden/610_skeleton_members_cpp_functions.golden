@@ -1,0 +1,48 @@
+--- STDOUT ---
+skeleton/members.cpp (57 rows, function signatures)
+---
+```cpp
+// Widget holds a value.
+class Widget {
+...
+    Widget();
+    virtual ~Widget();
+    // Nested type: walked with its own (struct, public) access.
+    struct Inner {
+...
+        void m();
+    };
+    class Deep {
+...
+        void d();
+    };
+...
+    template <typename T>
+    T get(T x) {
+...
+    static int count();
+...
+    void prot();
+};
+...
+namespace geo {
+// Point in the plane.
+struct Point {
+...
+    double norm() const;
+};
+void free_fn();
+}
+...
+template <typename T>
+class Box {
+...
+    T get();
+};
+...
+template <typename T>
+T identity(T x) {
+```
+
+
+--- STDERR ---

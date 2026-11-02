@@ -1,0 +1,28 @@
+--- STDOUT ---
+skeleton/members.dart (23 rows, definitions)
+---
+```dart
+/// Mixes in walking.
+mixin Walker {
+  int steps = 0;
+...
+  void walk() {
+...
+}
+...
+extension Shout on String {
+  String shout() {
+...
+}
+...
+enum Size {
+  small,
+  large;
+...
+  bool get isLarge {
+...
+}
+```
+
+
+--- STDERR ---

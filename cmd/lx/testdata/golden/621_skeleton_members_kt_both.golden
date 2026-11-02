@@ -1,0 +1,29 @@
+--- STDOUT ---
+skeleton/members.kt (28 rows, definitions)
+---
+```kotlin
+class K(val a: Int) {
+    val prop: Int = 1
+...
+    constructor(s: String) : this(1) {
+...
+    companion object {
+        const val X = 1
+...
+        fun create(): K {
+...
+    }
+...
+}
+...
+enum class Dir {
+    N,
+    S;
+...
+    fun flip(): Dir {
+...
+}
+```
+
+
+--- STDERR ---

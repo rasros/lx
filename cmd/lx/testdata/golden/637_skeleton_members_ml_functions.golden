@@ -1,0 +1,20 @@
+--- STDOUT ---
+skeleton/members.ml (20 rows, function signatures)
+---
+```ocaml
+(* A function with parameters. *)
+let area r =
+...
+let double = fun x -> 2 * x
+...
+let classify = function
+...
+module Config = struct
+...
+  let scale x =
+...
+end
+```
+
+
+--- STDERR ---
