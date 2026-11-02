@@ -1,5 +1,9 @@
 --- STDOUT ---
-
+build/gen.go (1 rows)
+---
+```go
+package build
+```
 
 
 --- STDERR ---

@@ -1,10 +1,15 @@
 --- STDOUT ---
-../build/keep.js (1 rows)
+[1/2] ../build/keep.js (1 rows)
 ---
 ```javascript
 re-included by the negation
 ```
 
+[2/2] ../build/out.js (1 rows)
+---
+```javascript
+ignored with its directory
+```
+
 
 --- STDERR ---
-Warning: Skipping path, use -f to include it (path=../build/out.js reason=parent directory /ROOT/build: rule "build/" in /ROOT/.gitignore)

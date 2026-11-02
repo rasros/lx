@@ -49,10 +49,14 @@ Arguments:
             1. A file path (added directly).
             2. A directory path (walked recursively).
             3. An http/https URL (fetched and added as a file).
-            4. An explicit action flag (-f, -p, -s).
+            4. An explicit action flag (-p, -s).
             5. "-" to read file paths from stdin.
 
           Archive URLs (.zip, .tar.gz, etc.) are expanded when -Z is active.
+
+          As in rg, a path you name, or pipe in as a file list, is never
+          filtered itself: ignore files, hidden-file skipping and -i/-e do
+          not apply to it. They filter what a named directory contains.
 
           If no actions are provided, lx walks the current directory ".".
 
@@ -242,7 +246,7 @@ Interleaved option:
           The value must be greater than zero; there is no "unlimited" spelling,
           simply omit the flag.
           
-          The limit applies to every input, including paths forced with -f.
+          The limit applies to every input, including paths named directly.
           Inputs whose size is not known ahead of time, such as remote URLs, are
           never skipped.
   -D, --documents
@@ -383,7 +387,7 @@ Action:
             lx -T src -s "Tests" test (tree only for src, not test)
             lx -T src -i "*.go" lib (two sections: tree for src, no tree for
             lib)
-            lx -T src -f extra -- file2 (one section: tree covers src, extra,
+            lx -T src extra -- file2 (one section: tree covers src, extra,
             file2)
   -t, --tree-only
           Print a file tree for all files in the current section without
@@ -395,18 +399,6 @@ Action:
             lx -t . (show tree of current directory)
           
           See --tree (-T) for full details on section semantics.
-  -f, --file <value>
-          Force process a specific file path immediately.
-          
-          Unlike passing a path as a standard argument, using -f forces the file
-          to be included even if it is:
-            - Listed in .gitignore
-            - Hidden (starts with .)
-            - Excluded by active -e filters
-            - Not included by active -i filters
-          
-          If the path is a directory, active filters (-i/-e) are preserved for
-          the recursive walk, but hidden/.gitignore checks are still disabled.
   -s, --section <value>
           Insert a logical section separator with a custom header.
           

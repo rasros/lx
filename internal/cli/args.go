@@ -40,9 +40,6 @@ type Op struct {
 	Value   string
 	Type    CmdType
 	IsShort bool
-	// FromStdin marks a path read from a piped file list rather than named
-	// on the command line.
-	FromStdin bool
 }
 
 type ParsedArgs struct {

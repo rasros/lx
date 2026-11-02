@@ -47,7 +47,7 @@ func parseRules(lines []string, basePath, source string) []Rule {
 	}
 
 	for _, p := range lines {
-		p = strings.TrimSpace(p)
+		p = trimTrailingSpaces(strings.TrimLeft(strings.TrimSuffix(p, "\r"), " \t"))
 		if p == "" || strings.HasPrefix(p, "#") {
 			continue
 		}
@@ -56,6 +56,9 @@ func parseRules(lines []string, basePath, source string) []Rule {
 		if strings.HasPrefix(p, "!") {
 			negate = true
 			p = strings.TrimPrefix(p, "!")
+		} else if strings.HasPrefix(p, `\!`) || strings.HasPrefix(p, `\#`) {
+			// An escaped leading ! or # is part of the pattern.
+			p = p[1:]
 		}
 
 		p = normalizePattern(p)
@@ -71,6 +74,19 @@ func parseRules(lines []string, basePath, source string) []Rule {
 		})
 	}
 	return rules
+}
+
+// trimTrailingSpaces strips the trailing spaces of an ignore file line, as
+// git does, except one escaped with a backslash, which is kept as a space.
+func trimTrailingSpaces(p string) string {
+	end := len(p)
+	for end > 0 && p[end-1] == ' ' {
+		if end >= 2 && p[end-2] == '\\' {
+			return p[:end-2] + " "
+		}
+		end--
+	}
+	return p[:end]
 }
 
 func matchCompiledSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
@@ -91,28 +107,69 @@ func matchCompiledSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 	return false
 }
 
-func match(rule Rule, relPath string, isDir bool) bool {
-	return matchWithPathInfo(rule, buildPathMatchInfo(relPath), isDir)
+// matchIgnoreSpec matches an ignore rule as git does: a pattern without a
+// slash against the base name only. A walk decides whether each directory
+// above a path is ignored before entering it, so the directories' names are
+// not matched again here, and the contents of a re-included directory, such
+// as tags/ after "tags" and "!tags/", are not ignored by the first rule.
+func matchIgnoreSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
+	if spec.Pattern.HasSlash || spec.Anchored {
+		return spec.Pattern.matchCandidate(ctx.relPath)
+	}
+	return spec.Pattern.matchCandidate(ctx.baseName)
 }
 
-func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool) bool {
+func match(rule Rule, relPath string, isDir bool) bool {
+	m := newPathMatcher(relPath)
+	return m.match(rule, isDir)
+}
+
+// pathMatcher matches one path against rules. Rules loaded from the same
+// directory share a base path, so the path relative to it is worked out once
+// per base path rather than once per rule.
+type pathMatcher struct {
+	ctx pathMatchInfo
+
+	base   string
+	under  bool
+	target pathMatchInfo
+}
+
+func newPathMatcher(relPath string) *pathMatcher {
+	return &pathMatcher{ctx: buildPathMatchInfo(relPath), base: "\x00"}
+}
+
+func (m *pathMatcher) match(rule Rule, isDir bool) bool {
 	if rule.Spec.DirOnly && !isDir {
 		return false
 	}
-
-	target := ctx
-	if rule.BasePathPrefix != "" {
-		if !strings.HasPrefix(ctx.relPath, rule.BasePathPrefix) && ctx.relPath != rule.BasePath {
-			return false
-		}
-		if ctx.relPath == rule.BasePath {
-			target = dotPathMatchInfo
-		} else {
-			target = buildPathMatchInfo(strings.TrimPrefix(ctx.relPath, rule.BasePathPrefix))
+	if rule.BasePathPrefix == "" {
+		return matchIgnoreSpec(rule.Spec, m.ctx)
+	}
+	if rule.BasePath != m.base {
+		m.base = rule.BasePath
+		switch {
+		case m.ctx.relPath == rule.BasePath:
+			m.under, m.target = true, dotPathMatchInfo
+		case strings.HasPrefix(m.ctx.relPath, rule.BasePathPrefix):
+			m.under, m.target = true, buildPathMatchInfo(m.ctx.relPath[len(rule.BasePathPrefix):])
+		default:
+			m.under = false
 		}
 	}
+	return m.under && matchIgnoreSpec(rule.Spec, m.target)
+}
 
-	return matchCompiledSpec(rule.Spec, target)
+// whitelisted reports whether the last of rules to match a path is a
+// negation, which re-includes it even when it is hidden, as in ripgrep.
+func whitelisted(relPath string, isDir bool, rules []Rule) (matched, negated bool) {
+	m := newPathMatcher(relPath)
+	for _, rule := range rules {
+		if m.match(rule, isDir) {
+			matched, negated = true, rule.Negate
+		}
+	}
+	return matched, negated
 }
 
 // checkIgnore applies rules to a path, continuing from the state ignored
@@ -122,10 +179,10 @@ func checkIgnore(relPath string, isDir bool, rules []Rule, ignored bool, reason 
 	if len(rules) == 0 {
 		return ignored, reason
 	}
-	ctx := buildPathMatchInfo(relPath)
+	m := newPathMatcher(relPath)
 
 	for _, rule := range rules {
-		if matchWithPathInfo(rule, ctx, isDir) {
+		if m.match(rule, isDir) {
 			if rule.Negate {
 				ignored = false
 				if wantReason {

@@ -87,26 +87,11 @@ func TestWalker_StartOnFile_Ignored(t *testing.T) {
 	mustWriteFile(t, tmp, "ignore.me", "content")
 	mustWriteFile(t, tmp, ".gitignore", "*.me")
 
-	w := newWalker(nil, nil)
-
-	var paths []string
-	fsys := os.DirFS(tmp)
-
-	err := w.Walk(fsys, "ignore.me", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		paths = append(paths, path)
-		return nil
-	})
-
-	if err != nil {
-		t.Fatalf("Walk failed: %v", err)
+	// The file is named, so it is included; a walk skips it.
+	if got := walkNamed(t, newWalker(nil, nil), tmp, "ignore.me"); !reflect.DeepEqual(got, []string{"ignore.me"}) {
+		t.Errorf("expected the named file to be included, got %v", got)
 	}
-
-	if len(paths) != 0 {
-		t.Errorf("Expected file to be ignored by .gitignore, but got: %v", paths)
-	}
+	assertNotContains(t, collectPaths(t, newWalker(nil, nil), tmp), "ignore.me")
 }
 
 func TestWalker_SkipHidden(t *testing.T) {
@@ -551,11 +536,10 @@ func TestWalkFollowTerminatesOnSymlinkCycle(t *testing.T) {
 }
 
 // walkNamed walks the single path name inside dir and returns the paths
-// passed to the callback and the reasons given for ignored ones.
-func walkNamed(t *testing.T, w *Walker, dir, name string) (got []string, ignored map[string]string) {
+// passed to the callback.
+func walkNamed(t *testing.T, w *Walker, dir, name string) []string {
 	t.Helper()
-	ignored = map[string]string{}
-	w.opts.OnIgnore = func(p, reason string) { ignored[p] = reason }
+	var got []string
 	err := w.Walk(os.DirFS(dir), name, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -566,195 +550,28 @@ func walkNamed(t *testing.T, w *Walker, dir, name string) (got []string, ignored
 	if err != nil {
 		t.Fatalf("Walk failed: %v", err)
 	}
-	return got, ignored
+	return got
 }
 
-func TestWalker_NamedFileInIgnoredDir(t *testing.T) {
-	tests := []struct {
-		name     string
-		files    map[string]string
-		repos    []string
-		target   string
-		included bool
-		reason   string
-	}{
-		{
-			name:   "ignored parent",
-			files:  map[string]string{".gitignore": "build/\n", "build/out.js": "x"},
-			target: "build/out.js",
-			reason: `parent directory build: rule "build/" in .gitignore`,
-		},
-		{
-			name:   "ignored grandparent",
-			files:  map[string]string{".gitignore": "build/\n", "build/js/out.js": "x"},
-			target: "build/js/out.js",
-			reason: `parent directory build: rule "build/" in .gitignore`,
-		},
-		{
-			name:   "ignored by a nested ignore file",
-			files:  map[string]string{"src/.gitignore": "gen/\n", "src/gen/out.js": "x"},
-			target: "src/gen/out.js",
-			reason: `parent directory src/gen: rule "gen/" in src/.gitignore`,
-		},
-		{
-			// Matches what a walk of the parent includes (see hasNestedException).
-			name: "negation re-includes like a walk",
-			files: map[string]string{
-				".gitignore":   "build/\n!build/out.js\n",
-				"build/out.js": "x",
-			},
-			target:   "build/out.js",
-			included: true,
-		},
-		{
-			name: "sibling of a re-included file stays ignored",
-			files: map[string]string{
-				".gitignore":    "build/\n!build/keep.js\n",
-				"build/keep.js": "x",
-				"build/out.js":  "x",
-			},
-			target: "build/out.js",
-			reason: `parent directory build: rule "build/" in .gitignore`,
-		},
-		{
-			name: "floating negation does not re-include other files",
-			files: map[string]string{
-				".gitignore": "build/\n!*.js\n",
-				"build/a.go": "x",
-			},
-			target: "build/a.go",
-			reason: `parent directory build: rule "build/" in .gitignore`,
-		},
-		{
-			name: "deep sibling under an anchored ignored dir",
-			files: map[string]string{
-				".gitignore":  "/a/b/\n!/a/b/c/d.txt\n",
-				"a/b/c/d.txt": "x",
-				"a/b/c/e.txt": "x",
-			},
-			target: "a/b/c/e.txt",
-			reason: `parent directory a/b: rule "/a/b/" in .gitignore`,
-		},
-		{
-			name: "deep re-included file",
-			files: map[string]string{
-				".gitignore":  "/a/b/\n!/a/b/c/d.txt\n",
-				"a/b/c/d.txt": "x",
-			},
-			target:   "a/b/c/d.txt",
-			included: true,
-		},
-		{
-			name: "unrelated negation does not re-include",
-			files: map[string]string{
-				".gitignore":   "build/\n!other/keep.js\n",
-				"build/out.js": "x",
-			},
-			target: "build/out.js",
-			reason: `parent directory build: rule "build/" in .gitignore`,
-		},
-		{
-			name: "negated directory stays included",
-			files: map[string]string{
-				".gitignore":   "build/\n!build/\n",
-				"build/out.js": "x",
-			},
-			target:   "build/out.js",
-			included: true,
-		},
-		{
-			name: "nested repository resets the rules",
-			files: map[string]string{
-				".gitignore":     "out/\n",
-				"sub/out/out.js": "x",
-			},
-			repos:    []string{"sub"},
-			target:   "sub/out/out.js",
-			included: true,
-		},
-		{
-			name: "stray .git directory keeps the rules",
-			files: map[string]string{
-				".gitignore":     "out/\n",
-				"sub/.git/HEAD":  "ref: refs/heads/main\n",
-				"sub/out/out.js": "x",
-			},
-			target: "sub/out/out.js",
-			reason: `parent directory sub/out: rule "out/" in .gitignore`,
-		},
-		{
-			name: "nested repository itself ignored",
-			files: map[string]string{
-				".gitignore":  "sub/\n",
-				"sub/main.go": "x",
-			},
-			repos:  []string{"sub"},
-			target: "sub/main.go",
-			reason: `parent directory sub: rule "sub/" in .gitignore`,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-			mustGitDir(t, dir, ".git")
-			for p, content := range tt.files {
-				mustMkdir(t, dir, filepath.Dir(p))
-				mustWriteFile(t, dir, p, content)
-			}
-			for _, r := range tt.repos {
-				mustGitDir(t, dir, filepath.Join(r, ".git"))
-			}
-			got, ignored := walkNamed(t, newWalker(nil, nil), dir, tt.target)
-			if tt.included {
-				if !reflect.DeepEqual(got, []string{tt.target}) {
-					t.Errorf("got %v, want %s included; ignored: %v", got, tt.target, ignored)
-				}
-				return
-			}
-			if len(got) != 0 {
-				t.Errorf("got %v, want nothing", got)
-			}
-			if ignored[tt.target] != tt.reason {
-				t.Errorf("reason = %q, want %q", ignored[tt.target], tt.reason)
-			}
-		})
-	}
-}
-
-func TestWalker_NamedFileInIgnoredDir_IgnoreDisabled(t *testing.T) {
+// As in ripgrep, a named file is never filtered: not by ignore files, the
+// directories above it, override rules or hidden-file skipping.
+func TestWalker_NamedFileIsNeverFiltered(t *testing.T) {
 	dir := t.TempDir()
-	mustMkdir(t, dir, "build")
-	mustWriteFile(t, dir, ".gitignore", "build/\n")
-	mustWriteFile(t, dir, "build/out.js", "x")
-
-	// -f disables ignore files and drops the base and override rules.
-	w := newWalker(nil, nil)
-	w.opts.IgnoreEnabled = false
-	got, ignored := walkNamed(t, w, dir, "build/out.js")
-	if !reflect.DeepEqual(got, []string{"build/out.js"}) {
-		t.Errorf("got %v, want build/out.js; ignored: %v", got, ignored)
-	}
-}
-
-func TestWalker_NamedFileInExcludedDir(t *testing.T) {
-	dir := t.TempDir()
+	mustGitDir(t, dir, ".git")
+	mustWriteFile(t, dir, ".gitignore", "build/\n*.log\n")
 	mustMkdir(t, dir, "build")
 	mustWriteFile(t, dir, "build/out.js", "x")
+	mustWriteFile(t, dir, "a.log", "x")
+	mustWriteFile(t, dir, ".env", "x")
 
-	// Override rules apply to directories even with ignore files disabled,
-	// as they do in a walk.
-	w := newWalker(nil, []string{"build/"})
-	w.opts.IgnoreEnabled = false
-	got, ignored := walkNamed(t, w, dir, "build/out.js")
-	if len(got) != 0 {
-		t.Errorf("got %v, want nothing", got)
-	}
-	if want := `parent directory build: rule "build/" in override flags`; ignored["build/out.js"] != want {
-		t.Errorf("reason = %q, want %q", ignored["build/out.js"], want)
+	w := New(Options{Override: []string{"*.js"}, IgnoreEnabled: true, SkipHidden: true})
+	for _, name := range []string{"build/out.js", "a.log", ".env"} {
+		if got := walkNamed(t, w, dir, name); !reflect.DeepEqual(got, []string{name}) {
+			t.Errorf("got %v, want %s included", got, name)
+		}
 	}
 }
 
-// newWalker returns a walker reading ignore files, with base and override
 // patterns.
 func newWalker(base, override []string) *Walker {
 	return New(Options{Base: base, Override: override, IgnoreEnabled: true})

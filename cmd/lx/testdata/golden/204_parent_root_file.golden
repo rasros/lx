@@ -1,6 +1,11 @@
 --- STDOUT ---
-
+../.gitignore (3 rows)
+---
+```gitignore
+bin/
+secret/
+*.tmp
+```
 
 
 --- STDERR ---
-Warning: Skipping path, use -f to include it (path=../.gitignore reason=hidden path)

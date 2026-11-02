@@ -79,7 +79,7 @@ func gatherInputs(parsed *ParsedArgs) error {
 	hasGenerators := false
 	for _, op := range parsed.Ops {
 		switch op.Action {
-		case "FILE", "file":
+		case "FILE":
 			hasFiles = true
 		case "section", "prompt", "prompt-file", "system-context":
 			hasGenerators = true
@@ -98,7 +98,7 @@ func gatherInputs(parsed *ParsedArgs) error {
 		if isPipe {
 			slog.Debug("Detected input from stdin pipe", "count", len(stdinFiles))
 			for _, f := range stdinFiles {
-				parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f, Type: CmdAction, FromStdin: true})
+				parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f, Type: CmdAction})
 			}
 			hasFiles = true
 		} else {
@@ -206,7 +206,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 			slog.Debug("Processing op", "action", op.Action, "value", op.Value)
 
 			switch op.Action {
-			case "FILE", "file":
+			case "FILE":
 				if section.skipFileOps[oi] {
 					slog.Debug("Skipping file content (tree-only mode)", "path", op.Value)
 					continue

@@ -91,7 +91,7 @@ func walkPath(t *testing.T, w *Walker, root string) []string {
 		dir = filepath.Dir(root)
 	}
 	var got []string
-	_, err = w.WalkPath(root, func(p string, d fs.DirEntry, err error) error {
+	err = w.WalkPath(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -169,40 +169,24 @@ func TestFrame_RulesFromEveryAncestor(t *testing.T) {
 	}
 }
 
-func TestFrame_Ignored(t *testing.T) {
+func TestWalk_IgnoredDirs(t *testing.T) {
 	repo := t.TempDir()
 	mustGitDir(t, repo, ".git")
 	mustWriteFile(t, repo, ".gitignore", "/build\ndist\ngen/**\nout\nlib/*\n!lib/keep\nkp/\n!kp/x/k.go\n")
-	for _, d := range []string{"build/x", "pkg/dist", "gen", "out/keep", "src/a", "lib/keep", "node_modules/pkg", "kp/x", "kp/y"} {
-		mustMkdir(t, repo, d)
-	}
+	writeTree(t, repo, "build/x/f.go", "pkg/dist/f.go", "gen/f.go", "out/keep/f.go", "src/a/f.go",
+		"lib/keep/f.go", "node_modules/pkg/f.go", "kp/x/k.go", "kp/x/f.go", "kp/y/k.go")
 	mustWriteFile(t, repo, "out/.gitignore", "!keep\n")
 
-	tests := []struct {
-		dir               string
-		ignored, excluded bool
-	}{
-		{"build", true, true},
-		{"build/x", true, true},
-		{"pkg/dist", true, true},
-		{"gen", true, true},
-		{"out/keep", true, true},
-		{"src/a", false, false},
-		{"lib/keep", false, false},
-		{"node_modules/pkg", true, true},
-		// A negation below keeps the directory open, as in a walk.
-		{"kp", true, false},
-		{"kp/x", true, false},
-		{"kp/y", true, true},
+	var got []string
+	for _, p := range walkPath(t, hostWalker(repo, "node_modules"), repo) {
+		rel, _ := filepath.Rel(repo, p)
+		got = append(got, filepath.ToSlash(rel))
 	}
-	w := hostWalker(repo, "node_modules")
-	for _, tt := range tests {
-		t.Run(tt.dir, func(t *testing.T) {
-			f := hostFrame(w, filepath.Join(repo, filepath.FromSlash(tt.dir)))
-			if f.ignored != tt.ignored || f.excluded != tt.excluded {
-				t.Fatalf("ignored, excluded = %v, %v, want %v, %v (%s)", f.ignored, f.excluded, tt.ignored, tt.excluded, f.reason)
-			}
-		})
+	// A negation below an ignored directory keeps the walk going into it,
+	// re-including only what it matches.
+	want := []string{"kp/x/k.go", "lib/keep/f.go", "src/a/f.go"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("walk included %v, want %v", got, want)
 	}
 }
 
@@ -249,19 +233,21 @@ func TestFrame_InfoExcludeComesFirst(t *testing.T) {
 	}
 }
 
-func TestFrame_InfoExcludeIgnoresParentDir(t *testing.T) {
+func TestWalk_InfoExcludeIgnoresDir(t *testing.T) {
 	repo := t.TempDir()
 	mustGitDir(t, repo, ".git")
 	mustMkdir(t, repo, ".git/info")
-	mustMkdir(t, repo, "scratch/x")
+	writeTree(t, repo, "scratch/x/f.go", "main.go")
 	mustWriteFile(t, repo, ".git/info/exclude", "/scratch/\n")
 
-	f := hostFrame(hostWalker(repo), filepath.Join(repo, "scratch", "x"))
-	if !f.excluded {
-		t.Fatal("expected a directory below an info/exclude entry to be excluded")
+	w := hostWalker(repo)
+	ignored := map[string]string{}
+	w.opts.OnIgnore = func(p, reason string) { ignored[p] = reason }
+	if got := walkPath(t, w, repo); !reflect.DeepEqual(got, []string{filepath.Join(repo, "main.go")}) {
+		t.Fatalf("walk included %v", got)
 	}
-	if want := `parent directory scratch: rule "/scratch/" in ` + filepath.Join(repo, ".git", "info", "exclude"); f.reason != want {
-		t.Fatalf("reason = %q, want %q", f.reason, want)
+	if want := `rule "/scratch/" in ` + filepath.Join(repo, ".git", "info", "exclude"); ignored["scratch"] != want {
+		t.Fatalf("reason = %q, want %q", ignored["scratch"], want)
 	}
 }
 
@@ -280,8 +266,8 @@ func TestFrame_StrayGitDirIsNotARepo(t *testing.T) {
 
 // Git's rules start over at a nested repository: base rules and git's
 // global excludes move to its root, followed by .ignore rules from above, its
-// info/exclude and its own ignore files. The enclosing repository still
-// decides whether the nested one is ignored.
+// info/exclude and its own ignore files. Whether the enclosing repository
+// ignores it does not carry over.
 func TestFrame_RepoBoundaryResets(t *testing.T) {
 	top := t.TempDir()
 	mustGitDir(t, top, ".git")
@@ -292,6 +278,7 @@ func TestFrame_RepoBoundaryResets(t *testing.T) {
 	mustWriteFile(t, top, "lib/inner/.git/info/exclude", "*.c\n")
 	mustWriteFile(t, top, "lib/inner/.gitignore", "*.o\n")
 	mustGitDir(t, top, "vendor/dep/.git")
+	mustWriteFile(t, top, "vendor/dep/d.go", "x")
 
 	for _, cwd := range []string{top, filepath.Join(top, "vendor", "dep")} {
 		w := New(Options{Base: []string{"*.base"}, GitExcludes: []string{"*.git"}, IgnoreEnabled: true, Cache: NewCache(newTestHost(cwd))})
@@ -300,11 +287,15 @@ func TestFrame_RepoBoundaryResets(t *testing.T) {
 		if got := rulePatterns(inner.rules, top); !reflect.DeepEqual(got, want) {
 			t.Fatalf("got rules %v, want %v", got, want)
 		}
-		if inner.ignored {
-			t.Fatalf("unexpected ignored nested repository %+v", inner)
+		// A walk of the enclosing repository skips the ignored nested one,
+		// but walking it directly applies its own rules alone.
+		for _, p := range walkPath(t, w, top) {
+			if strings.Contains(p, "vendor") {
+				t.Fatalf("expected the walk to skip vendor/, got %v", p)
+			}
 		}
-		if dep := hostFrame(w, filepath.Join(top, "vendor", "dep")); !dep.excluded {
-			t.Fatalf("from %s: expected a nested repository in an ignored directory to be excluded", cwd)
+		if got := walkPath(t, w, filepath.Join(top, "vendor", "dep")); !reflect.DeepEqual(got, []string{filepath.Join(top, "vendor", "dep", "d.go")}) {
+			t.Fatalf("walking the nested repository included %v", got)
 		}
 	}
 }
@@ -353,77 +344,53 @@ func TestWalkPath_RepoBoundaries(t *testing.T) {
 		}
 	}
 
-	if walked := walkPath(t, hostWalker(top), filepath.Join(top, "repo", "a.local")); len(walked) != 0 {
-		t.Fatalf("expected a file named from above its repository to honor info/exclude, got %v", walked)
+	for _, p := range walkPath(t, hostWalker(top), filepath.Join(top, "repo")) {
+		if filepath.Base(p) == "a.local" {
+			t.Fatal("expected a repository walked by name to honor its info/exclude")
+		}
 	}
 }
 
-func TestWalkPath_IgnoredRootSkipsEverything(t *testing.T) {
-	top := t.TempDir()
-	mustGitDir(t, top, ".git")
-	mustWriteFile(t, top, ".gitignore", "proj/\n")
-	writeTree(t, top, "proj/a.go")
-	proj := filepath.Join(top, "proj")
-
-	w := hostWalker(top)
-	reason, err := w.WalkPath(proj, func(string, fs.DirEntry, error) error {
-		t.Fatal("expected nothing below an ignored root")
-		return nil
-	})
-	if err != nil || reason != `parent directory proj: rule "proj/" in .gitignore` {
-		t.Fatalf("got reason %q, err %v", reason, err)
-	}
-	if walked := walkPath(t, w, filepath.Join(proj, "a.go")); len(walked) != 0 {
-		t.Fatalf("expected a file in an ignored root to be ignored, got %v", walked)
-	}
-
-	w = New(Options{Cache: NewCache(newTestHost(top))})
-	if walked := walkPath(t, w, filepath.Join(proj, "a.go")); len(walked) != 1 {
-		t.Fatalf("expected disabled ignores to include the file, got %v", walked)
-	}
-}
-
-// Every way of naming a path agrees: walking the repository, walking a
-// directory, naming each file, from the root or from a subdirectory.
-func TestWalkPath_EntryPathsAgree(t *testing.T) {
+// As in ripgrep, a named path is never filtered itself: a file is always
+// included and a directory always walked, whatever the rules say about it or
+// the directories above it, from any working directory. The entries below a
+// walked directory are filtered.
+func TestWalkPath_NamedPathsAreNotFiltered(t *testing.T) {
 	top := t.TempDir()
 	mustGitDir(t, top, ".git")
 	mustWriteFile(t, top, ".gitignore", "build/\n!build/keep.js\n/x/local.txt\n*.log\n")
-	writeTree(t, top, "build/keep.js", "build/out.js", "build/sub/keep.js", "x/local.txt", "x/main.go", "x/run.log", "main.go")
+	writeTree(t, top, "build/keep.js", "build/out.js", "build/sub/keep.js", "build/sub/b.log", "x/local.txt", "x/main.go", "x/run.log", "main.go", ".hidden")
 
-	all := []string{"build/keep.js", "build/out.js", "build/sub/keep.js", "main.go", "x/local.txt", "x/main.go", "x/run.log"}
-	want := []string{"build/keep.js", "main.go", "x/main.go"}
+	all := []string{".hidden", "build/keep.js", "build/out.js", "build/sub/b.log", "build/sub/keep.js", "main.go", "x/local.txt", "x/main.go", "x/run.log"}
+	walk := []string{"build/keep.js", "main.go", "x/main.go"}
+	dirs := []string{"build/keep.js", "build/out.js", "build/sub/keep.js", "x/main.go"}
 
+	rels := func(paths []string) []string {
+		var out []string
+		for _, p := range paths {
+			rel, _ := filepath.Rel(top, p)
+			out = append(out, filepath.ToSlash(rel))
+		}
+		return out
+	}
 	for _, cwd := range []string{top, filepath.Join(top, "x"), filepath.Join(top, "build")} {
 		w := hostWalker(cwd)
-		var walked []string
-		for _, p := range walkPath(t, w, top) {
-			rel, _ := filepath.Rel(top, p)
-			walked = append(walked, filepath.ToSlash(rel))
+		if got := rels(walkPath(t, w, top)); !reflect.DeepEqual(got, walk) {
+			t.Errorf("from %s: walk included %v, want %v", cwd, got, walk)
 		}
-		if !reflect.DeepEqual(walked, want) {
-			t.Errorf("from %s: walk included %v, want %v", cwd, walked, want)
-		}
-
 		var named []string
 		for _, f := range all {
-			if len(walkPath(t, w, filepath.Join(top, filepath.FromSlash(f)))) == 1 {
-				named = append(named, f)
-			}
+			named = append(named, rels(walkPath(t, w, filepath.Join(top, filepath.FromSlash(f))))...)
 		}
-		if !reflect.DeepEqual(named, want) {
-			t.Errorf("from %s: named files included %v, want %v", cwd, named, want)
+		if !reflect.DeepEqual(named, all) {
+			t.Errorf("from %s: named files included %v, want %v", cwd, named, all)
 		}
-
-		var dirs []string
+		var walked []string
 		for _, d := range []string{"build", "x"} {
-			for _, p := range walkPath(t, w, filepath.Join(top, d)) {
-				rel, _ := filepath.Rel(top, p)
-				dirs = append(dirs, filepath.ToSlash(rel))
-			}
+			walked = append(walked, rels(walkPath(t, w, filepath.Join(top, d)))...)
 		}
-		if wantDirs := []string{"build/keep.js", "x/main.go"}; !reflect.DeepEqual(dirs, wantDirs) {
-			t.Errorf("from %s: directory walks included %v, want %v", cwd, dirs, wantDirs)
+		if !reflect.DeepEqual(walked, dirs) {
+			t.Errorf("from %s: directory walks included %v, want %v", cwd, walked, dirs)
 		}
 	}
 }
@@ -453,8 +420,9 @@ func TestCache_ConcurrentWalks(t *testing.T) {
 	}
 }
 
-// Naming N files in a tree of D directories reads each ignore file once with a
-// shared cache, and about N times the depth without one.
+// Walking every directory of a tree of D directories reads each ignore file
+// once with a shared cache, and once per walk above it without one. Named
+// files read none.
 func TestCache_ReadsEachIgnoreFileOnce(t *testing.T) {
 	top := t.TempDir()
 	mustGitDir(t, top, ".git")
@@ -473,13 +441,22 @@ func TestCache_ReadsEachIgnoreFileOnce(t *testing.T) {
 		}
 	}
 
-	shared := newTestHost(top)
-	cache := NewCache(shared)
+	named := newTestHost(top)
+	cache := NewCache(named)
 	for _, f := range files {
 		w := New(Options{IgnoreEnabled: true, Cache: cache})
 		if got := walkPath(t, w, f); len(got) != 1 {
 			t.Fatalf("expected %s to be included, got %v", f, got)
 		}
+	}
+	if named.total() != 0 {
+		t.Errorf("named files: %d reads, want none", named.total())
+	}
+
+	shared := newTestHost(top)
+	cache = NewCache(shared)
+	for d := range dirs {
+		walkPath(t, New(Options{IgnoreEnabled: true, SkipHidden: true, Cache: cache}), d)
 	}
 	for name, n := range shared.reads {
 		if n != 1 {
@@ -493,13 +470,12 @@ func TestCache_ReadsEachIgnoreFileOnce(t *testing.T) {
 	}
 
 	unshared := newTestHost(top)
-	for _, f := range files {
-		w := New(Options{IgnoreEnabled: true, Cache: NewCache(unshared)})
-		walkPath(t, w, f)
+	for d := range dirs {
+		walkPath(t, New(Options{IgnoreEnabled: true, SkipHidden: true, Cache: NewCache(unshared)}), d)
 	}
-	t.Logf("%d files in %d directories: %d reads with a shared cache, %d with one cache per file",
-		len(files), len(dirs), shared.total(), unshared.total())
-	if unshared.total() < len(files)*4*4 {
-		t.Errorf("expected about N*4*depth reads without a shared cache, got %d", unshared.total())
+	t.Logf("walking each of %d directories: %d reads with a shared cache, %d with one cache per walk",
+		len(dirs), shared.total(), unshared.total())
+	if unshared.total() <= 2*shared.total() {
+		t.Errorf("expected many more reads without a shared cache, got %d", unshared.total())
 	}
 }

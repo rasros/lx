@@ -35,7 +35,7 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 	defaultRunCfg := lx.RunnerConfig{Head: -1, Tail: 0}
 	ops := []Op{
 		{Action: "head", Value: "7", Type: CmdInterleaved},
-		{Action: "file", Value: "forced.txt", Type: CmdAction},
+		{Action: "FILE", Value: "first.txt", Type: CmdAction},
 		{Action: "exclude", Value: "vendor/**", Type: CmdInterleaved},
 		{Action: "FILE", Value: "next.txt", Type: CmdAction},
 	}
@@ -51,8 +51,8 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 	if len(sections[0].Excludes) != 0 {
 		t.Fatalf("first Excludes = %v, want empty", sections[0].Excludes)
 	}
-	if len(sections[0].Ops) != 1 || sections[0].Ops[0].Action != "file" {
-		t.Fatalf("first Ops = %+v, want one forced file op", sections[0].Ops)
+	if len(sections[0].Ops) != 1 || sections[0].Ops[0].Action != "FILE" {
+		t.Fatalf("first Ops = %+v, want one file op", sections[0].Ops)
 	}
 
 	if sections[1].RunCfg.Head != -1 || sections[1].RunCfg.Tail != 0 {

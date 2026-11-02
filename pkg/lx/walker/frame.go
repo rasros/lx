@@ -18,6 +18,7 @@ type Host interface {
 	Lstat(name string) (fs.FileInfo, error)
 	ReadLink(name string) (string, error)
 	ReadFile(name string) ([]byte, error)
+	EvalSymlinks(path string) (string, error)
 	DirFS(dir string) fs.FS
 }
 
@@ -30,6 +31,9 @@ func (OSHost) Lstat(name string) (fs.FileInfo, error) { return os.Lstat(name) }
 func (OSHost) ReadLink(name string) (string, error)   { return os.Readlink(name) }
 func (OSHost) ReadFile(name string) ([]byte, error)   { return os.ReadFile(name) }
 func (OSHost) DirFS(dir string) fs.FS                 { return os.DirFS(dir) }
+func (OSHost) EvalSymlinks(path string) (string, error) {
+	return filepath.EvalSymlinks(path)
+}
 
 // Cache holds the ignore rules found on the host, keyed by absolute
 // directory, so the walkers of one run read each ignore file and look each
@@ -60,7 +64,10 @@ func (c *Cache) hostTree() *ruleTree {
 		} else {
 			cwd = filepath.Clean(cwd)
 		}
-		c.ht = hostTree{h: c.host, cwd: cwd}
+		c.ht = hostTree{h: c.host}
+		if cwd != "" {
+			c.ht.cwd = c.ht.real(cwd)
+		}
 		c.tree = newRuleTree(c.ht, true)
 	})
 	return c.tree
@@ -77,10 +84,20 @@ type tree interface {
 	display(p string) string
 }
 
-// hostTree is the host filesystem, seen from the working directory cwd.
+// hostTree is the host filesystem, seen from the working directory cwd, with
+// symlinks resolved. Directories in the tree are real paths, as ripgrep
+// resolves the paths it searches.
 type hostTree struct {
 	h   Host
 	cwd string
+}
+
+// real returns p with symlinks resolved, or p itself when it cannot be.
+func (t hostTree) real(p string) string {
+	if r, err := t.h.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return p
 }
 
 func (t hostTree) parent(dir string) (string, bool) {
@@ -106,23 +123,14 @@ func (t hostTree) readFile(dir, name string) ([]byte, string, error) {
 // display names p relative to the working directory when it is below it,
 // and by its absolute path otherwise.
 func (t hostTree) display(p string) string {
-	if rel, ok := t.below(p); ok {
-		return rel
-	}
-	return p
-}
-
-// below returns p relative to the working directory, reporting false when p
-// is not at or below it.
-func (t hostTree) below(p string) (string, bool) {
 	if t.cwd == "" {
-		return "", false
+		return p
 	}
 	rel, err := filepath.Rel(t.cwd, p)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", false
+		return p
 	}
-	return rel, true
+	return rel
 }
 
 // fsTree is a walked fs.FS that stands alone: its root is the top, and a
@@ -248,17 +256,10 @@ type frameSet struct {
 	frames    map[string]*frame
 }
 
-// frame is the ignore state of a directory: the rules in effect in it and
-// whether it is ignored itself.
+// frame is the ignore state of a directory: the rules in effect in it.
 type frame struct {
 	node  *node
 	rules []Rule
-	// ignored reports that the directory is ignored. Unless it is also
-	// excluded, a negation could re-include something below it, so a walk
-	// still enters it, carrying the ignored state down. excluded reports
-	// that nothing below it is included.
-	ignored, excluded bool
-	reason            string
 }
 
 // frame returns the frame of dir for w's base rules.
@@ -281,16 +282,7 @@ func (rt *ruleTree) frameOf(set *frameSet, dir string) *frame {
 	f := &frame{node: n}
 	var parentRules []Rule
 	if n.parent != nil {
-		pf := rt.frameOf(set, n.parent.dir)
-		parentRules = pf.rules
-		if pf.excluded {
-			f.ignored, f.excluded, f.reason = true, true, pf.reason
-		} else {
-			ignored, descend, reason, own := judgeDir(pf.rules, n.rel, nil, "", pf.ignored, pf.reason)
-			if ignored {
-				f.ignored, f.excluded, f.reason = true, !descend, dirReason(rt.t.display(dir), reason, own)
-			}
-		}
+		parentRules = rt.frameOf(set, n.parent.dir).rules
 	}
 	own := rt.ownRules(n)
 	switch {

@@ -43,9 +43,10 @@ func (h *countingHost) count(name string) {
 	}
 }
 
-// A piped file list shares one rule cache, so each directory's ignore files
-// are read once however many files it holds.
-func TestResolveSections_PipedFilesReadIgnoreFilesOnce(t *testing.T) {
+// Named files are never filtered, so a piped file list reads no ignore
+// files at all. Named directories share one rule cache, so each directory's
+// ignore files are read once however many walks reach it.
+func TestResolveSections_IgnoreFileReads(t *testing.T) {
 	dir := t.TempDir()
 	for _, sub := range []string{"objects", "refs"} {
 		if err := os.MkdirAll(filepath.Join(dir, ".git", sub), 0o755); err != nil {
@@ -64,30 +65,44 @@ func TestResolveSections_PipedFilesReadIgnoreFilesOnce(t *testing.T) {
 	write(".git/HEAD", "ref: refs/heads/main\n")
 	write(".gitignore", "*.log\n")
 
-	var ops []Op
+	var fileOps, dirOps []Op
 	for _, d := range []string{"a/b/c", "a/b/d", "e/f/g"} {
 		for i := range 20 {
 			rel := d + "/f" + strings.Repeat("x", i) + ".go"
 			write(rel, "package x")
-			ops = append(ops, Op{Action: "FILE", Value: filepath.Join(dir, filepath.FromSlash(rel)), Type: CmdAction, FromStdin: true})
+			fileOps = append(fileOps, Op{Action: "FILE", Value: filepath.Join(dir, filepath.FromSlash(rel)), Type: CmdAction})
 		}
+		write(d+"/skip.log", "ignored in a walk")
+	}
+	fileOps = append(fileOps, Op{Action: "FILE", Value: filepath.Join(dir, "a", "b", "c", "skip.log"), Type: CmdAction})
+	for _, d := range []string{".", "a", "a/b", "a/b/c", "a/b/d", "e", "e/f", "e/f/g"} {
+		dirOps = append(dirOps, Op{Action: "FILE", Value: filepath.Join(dir, filepath.FromSlash(d)), Type: CmdAction})
 	}
 
-	host := &countingHost{cwd: dir, reads: map[string]int{}}
-	rc := testResolveContext(Section{})
-	rc.rules = lx.NewRuleCache(host)
-	sections := []Section{{Ops: ops}}
-	if unresolved := resolveSections(context.Background(), sections, rc); unresolved != 0 {
-		t.Fatalf("unresolved = %d", unresolved)
-	}
-	included := 0
-	for _, files := range sections[0].resolved {
-		included += len(files)
-	}
-	if included != len(ops) {
-		t.Fatalf("included %d files, want %d", included, len(ops))
+	resolve := func(ops []Op) (*countingHost, int) {
+		host := &countingHost{cwd: dir, reads: map[string]int{}}
+		rc := testResolveContext(Section{})
+		rc.rules = lx.NewRuleCache(host)
+		sections := []Section{{Ops: ops}}
+		if unresolved := resolveSections(context.Background(), sections, rc); unresolved != 0 {
+			t.Fatalf("unresolved = %d", unresolved)
+		}
+		included := 0
+		for _, files := range sections[0].resolved {
+			included += len(files)
+		}
+		return host, included
 	}
 
+	host, included := resolve(fileOps)
+	if included != len(fileOps) {
+		t.Fatalf("included %d named files, want all %d", included, len(fileOps))
+	}
+	if len(host.reads) != 0 {
+		t.Errorf("named files read %v, want nothing", host.reads)
+	}
+
+	host, _ = resolve(dirOps)
 	total := 0
 	for name, n := range host.reads {
 		if n != 1 {
@@ -99,6 +114,6 @@ func TestResolveSections_PipedFilesReadIgnoreFilesOnce(t *testing.T) {
 	// and a .git each, and above the repository an .ignore, an .lxignore and a
 	// .git per directory.
 	if want := 8*4 + 3*strings.Count(dir, string(filepath.Separator)); total != want {
-		t.Errorf("%d reads for %d piped files, want %d", total, len(ops), want)
+		t.Errorf("%d reads for %d walked directories, want %d", total, len(dirOps), want)
 	}
 }

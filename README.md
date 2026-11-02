@@ -22,7 +22,8 @@ On Linux the clipboard flag (-c) needs xclip (X11) or wl-clipboard (Wayland).
 ## Everyday use
 
 With no arguments lx bundles the current directory to stdout, respecting .ignore and .lxignore, plus .gitignore and
-.git/info/exclude inside git repositories, and skipping hidden files and binaries. Name any paths you like, and add -c to copy instead:
+.git/info/exclude inside git repositories, and skipping hidden files and binaries. Name any paths you like, as with rg a
+path you name is never filtered itself, and add -c to copy instead:
 
 ```bash
 lx -c                          # this project, on the clipboard

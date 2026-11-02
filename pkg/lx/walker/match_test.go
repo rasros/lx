@@ -91,3 +91,43 @@ func TestHasNestedException(t *testing.T) {
 		t.Fatal("did not expect nested exception for unrelated directory")
 	}
 }
+
+func TestParseRules_Escapes(t *testing.T) {
+	tests := []struct {
+		line, pattern string
+		negate        bool
+	}{
+		{`trail\ `, "trail ", false},
+		{"trail2   ", "trail2", false},
+		{"crlf\r", "crlf", false},
+		{`\#hash`, "#hash", false},
+		{`\!bang`, "!bang", false},
+		{"!keep", "keep", true},
+	}
+	for _, tt := range tests {
+		rules := parseRules([]string{tt.line}, "", "test")
+		if len(rules) != 1 || rules[0].Pattern != tt.pattern || rules[0].Negate != tt.negate {
+			t.Errorf("parseRules(%q) = %+v, want pattern %q negate %v", tt.line, rules, tt.pattern, tt.negate)
+		}
+	}
+}
+
+func TestCheckIgnore_FloatingPatternMatchesBaseNameOnly(t *testing.T) {
+	rules := parseRules([]string{"tags", "!tags/"}, "", ".gitignore")
+	if ignored, _ := checkIgnore("tags", true, rules, false, "", false); ignored {
+		t.Fatal("expected the negated directory to be re-included")
+	}
+	if ignored, _ := checkIgnore("tags/Makefile", false, rules, false, "", false); ignored {
+		t.Fatal("expected a file in a re-included directory not to match the directory's name")
+	}
+}
+
+func TestWhitelisted(t *testing.T) {
+	rules := parseRules([]string{".*", "!.keep"}, "", ".gitignore")
+	if m, n := whitelisted(".keep", false, rules); !m || !n {
+		t.Fatal("expected .keep to be whitelisted by the negation")
+	}
+	if m, n := whitelisted(".other", false, rules); !m || n {
+		t.Fatal("expected .other to be decided by the ignore rule")
+	}
+}

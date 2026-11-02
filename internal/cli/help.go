@@ -78,10 +78,14 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
             1. A file path (added directly).
             2. A directory path (walked recursively).
             3. An http/https URL (fetched and added as a file).
-            4. An explicit action flag (-f, -p, -s).
+            4. An explicit action flag (-p, -s).
             5. "-" to read file paths from stdin.
 
           Archive URLs (.zip, .tar.gz, etc.) are expanded when -Z is active.
+
+          As in rg, a path you name, or pipe in as a file list, is never
+          filtered itself: ignore files, hidden-file skipping and -i/-e do
+          not apply to it. They filter what a named directory contains.
 
           If no actions are provided, lx walks the current directory ".".
 

@@ -1,6 +1,0 @@
---- STDOUT ---
-
-
-
---- STDERR ---
-Warning: Skipping path, use -f to include it (path=dist/out.js reason=rule "dist" in .gitignore)
