@@ -36,7 +36,9 @@ lx -n 20 src/                  # first 20 lines of each file
 
 -i and -e work as rg's `-g GLOB` and `-g '!GLOB'`: the last one to match a path wins, ahead of your ignore files, and once
 there is an -i a file has to match one. A glob with a slash matches the path from the working directory as you named
-the root, so `lx -i "src/*.go" src/` works while `lx -i "*.go" -e "src/gen/**" src/` drops a subtree.
+the root, so `lx -i "src/*.go" src/` works while `lx -i "*.go" -e "src/gen/**" src/` drops a subtree. One addition over
+rg: `-e "!GLOB"` keeps what it matches, over ignore files and hidden-file skipping, without limiting the output to it,
+so `lx -e "vendor/**" -e "!vendor/keep.go"` keeps one file of vendor/ and everything else.
 
 Paths can also come from stdin, so lx composes with whatever you use to pick files:
 
