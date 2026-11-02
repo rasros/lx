@@ -163,7 +163,8 @@ func SetupNegatedIgnoredDirFixture(t *testing.T) string {
 // that can and cannot re-include a file: glob/* and deep/** ignore what is
 // inside a directory, so a negation re-includes a file there, while nested/
 // ignores the directory itself, so its own .gitignore never applies. ovr is
-// left to the -e patterns.
+// left to the -e patterns. all, any and two each hold a .gitignore with a
+// rule ending in /**.
 func SetupIgnoredDirNegationsFixture(t *testing.T) string {
 	t.Helper()
 	setupMockConfig(t)
@@ -180,6 +181,13 @@ func SetupIgnoredDirNegationsFixture(t *testing.T) string {
 	writeFile(t, dir, "ovr/keep.js", "ovr keep", 0644)
 	writeFile(t, dir, "ovr/out.js", "ovr out", 0644)
 	writeFile(t, dir, "src/main.go", "package src", 0644)
+	// A trailing /** needs at least one component below what precedes it.
+	for _, p := range []struct{ dir, rule string }{{"all", "**/**"}, {"any", "a/**/**"}, {"two", "a/**/*/**"}} {
+		writeFile(t, dir, p.dir+"/.gitignore", p.rule+"\n", 0644)
+		writeFile(t, dir, p.dir+"/a/d.txt", "a/d.txt under "+p.rule, 0644)
+		writeFile(t, dir, p.dir+"/a/c/e.txt", "a/c/e.txt under "+p.rule, 0644)
+		writeFile(t, dir, p.dir+"/z.txt", "z.txt under "+p.rule, 0644)
+	}
 
 	return dir
 }

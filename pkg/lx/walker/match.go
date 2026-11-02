@@ -3,8 +3,6 @@ package walker
 import (
 	"fmt"
 	"strings"
-
-	"github.com/bmatcuk/doublestar/v4"
 )
 
 type pathMatchInfo struct {
@@ -65,6 +63,12 @@ func parseRules(lines []string, basePath, source string) []Rule {
 		// kept for the matcher rather than read as separators.
 		p = cleanPattern(p)
 		spec := compileNormalizedSpec(p)
+		// A trailing "/**" matches everything inside a directory but not the
+		// directory itself, as in git and ripgrep, so "*" and "!src/**"
+		// leave src/ ignored: at least one component must follow.
+		if dir, ok := strings.CutSuffix(spec.Pattern.Pattern, "/**"); ok {
+			spec.Pattern = compilePattern(dir + "/*/**")
+		}
 
 		rules = append(rules, Rule{
 			Pattern:        p,
@@ -114,15 +118,9 @@ func matchCompiledSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 // above a path is ignored before entering it, so the directories' names are
 // not matched again here, and the contents of a re-included directory, such
 // as tags/ after "tags" and "!tags/", are not ignored by the first rule.
-// A pattern ending in "/**" matches what is inside a directory, not the
-// directory itself, so "*" and "!src/**" leave src/ ignored, as in git and
-// ripgrep.
 func matchIgnoreSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 	if spec.Pattern.HasSlash || spec.Anchored {
-		if !spec.Pattern.matchCandidate(ctx.relPath) {
-			return false
-		}
-		return spec.Pattern.Dir == "" || !doublestar.MatchUnvalidated(spec.Pattern.Dir, ctx.relPath)
+		return spec.Pattern.matchCandidate(ctx.relPath)
 	}
 	return spec.Pattern.matchCandidate(ctx.baseName)
 }

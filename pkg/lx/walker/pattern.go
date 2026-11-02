@@ -19,9 +19,6 @@ type CompiledPattern struct {
 	OnlyStarWildcards bool
 	LiteralPrefix     string
 	LiteralSuffix     string
-	// Dir is the directory a pattern ending in "/**" names everything
-	// inside of, which, in an ignore rule, it does not match itself.
-	Dir string
 }
 
 // CompiledSpec captures matching behavior around a compiled pattern.
@@ -51,9 +48,6 @@ func compilePattern(pattern string) CompiledPattern {
 	cp.OnlyStarWildcards = !cp.IsLiteral && hasOnlyStarWildcards(pattern) && !cp.HasDoubleStar
 	if cp.OnlyStarWildcards {
 		cp.LiteralPrefix, cp.LiteralSuffix = starWildcardPrefixSuffix(pattern)
-	}
-	if dir, ok := strings.CutSuffix(pattern, "/**"); ok {
-		cp.Dir = dir
 	}
 
 	actual, _ := compiledPatternCache.LoadOrStore(pattern, cp)
