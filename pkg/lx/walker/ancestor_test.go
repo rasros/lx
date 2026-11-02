@@ -422,12 +422,13 @@ func TestFindGitDir_Validity(t *testing.T) {
 				t.Errorf("findRepoRoot found %q (%v), want repo root %v", root, found, tt.want)
 			}
 
-			// Without a host path the walk resolves .git within its fs.FS,
-			// where an absolute gitdir cannot be followed.
+			// Without a host path the walk resolves .git within its fs.FS.
+			// An absolute gitdir cannot be followed there but still marks
+			// the repository boundary.
 			w := NewWalker(nil, nil)
 			_, got := w.repoRules(os.DirFS(base), "repo")
-			if want := tt.want && !strings.Contains(tt.name, "absolute"); got != want {
-				t.Errorf("repoRules without FSRoot = %v, want %v", got, want)
+			if got != tt.want {
+				t.Errorf("repoRules without FSRoot = %v, want %v", got, tt.want)
 			}
 			w.FSRoot = base
 			if _, got := w.repoRules(os.DirFS(base), "repo"); got != tt.want {
@@ -452,5 +453,112 @@ func TestLoadAncestorRules_StrayGitDirIsNotARepo(t *testing.T) {
 	w.LoadAncestorRules(filepath.Join(cwd, "proj", "sub"))
 	if len(w.AncestorRules) != 1 || w.AncestorRules[0].Pattern != "*.tmp" {
 		t.Fatalf("expected only the working directory's rule, not the stray info/exclude, got %+v", w.AncestorRules)
+	}
+}
+
+func TestRepoRules_UnreachableGitDirKeepsBoundary(t *testing.T) {
+	tests := []struct{ name, gitdir string }{
+		{"relative gitdir outside the walked fs", "../../R/.git/worktrees/x"},
+		{"absolute gitdir", "/nonexistent/R/.git/worktrees/x"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			mustMkdir(t, dir, "wt")
+			mustWriteFile(t, dir, ".gitignore", "leak*\n")
+			mustWriteFile(t, dir, "wt/.git", "gitdir: "+tt.gitdir+"\n")
+			mustWriteFile(t, dir, "wt/leak.txt", "x")
+
+			base := []Rule{offsetRule(t, "*.base", "")}
+			w := NewWalker(nil, nil)
+			w.BaseRules = base
+			rules, ok := w.repoRules(os.DirFS(dir), "wt")
+			if !ok {
+				t.Fatal("expected a .git file with an unreachable gitdir to stay a repository boundary")
+			}
+			if len(rules) != len(base) {
+				t.Fatalf("expected only the base rules, got %+v", rules)
+			}
+
+			got := walkFrom(t, NewWalker(nil, nil), dir, ".")
+			if !strings.Contains(strings.Join(got, ","), "wt/leak.txt") {
+				t.Fatalf("expected the outer .gitignore to stop at the boundary, walked %v", got)
+			}
+		})
+	}
+}
+
+func TestRepoRules_UnreachableCommonDirSkipsInfoExclude(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, dir, "wt/gd/info")
+	mustWriteFile(t, dir, "wt/gd/HEAD", "ref: refs/heads/x\n")
+	mustWriteFile(t, dir, "wt/gd/commondir", "../../../elsewhere\n")
+	mustWriteFile(t, dir, "wt/gd/info/exclude", "*.go\n")
+	mustWriteFile(t, dir, "wt/.git", "gitdir: gd\n")
+
+	w := NewWalker(nil, nil)
+	rules, ok := w.repoRules(os.DirFS(dir), "wt")
+	if !ok || len(rules) != 0 {
+		t.Fatalf("expected a boundary without info/exclude, got %v %+v", ok, rules)
+	}
+}
+
+func TestValidHead_Symlink(t *testing.T) {
+	tests := []struct {
+		name, target string
+		packed       bool
+		want         bool
+	}{
+		{"unborn branch", "refs/heads/main", false, true},
+		{"packed refs", "refs/heads/main", true, true},
+		{"outside refs", "../elsewhere/HEAD", false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			mustMkdir(t, dir, "repo/.git/objects")
+			mustMkdir(t, dir, "repo/.git/refs/heads")
+			if tt.packed {
+				mustWriteFile(t, dir, "repo/.git/packed-refs", strings.Repeat("a", 40)+" refs/heads/main\n")
+			}
+			if err := os.Symlink(tt.target, filepath.Join(dir, "repo", ".git", "HEAD")); err != nil {
+				t.Skipf("symlinks unavailable: %v", err)
+			}
+			repo := filepath.Join(dir, "repo")
+
+			if _, got := resolveGitDir(repo); got != tt.want {
+				t.Errorf("resolveGitDir = %v, want %v", got, tt.want)
+			}
+			w := NewWalker(nil, nil)
+			if _, got := w.repoRules(os.DirFS(dir), "repo"); got != tt.want {
+				t.Errorf("repoRules without FSRoot = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidHeadContent(t *testing.T) {
+	oid := strings.Repeat("0123456789", 4)
+	tests := []struct {
+		head string
+		want bool
+	}{
+		{"ref: refs/heads/main", true},
+		{"ref: refs/heads/main\n", true},
+		{"ref:refs/heads/main\n", true},
+		{"ref: heads/main\n", false},
+		{oid, true},
+		{oid + "\n", true},
+		{oid + " extra text\n", true},
+		{strings.Repeat("ab", 32) + "\n", true},
+		{oid[:39] + "\n", false},
+		{"g" + oid[1:] + "\n", false},
+		{"", false},
+		{"garbage\n", false},
+	}
+	for _, tt := range tests {
+		if got := validHeadContent([]byte(tt.head)); got != tt.want {
+			t.Errorf("validHeadContent(%q) = %v, want %v", tt.head, got, tt.want)
+		}
 	}
 }
