@@ -80,7 +80,9 @@ lx -M assets/       # codec, duration, and dimensions of audio, video, and image
 ## Stream processing
 
 lx reads its arguments left to right, and an option applies only to the paths after it. An option (or -s) after a path
-starts a new section with the per-section options reset:
+starts a new section with the per-section options reset. Options that no path follows before the next -s or the end
+apply back to the paths right before them, with a warning; options before any path carry on into the section a -s
+starts:
 
 ```bash
 lx --tail 50 app.log \

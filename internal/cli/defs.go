@@ -495,8 +495,12 @@ This helps organize the output for the LLM by grouping related files. In
 Markdown mode this renders as a "## Header" block; in XML mode it wraps
 succeeding content in a named element.
 
--s also acts as a section boundary: all interleaved options (like -l, -n,
--i, -e) reset to their defaults for the files that follow.
+-s also acts as a section boundary for interleaved options (like -l, -n, -i,
+-e): after files, the section it starts begins with them all at their
+defaults. Options given since the last file decide where they go: if files
+came right before them, they apply back to those files, with a warning,
+whatever prompts or trees follow; otherwise, as for options before the first
+file, they carry on into the section -s starts.
 
 Example:
   lx -s "Backend" -l src/ -s "Frontend" -i "*.ts" web/

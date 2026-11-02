@@ -22,10 +22,15 @@ Description:
   Section boundaries are created in two ways:
     1. An interleaved option appears after files: all interleaved options
        reset to defaults before the new option takes effect.
-    2. A -s (section) action is used: this also resets all interleaved
-       options to defaults for the files that follow. Options that no file
-       has followed yet, such as those before the first file, carry on into
-       the new section.
+    2. A -s (section) action is used after files: this also resets all
+       interleaved options to defaults for the files that follow.
+
+  Options that no file follows before a -s or the end of the arguments:
+    - If files come right before them, they apply back to those files, with a
+      warning, even when prompts or trees come between them and the -s.
+    - Otherwise, as for options before the first file, they carry on into the
+      section the -s starts. Options no file follows at all are reported, and
+      so is a tree with no files to show.
 
   Example: last 50 lines of app.log, then src/ with line numbers:
     lx --tail 50 app.log -l src/
@@ -186,7 +191,8 @@ Interleaved option:
   Options that configure the section which follows them. When placed before any
   files, they accumulate into the first section's settings. When placed after
   files, they trigger a section boundary: all interleaved options reset to
-  defaults, then the new option applies to the next section.
+  defaults, then the new option applies to the next section. Options after
+  files that no file follows apply back to those files.
 
   -l, --line-numbers
           Enable line numbers for the next section.
@@ -444,8 +450,13 @@ Action:
           In Markdown mode this renders as a "## Header" block; in XML mode it
           wraps succeeding content in a named element.
           
-          -s also acts as a section boundary: all interleaved options (like -l,
-          -n, -i, -e) reset to their defaults for the files that follow.
+          -s also acts as a section boundary for interleaved options (like -l,
+          -n, -i, -e): after files, the section it starts begins with them all
+          at their defaults. Options given since the last file decide where they
+          go: if files came right before them, they apply back to those files,
+          with a warning, whatever prompts or trees follow; otherwise, as for
+          options before the first file, they carry on into the section -s
+          starts.
           
           Example:
             lx -s "Backend" -l src/ -s "Frontend" -i "*.ts" web/
