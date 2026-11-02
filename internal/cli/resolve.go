@@ -346,7 +346,7 @@ func inputAbsPath(path string, t walkTargetArgs) string {
 }
 
 func expandArchive(ctx context.Context, absPath, displayPath string, isForced bool, rc resolveContext, ignoreMsg string) []lx.InputFile {
-	archiveWalker := newArchiveWalker(rc.section.RunCfg.ShowHidden, isForced)
+	archiveWalker := newArchiveWalker(rc.section.Excludes, rc.section.RunCfg.ShowHidden, isForced)
 	if rc.debug {
 		archiveWalker.OnIgnore = func(p, reason string) {
 			slog.Debug(ignoreMsg, "path", displayPath+"/"+p, "reason", reason)
