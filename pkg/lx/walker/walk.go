@@ -1,8 +1,6 @@
 package walker
 
 import (
-	"bufio"
-	"bytes"
 	"io/fs"
 	"os"
 	"path"
@@ -30,30 +28,26 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 			return nil
 		}
 
-		var localRules []Rule
-		if w.IgnoreEnabled {
-			dir := path.Dir(root)
-			// Always load root rules.
-			localRules = append(localRules, w.loadIgnoreFiles(fsys, ".")...)
-
-			if dir != "." {
-				parts := strings.Split(dir, "/")
-				curr := ""
-				for _, p := range parts {
-					if curr == "" {
-						curr = p
-					} else {
-						curr = curr + "/" + p
-					}
-					localRules = append(localRules, w.loadIgnoreFiles(fsys, curr)...)
-				}
-			}
-		}
-
-		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(w.AncestorRules)+len(localRules)+len(w.OverrideRules))
+		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(w.AncestorRules)+len(w.OverrideRules))
 		effectiveRules = append(effectiveRules, w.BaseRules...)
 		effectiveRules = append(effectiveRules, w.AncestorRules...)
-		effectiveRules = append(effectiveRules, localRules...)
+		if w.IgnoreEnabled {
+			// Load each directory's rules from the filesystem root down to
+			// the file, starting over at every repository boundary.
+			dirs := []string{"."}
+			if dir := path.Dir(root); dir != "." {
+				parts := strings.Split(dir, "/")
+				for i := range parts {
+					dirs = append(dirs, strings.Join(parts[:i+1], "/"))
+				}
+			}
+			for _, d := range dirs {
+				if rules, ok := w.repoRules(fsys, d); ok {
+					effectiveRules = rules
+				}
+				effectiveRules = append(effectiveRules, w.loadIgnoreFiles(fsys, d)...)
+			}
+		}
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 
 		isIgnored, reason := checkIgnore(root, info.IsDir(), effectiveRules, false, w.OnIgnore != nil)
@@ -111,6 +105,9 @@ func (w *Walker) resolveEntry(fsys fs.FS, path string, d fs.DirEntry, ancestors 
 func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkFn fs.WalkDirFunc, parentIgnored bool, ancestors []fs.FileInfo) error {
 	var localRules []Rule
 	if w.IgnoreEnabled {
+		if rules, ok := w.repoRules(fsys, dir); ok {
+			parentRules = rules
+		}
 		localRules = w.loadIgnoreFiles(fsys, dir)
 	}
 
@@ -233,13 +230,9 @@ func (w *Walker) loadIgnoreFiles(fsys fs.FS, dir string) []Rule {
 		}
 
 		data, err := fs.ReadFile(fsys, fp)
+		logReadError(fp, err)
 		if err == nil {
-			sc := bufio.NewScanner(bytes.NewReader(data))
-			var lines []string
-			for sc.Scan() {
-				lines = append(lines, sc.Text())
-			}
-			rules = append(rules, parseRules(lines, dir, name)...)
+			rules = append(rules, parseRuleFile(data, dir, name)...)
 		}
 	}
 	return rules

@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -232,8 +233,90 @@ func TestLoadAncestorRules_InfoExcludeComesFirst(t *testing.T) {
 	}
 
 	w.LoadAncestorRules(repo)
-	if len(w.AncestorRules) != 1 || w.AncestorRules[0].PathOffset != "" {
-		t.Fatalf("expected only the unoffset info/exclude rule at the repo root, got %+v", w.AncestorRules)
+	if len(w.AncestorRules) != 0 {
+		t.Fatalf("expected no ancestor rules at the repo root, which the walk loads itself, got %+v", w.AncestorRules)
+	}
+}
+
+func walkAll(t *testing.T, dir string) []string {
+	t.Helper()
+	w := NewWalker(nil, nil)
+	w.FSRoot = dir
+	return walkFrom(t, w, dir, ".")
+}
+
+func TestWalk_RepoBoundaries(t *testing.T) {
+	top := t.TempDir()
+	for _, d := range []string{"repo/.git/info", "repo/.git/modules/mod/info", "repo/sub/mod", "repo/sub/inner/.git/info"} {
+		mustMkdir(t, top, d)
+	}
+	mustWriteFile(t, top, "repo/.git/info/exclude", "*.local\n")
+	mustWriteFile(t, top, "repo/.gitignore", "*.tmp\n")
+	mustWriteFile(t, top, "repo/a.local", "x")
+	mustWriteFile(t, top, "repo/a.go", "x")
+
+	// A submodule: its .git file points into the outer repository.
+	mustWriteFile(t, top, "repo/sub/mod/.git", "gitdir: ../../.git/modules/mod\n")
+	mustWriteFile(t, top, "repo/.git/modules/mod/info/exclude", "*.b\n")
+	mustWriteFile(t, top, "repo/sub/mod/x.b", "x")
+	mustWriteFile(t, top, "repo/sub/mod/y.local", "x")
+	mustWriteFile(t, top, "repo/sub/mod/z.tmp", "x")
+
+	// A nested repository with its own git directory.
+	mustWriteFile(t, top, "repo/sub/inner/.git/info/exclude", "*.c\n")
+	mustWriteFile(t, top, "repo/sub/inner/x.c", "x")
+	mustWriteFile(t, top, "repo/sub/inner/y.local", "x")
+
+	got := map[string]bool{}
+	for _, p := range walkAll(t, top) {
+		got[p] = true
+	}
+	for p, want := range map[string]bool{
+		"repo/a.go":              true,
+		"repo/a.local":           false, // outer info/exclude, found from above the repo
+		"repo/sub/mod/x.b":       false, // the submodule's own info/exclude
+		"repo/sub/mod/y.local":   true,  // outer info/exclude stops at the submodule
+		"repo/sub/mod/z.tmp":     true,  // outer .gitignore stops at the submodule
+		"repo/sub/inner/x.c":     false,
+		"repo/sub/inner/y.local": true,
+	} {
+		if got[p] != want {
+			t.Errorf("%s included = %v, want %v (walked %v)", p, got[p], want, got)
+		}
+	}
+
+	w := NewWalker(nil, nil)
+	w.FSRoot = top
+	if walked := walkFrom(t, w, top, "repo/a.local"); len(walked) != 0 {
+		t.Fatalf("expected a file named from above its repository to honor info/exclude, got %v", walked)
+	}
+}
+
+func TestResolveRelative_FollowsSymlinkedBase(t *testing.T) {
+	top := t.TempDir()
+	mustMkdir(t, top, "data/proj/.git/modules/mod")
+	mustMkdir(t, top, "data/proj/mod")
+	mustMkdir(t, top, "links")
+	if err := os.Symlink(filepath.Join(top, "data", "proj", "mod"), filepath.Join(top, "links", "mod")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	mustWriteFile(t, top, "data/proj/mod/.git", "gitdir: ../.git/modules/mod\n")
+
+	gitDir, ok := resolveGitDir(filepath.Join(top, "links", "mod"))
+	if !ok {
+		t.Fatal("expected git dir to resolve")
+	}
+	want, _ := filepath.EvalSymlinks(filepath.Join(top, "data", "proj", ".git", "modules", "mod"))
+	if gitDir != want {
+		t.Fatalf("got %q, want %q", gitDir, want)
+	}
+}
+
+func TestParseRuleFile_LongLine(t *testing.T) {
+	data := "/" + strings.Repeat("a", 70_000) + "\n*.log\n"
+	rules := parseRuleFile([]byte(data), ".", "exclude")
+	if len(rules) != 2 || rules[1].Pattern != "*.log" {
+		t.Fatalf("expected the rule after a long line to survive, got %d rules", len(rules))
 	}
 }
 
