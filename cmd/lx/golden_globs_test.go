@@ -46,6 +46,10 @@ func TestGoldenGlobs(t *testing.T) {
 		// starts, past prompts and system context.
 		{name: "955_section_options_carried_past_prompt", args: []string{"-n0", "-i", "*.go", "-p", "hi", "-s", "A", "."}},
 		{name: "956_section_options_carried_past_system_context", args: []string{"-n0", "-E", "-s", "A", "src"}},
+		// Options after files apply back to them whatever comes before the
+		// next -s, and a tree with no files to show is reported.
+		{name: "959_section_trailing_options_past_prompt", args: []string{"build/x.js", "-l", "-p", "hi", "-s", "X", "b.txt"}},
+		{name: "959b_section_trailing_options_past_tree", args: []string{"build/x.js", "-l", "-T", "-s", "X", "b.txt"}},
 
 		// Globs and roots are matched as written, as rg matches them: no
 		// cleaning of "./", "//" or "..". An -i that is empty or starts with

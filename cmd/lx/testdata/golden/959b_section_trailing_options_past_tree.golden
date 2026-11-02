@@ -1,0 +1,20 @@
+--- STDOUT ---
+build/x.js (1 rows)
+---
+```javascript
+1: x
+```
+
+## X
+---
+
+b.txt (1 rows)
+---
+```text
+x
+```
+
+
+--- STDERR ---
+Warning: Trailing interleaved options detected; applying to preceding files (flags=--line-numbers)
+Warning: Tree options cover no files (flags=--tree)

@@ -20,11 +20,12 @@ type Section struct {
 
 // parseSections splits ops into sections, each with its own interleaved
 // options. An interleaved option after files, or a -s after files, starts a
-// new section with the options reset. Options no file has followed yet carry
-// on into the section a -s starts, so options before the first file belong
-// to it however many prompts or -s come first. Options that come right after
-// files and that no file follows before the next -s or the end apply to
-// those files, with a warning; options no file follows at all are reported.
+// new section with the options reset. Options after files that no file
+// follows before the next -s or the end apply back to those files, with a
+// warning, whatever prompts or trees come between. Options with no file
+// before them in their section carry on into the section a -s starts, so
+// options before the first file belong to it however many prompts or -s
+// come first; options no file follows at all are reported.
 func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 	var sections []Section
 	current := Section{Render: defaultRender}
@@ -53,7 +54,7 @@ func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 			case "section":
 				next := Section{Render: defaultRender}
 				switch {
-				case afterFiles && len(current.Ops) == 0:
+				case afterFiles:
 					applyTrailing(pending, &sections[len(sections)-1])
 					pending = nil
 				case !hasFiles:
@@ -70,7 +71,7 @@ func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 		}
 	}
 	switch {
-	case afterFiles && len(current.Ops) == 0:
+	case afterFiles:
 		applyTrailing(pending, &sections[len(sections)-1])
 	case !hasFiles && len(pending) > 0:
 		slog.Warn("Interleaved options apply to no files", "flags", flagNames(pending))

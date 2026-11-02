@@ -1,6 +1,10 @@
 package cli
 
-import "github.com/rasros/lx/pkg/lx"
+import (
+	"log/slog"
+
+	"github.com/rasros/lx/pkg/lx"
+)
 
 // assignTrees gives each tree op the resolved files it covers: the file ops
 // beside it up to the next section or tree-only boundary. The stream builds
@@ -18,6 +22,9 @@ func assignSectionTrees(g *Section) {
 	subTreeOnly := false
 
 	flush := func() {
+		if len(subTreeIdxs) > 0 && len(subFileIdxs) == 0 {
+			slog.Warn("Tree options cover no files", "flags", flagNames(treeOps(g.Ops, subTreeIdxs)))
+		}
 		if len(subTreeIdxs) > 0 {
 			var files []lx.InputFile
 			for _, idx := range subFileIdxs {
@@ -60,4 +67,13 @@ func assignSectionTrees(g *Section) {
 		}
 	}
 	flush()
+}
+
+// treeOps returns the ops of g at idxs.
+func treeOps(ops []Op, idxs []int) []Op {
+	out := make([]Op, len(idxs))
+	for i, idx := range idxs {
+		out[i] = ops[idx]
+	}
+	return out
 }
