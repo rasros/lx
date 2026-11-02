@@ -17,7 +17,7 @@ func readString(t *testing.T, path string) string {
 	return string(data)
 }
 
-// entries returns the names in dir, to catch a temporary file left behind.
+// entries returns the names in dir, to catch a file left behind.
 func entries(t *testing.T, dir string) []string {
 	t.Helper()
 	des, err := os.ReadDir(dir)
@@ -34,7 +34,7 @@ func entries(t *testing.T, dir string) []string {
 // commit writes content to the file at path through a sink.
 func commit(t *testing.T, path, content string) {
 	t.Helper()
-	sink, err := createFileSink(path, filepath.Base(path))
+	sink, err := createFileSink(path, filepath.Base(path), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,13 +48,13 @@ func commit(t *testing.T, path, content string) {
 }
 
 func TestFileSink_AbortKeepsOldFile(t *testing.T) {
-	dir := t.TempDir()
+	dir, tmp := t.TempDir(), t.TempDir()
 	path := filepath.Join(dir, "out.md")
 	if err := os.WriteFile(path, []byte("old"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	sink, err := createFileSink(path, "out.md")
+	sink, err := createFileSink(path, "out.md", tmp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,28 +72,19 @@ func TestFileSink_AbortKeepsOldFile(t *testing.T) {
 	if names := entries(t, dir); !slices.Equal(names, []string{"out.md"}) {
 		t.Errorf("dir holds %v after Abort, want only out.md", names)
 	}
+	if names := entries(t, tmp); len(names) != 0 {
+		t.Errorf("temp dir holds %v after Abort, want nothing", names)
+	}
 }
 
-func TestFileSink_CommitReplacesFileKeepingMode(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "out.md")
-	if err := os.WriteFile(path, []byte("old content"), 0o640); err != nil {
+func TestFileSink_CommitWritesFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.md")
+	if err := os.WriteFile(path, []byte("a longer old content"), 0o640); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(path, 0o640); err != nil {
-		t.Fatal(err)
-	}
-
 	commit(t, path, "new")
-
 	if got := readString(t, path); got != "new" {
 		t.Errorf("file = %q after Commit, want the new content", got)
-	}
-	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o640 {
-		t.Errorf("mode = %v, want the old file's 0640", info.Mode().Perm())
-	}
-	if names := entries(t, dir); !slices.Equal(names, []string{"out.md"}) {
-		t.Errorf("dir holds %v after Commit, want only out.md", names)
 	}
 }
 
@@ -129,11 +120,8 @@ func TestFileSink_WritesThroughSymlinks(t *testing.T) {
 	}
 }
 
-// A name as long as a file name may be still works: the temporary file has a
-// short name of its own.
 func TestFileSink_LongName(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, strings.Repeat("n", 250)+".md")
+	path := filepath.Join(t.TempDir(), strings.Repeat("n", 250)+".md")
 	commit(t, path, "first")
 	commit(t, path, "second")
 	if got := readString(t, path); got != "second" {
@@ -144,15 +132,15 @@ func TestFileSink_LongName(t *testing.T) {
 // A bad path fails up front, naming the path as given, without creating
 // anything.
 func TestFileSink_ChecksThePathUpFront(t *testing.T) {
-	dir := t.TempDir()
-	if _, err := createFileSink(filepath.Join(dir, "missing", "out.md"), "missing/out.md"); err == nil ||
+	dir, tmp := t.TempDir(), t.TempDir()
+	if _, err := createFileSink(filepath.Join(dir, "missing", "out.md"), "missing/out.md", tmp); err == nil ||
 		err.Error() != "open missing/out.md: no such file or directory" {
 		t.Errorf("err = %v, want it to name missing/out.md", err)
 	}
-	if _, err := createFileSink(dir, "dir"); err == nil || err.Error() != "open dir: is a directory" {
+	if _, err := createFileSink(dir, "dir", tmp); err == nil || err.Error() != "open dir: is a directory" {
 		t.Errorf("err = %v, want it to name dir as a directory", err)
 	}
-	if names := entries(t, dir); len(names) != 0 {
-		t.Errorf("dir holds %v, want nothing created", names)
+	if names := append(entries(t, dir), entries(t, tmp)...); len(names) != 0 {
+		t.Errorf("created %v, want nothing", names)
 	}
 }

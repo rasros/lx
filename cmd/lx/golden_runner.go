@@ -84,6 +84,7 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 				Stderr:    &stderrBuf,
 				LookupEnv: lookupEnv,
 				Cwd:       run.cwd,
+				TempDir:   t.TempDir(),
 				Clipboard: func(string) error {
 					t.Error("a golden run wrote to the clipboard")
 					return nil

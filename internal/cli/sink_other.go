@@ -2,9 +2,6 @@
 
 package cli
 
-import "io/fs"
-
-// soleOwnedLink reports whether renaming a new file over the one info
-// describes keeps everything about it but its content. Without a way to see
-// its links and owner here, the file is written in place.
-func soleOwnedLink(fs.FileInfo) bool { return false }
+// checkWritable has no portable access(2) to ask here; opening the file at
+// commit reports what it finds.
+func checkWritable(string) error { return nil }

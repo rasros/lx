@@ -24,6 +24,8 @@ type Env struct {
 	LookupEnv osenv.Lookup
 	// Cwd is the absolute working directory relative paths resolve against.
 	Cwd string
+	// TempDir is where a run keeps the -o output until it has all of it.
+	TempDir string
 	// Clipboard receives the output of a run that copies it, if not nil.
 	Clipboard func(text string) error
 }
@@ -40,6 +42,7 @@ func OSEnv() (Env, error) {
 		Stderr:    os.Stderr,
 		LookupEnv: os.LookupEnv,
 		Cwd:       cwd,
+		TempDir:   os.TempDir(),
 		Clipboard: clipboard.WriteAll,
 	}, nil
 }

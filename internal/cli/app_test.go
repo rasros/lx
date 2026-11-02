@@ -224,7 +224,8 @@ func testEnv(t *testing.T) (Env, *bytes.Buffer, *bytes.Buffer) {
 			v, ok := vars[k]
 			return v, ok
 		},
-		Cwd: t.TempDir(),
+		Cwd:     t.TempDir(),
+		TempDir: t.TempDir(),
 		Clipboard: func(string) error {
 			t.Error("unexpected clipboard write")
 			return nil

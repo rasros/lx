@@ -9,49 +9,62 @@ import (
 	"syscall"
 )
 
-// fileSink is the file -o names. A run writes its output to a buffer, a
-// temporary file elsewhere, and the file only receives it on Commit, so a run
-// that fails leaves the file as it found it.
-//
-// Commit replaces a regular file the run owns, with one link, by renaming a
-// copy beside it, keeping its mode. Anything else is written in place, as
-// os.Create would: a missing file is created with the umask, and symlinks,
-// devices, pipes, files with other links or owners and files in directories
-// the run cannot write to are written through.
+// fileSink is where -o writes. A regular file, or one still to be created,
+// only receives the output once the run has succeeded, so a failed run
+// leaves it as it was: the output goes to a buffer, an anonymous temporary
+// file, until Commit writes it to the file as os.Create opens it. Anything
+// else, such as a device, a pipe or /dev/stdout, is opened up front and
+// written to as the output is produced.
 type fileSink struct {
-	path string // absolute
-	name string // as given, for errors
-	buf  *os.File
-	done bool
+	f        *os.File // the buffer, or the target itself
+	buffered bool
+	unlinked bool // the buffer has no name left to remove
+	path     string
+	name     string // the path as given, for errors
+	done     bool
 }
 
-// createFileSink checks that the file at path, named name in errors, could be
-// created, without creating it, and starts buffering its content.
-func createFileSink(path, name string) (*fileSink, error) {
-	if err := checkOutputPath(path, name); err != nil {
-		return nil, err
-	}
-	buf, err := os.CreateTemp("", "lx-output-*")
-	if err != nil {
-		return nil, err
-	}
-	return &fileSink{path: path, name: name, buf: buf}, nil
-}
-
-// checkOutputPath reports the error os.Create would return for path, short of
-// those only trying to write it finds, such as a read-only directory.
-func checkOutputPath(path, name string) error {
+// createFileSink checks that the file at path, named name in errors, can be
+// written, as os.Create would find, without creating it, and starts the
+// sink. Buffers are made in tempDir.
+func createFileSink(path, name, tempDir string) (*fileSink, error) {
 	info, err := os.Stat(path)
 	switch {
 	case err == nil && info.IsDir():
-		return &fs.PathError{Op: "open", Path: name, Err: syscall.EISDIR}
+		return nil, &fs.PathError{Op: "open", Path: name, Err: syscall.EISDIR}
+	case err == nil && !info.Mode().IsRegular():
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
+		if err != nil {
+			return nil, asGiven(err, name)
+		}
+		return &fileSink{f: f, path: path, name: name}, nil
 	case err == nil:
-		return nil
-	case !errors.Is(err, fs.ErrNotExist):
-		return asGiven(err, name)
+		if err := checkWritable(path); err != nil {
+			return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+		}
+	case errors.Is(err, fs.ErrNotExist):
+		if err := checkCreatable(path); err != nil {
+			return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+		}
+	default:
+		return nil, asGiven(err, name)
 	}
-	// os.Create creates a missing file, through a dangling symlink too, in a
-	// directory that must exist.
+
+	buf, err := os.CreateTemp(tempDir, "lx-output-*")
+	if err != nil {
+		return nil, err
+	}
+	s := &fileSink{f: buf, buffered: true, path: path, name: name}
+	// Where an open file can lose its name, it does at once, so nothing is
+	// left behind however the process ends.
+	s.unlinked = os.Remove(buf.Name()) == nil
+	return s, nil
+}
+
+// checkCreatable reports why os.Create could not create the missing file at
+// path, through a dangling symlink too: its directory must exist and be
+// writable.
+func checkCreatable(path string) error {
 	target := path
 	if link, err := os.Readlink(path); err == nil {
 		if !filepath.IsAbs(link) {
@@ -59,98 +72,56 @@ func checkOutputPath(path, name string) error {
 		}
 		target = link
 	}
-	dir, err := os.Stat(filepath.Dir(target))
+	dir := filepath.Dir(target)
+	info, err := os.Stat(dir)
 	if err != nil {
 		var pe *fs.PathError
 		if errors.As(err, &pe) {
-			return &fs.PathError{Op: "open", Path: name, Err: pe.Err}
+			return pe.Err
 		}
 		return err
 	}
-	if !dir.IsDir() {
-		return &fs.PathError{Op: "open", Path: name, Err: syscall.ENOTDIR}
+	if !info.IsDir() {
+		return syscall.ENOTDIR
 	}
-	return nil
+	return checkWritable(dir)
 }
 
-func (s *fileSink) Write(p []byte) (int, error) { return s.buf.Write(p) }
+func (s *fileSink) Write(p []byte) (int, error) { return s.f.Write(p) }
 
-// Commit writes what was buffered to the file.
+// Commit finishes the output: a buffered one is written to the file.
 func (s *fileSink) Commit() error {
 	if s.done {
 		return nil
 	}
+	if !s.buffered {
+		s.done = true
+		return s.f.Close()
+	}
 	defer s.Abort()
-	if _, err := s.buf.Seek(0, io.SeekStart); err != nil {
+	if _, err := s.f.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	if info, err := os.Lstat(s.path); err == nil && info.Mode().IsRegular() && soleOwnedLink(info) {
-		replaced, err := s.replace(info)
-		if replaced || err != nil {
-			return err
-		}
-		// The directory cannot take a new file; write in place.
-		if _, err := s.buf.Seek(0, io.SeekStart); err != nil {
-			return err
-		}
-	}
-	return s.writeInPlace()
-}
-
-// replace renames a copy of the buffer over the file, which info describes,
-// reporting false when the directory does not let it make one.
-func (s *fileSink) replace(info fs.FileInfo) (bool, error) {
-	// A short fixed name, whatever the length of the file's own.
-	tmp, err := os.CreateTemp(filepath.Dir(s.path), ".lx-*.tmp")
-	if errors.Is(err, fs.ErrPermission) {
-		return false, nil
-	}
-	if err != nil {
-		return true, err
-	}
-	_, err = io.Copy(tmp, s.buf)
-	if err == nil {
-		err = tmp.Chmod(info.Mode() & (fs.ModePerm | fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky))
-	}
-	if closeErr := tmp.Close(); err == nil {
-		err = closeErr
-	}
-	if err == nil {
-		err = os.Rename(tmp.Name(), s.path)
-	}
-	if err != nil {
-		os.Remove(tmp.Name())
-		return true, err
-	}
-	return true, nil
-}
-
-// writeInPlace writes the buffer to the file as os.Create opens it. A file it
-// creates is removed again if the write fails.
-func (s *fileSink) writeInPlace() error {
-	_, statErr := os.Stat(s.path)
-	created := errors.Is(statErr, fs.ErrNotExist)
-	f, err := os.OpenFile(s.path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
+	out, err := os.OpenFile(s.path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
 	if err != nil {
 		return asGiven(err, s.name)
 	}
-	_, err = io.Copy(f, s.buf)
-	if closeErr := f.Close(); err == nil {
+	_, err = io.Copy(out, s.f)
+	if closeErr := out.Close(); err == nil {
 		err = closeErr
-	}
-	if err != nil && created {
-		os.Remove(s.path)
 	}
 	return err
 }
 
-// Abort drops what was buffered, leaving the file untouched. It does nothing
+// Abort drops a buffered output, leaving the file untouched. It does nothing
 // after Commit.
 func (s *fileSink) Abort() {
 	if s.done {
 		return
 	}
 	s.done = true
-	s.buf.Close()
-	os.Remove(s.buf.Name())
+	s.f.Close()
+	if s.buffered && !s.unlinked {
+		os.Remove(s.f.Name())
+	}
 }
