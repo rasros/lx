@@ -204,6 +204,12 @@ the absolute path is matched. A glob matches a directory only as itself, so
 so no later glob keeps anything below it: -e build -i build/keep.js keeps
 nothing, -e "build/**" -i build/keep.js keeps it.
 
+As in rg, globs and roots are matched as written, without cleaning: neither
+"./src/*.go" nor "src//*.go" matches src/main.go, and below the root
+src/../build paths start with "src/../build/". An -i that is empty or starts
+with "#" adds no glob, and a glob that cannot be parsed, such as "src/[ab",
+is an error.
+
 Examples:
   -i "*.go"       (Keep only Go files)
   -i "src/**"     (Keep the files inside src)
@@ -219,10 +225,13 @@ Examples:
 		Long: `Drop what matches a glob for subsequent paths, as rg -g '!GLOB' does.
 
 -e globs match as -i globs do, and the last -i or -e to match a path decides
-it, ahead of ignore files. A leading "!" keeps what matches, even when an
-ignore file ignores it or it is hidden, without requiring every file to match
-some glob as -i does: -e "vendor/**" -e "!vendor/keep.go" keeps one file of
-vendor/ and everything outside it.
+it, ahead of ignore files.
+
+A leading "!" keeps what matches, even when an ignore file ignores it or it is
+hidden, without requiring every other file to match some glob as -i does:
+-e "vendor/**" -e "!vendor/keep.go" keeps one file of vendor/ and everything
+outside it. rg has no such glob: its -g "!!glob" excludes a file named
+"!glob".
 
 Examples:
   -e "*_test.go"  (Skip Go test files)
