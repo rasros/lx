@@ -7,65 +7,6 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-func TestBuildASCIITree_SingleRoot(t *testing.T) {
-	paths := []string{
-		"src/main.go",
-		"src/lib/util.go",
-		"src/zeta.txt",
-		"src/a.md",
-	}
-
-	got := buildASCIITree(paths)
-	want := "" +
-		"src/\n" +
-		"├── lib/\n" +
-		"│   └── util.go\n" +
-		"├── a.md\n" +
-		"├── main.go\n" +
-		"└── zeta.txt"
-
-	if got != want {
-		t.Fatalf("buildASCIITree mismatch\nwant:\n%s\n\ngot:\n%s", want, got)
-	}
-}
-
-func TestBuildASCIITree_MultipleRoots(t *testing.T) {
-	paths := []string{
-		"b.txt",
-		"a/one.go",
-		"a/two.go",
-	}
-
-	got := buildASCIITree(paths)
-	want := "" +
-		"├── a/\n" +
-		"│   ├── one.go\n" +
-		"│   └── two.go\n" +
-		"└── b.txt"
-
-	if got != want {
-		t.Fatalf("buildASCIITree mismatch\nwant:\n%s\n\ngot:\n%s", want, got)
-	}
-}
-
-func TestBuildASCIITree_Empty(t *testing.T) {
-	got := buildASCIITree([]string{"", ".", "./"})
-	if got != "" {
-		t.Fatalf("buildASCIITree should be empty, got %q", got)
-	}
-}
-
-func TestBuildASCIITree_URLPreservesScheme(t *testing.T) {
-	got := buildASCIITree([]string{"http://127.0.0.1:18082/a.txt"})
-	want := "" +
-		"http://127.0.0.1:18082/\n" +
-		"└── a.txt"
-
-	if got != want {
-		t.Fatalf("buildASCIITree URL mismatch\nwant:\n%s\n\ngot:\n%s", want, got)
-	}
-}
-
 // Stdin is left to the content pass, and a missing path is counted so the
 // stats summary can report it.
 func TestResolveSections_StdinAndMissingPaths(t *testing.T) {
@@ -82,7 +23,7 @@ func TestResolveSections_StdinAndMissingPaths(t *testing.T) {
 	}
 }
 
-func TestPrecomputeTrees_TreeOnlyMarksFileOps(t *testing.T) {
+func TestAssignTrees_TreeOnlyMarksFileOps(t *testing.T) {
 	groups := []Section{
 		{
 			Ops: []Op{
@@ -92,7 +33,7 @@ func TestPrecomputeTrees_TreeOnlyMarksFileOps(t *testing.T) {
 		},
 	}
 
-	precomputeTrees(groups)
+	assignTrees(groups)
 	if !groups[0].skipFileOps[1] {
 		t.Fatalf("expected file op at index 1 to be skipped in tree-only section")
 	}

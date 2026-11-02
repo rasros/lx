@@ -13,7 +13,7 @@ type Section struct {
 	Discover lx.DiscoverOptions
 	Ops      []Op
 
-	treeStrings map[int]string
+	treeFiles   map[int][]lx.InputFile
 	skipFileOps map[int]bool
 	resolved    map[int][]lx.InputFile
 }

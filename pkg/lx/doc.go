@@ -39,10 +39,12 @@
 //
 // Stream methods:
 //
-//   - AddFile, AddSection, AddPrompt, AddTree, AddMeta enqueue content.
+//   - AddFile, AddSection, AddPrompt, AddMeta enqueue content.
+//   - AddTree enqueues a directory tree of the files Admit keeps.
 //   - Execute renders output to an io.Writer.
 //   - GetGlobalContext exposes aggregate statistics.
-//   - WithConcurrency / WithOnFileError customize processing.
+//   - WithConcurrency / WithOnFileError customize processing. Skeleton
+//     rendering caps the workers at two.
 //
 // Example, rendering a directory as lx <dir> does when no project or user
 // lx config changes the output and stats are off:

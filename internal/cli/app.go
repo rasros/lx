@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -170,13 +169,12 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 		d := &sections[i].Discover
 		d.IgnoreRules, d.GitExcludes, d.OutPath = ignoreRules, gitExcludes, outPath
 	}
-	applyWorkloadConcurrency(stream, sections, runtime.NumCPU())
 
 	unresolved, err := resolveSections(ctx, sections, lx.NewCollector())
 	if err != nil {
 		return err
 	}
-	precomputeTrees(sections)
+	assignTrees(sections)
 	var metaFields map[string]string
 	var metaBody string
 	resolveSystemContext := func() (map[string]string, string) {
@@ -215,12 +213,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 				}
 
 			case "tree", "tree-only":
-				if ts, ok := section.treeStrings[oi]; ok {
-					slog.Debug("Adding tree", "lines", strings.Count(ts, "\n")+1)
-					stream.AddTree(ts)
-				} else {
-					slog.Debug("Skipping empty tree (no files in group)")
-				}
+				slog.Debug("Adding tree", "files", len(section.treeFiles[oi]))
+				stream.AddTree(section.treeFiles[oi], section.Render)
 			case "section":
 				slog.Debug("Adding section", "title", op.Value)
 				stream.AddSection(op.Value)
@@ -286,33 +280,6 @@ func setupLogger(level slog.Level) {
 		})
 	}
 	slog.SetDefault(slog.New(handler))
-}
-
-const maxSkeletonWorkers = 2
-
-func applyWorkloadConcurrency(stream *lx.Stream, sections []Section, cpuCount int) {
-	workers, limited := workloadConcurrency(sections, cpuCount)
-	if !limited {
-		return
-	}
-	stream.WithConcurrency(workers)
-	slog.Debug("Applying skeleton concurrency limit", "workers", workers, "cpu_count", cpuCount)
-}
-
-func workloadConcurrency(sections []Section, cpuCount int) (int, bool) {
-	if cpuCount < 1 {
-		cpuCount = 1
-	}
-
-	for _, section := range sections {
-		if section.Render.SkeletonFunctions || section.Render.SkeletonTypes {
-			if cpuCount > maxSkeletonWorkers {
-				return maxSkeletonWorkers, true
-			}
-			return cpuCount, true
-		}
-	}
-	return 0, false
 }
 
 func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer, unresolved int) {

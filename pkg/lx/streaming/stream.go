@@ -34,6 +34,15 @@ type Stream struct {
 	prepared    []render.PreparedItem
 
 	skippedBySize int
+	skeletons     bool
+}
+
+// workers is the worker count for executing the queued files.
+func (s *Stream) workers() int {
+	if s.skeletons && s.concurrency > maxSkeletonWorkers {
+		return maxSkeletonWorkers
+	}
+	return s.concurrency
 }
 
 func NewStream(cfg *core.Config) (*Stream, error) {
@@ -50,7 +59,12 @@ func NewStream(cfg *core.Config) (*Stream, error) {
 	}, nil
 }
 
-// WithConcurrency sets concurrent workers for file processing.
+// maxSkeletonWorkers caps the workers while any queued file renders as a
+// skeleton, because tree-sitter parsing does not scale past two workers.
+const maxSkeletonWorkers = 2
+
+// WithConcurrency sets the concurrent workers for file processing. The stream
+// lowers it to maxSkeletonWorkers when any queued file renders as a skeleton.
 func (s *Stream) WithConcurrency(n int) *Stream {
 	if n < 1 {
 		n = 1
@@ -69,13 +83,22 @@ func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
 	return s
 }
 
-// AddFile enqueues a file to render with opts, unless it exceeds opts.MaxSize.
-// Inputs with an unknown size (negative, as for remote URLs) are always kept.
+// Admit reports whether the stream keeps f when added with opts: a file over
+// opts.MaxSize is dropped. Inputs with an unknown size (negative, as for
+// remote URLs) are always kept. AddFile and AddTree both decide by it.
+func (s *Stream) Admit(f sources.InputFile, opts core.RenderOptions) bool {
+	return opts.MaxSize <= 0 || f.Size <= opts.MaxSize
+}
+
+// AddFile enqueues a file to render with opts, unless Admit drops it.
 func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
-	if opts.MaxSize > 0 && f.Size > opts.MaxSize {
+	if !s.Admit(f, opts) {
 		slog.Debug("Skipped by size limit (-m)", "path", f.Path, "size", f.Size, "max_size", opts.MaxSize)
 		s.skippedBySize++
 		return s
+	}
+	if opts.SkeletonFunctions || opts.SkeletonTypes {
+		s.skeletons = true
 	}
 	s.items = append(s.items, render.FileItem{File: f, Opts: opts})
 	return s
@@ -91,8 +114,20 @@ func (s *Stream) AddPrompt(text string) *Stream {
 	return s
 }
 
-func (s *Stream) AddTree(body string) *Stream {
-	s.items = append(s.items, core.TreeContext{Body: body})
+// AddTree enqueues a directory tree of the files Admit keeps under opts. The
+// files need not be added with AddFile, so a tree can stand in for content.
+// A tree with no admitted files is left out.
+func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *Stream {
+	var paths []string
+	for _, f := range files {
+		if s.Admit(f, opts) {
+			paths = append(paths, f.Path)
+		}
+	}
+	if len(paths) == 0 {
+		return s
+	}
+	s.items = append(s.items, core.TreeContext{Body: buildTree(paths)})
 	return s
 }
 
