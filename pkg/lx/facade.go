@@ -21,6 +21,7 @@ type StatsContext = core.StatsContext
 
 type InputFile = sources.InputFile
 type DiscoverOptions = discover.Options
+type Glob = discover.Glob
 type Collector = discover.Collector
 type URLError = discover.URLError
 
@@ -33,6 +34,14 @@ func Merge(dst *Config, src *Config) { core.Merge(dst, src) }
 // NewCollector returns a Collector, which finds the inputs of the targets of
 // one run as lx does.
 func NewCollector() *Collector { return discover.NewCollector() }
+
+// IncludeGlob returns lx's -i pattern p for DiscoverOptions.Globs. It works
+// as ripgrep's -g p.
+func IncludeGlob(p string) Glob { return discover.IncludeGlob(p) }
+
+// ExcludeGlob returns lx's -e pattern p for DiscoverOptions.Globs. It works
+// as ripgrep's -g '!p', and a leading "!" keeps what it matches instead.
+func ExcludeGlob(p string) Glob { return discover.ExcludeGlob(p) }
 
 // UserIgnoreRules reads the ignore files lx applies everywhere, for
 // DiscoverOptions.IgnoreRules and GitExcludes.

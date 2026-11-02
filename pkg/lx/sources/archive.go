@@ -38,15 +38,6 @@ func IsArchivePath(path string) bool {
 	return false
 }
 
-// EntrySelector decides which entries of an archive are expanded. Paths
-// relative to the archive root are slash-separated.
-type EntrySelector interface {
-	// Descend reports whether the walk enters the directory dir.
-	Descend(dir string) bool
-	// Accept reports whether the file entry, displayed as path, is expanded.
-	Accept(entry, path string) bool
-}
-
 type archiveCandidate struct {
 	key           string
 	entryPath     string
@@ -58,9 +49,9 @@ type archiveCandidate struct {
 }
 
 // ExpandArchive returns the files in the archive at absPath, displayed below
-// displayPath, that w walks to and sel accepts. A nil sel accepts every file.
+// displayPath, that w walks to.
 // Entries are read into memory, so the archive is not needed once it returns.
-func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, sel EntrySelector) ([]InputFile, error) {
+func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker) ([]InputFile, error) {
 	if !IsArchivePath(absPath) {
 		return nil, nil
 	}
@@ -84,9 +75,6 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 			return nil
 		}
 		if d.IsDir() {
-			if dir := normalizeArchiveEntryPath(entryPath); sel != nil && dir != "" && !sel.Descend(dir) {
-				return fs.SkipDir
-			}
 			return nil
 		}
 		if err := ctx.Err(); err != nil {
@@ -103,10 +91,6 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 			return nil
 		}
 		effectivePath := archiveBase + "/" + key
-
-		if sel != nil && !sel.Accept(key, effectivePath) {
-			return nil
-		}
 
 		info, err := d.Info()
 		if err != nil {

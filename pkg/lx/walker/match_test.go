@@ -38,16 +38,16 @@ func TestMatch_DirOnlyRequiresDirEntry(t *testing.T) {
 func TestCheckIgnore_NegationOverridesPreviousRule(t *testing.T) {
 	rules := parseRules([]string{"*.log", "!keep.log"}, "", ".gitignore")
 
-	ignored, reason := checkIgnore("app.log", false, rules, false, "", true)
-	if !ignored {
+	m, reason := lastMatch("app.log", false, rules, true)
+	if m != matchIgnore {
 		t.Fatal("expected app.log to be ignored")
 	}
 	if !strings.Contains(reason, "*.log") {
 		t.Fatalf("unexpected ignore reason: %q", reason)
 	}
 
-	ignored, reason = checkIgnore("keep.log", false, rules, false, "", true)
-	if ignored {
+	m, reason = lastMatch("keep.log", false, rules, true)
+	if m != matchKeep {
 		t.Fatal("expected keep.log to be un-ignored by negation rule")
 	}
 	if reason != "" {
@@ -55,25 +55,10 @@ func TestCheckIgnore_NegationOverridesPreviousRule(t *testing.T) {
 	}
 }
 
-// The override rules continue from the state the ignore-file rules left.
-func TestCheckIgnore_ChainsFromEarlierRules(t *testing.T) {
-	rules := parseRules([]string{"!keep.go"}, "", "override flags")
-
-	ignored, _ := checkIgnore("other.go", false, rules, true, "", false)
-	if !ignored {
-		t.Fatal("expected the earlier rules' ignored state to persist when the negation does not match")
-	}
-
-	ignored, _ = checkIgnore("keep.go", false, rules, true, "", false)
-	if ignored {
-		t.Fatal("expected a matching negation to clear the earlier rules' ignored state")
-	}
-}
-
 func TestCheckIgnore_OmitsReasonWhenNotRequested(t *testing.T) {
 	rules := parseRules([]string{"*.log"}, "", ".gitignore")
-	ignored, reason := checkIgnore("app.log", false, rules, false, "", false)
-	if !ignored {
+	m, reason := lastMatch("app.log", false, rules, false)
+	if m != matchIgnore {
 		t.Fatal("expected app.log to be ignored")
 	}
 	if reason != "" {
@@ -104,7 +89,7 @@ func TestParseRules_Escapes(t *testing.T) {
 func TestCheckIgnore_BackslashEscapes(t *testing.T) {
 	rules := parseRules([]string{`\*.go`, `a\ b.go`}, "", ".gitignore")
 	for path, want := range map[string]bool{"*.go": true, "x.go": false, "a b.go": true, `a\ b.go`: false} {
-		if ignored, _ := checkIgnore(path, false, rules, false, "", false); ignored != want {
+		if ignored := isIgnored(path, false, rules); ignored != want {
 			t.Errorf("%q ignored = %v, want %v", path, ignored, want)
 		}
 	}
@@ -112,20 +97,25 @@ func TestCheckIgnore_BackslashEscapes(t *testing.T) {
 
 func TestCheckIgnore_FloatingPatternMatchesBaseNameOnly(t *testing.T) {
 	rules := parseRules([]string{"tags", "!tags/"}, "", ".gitignore")
-	if ignored, _ := checkIgnore("tags", true, rules, false, "", false); ignored {
+	if isIgnored("tags", true, rules) {
 		t.Fatal("expected the negated directory to be re-included")
 	}
-	if ignored, _ := checkIgnore("tags/Makefile", false, rules, false, "", false); ignored {
+	if isIgnored("tags/Makefile", false, rules) {
 		t.Fatal("expected a file in a re-included directory not to match the directory's name")
 	}
 }
 
-func TestWhitelisted(t *testing.T) {
+func TestLastMatch_NegationKeeps(t *testing.T) {
 	rules := parseRules([]string{".*", "!.keep"}, "", ".gitignore")
-	if m, n := whitelisted(".keep", false, rules); !m || !n {
-		t.Fatal("expected .keep to be whitelisted by the negation")
+	if m, _ := lastMatch(".keep", false, rules, false); m != matchKeep {
+		t.Fatal("expected .keep to be kept by the negation")
 	}
-	if m, n := whitelisted(".other", false, rules); !m || n {
+	if m, _ := lastMatch(".other", false, rules, false); m != matchIgnore {
 		t.Fatal("expected .other to be decided by the ignore rule")
 	}
+}
+
+func isIgnored(path string, isDir bool, rules []Rule) bool {
+	m, _ := lastMatch(path, isDir, rules, false)
+	return m == matchIgnore
 }

@@ -116,9 +116,9 @@ func applyInterleaved(op Op, s *Section) {
 		s.Discover.NoIgnore = true
 	case "include":
 		slog.Debug("Adding include filter", "pattern", op.Value)
-		s.Discover.Includes = append(s.Discover.Includes, op.Value)
+		s.Discover.Globs = append(s.Discover.Globs, lx.IncludeGlob(op.Value))
 	case "exclude":
 		slog.Debug("Adding exclude filter", "pattern", op.Value)
-		s.Discover.Excludes = append(s.Discover.Excludes, op.Value)
+		s.Discover.Globs = append(s.Discover.Globs, lx.ExcludeGlob(op.Value))
 	}
 }

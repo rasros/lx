@@ -1,0 +1,9 @@
+--- STDOUT ---
+[1/5] a.go (1 rows)
+[2/5] ign/z.go (1 rows)
+[3/5] src/.hidden.go (1 rows)
+[4/5] src/a.go (1 rows)
+[5/5] src/a_test.go (1 rows)
+
+
+--- STDERR ---

@@ -1,17 +1,23 @@
 --- STDOUT ---
-[1/3] ignore_test/foo.go (1 rows)
+[1/4] ignore_test/bar.go (1 rows)
+---
+```go
+package bar
+```
+
+[2/4] ignore_test/foo.go (1 rows)
 ---
 ```go
 package foo
 ```
 
-[2/3] pkg/util.go (1 rows)
+[3/4] pkg/util.go (1 rows)
 ---
 ```go
 package pkg
 ```
 
-[3/3] src/script.py (1 rows)
+[4/4] src/script.py (1 rows)
 ---
 ```python
 print('hello')

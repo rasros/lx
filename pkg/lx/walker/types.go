@@ -23,12 +23,18 @@ type Options struct {
 	// to the root of the filesystem.
 	Base        []string
 	GitExcludes []string
-	// Override patterns apply after every ignore file, whether or not
-	// IgnoreEnabled is set. WalkPath matches them relative to the working
-	// directory; Walk relative to the walked fs.FS, with OverridePrefix, if
-	// any, before each path.
-	Override       []string
+	// Overrides decide what they match ahead of every ignore file and
+	// hidden-file skipping, whether or not IgnoreEnabled is set: the last
+	// one to match a path wins, as with ripgrep's -g globs. WalkPath matches
+	// them against the path from the working directory, as the root was
+	// named; Walk against the path within the walked fs.FS, with
+	// OverridePrefix, if any, before it.
+	Overrides      []Override
 	OverridePrefix string
+	// MatchAsDir, when set, picks the files, by name, that ignore rules and
+	// overrides match as directories, such as archives that are expanded
+	// like directories.
+	MatchAsDir func(name string) bool
 	// IgnoreEnabled reads .ignore and .lxignore files and, inside a git
 	// repository, .gitignore files and the repository's info/exclude.
 	IgnoreEnabled bool
@@ -50,7 +56,7 @@ type Walker struct {
 	base        []Rule
 	gitExcludes []Rule
 	baseKey     string
-	override    []Rule
+	overrides   *overrides
 	cache       *Cache
 }
 
@@ -65,7 +71,15 @@ func New(opts Options) *Walker {
 		base:        parseRules(opts.Base, "", "global/base"),
 		gitExcludes: withScope(parseRules(opts.GitExcludes, "", "global git excludes"), scopeGit),
 		baseKey:     strings.Join(opts.Base, "\n") + "\x00" + strings.Join(opts.GitExcludes, "\n"),
-		override:    parseRules(opts.Override, "", "override flags"),
+		overrides:   compileOverrides(opts.Overrides),
 		cache:       cache,
 	}
+}
+
+// Accepts reports whether the path, named from the working directory or
+// absolutely, is kept by the overrides as it would be in a walk from the
+// working directory: neither it nor a directory above it is excluded, and in
+// whitelist mode a file must be included. Ignore files are not consulted.
+func (w *Walker) Accepts(path string, isDir bool) bool {
+	return w.overrides == nil || w.overrides.accepts(w.cache.Anchor(path).Path("."), isDir)
 }

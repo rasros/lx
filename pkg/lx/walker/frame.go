@@ -74,30 +74,84 @@ func (c *Cache) hostTree() *ruleTree {
 	return c.tree
 }
 
-// OverridePrefix returns what to put before a path below absRoot to name it
-// relative to the working directory, where ripgrep anchors its -g globs: a
-// path outside it, such as one below "..", keeps its leading "../", which an
-// anchored glob cannot match. The working directory may be named through a
-// symlink and absRoot by its real path, or the other way round, so a root
-// below either name of it counts as below it.
-func (c *Cache) OverridePrefix(absRoot string) string {
+// Anchor names the paths below a root as ripgrep matches its -g globs
+// against them: as the root was named, relative or absolute, with the
+// working directory stripped from the front of an absolute path below it.
+type Anchor struct {
+	// prefix is the root's own path and a slash, or empty at the working
+	// directory.
+	prefix string
+	// strip holds the names of the working directory, each with a slash,
+	// that are stripped from the paths below an absolute root above it.
+	strip []string
+}
+
+// Anchor returns the anchor of root, a path named from the working
+// directory or absolutely. As in ripgrep, a relative root keeps its path as
+// written, cleaned, so the paths below "../x" start with "../x/". The
+// working directory may be named through a symlink and root by its real
+// path, or the other way round, so either name of it is stripped.
+func (c *Cache) Anchor(root string) Anchor {
 	c.hostTree()
-	if c.wd == "" {
-		return ""
+	p := filepath.ToSlash(filepath.Clean(root))
+	if !filepath.IsAbs(root) {
+		if p == "." {
+			return Anchor{}
+		}
+		return Anchor{prefix: p + "/"}
 	}
-	rel, err := filepath.Rel(c.wd, absRoot)
-	if err != nil || isOutside(rel) {
-		for _, p := range [][2]string{{c.ht.cwd, absRoot}, {c.ht.cwd, c.ht.real(absRoot)}} {
-			if r, err := filepath.Rel(p[0], p[1]); err == nil && !isOutside(r) {
-				rel = r
-				break
-			}
+	if !strings.HasSuffix(p, "/") {
+		p += "/"
+	}
+	a := Anchor{prefix: p}
+	for _, wd := range []string{c.wd, c.ht.cwd} {
+		if wd == "" {
+			continue
+		}
+		wd = strings.TrimSuffix(filepath.ToSlash(wd), "/") + "/"
+		switch {
+		case strings.HasPrefix(p, wd):
+			return Anchor{prefix: p[len(wd):]}
+		case strings.HasPrefix(wd, p):
+			a.strip = append(a.strip, wd)
 		}
 	}
-	if rel == "." || rel == "" {
-		return ""
+	return a
+}
+
+// Path returns the path to match for rel, a slash-separated path below the
+// root, or "." for the root itself.
+func (a Anchor) Path(rel string) string {
+	if rel == "." {
+		switch a.prefix {
+		case "":
+			return "."
+		case "/":
+			return "/"
+		}
+		return strings.TrimSuffix(a.prefix, "/")
 	}
-	return filepath.ToSlash(rel) + "/"
+	p := a.prefix + rel
+	for _, wd := range a.strip {
+		if strings.HasPrefix(p, wd) {
+			return p[len(wd):]
+		}
+		if len(p)+1 == len(wd) && strings.HasPrefix(wd, p) {
+			return "."
+		}
+	}
+	return p
+}
+
+// leadsToWD reports whether p, an absolute path from Path, is a directory
+// above the working directory, below which paths are matched relative to it.
+func (a Anchor) leadsToWD(p string) bool {
+	for _, wd := range a.strip {
+		if strings.HasPrefix(wd, p+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // isOutside reports whether rel, a path from filepath.Rel, leaves the
@@ -372,13 +426,4 @@ func rebase(rules []Rule, rel string) []Rule {
 		out[i] = r
 	}
 	return out
-}
-
-// judgeDir reports whether a directory is ignored, and why: rules are those
-// in effect in its parent, matched at rel, and override those of the walk,
-// matched at ovRel. As in git and ripgrep, an ignored directory is not
-// entered, so no negation can re-include anything below it.
-func judgeDir(rules []Rule, rel string, override []Rule, ovRel string) (bool, string) {
-	ignored, reason := checkIgnore(rel, true, rules, false, "", true)
-	return checkIgnore(ovRel, true, override, ignored, reason, true)
 }

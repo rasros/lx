@@ -20,11 +20,8 @@ func TestParseSections_NoSplitBeforeFiles(t *testing.T) {
 		t.Fatalf("len(sections) = %d, want 1", len(sections))
 	}
 
-	if !reflect.DeepEqual(sections[0].Discover.Includes, []string{"*.go"}) {
-		t.Fatalf("Includes = %v, want [*.go]", sections[0].Discover.Includes)
-	}
-	if !reflect.DeepEqual(sections[0].Discover.Excludes, []string{"*_test.go"}) {
-		t.Fatalf("Excludes = %v, want [*_test.go]", sections[0].Discover.Excludes)
+	if want := []lx.Glob{lx.IncludeGlob("*.go"), lx.ExcludeGlob("*_test.go")}; !reflect.DeepEqual(sections[0].Discover.Globs, want) {
+		t.Fatalf("Globs = %v, want %v", sections[0].Discover.Globs, want)
 	}
 	if len(sections[0].Ops) != 1 || sections[0].Ops[0].Action != "FILE" {
 		t.Fatalf("Ops = %+v, want one FILE op", sections[0].Ops)
@@ -48,8 +45,8 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 	if sections[0].Render.Head != 7 || sections[0].Render.Tail != 0 {
 		t.Fatalf("first Render = %+v, want Head=7 Tail=0", sections[0].Render)
 	}
-	if len(sections[0].Discover.Excludes) != 0 {
-		t.Fatalf("first Excludes = %v, want empty", sections[0].Discover.Excludes)
+	if len(sections[0].Discover.Globs) != 0 {
+		t.Fatalf("first Globs = %v, want empty", sections[0].Discover.Globs)
 	}
 	if len(sections[0].Ops) != 1 || sections[0].Ops[0].Action != "FILE" {
 		t.Fatalf("first Ops = %+v, want one file op", sections[0].Ops)
@@ -58,8 +55,8 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 	if sections[1].Render.Head != -1 || sections[1].Render.Tail != 0 {
 		t.Fatalf("second Render = %+v, want reset defaults before applying exclude", sections[1].Render)
 	}
-	if !reflect.DeepEqual(sections[1].Discover.Excludes, []string{"vendor/**"}) {
-		t.Fatalf("second Excludes = %v, want [vendor/**]", sections[1].Discover.Excludes)
+	if want := []lx.Glob{lx.ExcludeGlob("vendor/**")}; !reflect.DeepEqual(sections[1].Discover.Globs, want) {
+		t.Fatalf("second Globs = %v, want %v", sections[1].Discover.Globs, want)
 	}
 	if len(sections[1].Ops) != 1 || sections[1].Ops[0].Action != "FILE" {
 		t.Fatalf("second Ops = %+v, want one FILE op", sections[1].Ops)
@@ -100,17 +97,17 @@ func TestApplyInterleaved_RunConfigFlags(t *testing.T) {
 	}
 }
 
-func TestApplyInterleaved_FilterFlagsAppend(t *testing.T) {
+// -i and -e append to one list in command-line order, since the last glob
+// to match a path decides it.
+func TestApplyInterleaved_FilterFlagsKeepOrder(t *testing.T) {
 	s := Section{}
 
-	applyInterleaved(Op{Action: "include", Value: "*.go"}, &s)
-	applyInterleaved(Op{Action: "include", Value: "*.md"}, &s)
-	applyInterleaved(Op{Action: "exclude", Value: "vendor/**"}, &s)
+	applyInterleaved(Op{Action: "exclude", Value: "build/*"}, &s)
+	applyInterleaved(Op{Action: "include", Value: "build/keep.js"}, &s)
+	applyInterleaved(Op{Action: "exclude", Value: "*.min.js"}, &s)
 
-	if !reflect.DeepEqual(s.Discover.Includes, []string{"*.go", "*.md"}) {
-		t.Fatalf("Includes = %v, want [*.go *.md]", s.Discover.Includes)
-	}
-	if !reflect.DeepEqual(s.Discover.Excludes, []string{"vendor/**"}) {
-		t.Fatalf("Excludes = %v, want [vendor/**]", s.Discover.Excludes)
+	want := []lx.Glob{lx.ExcludeGlob("build/*"), lx.IncludeGlob("build/keep.js"), lx.ExcludeGlob("*.min.js")}
+	if !reflect.DeepEqual(s.Discover.Globs, want) {
+		t.Fatalf("Globs = %v, want %v", s.Discover.Globs, want)
 	}
 }
