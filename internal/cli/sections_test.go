@@ -8,23 +8,23 @@ import (
 )
 
 func TestParseSections_NoSplitBeforeFiles(t *testing.T) {
-	defaultRunCfg := lx.RunnerConfig{Head: -1, Tail: 0}
+	defaultRender := lx.RenderOptions{Head: -1, Tail: 0}
 	ops := []Op{
 		{Action: "include", Value: "*.go", Type: CmdInterleaved},
 		{Action: "exclude", Value: "*_test.go", Type: CmdInterleaved},
 		{Action: "FILE", Value: "main.go", Type: CmdAction},
 	}
 
-	sections := parseSections(ops, defaultRunCfg)
+	sections := parseSections(ops, defaultRender)
 	if len(sections) != 1 {
 		t.Fatalf("len(sections) = %d, want 1", len(sections))
 	}
 
-	if !reflect.DeepEqual(sections[0].Includes, []string{"*.go"}) {
-		t.Fatalf("Includes = %v, want [*.go]", sections[0].Includes)
+	if !reflect.DeepEqual(sections[0].Discover.Includes, []string{"*.go"}) {
+		t.Fatalf("Includes = %v, want [*.go]", sections[0].Discover.Includes)
 	}
-	if !reflect.DeepEqual(sections[0].Excludes, []string{"*_test.go"}) {
-		t.Fatalf("Excludes = %v, want [*_test.go]", sections[0].Excludes)
+	if !reflect.DeepEqual(sections[0].Discover.Excludes, []string{"*_test.go"}) {
+		t.Fatalf("Excludes = %v, want [*_test.go]", sections[0].Discover.Excludes)
 	}
 	if len(sections[0].Ops) != 1 || sections[0].Ops[0].Action != "FILE" {
 		t.Fatalf("Ops = %+v, want one FILE op", sections[0].Ops)
@@ -32,7 +32,7 @@ func TestParseSections_NoSplitBeforeFiles(t *testing.T) {
 }
 
 func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
-	defaultRunCfg := lx.RunnerConfig{Head: -1, Tail: 0}
+	defaultRender := lx.RenderOptions{Head: -1, Tail: 0}
 	ops := []Op{
 		{Action: "head", Value: "7", Type: CmdInterleaved},
 		{Action: "FILE", Value: "first.txt", Type: CmdAction},
@@ -40,26 +40,26 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 		{Action: "FILE", Value: "next.txt", Type: CmdAction},
 	}
 
-	sections := parseSections(ops, defaultRunCfg)
+	sections := parseSections(ops, defaultRender)
 	if len(sections) != 2 {
 		t.Fatalf("len(sections) = %d, want 2", len(sections))
 	}
 
-	if sections[0].RunCfg.Head != 7 || sections[0].RunCfg.Tail != 0 {
-		t.Fatalf("first RunCfg = %+v, want Head=7 Tail=0", sections[0].RunCfg)
+	if sections[0].Render.Head != 7 || sections[0].Render.Tail != 0 {
+		t.Fatalf("first Render = %+v, want Head=7 Tail=0", sections[0].Render)
 	}
-	if len(sections[0].Excludes) != 0 {
-		t.Fatalf("first Excludes = %v, want empty", sections[0].Excludes)
+	if len(sections[0].Discover.Excludes) != 0 {
+		t.Fatalf("first Excludes = %v, want empty", sections[0].Discover.Excludes)
 	}
 	if len(sections[0].Ops) != 1 || sections[0].Ops[0].Action != "FILE" {
 		t.Fatalf("first Ops = %+v, want one file op", sections[0].Ops)
 	}
 
-	if sections[1].RunCfg.Head != -1 || sections[1].RunCfg.Tail != 0 {
-		t.Fatalf("second RunCfg = %+v, want reset defaults before applying exclude", sections[1].RunCfg)
+	if sections[1].Render.Head != -1 || sections[1].Render.Tail != 0 {
+		t.Fatalf("second Render = %+v, want reset defaults before applying exclude", sections[1].Render)
 	}
-	if !reflect.DeepEqual(sections[1].Excludes, []string{"vendor/**"}) {
-		t.Fatalf("second Excludes = %v, want [vendor/**]", sections[1].Excludes)
+	if !reflect.DeepEqual(sections[1].Discover.Excludes, []string{"vendor/**"}) {
+		t.Fatalf("second Excludes = %v, want [vendor/**]", sections[1].Discover.Excludes)
 	}
 	if len(sections[1].Ops) != 1 || sections[1].Ops[0].Action != "FILE" {
 		t.Fatalf("second Ops = %+v, want one FILE op", sections[1].Ops)
@@ -67,35 +67,35 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 }
 
 func TestApplyInterleaved_RunConfigFlags(t *testing.T) {
-	s := Section{RunCfg: lx.RunnerConfig{Head: -1, Tail: 0}}
+	s := Section{Render: lx.RenderOptions{Head: -1, Tail: 0}}
 
 	applyInterleaved(Op{Action: "head", Value: "9"}, &s)
-	if s.RunCfg.Head != 9 || s.RunCfg.Tail != 0 {
-		t.Fatalf("after head: RunCfg = %+v, want Head=9 Tail=0", s.RunCfg)
+	if s.Render.Head != 9 || s.Render.Tail != 0 {
+		t.Fatalf("after head: Render = %+v, want Head=9 Tail=0", s.Render)
 	}
 
 	applyInterleaved(Op{Action: "tail", Value: "4"}, &s)
-	if s.RunCfg.Head != 0 || s.RunCfg.Tail != 4 {
-		t.Fatalf("after tail: RunCfg = %+v, want Head=0 Tail=4", s.RunCfg)
+	if s.Render.Head != 0 || s.Render.Tail != 4 {
+		t.Fatalf("after tail: Render = %+v, want Head=0 Tail=4", s.Render)
 	}
 
 	applyInterleaved(Op{Action: "lines", Value: "5"}, &s)
-	if s.RunCfg.Head != 3 || s.RunCfg.Tail != 2 {
-		t.Fatalf("after lines: RunCfg = %+v, want Head=3 Tail=2", s.RunCfg)
+	if s.Render.Head != 3 || s.Render.Tail != 2 {
+		t.Fatalf("after lines: Render = %+v, want Head=3 Tail=2", s.Render)
 	}
 
 	applyInterleaved(Op{Action: "line-numbers"}, &s)
-	if !s.RunCfg.LineNumbers {
+	if !s.Render.LineNumbers {
 		t.Fatalf("line numbers should be enabled")
 	}
 
 	applyInterleaved(Op{Action: "functions"}, &s)
-	if !s.RunCfg.SkeletonFunctions {
+	if !s.Render.SkeletonFunctions {
 		t.Fatalf("skeleton functions should be enabled")
 	}
 
 	applyInterleaved(Op{Action: "types"}, &s)
-	if !s.RunCfg.SkeletonTypes {
+	if !s.Render.SkeletonTypes {
 		t.Fatalf("skeleton types should be enabled")
 	}
 }
@@ -107,10 +107,10 @@ func TestApplyInterleaved_FilterFlagsAppend(t *testing.T) {
 	applyInterleaved(Op{Action: "include", Value: "*.md"}, &s)
 	applyInterleaved(Op{Action: "exclude", Value: "vendor/**"}, &s)
 
-	if !reflect.DeepEqual(s.Includes, []string{"*.go", "*.md"}) {
-		t.Fatalf("Includes = %v, want [*.go *.md]", s.Includes)
+	if !reflect.DeepEqual(s.Discover.Includes, []string{"*.go", "*.md"}) {
+		t.Fatalf("Includes = %v, want [*.go *.md]", s.Discover.Includes)
 	}
-	if !reflect.DeepEqual(s.Excludes, []string{"vendor/**"}) {
-		t.Fatalf("Excludes = %v, want [vendor/**]", s.Excludes)
+	if !reflect.DeepEqual(s.Discover.Excludes, []string{"vendor/**"}) {
+		t.Fatalf("Excludes = %v, want [vendor/**]", s.Discover.Excludes)
 	}
 }

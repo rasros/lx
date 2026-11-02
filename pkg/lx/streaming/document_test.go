@@ -47,15 +47,16 @@ func makeTestDOCX(t *testing.T, paragraphs ...string) []byte {
 	return buf.Bytes()
 }
 
-func TestStream_ExtractDocuments_PropagatesFromRunnerConfig(t *testing.T) {
+func TestStream_ExtractDocuments_PropagatesFromRenderOptions(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1, ExtractDocuments: false})
+	opts := core.RenderOptions{Head: -1, ExtractDocuments: false}
+	stream, err := NewStream(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	data := makeTestDOCX(t, "Content")
-	stream.AddFile(sources.NewBufferInputFile("doc.docx", data))
+	stream.AddFile(sources.NewBufferInputFile("doc.docx", data), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {
@@ -68,15 +69,16 @@ func TestStream_ExtractDocuments_PropagatesFromRunnerConfig(t *testing.T) {
 	}
 }
 
-func TestStream_ExtractDocuments_EnabledViaRunnerConfig(t *testing.T) {
+func TestStream_ExtractDocuments_EnabledViaRenderOptions(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1, ExtractDocuments: true})
+	opts := core.RenderOptions{Head: -1, ExtractDocuments: true}
+	stream, err := NewStream(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	data := makeTestDOCX(t, "DefaultEnabled")
-	stream.AddFile(sources.NewBufferInputFile("doc.docx", data))
+	stream.AddFile(sources.NewBufferInputFile("doc.docx", data), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {
@@ -92,12 +94,13 @@ func TestStream_ExtractDocuments_EnabledViaRunnerConfig(t *testing.T) {
 func TestStream_ConvertedFromNamesTheSourceFormat(t *testing.T) {
 	cfg := core.NewConfig()
 	cfg.FileContentTemplate = "[{{ .ConvertedFrom }}]"
-	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1, ExtractDocuments: true})
+	opts := core.RenderOptions{Head: -1, ExtractDocuments: true}
+	stream, err := NewStream(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	stream.AddFile(sources.NewBufferInputFile("doc.docx", makeTestDOCX(t, "Content")))
+	stream.AddFile(sources.NewBufferInputFile("doc.docx", makeTestDOCX(t, "Content")), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {
@@ -111,12 +114,13 @@ func TestStream_ConvertedFromNamesTheSourceFormat(t *testing.T) {
 func TestStream_ConvertedFromEmptyWithoutAConverter(t *testing.T) {
 	cfg := core.NewConfig()
 	cfg.FileContentTemplate = "[{{ .ConvertedFrom }}]"
-	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1})
+	opts := core.RenderOptions{Head: -1}
+	stream, err := NewStream(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	stream.AddFile(sources.NewBufferInputFile("main.go", []byte("package main\n")))
+	stream.AddFile(sources.NewBufferInputFile("main.go", []byte("package main\n")), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {

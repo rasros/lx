@@ -61,6 +61,6 @@ func parseSizeLimit(raw string) (int64, error) {
 // overMaxSize matches the guard streaming applies in AddFile, so a file dropped
 // from the bundle is dropped from the tree too. A negative size means unknown,
 // as for remote inputs, and is never over the limit.
-func overMaxSize(cfg lx.RunnerConfig, size int64) bool {
+func overMaxSize(cfg lx.RenderOptions, size int64) bool {
 	return cfg.MaxSize > 0 && size > cfg.MaxSize
 }

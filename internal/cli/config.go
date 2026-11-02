@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/rasros/lx/pkg/lx"
 	"gopkg.in/yaml.v3"
@@ -87,39 +86,4 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 	}
 
 	return lxCfg, mergedCli, nil
-}
-
-// LoadGlobalIgnorePatterns returns the global ignore patterns: lx's own,
-// which apply everywhere, and git's global excludes, which apply only inside
-// a git repository.
-func LoadGlobalIgnorePatterns() (lxPatterns, gitPatterns []string) {
-	home, _ := os.UserHomeDir()
-	configDir, _ := os.UserConfigDir()
-	lxPatterns = readIgnorePatterns(filepath.Join(configDir, "lx", "ignore"))
-
-	xdgConfig := os.Getenv("XDG_CONFIG_HOME")
-	if xdgConfig == "" && home != "" {
-		xdgConfig = filepath.Join(home, ".config")
-	}
-	if xdgConfig != "" {
-		gitPatterns = readIgnorePatterns(filepath.Join(xdgConfig, "git", "ignore"))
-	}
-	return lxPatterns, gitPatterns
-}
-
-// readIgnorePatterns returns the patterns in the ignore file at p, if any.
-func readIgnorePatterns(p string) []string {
-	data, err := os.ReadFile(p)
-	if err != nil {
-		return nil
-	}
-	slog.Debug("Loaded global ignore file", "path", p)
-	var lines []string
-	for _, line := range strings.Split(string(data), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
-			lines = append(lines, trimmed)
-		}
-	}
-	return lines
 }

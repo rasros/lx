@@ -254,7 +254,7 @@ func TestWorkloadConcurrency(t *testing.T) {
 	}{
 		{
 			name:        "no skeleton flags",
-			sections:    []Section{{RunCfg: lx.RunnerConfig{}}},
+			sections:    []Section{{Render: lx.RenderOptions{}}},
 			cpuCount:    8,
 			wantWorkers: 0,
 			wantLimited: false,
@@ -262,7 +262,7 @@ func TestWorkloadConcurrency(t *testing.T) {
 		{
 			name: "skeleton functions limited to max",
 			sections: []Section{{
-				RunCfg: lx.RunnerConfig{
+				Render: lx.RenderOptions{
 					SkeletonFunctions: true,
 				},
 			}},
@@ -273,7 +273,7 @@ func TestWorkloadConcurrency(t *testing.T) {
 		{
 			name: "skeleton types keeps low cpu count",
 			sections: []Section{{
-				RunCfg: lx.RunnerConfig{
+				Render: lx.RenderOptions{
 					SkeletonTypes: true,
 				},
 			}},
@@ -284,8 +284,8 @@ func TestWorkloadConcurrency(t *testing.T) {
 		{
 			name: "multiple sections one skeleton section limits",
 			sections: []Section{
-				{RunCfg: lx.RunnerConfig{}},
-				{RunCfg: lx.RunnerConfig{SkeletonTypes: true}},
+				{Render: lx.RenderOptions{}},
+				{Render: lx.RenderOptions{SkeletonTypes: true}},
 			},
 			cpuCount:    6,
 			wantWorkers: maxSkeletonWorkers,

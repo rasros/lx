@@ -23,7 +23,7 @@ func computeSectionTrees(g *Section) {
 			var paths []string
 			for _, idx := range subFileIdxs {
 				for _, f := range g.resolved[idx] {
-					if overMaxSize(g.RunCfg, f.Size) {
+					if overMaxSize(g.Render, f.Size) {
 						continue
 					}
 					paths = append(paths, f.Path)

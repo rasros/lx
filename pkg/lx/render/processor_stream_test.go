@@ -60,16 +60,15 @@ func streamInput(name string, body *countingBody) sources.InputFile {
 	}
 }
 
-func renderStream(t *testing.T, file sources.InputFile, cfg core.RunnerConfig) string {
+func renderStream(t *testing.T, file sources.InputFile, cfg core.RenderOptions) string {
 	t.Helper()
 	engine, err := templatex.Compile(core.NewConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
-	file.Config = cfg
 	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1}, nil)
 	var buf bytes.Buffer
-	item := PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}
+	item := PreparedItem{Raw: FileItem{File: file, Opts: cfg}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
 	if _, err := proc.RenderPrepared(&buf, item, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +98,7 @@ func TestProcessorReadsOnlyMediaHeadersFromStream(t *testing.T) {
 	}
 
 	out := renderStream(t, streamInput("https://example.com/huge.png", body),
-		core.RunnerConfig{Head: -1, ExtractMedia: true})
+		core.RenderOptions{Head: -1, ExtractMedia: true})
 	if !strings.Contains(out, "Image: 640x480, rgb, 8-bit") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
@@ -123,7 +122,7 @@ func TestProcessorStopsMatroskaStreamAfterTracks(t *testing.T) {
 	}
 
 	out := renderStream(t, streamInput("https://example.com/live.mkv", body),
-		core.RunnerConfig{Head: -1, ExtractMedia: true})
+		core.RenderOptions{Head: -1, ExtractMedia: true})
 	for _, want := range []string{"Container: mkv", "Video: h264, 32x32", "Audio: aac, 8000 Hz, mono"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
@@ -155,7 +154,7 @@ func TestProcessorFindsTrailingMoovInStream(t *testing.T) {
 		length: total,
 	}
 	out := renderStream(t, streamInput("https://example.com/video.mp4", body),
-		core.RunnerConfig{Head: -1, ExtractMedia: true})
+		core.RenderOptions{Head: -1, ExtractMedia: true})
 	for _, want := range []string{
 		"Container: mp4",
 		"Duration: 00:00:01.000",
@@ -180,7 +179,7 @@ func TestProcessorCountsLargeStreamFromItsStart(t *testing.T) {
 		r:      io.LimitReader(&repeatReader{line: line}, declared),
 		length: declared,
 	}
-	out := renderStream(t, streamInput("https://example.com/big.log", body), core.RunnerConfig{})
+	out := renderStream(t, streamInput("https://example.com/big.log", body), core.RenderOptions{})
 	if !strings.Contains(out, "~2097152 rows") {
 		t.Fatalf("unexpected output:\n%s", out)
 	}
@@ -207,7 +206,7 @@ func TestProcessorRendersWholeStream(t *testing.T) {
 	// what the stream declared.
 	text := strings.Repeat("line\n", 20000)
 	body := &countingBody{r: strings.NewReader(text), length: int64(len(text))}
-	out := renderStream(t, streamInput("https://example.com/notes.txt", body), core.RunnerConfig{Head: -1})
+	out := renderStream(t, streamInput("https://example.com/notes.txt", body), core.RenderOptions{Head: -1})
 	if strings.Count(out, "line\n") != 20000 {
 		t.Errorf("rendered %d lines, want 20000", strings.Count(out, "line\n"))
 	}
@@ -222,13 +221,13 @@ func TestProcessorSurvivesLyingContentLength(t *testing.T) {
 	text := strings.Repeat("func f() {}\n", 170)
 	cases := []struct {
 		name string
-		cfg  core.RunnerConfig
+		cfg  core.RenderOptions
 		want string
 	}{
-		{"whole", core.RunnerConfig{Head: -1}, text},
-		{"head and tail", core.RunnerConfig{Head: 3, Tail: 3}, "func f() {}\n"},
-		{"compact", core.RunnerConfig{}, "(170 rows)"},
-		{"skeleton", core.RunnerConfig{Head: -1, SkeletonFunctions: true}, "func f()"},
+		{"whole", core.RenderOptions{Head: -1}, text},
+		{"head and tail", core.RenderOptions{Head: 3, Tail: 3}, "func f() {}\n"},
+		{"compact", core.RenderOptions{}, "(170 rows)"},
+		{"skeleton", core.RenderOptions{Head: -1, SkeletonFunctions: true}, "func f()"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

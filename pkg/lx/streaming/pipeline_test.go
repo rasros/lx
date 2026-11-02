@@ -18,11 +18,14 @@ import (
 
 const testFooter = "<<END-OF-OUTPUT>>"
 
+// wholeFile renders every line of a file.
+var wholeFile = core.RenderOptions{Head: -1, Tail: -1}
+
 func newFooterStream(t *testing.T, workers int) *Stream {
 	t.Helper()
 	cfg := core.NewConfig()
 	cfg.OutputFooterTemplate = testFooter
-	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1, Tail: -1})
+	stream, err := NewStream(cfg)
 	if err != nil {
 		t.Fatalf("NewStream: %v", err)
 	}
@@ -73,7 +76,7 @@ func waitGoroutines(t *testing.T, base int) {
 func TestPipeline_CancelledContextFailsWithoutFooter(t *testing.T) {
 	stream := newFooterStream(t, 4)
 	for i := 0; i < 200; i++ {
-		stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%d.txt", i), []byte("data")))
+		stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%d.txt", i), []byte("data")), wholeFile)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -96,9 +99,9 @@ func TestPipeline_CancelMidRunFailsWithoutFooter(t *testing.T) {
 	stream := newFooterStream(t, 2)
 	gate := make(chan struct{})
 	started := make(chan struct{})
-	stream.AddFile(gatedFile("slow.txt", "slow", gate, started))
+	stream.AddFile(gatedFile("slow.txt", "slow", gate, started), wholeFile)
 	for i := 0; i < 20; i++ {
-		stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%d.txt", i), []byte("data")))
+		stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%d.txt", i), []byte("data")), wholeFile)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,9 +130,9 @@ func TestPipeline_SlowHeadBoundsBufferedResults(t *testing.T) {
 	gate := make(chan struct{})
 	headStarted := make(chan struct{})
 	var started atomic.Int64
-	stream.AddFile(gatedFile("slow.txt", "slow", gate, headStarted))
+	stream.AddFile(gatedFile("slow.txt", "slow", gate, headStarted), wholeFile)
 	for i := 0; i < fastItems; i++ {
-		stream.AddFile(countingFile(fmt.Sprintf("f%d.txt", i), "data", &started))
+		stream.AddFile(countingFile(fmt.Sprintf("f%d.txt", i), "data", &started), wholeFile)
 	}
 
 	done := make(chan error, 1)
@@ -184,7 +187,7 @@ func TestPipeline_WriteErrorReturnedWithoutLeaks(t *testing.T) {
 
 	stream := newFooterStream(t, 4)
 	for i := 0; i < 500; i++ {
-		stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%d.txt", i), bytes.Repeat([]byte("x"), 256)))
+		stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%d.txt", i), bytes.Repeat([]byte("x"), 256)), wholeFile)
 	}
 
 	err := stream.Execute(context.Background(), &failingWriter{limit: 2048})
@@ -202,7 +205,7 @@ func TestPipeline_PreservesOrderWithConcurrency(t *testing.T) {
 			if i%50 == 0 {
 				stream.AddSection(fmt.Sprintf("Section %d", i/50))
 			}
-			stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%03d.txt", i), []byte(fmt.Sprintf("item-%03d", i))))
+			stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%03d.txt", i), []byte(fmt.Sprintf("item-%03d", i))), wholeFile)
 		}
 		var buf strings.Builder
 		if err := stream.Execute(context.Background(), &buf); err != nil {

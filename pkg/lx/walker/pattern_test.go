@@ -167,38 +167,6 @@ func TestCompiledPatternMatchCandidate(t *testing.T) {
 	}
 }
 
-func TestIsKeptAndIsMatchParity(t *testing.T) {
-	tests := []struct {
-		pattern string
-		path    string
-	}{
-		{pattern: "*.go", path: "main.go"},
-		{pattern: "*.go", path: "src/main.go"},
-		{pattern: "/foo.txt", path: "foo.txt"},
-		{pattern: "/foo.txt", path: "sub/foo.txt"},
-		{pattern: "src/*.go", path: "src/main.go"},
-		{pattern: "src/*.go", path: "pkg/main.go"},
-		{pattern: "**/test", path: "a/b/test"},
-		{pattern: "**/test", path: "test"},
-		{pattern: "node_modules/", path: "node_modules/pkg/foo.go"},
-		{pattern: "node_modules/", path: "other/foo.go"},
-		{pattern: `src\*.go`, path: `src\main.go`},
-		{pattern: "[", path: "main.go"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.pattern+"|"+tt.path, func(t *testing.T) {
-			match := IsMatch(tt.pattern, tt.path)
-			if got := IsKept(tt.path, []string{tt.pattern}, nil); got != match {
-				t.Fatalf("IsKept(include=%q) = %v, want %v (IsMatch parity)", tt.pattern, got, match)
-			}
-			if got := IsKept(tt.path, nil, []string{tt.pattern}); got != !match {
-				t.Fatalf("IsKept(exclude=%q) = %v, want %v (!IsMatch parity)", tt.pattern, got, !match)
-			}
-		})
-	}
-}
-
 func TestParseRulesUsesCompiledSpec(t *testing.T) {
 	rules := parseRules([]string{
 		"foo",

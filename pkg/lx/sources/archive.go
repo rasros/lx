@@ -38,8 +38,13 @@ func IsArchivePath(path string) bool {
 	return false
 }
 
-type FileSink interface {
-	Add(InputFile)
+// EntrySelector decides which entries of an archive are expanded. Paths
+// relative to the archive root are slash-separated.
+type EntrySelector interface {
+	// Descend reports whether the walk enters the directory dir.
+	Descend(dir string) bool
+	// Accept reports whether the file entry, displayed as path, is expanded.
+	Accept(entry, path string) bool
 }
 
 type archiveCandidate struct {
@@ -52,13 +57,16 @@ type archiveCandidate struct {
 	materialized  bool
 }
 
-func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, includes []string, outPath string, sink FileSink) error {
+// ExpandArchive returns the files in the archive at absPath, displayed below
+// displayPath, that w walks to and sel accepts. A nil sel accepts every file.
+// Entries are read into memory, so the archive is not needed once it returns.
+func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, sel EntrySelector) ([]InputFile, error) {
 	if !IsArchivePath(absPath) {
-		return nil
+		return nil, nil
 	}
 	fsys, err := archives.FileSystem(ctx, absPath, nil)
 	if err != nil {
-		return fmt.Errorf("open archive %q: %w", absPath, err)
+		return nil, fmt.Errorf("open archive %q: %w", absPath, err)
 	}
 	defer closeFS(fsys)
 
@@ -76,6 +84,9 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 			return nil
 		}
 		if d.IsDir() {
+			if sel != nil && entryPath != "." && !sel.Descend(entryPath) {
+				return fs.SkipDir
+			}
 			return nil
 		}
 		if err := ctx.Err(); err != nil {
@@ -93,25 +104,8 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 		}
 		effectivePath := archiveBase + "/" + key
 
-		if len(includes) > 0 {
-			matched := false
-			for _, inc := range includes {
-				if walker.IsMatch(inc, key) {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				slog.Debug("Ignored by include filter (-i)", "path", effectivePath)
-				return nil
-			}
-		}
-
-		if outPath != "" {
-			if abs, _ := filepath.Abs(effectivePath); abs == outPath {
-				slog.Warn("Skipping output file to avoid infinite recursion", "path", effectivePath)
-				return nil
-			}
+		if sel != nil && !sel.Accept(key, effectivePath) {
+			return nil
 		}
 
 		info, err := d.Info()
@@ -136,17 +130,17 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 		return nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(candidates) == 0 {
 		slog.Debug("Archive expansion finished", "archive", displayPath, "files_found", 0)
-		return nil
+		return nil, nil
 	}
 
 	usedExtractor, err := materializeWithExtractor(ctx, absPath, candidates, candidateByKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for i := range candidates {
@@ -162,7 +156,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 		candidates[i].materialized = true
 	}
 
-	count := 0
+	var files []InputFile
 	for i := range candidates {
 		if !candidates[i].materialized {
 			continue
@@ -178,12 +172,11 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 			},
 		}
 		slog.Debug("File accepted from archive", "path", f.Path, "size", f.Size)
-		sink.Add(f)
-		count++
+		files = append(files, f)
 	}
 
-	slog.Debug("Archive expansion finished", "archive", displayPath, "files_found", count, "used_extractor", usedExtractor)
-	return nil
+	slog.Debug("Archive expansion finished", "archive", displayPath, "files_found", len(files), "used_extractor", usedExtractor)
+	return files, nil
 }
 
 func closeFS(fsys fs.FS) {

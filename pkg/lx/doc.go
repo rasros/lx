@@ -1,12 +1,34 @@
 // Package lx provides a library for collecting project files and rendering
-// them into LLM-friendly output.
+// them into LLM-friendly output, as the lx command does.
 //
 // Core API:
 //
+//   - NewCollector finds the inputs a path or URL refers to, as lx does.
 //   - NewConfig creates a Config with sensible defaults.
 //   - NewStream creates a Stream that renders files, sections, and prompts.
-//   - NewWalker creates a filesystem walker with ignore-rule support.
-//   - NewInputFile / NewBufferInputFile create inputs for Stream.AddFile.
+//   - NewInputFile / NewBufferInputFile create inputs of your own.
+//
+// DiscoverOptions decide what Collector.Collect finds:
+//
+//   - Includes / Excludes filter the files below a directory or in an archive.
+//   - IgnoreRules / GitExcludes apply everywhere; UserIgnoreRules reads the
+//     ones lx uses. Ignore files (.gitignore inside a git repository,
+//     .ignore and .lxignore everywhere) apply from every directory above the
+//     target down, unless NoIgnore is set.
+//   - ShowHidden, FollowDirSymlinks and SkipFileSymlinks control the walk.
+//   - ExpandArchives collects the files inside .zip, .tar.gz and other
+//     archives, local or remote, instead of the archives themselves.
+//
+// RenderOptions decide how each file added to a Stream renders:
+//
+//   - Head / Tail choose how many lines to include from start/end; a negative
+//     Head renders the whole file, and zero for both only its header.
+//   - MaxSize skips files larger than the given byte count; zero disables it.
+//   - LineNumbers enables numbered output.
+//   - SkeletonFunctions / SkeletonTypes reduce source files to signatures/defs.
+//   - ExtractDocuments converts .pdf/.docx/.xlsx/.pptx to text and HTML to
+//     Markdown.
+//   - ExtractMedia replaces audio and video files with their container metadata.
 //
 // Main configuration:
 //
@@ -15,83 +37,43 @@
 //   - Config template fields (FileContentTemplate, SectionTemplate, etc.) allow
 //     custom output structure.
 //
-// RunnerConfig controls per-file slicing, filtering, and discovery:
-//
-//   - Head / Tail choose how many lines to include from start/end.
-//   - MaxSize skips files larger than the given byte count; zero disables it.
-//   - LineNumbers enables numbered output.
-//   - SkeletonFunctions / SkeletonTypes reduce source files to signatures/defs.
-//   - ExpandArchives opens compressed files and directories for .zip/.tar.gz, etc..
-//   - ExtractDocuments converts .pdf/.docx/.xlsx/.pptx to text and HTML to
-//     Markdown.
-//   - ExtractMedia replaces audio and video files with their container metadata.
-//   - ShowHidden, FollowDirSymlinks, SkipFileSymlinks control discovery options.
-//   - NoIgnore disables adhering to .ignore files.
-//
 // Stream methods:
 //
-//   - AddFile, AddSection, AddPrompt enqueue content.
+//   - AddFile, AddSection, AddPrompt, AddTree, AddMeta enqueue content.
 //   - Execute renders output to an io.Writer.
-//   - Prepare / GetGlobalContext expose aggregate statistics.
-//   - WithConcurrency / WithTokenizer / WithOnFileError customize processing.
+//   - GetGlobalContext exposes aggregate statistics.
+//   - WithConcurrency / WithOnFileError customize processing.
 //
-// Walker methods:
-//
-//   - WalkPath traverses a path on the host while applying .gitignore, .ignore,
-//     .lxignore and info/exclude semantics (when enabled), including the rules
-//     of the directories above it.
-//   - Walk traverses any other fs.FS, such as an archive, on its own.
-//   - Base and override rules, and a RuleCache shared between walkers, are set
-//     in WalkerOptions.
-//
-// Archive and document helpers:
-//
-//   - IsArchivePath / ExpandArchive handle archive expansion into stream files.
-//   - IsDocumentPath / ConvertInput convert documents to text, or to Markdown
-//     for HTML.
-//   - IsMediaPath / ExtractMediaMetadata describe media files by their headers.
-//
-// Typical flow:
-//
-//  1. Build a Config and Stream.
-//  2. Walk a filesystem with Walker, adding files via NewInputFile.
-//  3. Render the stream to an io.Writer.
-//
-// Example:
+// Example, rendering a directory as lx <dir> does:
 //
 //	package main
 //
 //	import (
 //		"context"
-//		"io/fs"
 //		"os"
-//		"path/filepath"
 //
 //		"github.com/rasros/lx/pkg/lx"
 //	)
 //
 //	func main() {
-//		cfg := lx.NewConfig()
-//		stream, err := lx.NewStream(cfg, lx.RunnerConfig{Head: -1})
+//		ctx := context.Background()
+//
+//		var opts lx.DiscoverOptions
+//		opts.IgnoreRules, opts.GitExcludes = lx.UserIgnoreRules()
+//		files, err := lx.NewCollector().Collect(ctx, ".", opts)
 //		if err != nil {
 //			panic(err)
 //		}
 //
-//		w := lx.NewWalker(lx.WalkerOptions{IgnoreEnabled: true})
-//		root, _ := filepath.Abs(".")
-//		fsys := os.DirFS(root)
-//		_ = w.WalkPath(root, func(path string, d fs.DirEntry, err error) error {
-//			if err != nil || d.IsDir() {
-//				return err
-//			}
-//			info, err := d.Info()
-//			if err != nil {
-//				return err
-//			}
-//			stream.AddFile(lx.NewInputFile(fsys, path, info))
-//			return nil
-//		})
-//
-//		_ = stream.Execute(context.Background(), os.Stdout)
+//		stream, err := lx.NewStream(lx.NewConfig())
+//		if err != nil {
+//			panic(err)
+//		}
+//		for _, f := range files {
+//			stream.AddFile(f, lx.RenderOptions{Head: -1})
+//		}
+//		if err := stream.Execute(ctx, os.Stdout); err != nil {
+//			panic(err)
+//		}
 //	}
 package lx

@@ -6,13 +6,13 @@ import (
 	"io/fs"
 
 	"github.com/rasros/lx/pkg/lx/core"
+	"github.com/rasros/lx/pkg/lx/discover"
 	"github.com/rasros/lx/pkg/lx/sources"
 	streamingpkg "github.com/rasros/lx/pkg/lx/streaming"
-	walkerpkg "github.com/rasros/lx/pkg/lx/walker"
 )
 
 type GlobalContext = core.GlobalContext
-type RunnerConfig = core.RunnerConfig
+type RenderOptions = core.RenderOptions
 type TemplateEngine = core.TemplateEngine
 type Config = core.Config
 type SectionContext = core.SectionContext
@@ -20,40 +20,22 @@ type PromptContext = core.PromptContext
 type StatsContext = core.StatsContext
 
 type InputFile = sources.InputFile
-type Walker = walkerpkg.Walker
-type WalkerOptions = walkerpkg.Options
-type RuleCache = walkerpkg.Cache
-type Host = walkerpkg.Host
-type OSHost = walkerpkg.OSHost
-type CompiledSpec = walkerpkg.CompiledSpec
+type DiscoverOptions = discover.Options
+type Collector = discover.Collector
 
 type FileErrorHandler = streamingpkg.FileErrorHandler
-type FileSink = sources.FileSink
 
 func NewConfig() *Config { return core.NewConfig() }
 
 func Merge(dst *Config, src *Config) { core.Merge(dst, src) }
 
-// NewWalker returns a Walker configured by opts.
-func NewWalker(opts WalkerOptions) *Walker { return walkerpkg.New(opts) }
+// NewCollector returns a Collector, which finds the inputs of the targets of
+// one run as lx does.
+func NewCollector() *Collector { return discover.NewCollector() }
 
-// NewRuleCache returns a cache of the ignore rules found on host, or on the
-// OS when host is nil, to share between the walkers of one run.
-func NewRuleCache(host Host) *RuleCache { return walkerpkg.NewCache(host) }
-
-func CompileSpecs(patterns []string) []CompiledSpec { return walkerpkg.CompileSpecs(patterns) }
-
-func IsMatchAnyCompiled(specs []CompiledSpec, relPath string) bool {
-	return walkerpkg.IsMatchAnyCompiled(specs, relPath)
-}
-
-func CouldMatchAnyDescendant(specs []CompiledSpec, dirRelPath string) bool {
-	return walkerpkg.CouldMatchAnyDescendant(specs, dirRelPath)
-}
-
-func IsKept(p string, includes, excludes []string) bool {
-	return walkerpkg.IsKept(p, includes, excludes)
-}
+// UserIgnoreRules reads the ignore files lx applies everywhere, for
+// DiscoverOptions.IgnoreRules and GitExcludes.
+func UserIgnoreRules() (ignoreRules, gitExcludes []string) { return discover.UserIgnoreRules() }
 
 func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	return sources.NewInputFile(fsys, path, info)
@@ -63,26 +45,12 @@ func NewBufferInputFile(name string, data []byte) InputFile {
 	return sources.NewBufferInputFile(name, data)
 }
 
-func IsHTTPURL(raw string) bool { return sources.IsHTTPURL(raw) }
-
-func IsHTTPArchiveURL(raw string) bool { return sources.IsHTTPArchiveURL(raw) }
-
-func RewriteRepoURL(raw string) (string, bool) { return sources.RewriteRepoURL(raw) }
-
-func NewURLInputFile(raw string) (InputFile, error) { return sources.NewURLInputFile(raw) }
-
-func DownloadURLToTempFile(ctx context.Context, raw string) (path string, cleanup func(), err error) {
-	return sources.DownloadURLToTempFile(ctx, raw)
-}
-
-func IsArchivePath(path string) bool { return sources.IsArchivePath(path) }
-
 type Stream struct {
 	inner *streamingpkg.Stream
 }
 
-func NewStream(cfg *Config, runnerCfg RunnerConfig) (*Stream, error) {
-	s, err := streamingpkg.NewStream(cfg, runnerCfg)
+func NewStream(cfg *Config) (*Stream, error) {
+	s, err := streamingpkg.NewStream(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -94,18 +62,14 @@ func (s *Stream) WithConcurrency(n int) *Stream {
 	return s
 }
 
-func (s *Stream) WithRunnerConfig(cfg RunnerConfig) *Stream {
-	s.inner.WithRunnerConfig(cfg)
-	return s
-}
-
 func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
 	s.inner.WithOnFileError(h)
 	return s
 }
 
-func (s *Stream) AddFile(f InputFile) *Stream {
-	s.inner.AddFile(f)
+// AddFile enqueues f to render with opts, unless it exceeds opts.MaxSize.
+func (s *Stream) AddFile(f InputFile, opts RenderOptions) *Stream {
+	s.inner.AddFile(f, opts)
 	return s
 }
 
@@ -134,10 +98,3 @@ func (s *Stream) GetGlobalContext() GlobalContext { return s.inner.GetGlobalCont
 func (s *Stream) Execute(ctx context.Context, w io.Writer) error { return s.inner.Execute(ctx, w) }
 
 func (s *Stream) GetEngine() *TemplateEngine { return s.inner.GetEngine() }
-
-// Add lets a Stream be used directly as a FileSink.
-func (s *Stream) Add(f InputFile) { s.AddFile(f) }
-
-func ExpandArchive(ctx context.Context, absPath, displayPath string, walker *Walker, includes []string, outPath string, sink FileSink) error {
-	return sources.ExpandArchive(ctx, absPath, displayPath, walker, includes, outPath, sink)
-}
