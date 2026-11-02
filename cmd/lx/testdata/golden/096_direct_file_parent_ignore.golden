@@ -7,4 +7,4 @@ should appear
 
 
 --- STDERR ---
-Warning: Skipping path, use -f to include it (path=direct_ignore_test/test.ignored reason=rule "*.ignored" in .gitignore)
+Warning: Skipping path, use -f to include it (path=direct_ignore_test/test.ignored reason=rule "*.ignored" in direct_ignore_test/.gitignore)

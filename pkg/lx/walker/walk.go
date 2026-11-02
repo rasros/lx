@@ -1,119 +1,141 @@
 package walker
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
+// Walk walks root within fsys, which stands alone: ignore files apply from
+// its root down, and a .git file pointing outside it cannot be followed.
+// Paths passed to walkFn, and override rules, are relative to fsys. Use
+// WalkPath for the host filesystem.
 func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	info, err := fs.Stat(fsys, root)
 	if err != nil {
 		return walkFn(root, nil, err)
 	}
-
-	if w.IgnoreEnabled && w.RootIgnored {
-		if w.OnIgnore != nil {
-			w.OnIgnore(root, "parent directory")
-		}
-		return nil
+	rt := newRuleTree(fsTree{fsys}, w.opts.IgnoreEnabled)
+	if info.IsDir() {
+		_, err = w.walkRoot(rt, fsys, root, root, info, walkFn)
+		return err
 	}
-
-	if !info.IsDir() {
-		if w.SkipHidden && isHiddenName(path.Base(root)) {
-			if w.OnIgnore != nil {
-				w.OnIgnore(root, "hidden path")
-			}
-			return nil
-		}
-
-		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(w.AncestorRules)+len(w.OverrideRules))
-		effectiveRules = append(effectiveRules, w.BaseRules...)
-		effectiveRules = append(effectiveRules, w.AncestorRules...)
-
-		// Visit each directory from the filesystem root down to the file,
-		// checking it against the rules in effect at its parent as a walk
-		// would. As in git, nothing below an ignored directory is included,
-		// whatever a later negation says. With ignore files enabled, each
-		// directory's rules are loaded, starting over at every repository
-		// boundary.
-		dirs := []string{"."}
-		if dir := path.Dir(root); dir != "." {
-			parts := strings.Split(dir, "/")
-			for i := range parts {
-				dirs = append(dirs, strings.Join(parts[:i+1], "/"))
-			}
-		}
-		// parentIgnored mirrors recursiveWalk: an ignored directory is still
-		// descended when a negation could re-include something below it, but
-		// everything under it stays ignored unless a rule re-includes it.
-		parentIgnored, parentReason := false, ""
-		for _, d := range dirs {
-			if d != "." {
-				ignored, descend, reason := w.dirIgnoredBy(d, effectiveRules, parentIgnored)
-				if reason == "parent directory" && parentReason != "" {
-					reason = parentReason
-				}
-				if ignored && !descend {
-					if w.OnIgnore != nil {
-						w.OnIgnore(root, reason)
-					}
-					return nil
-				}
-				parentIgnored = ignored
-				if ignored && reason != "" {
-					parentReason = reason
-				}
-			}
-			if !w.IgnoreEnabled {
-				continue
-			}
-			if rules, ok := w.repoRules(fsys, d); ok {
-				effectiveRules = rules
-			}
-			effectiveRules = append(effectiveRules, w.loadIgnoreFiles(fsys, d)...)
-		}
-		effectiveRules = append(effectiveRules, w.OverrideRules...)
-
-		isIgnored, reason := checkIgnore(root, info.IsDir(), effectiveRules, parentIgnored, w.OnIgnore != nil)
-		if isIgnored {
-			if parentIgnored && reason == "parent directory" && parentReason != "" {
-				reason = parentReason
-			}
-			if w.OnIgnore != nil {
-				w.OnIgnore(root, reason)
-			}
-			return nil
-		}
-		return walkFn(root, dirEntryAdapter{info}, nil)
-	}
-
-	initialRules := make([]Rule, 0, len(w.BaseRules)+len(w.AncestorRules))
-	initialRules = append(initialRules, w.BaseRules...)
-	initialRules = append(initialRules, w.AncestorRules...)
-	return w.recursiveWalk(fsys, root, initialRules, walkFn, false, []fs.FileInfo{info})
+	_, err = w.walkFile(rt, ".", root, root, info, walkFn)
+	return err
 }
 
-// dirIgnoredBy reports whether the walk-relative directory dir is ignored by
-// rules, the ignore rules in effect at its parent, followed by the override
-// rules as the walk applies them. descend reports whether a negation could
-// still re-include something below an ignored dir, in which case recursiveWalk
-// enters it with its parent marked ignored. The reason names the directory.
-func (w *Walker) dirIgnoredBy(dir string, rules []Rule, parentIgnored bool) (ignored, descend bool, reason string) {
-	if len(w.OverrideRules) > 0 {
-		rules = append(rules[:len(rules):len(rules)], w.OverrideRules...)
+// WalkPath walks absRoot, an absolute path on the cache's host, with the
+// ignore rules of the directories above it and of its repository, as git
+// would see them. Paths passed to fn are relative to absRoot when it is a
+// directory; a file root is passed as its base name.
+//
+// Override rules match relative to absRoot, or for a file root relative to
+// the working directory when the file is below it, and to the file's
+// directory otherwise.
+//
+// skipped is the reason absRoot itself was skipped, empty when it was not.
+func (w *Walker) WalkPath(absRoot string, fn fs.WalkDirFunc) (skipped string, err error) {
+	h := w.cache.host
+	absRoot = filepath.Clean(absRoot)
+	info, err := h.Stat(absRoot)
+	if err != nil {
+		return "", fn(filepath.Base(absRoot), nil, err)
 	}
-	ignored, reason = checkIgnore(dir, true, rules, parentIgnored, w.OnIgnore != nil)
-	if !ignored {
-		return false, false, ""
+	rt := w.cache.hostTree()
+	if info.IsDir() {
+		fsys := h.DirFS(absRoot)
+		// The walk needs to search the directory, which stat'ing it alone
+		// does not check.
+		if info, err = fs.Stat(fsys, "."); err != nil {
+			return "", fn(".", nil, err)
+		}
+		dir := absRoot
+		if !w.opts.IgnoreEnabled {
+			rt, dir = newRuleTree(fsTree{fsys}, false), "."
+		}
+		return w.walkRoot(rt, fsys, dir, ".", info, fn)
 	}
-	descend = hasNestedException(dir, rules)
-	if w.OnIgnore != nil && reason != "parent directory" {
-		reason = fmt.Sprintf("parent directory %s: %s", dir, reason)
+
+	base, rel := filepath.Dir(absRoot), filepath.Base(absRoot)
+	if r, ok := w.cache.ht.below(absRoot); ok {
+		base, rel = w.cache.ht.cwd, filepath.ToSlash(r)
 	}
-	return true, descend, reason
+	if !w.opts.IgnoreEnabled {
+		rt, base = newRuleTree(fsTree{h.DirFS(base)}, false), "."
+	}
+	return w.walkFile(rt, base, rel, filepath.Base(absRoot), info, fn)
+}
+
+func (w *Walker) ignore(p, reason string) {
+	if w.opts.OnIgnore != nil {
+		w.opts.OnIgnore(p, reason)
+	}
+}
+
+// walkRoot walks the directory dir of rt, which is root within fsys.
+func (w *Walker) walkRoot(rt *ruleTree, fsys fs.FS, dir, root string, info fs.FileInfo, fn fs.WalkDirFunc) (string, error) {
+	f := rt.frame(w, dir)
+	if f.excluded {
+		w.ignore(root, f.reason)
+		return f.reason, nil
+	}
+	return "", w.walkDir(rt, fsys, f, root, f.ignored, f.reason, fn, []fs.FileInfo{info})
+}
+
+// walkFile checks the single file at rel below the directory base of rt: the
+// frame of its directory, plus a check on the file. Override rules also apply
+// to the directories between base and the file, as a walk from base would
+// apply them. The file is passed to fn as name.
+func (w *Walker) walkFile(rt *ruleTree, base, rel, name string, info fs.FileInfo, fn fs.WalkDirFunc) (string, error) {
+	skip := func(reason string) (string, error) {
+		w.ignore(name, reason)
+		return reason, nil
+	}
+	f := rt.frame(w, base)
+	if f.excluded {
+		return skip(f.reason)
+	}
+	if w.opts.SkipHidden && isHiddenName(path.Base(rel)) {
+		return skip("hidden path")
+	}
+
+	ignored, reason := f.ignored, f.reason
+	if parent := path.Dir(rel); parent != "." {
+		dir, walkRel := base, "."
+		for _, part := range strings.Split(parent, "/") {
+			child := rt.t.child(dir, part)
+			walkRel = joinRel(walkRel, part)
+			dir = child
+			if len(w.override) == 0 {
+				continue
+			}
+			ign, descend, r, own := judgeDir(f.rules, joinRel(f.node.rel, part), rt.isTop(child), w.override, walkRel, ignored, reason)
+			if ign {
+				r = dirReason(rt.t.display(child), r, own)
+				if !descend {
+					return skip(r)
+				}
+			}
+			ignored, reason = ign, r
+			f = rt.frame(w, child)
+		}
+		if len(w.override) == 0 {
+			// Without override rules the directory's frame holds the answer.
+			if f = rt.frame(w, dir); f.excluded {
+				return skip(f.reason)
+			}
+			ignored, reason = f.ignored, f.reason
+		}
+	}
+
+	ignored, reason = checkIgnore(joinRel(f.node.rel, path.Base(rel)), false, f.rules, ignored, reason, true)
+	ignored, reason = checkIgnore(rel, false, w.override, ignored, reason, true)
+	if ignored {
+		return skip(reason)
+	}
+	return "", fn(name, dirEntryAdapter{info}, nil)
 }
 
 // resolveEntry reports how an entry should be treated, applying symlink policy.
@@ -128,20 +150,20 @@ func (w *Walker) resolveEntry(fsys fs.FS, path string, d fs.DirEntry, ancestors 
 	if err != nil {
 		// Broken link. It resolves to nothing, so file-symlink policy governs
 		// it; otherwise leave it for the callback to report.
-		if w.SkipFileSymlinks {
+		if w.opts.SkipFileSymlinks {
 			return false, nil, true, "file symlink"
 		}
 		return false, nil, false, ""
 	}
 
 	if !info.IsDir() {
-		if w.SkipFileSymlinks {
+		if w.opts.SkipFileSymlinks {
 			return false, nil, true, "file symlink"
 		}
 		return false, nil, false, ""
 	}
 
-	if !w.FollowDirSymlinks {
+	if !w.opts.FollowDirSymlinks {
 		return false, nil, true, "directory symlink"
 	}
 	for _, a := range ancestors {
@@ -152,37 +174,15 @@ func (w *Walker) resolveEntry(fsys fs.FS, path string, d fs.DirEntry, ancestors 
 	return true, info, false, ""
 }
 
-func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkFn fs.WalkDirFunc, parentIgnored bool, ancestors []fs.FileInfo) error {
-	var localRules []Rule
-	if w.IgnoreEnabled {
-		if rules, ok := w.repoRules(fsys, dir); ok {
-			parentRules = rules
-		}
-		localRules = w.loadIgnoreFiles(fsys, dir)
-	}
-
-	var mergedRules []Rule
-	if len(localRules) == 0 {
-		mergedRules = parentRules
-	} else {
-		mergedRules = make([]Rule, 0, len(parentRules)+len(localRules))
-		mergedRules = append(mergedRules, parentRules...)
-		mergedRules = append(mergedRules, localRules...)
-	}
-
-	var effectiveRules []Rule
-	if len(w.OverrideRules) == 0 {
-		effectiveRules = mergedRules
-	} else {
-		effectiveRules = make([]Rule, 0, len(mergedRules)+len(w.OverrideRules))
-		effectiveRules = append(effectiveRules, mergedRules...)
-		effectiveRules = append(effectiveRules, w.OverrideRules...)
-	}
-
+// walkDir walks the directory at dir within fsys, whose frame is f. ignored
+// and reason are the state carried from above, set when the directory is
+// ignored but entered because a negation could re-include something below.
+func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, ignored bool, reason string, walkFn fs.WalkDirFunc, ancestors []fs.FileInfo) error {
 	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
 		return walkFn(dir, nil, err)
 	}
+	wantReason := w.opts.OnIgnore != nil
 
 	for _, d := range entries {
 		childPath := d.Name()
@@ -190,18 +190,14 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 			childPath = path.Join(dir, d.Name())
 		}
 
-		if w.SkipHidden && isHiddenName(d.Name()) {
-			if w.OnIgnore != nil {
-				w.OnIgnore(childPath, "hidden path")
-			}
+		if w.opts.SkipHidden && isHiddenName(d.Name()) {
+			w.ignore(childPath, "hidden path")
 			continue
 		}
 
 		isDir, target, skip, skipReason := w.resolveEntry(fsys, childPath, d, ancestors)
 		if skip {
-			if w.OnIgnore != nil {
-				w.OnIgnore(childPath, skipReason)
-			}
+			w.ignore(childPath, skipReason)
 			continue
 		}
 
@@ -209,7 +205,7 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 		// the followed links. Skipped entirely when not following, so ordinary
 		// walks pay no extra stat.
 		childAncestors := ancestors
-		if isDir && w.FollowDirSymlinks {
+		if isDir && w.opts.FollowDirSymlinks {
 			info := target
 			if info == nil {
 				info, _ = d.Info()
@@ -219,43 +215,38 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 			}
 		}
 
-		isIgnored, reason := checkIgnore(childPath, isDir, effectiveRules, parentIgnored, w.OnIgnore != nil)
-
+		rel := joinRel(f.node.rel, d.Name())
 		if isDir {
-			if isIgnored {
-				if hasNestedException(childPath, effectiveRules) {
-					if err := w.recursiveWalk(fsys, childPath, mergedRules, walkFn, true, childAncestors); err != nil {
-						return err
-					}
-					continue
-				}
-				if w.OnIgnore != nil {
-					w.OnIgnore(childPath, reason)
-				}
+			childDir := rt.t.child(f.node.dir, d.Name())
+			ign, descend, r, own := judgeDir(f.rules, rel, rt.isTop(childDir), w.override, childPath, ignored, reason)
+			if ign && !descend {
+				w.ignore(childPath, r)
 				continue
 			}
-
-			entry := d
-			if target != nil {
-				entry = followedDirEntry{DirEntry: d, info: target}
-			}
-			if err := walkFn(childPath, entry, nil); err != nil {
-				if err == fs.SkipDir {
-					continue
+			if ign {
+				r = dirReason(rt.t.display(childDir), r, own)
+			} else {
+				entry := d
+				if target != nil {
+					entry = followedDirEntry{DirEntry: d, info: target}
 				}
-				return err
+				if err := walkFn(childPath, entry, nil); err != nil {
+					if err == fs.SkipDir {
+						continue
+					}
+					return err
+				}
 			}
-
-			if err := w.recursiveWalk(fsys, childPath, mergedRules, walkFn, false, childAncestors); err != nil {
+			if err := w.walkDir(rt, fsys, rt.frame(w, childDir), childPath, ign, r, walkFn, childAncestors); err != nil {
 				return err
 			}
 			continue
 		}
 
-		if isIgnored {
-			if w.OnIgnore != nil {
-				w.OnIgnore(childPath, reason)
-			}
+		ign, r := checkIgnore(rel, false, f.rules, ignored, reason, wantReason)
+		ign, r = checkIgnore(childPath, false, w.override, ign, r, wantReason)
+		if ign {
+			w.ignore(childPath, r)
 			continue
 		}
 		if err := walkFn(childPath, d, nil); err != nil {
@@ -267,25 +258,6 @@ func (w *Walker) recursiveWalk(fsys fs.FS, dir string, parentRules []Rule, walkF
 
 func isHiddenName(name string) bool {
 	return strings.HasPrefix(name, ".") && name != "." && name != ".."
-}
-
-func (w *Walker) loadIgnoreFiles(fsys fs.FS, dir string) []Rule {
-	var rules []Rule
-	files := []string{".gitignore", ".ignore", ".lxignore"}
-
-	for _, name := range files {
-		fp := name
-		if dir != "." {
-			fp = path.Join(dir, name)
-		}
-
-		data, err := fs.ReadFile(fsys, fp)
-		logReadError(fp, err)
-		if err == nil {
-			rules = append(rules, parseRuleFile(data, dir, name)...)
-		}
-	}
-	return rules
 }
 
 // followedDirEntry presents a followed directory symlink as a directory, so

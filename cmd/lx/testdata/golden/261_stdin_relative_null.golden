@@ -1,12 +1,10 @@
 --- STDOUT ---
-[1/2] ../main.go (2 rows)
+../main.go (2 rows)
 ---
 ```go
 package main
 func main() {}
 ```
-
-[2/2] ../bin/data.bin - binary file skipped (4 B)
 
 
 --- STDERR ---

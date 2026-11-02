@@ -20,7 +20,7 @@ func TestWalker_NestedIgnores(t *testing.T) {
 	mustWriteFile(t, tmp, "nested/other.log", "ignore me too")
 	mustWriteFile(t, tmp, "nested/important.log", "keep me")
 
-	w := NewWalker(
+	w := newWalker(
 		[]string{"*.log"},
 		[]string{"!nested/important.log"},
 	)
@@ -42,7 +42,7 @@ func TestWalker_WildcardException(t *testing.T) {
 	mustWriteFile(t, tmp, "logs/db/junk.txt", "trash")
 	mustWriteFile(t, tmp, "logs/db/keep.txt", "treasure")
 
-	w := NewWalker(
+	w := newWalker(
 		[]string{"logs"},
 		[]string{"!logs/*/keep.txt"},
 	)
@@ -59,7 +59,7 @@ func TestWalker_StartOnFile(t *testing.T) {
 	tmp := t.TempDir()
 	mustWriteFile(t, tmp, "hello.txt", "world")
 
-	w := NewWalker(nil, nil)
+	w := newWalker(nil, nil)
 
 	var paths []string
 	fsys := os.DirFS(tmp)
@@ -86,7 +86,7 @@ func TestWalker_StartOnFile_Ignored(t *testing.T) {
 	mustWriteFile(t, tmp, "ignore.me", "content")
 	mustWriteFile(t, tmp, ".gitignore", "*.me")
 
-	w := NewWalker(nil, nil)
+	w := newWalker(nil, nil)
 
 	var paths []string
 	fsys := os.DirFS(tmp)
@@ -116,9 +116,9 @@ func TestWalker_SkipHidden(t *testing.T) {
 	mustWriteFile(t, tmp, ".hidden/file.txt", "secret")
 	mustWriteFile(t, tmp, "visible/file.txt", "public")
 
-	w := NewWalker(nil, nil)
-	w.SkipHidden = true
-	w.IgnoreEnabled = false
+	w := newWalker(nil, nil)
+	w.opts.SkipHidden = true
+	w.opts.IgnoreEnabled = false
 
 	files := collectPaths(t, w, tmp)
 	assertNotContains(t, files, ".env")
@@ -133,7 +133,7 @@ func TestWalker_Anchoring(t *testing.T) {
 	mustWriteFile(t, tmp, "foo.txt", "root foo")
 	mustWriteFile(t, tmp, "nested/foo.txt", "nested foo")
 
-	w := NewWalker([]string{"/foo.txt"}, nil)
+	w := newWalker([]string{"/foo.txt"}, nil)
 
 	files := collectPaths(t, w, tmp)
 
@@ -150,7 +150,7 @@ func TestWalker_DoubleStar(t *testing.T) {
 	mustWriteFile(t, tmp, "a/b/c/junk.log", "trash")
 	mustWriteFile(t, tmp, "a/b/c/keep.txt", "treasure")
 
-	w := NewWalker([]string{"**/junk.log"}, nil)
+	w := newWalker([]string{"**/junk.log"}, nil)
 
 	files := collectPaths(t, w, tmp)
 
@@ -165,7 +165,7 @@ func TestWalker_Precedence(t *testing.T) {
 	mustWriteFile(t, tmp, "file.txt", "content")
 
 	// Base vs Override: Override wins
-	w1 := NewWalker(
+	w1 := newWalker(
 		[]string{"file.txt"},
 		[]string{"!file.txt"},
 	)
@@ -173,7 +173,7 @@ func TestWalker_Precedence(t *testing.T) {
 	assertContains(t, files1, "file.txt")
 
 	// Same level: Last wins
-	w2 := NewWalker(
+	w2 := newWalker(
 		[]string{"!file.txt", "file.txt"},
 		nil,
 	)
@@ -189,7 +189,7 @@ func TestWalker_DirectoryTrailingSlash(t *testing.T) {
 	mustWriteFile(t, tmp, "bin/exec", "binary")
 	mustWriteFile(t, tmp, "src/code.go", "code")
 
-	w := NewWalker([]string{"bin/"}, nil)
+	w := newWalker([]string{"bin/"}, nil)
 
 	files := collectPaths(t, w, tmp)
 
@@ -206,7 +206,7 @@ func TestWalker_LoadLocalGitignore(t *testing.T) {
 	mustWriteFile(t, tmp, "nested/should_keep.txt", "hi")
 	mustWriteFile(t, tmp, "nested/.gitignore", "should_ignore.txt")
 
-	w := NewWalker(nil, nil)
+	w := newWalker(nil, nil)
 	files := collectPaths(t, w, tmp)
 
 	assertContains(t, files, "root.txt")
@@ -225,7 +225,7 @@ func TestWalker_NestedGitignoreOverride(t *testing.T) {
 	mustWriteFile(t, tmp, "deep/target.txt", "kept")
 	mustWriteFile(t, tmp, "deep/other.txt", "ignored")
 
-	w := NewWalker(nil, nil)
+	w := newWalker(nil, nil)
 	files := collectPaths(t, w, tmp)
 
 	assertNotContains(t, files, "root_file.txt")
@@ -396,7 +396,7 @@ func TestWalker_AlternateIgnoreFiles(t *testing.T) {
 			mustWriteFile(t, tmp, "secret.txt", "hidden")
 			mustWriteFile(t, tmp, "public.txt", "visible")
 
-			w := NewWalker(nil, nil)
+			w := newWalker(nil, nil)
 			files := collectPaths(t, w, tmp)
 
 			assertNotContains(t, files, "secret.txt")
@@ -410,9 +410,9 @@ func TestWalker_OnIgnore(t *testing.T) {
 	mustWriteFile(t, tmp, "junk.log", "trash")
 	mustWriteFile(t, tmp, "keep.go", "keep")
 
-	w := NewWalker([]string{"*.log"}, nil)
+	w := newWalker([]string{"*.log"}, nil)
 	var ignored []string
-	w.OnIgnore = func(path string, reason string) {
+	w.opts.OnIgnore = func(path string, reason string) {
 		ignored = append(ignored, path)
 	}
 
@@ -434,8 +434,8 @@ func TestWalker_IgnoreDisabled(t *testing.T) {
 	mustWriteFile(t, tmp, ".gitignore", "*.log")
 	mustWriteFile(t, tmp, "keep.log", "content")
 
-	w := NewWalker(nil, nil)
-	w.IgnoreEnabled = false
+	w := newWalker(nil, nil)
+	w.opts.IgnoreEnabled = false
 
 	files := collectPaths(t, w, tmp)
 	assertContains(t, files, "keep.log")
@@ -471,7 +471,7 @@ func symlinkTree(t *testing.T) string {
 
 func walkPaths(t *testing.T, dir string, configure func(*Walker)) []string {
 	t.Helper()
-	w := NewWalker(nil, nil)
+	w := newWalker(nil, nil)
 	if configure != nil {
 		configure(w)
 	}
@@ -499,7 +499,7 @@ func TestWalkSkipsDirectorySymlinksByDefault(t *testing.T) {
 }
 
 func TestWalkFollowsDirectorySymlinksWhenEnabled(t *testing.T) {
-	got := walkPaths(t, symlinkTree(t), func(w *Walker) { w.FollowDirSymlinks = true })
+	got := walkPaths(t, symlinkTree(t), func(w *Walker) { w.opts.FollowDirSymlinks = true })
 	want := []string{"brokenlink", "dirlink/inside.txt", "filelink", "real/inside.txt", "top.txt"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
@@ -508,7 +508,7 @@ func TestWalkFollowsDirectorySymlinksWhenEnabled(t *testing.T) {
 
 // A broken link resolves to nothing, so file-symlink policy governs it.
 func TestWalkSkipFileSymlinksDropsFileAndBrokenLinks(t *testing.T) {
-	got := walkPaths(t, symlinkTree(t), func(w *Walker) { w.SkipFileSymlinks = true })
+	got := walkPaths(t, symlinkTree(t), func(w *Walker) { w.opts.SkipFileSymlinks = true })
 	want := []string{"real/inside.txt", "top.txt"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
@@ -533,7 +533,7 @@ func TestWalkFollowTerminatesOnSymlinkCycle(t *testing.T) {
 	}
 
 	done := make(chan []string, 1)
-	go func() { done <- walkPaths(t, dir, func(w *Walker) { w.FollowDirSymlinks = true }) }()
+	go func() { done <- walkPaths(t, dir, func(w *Walker) { w.opts.FollowDirSymlinks = true }) }()
 
 	select {
 	case got := <-done:
@@ -552,7 +552,7 @@ func TestWalkFollowTerminatesOnSymlinkCycle(t *testing.T) {
 func walkNamed(t *testing.T, w *Walker, dir, name string) (got []string, ignored map[string]string) {
 	t.Helper()
 	ignored = map[string]string{}
-	w.OnIgnore = func(p, reason string) { ignored[p] = reason }
+	w.opts.OnIgnore = func(p, reason string) { ignored[p] = reason }
 	err := w.Walk(os.DirFS(dir), name, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -591,7 +591,7 @@ func TestWalker_NamedFileInIgnoredDir(t *testing.T) {
 			name:   "ignored by a nested ignore file",
 			files:  map[string]string{"src/.gitignore": "gen/\n", "src/gen/out.js": "x"},
 			target: "src/gen/out.js",
-			reason: `parent directory src/gen: rule "gen/" in .gitignore`,
+			reason: `parent directory src/gen: rule "gen/" in src/.gitignore`,
 		},
 		{
 			// Matches what a walk of the parent includes (see hasNestedException).
@@ -700,7 +700,7 @@ func TestWalker_NamedFileInIgnoredDir(t *testing.T) {
 			for _, r := range tt.repos {
 				mustGitDir(t, dir, filepath.Join(r, ".git"))
 			}
-			got, ignored := walkNamed(t, NewWalker(nil, nil), dir, tt.target)
+			got, ignored := walkNamed(t, newWalker(nil, nil), dir, tt.target)
 			if tt.included {
 				if !reflect.DeepEqual(got, []string{tt.target}) {
 					t.Errorf("got %v, want %s included; ignored: %v", got, tt.target, ignored)
@@ -724,8 +724,8 @@ func TestWalker_NamedFileInIgnoredDir_IgnoreDisabled(t *testing.T) {
 	mustWriteFile(t, dir, "build/out.js", "x")
 
 	// -f disables ignore files and drops the base and override rules.
-	w := NewWalker(nil, nil)
-	w.IgnoreEnabled = false
+	w := newWalker(nil, nil)
+	w.opts.IgnoreEnabled = false
 	got, ignored := walkNamed(t, w, dir, "build/out.js")
 	if !reflect.DeepEqual(got, []string{"build/out.js"}) {
 		t.Errorf("got %v, want build/out.js; ignored: %v", got, ignored)
@@ -739,8 +739,8 @@ func TestWalker_NamedFileInExcludedDir(t *testing.T) {
 
 	// Override rules apply to directories even with ignore files disabled,
 	// as they do in a walk.
-	w := NewWalker(nil, []string{"build/"})
-	w.IgnoreEnabled = false
+	w := newWalker(nil, []string{"build/"})
+	w.opts.IgnoreEnabled = false
 	got, ignored := walkNamed(t, w, dir, "build/out.js")
 	if len(got) != 0 {
 		t.Errorf("got %v, want nothing", got)
@@ -748,4 +748,10 @@ func TestWalker_NamedFileInExcludedDir(t *testing.T) {
 	if want := `parent directory build: rule "build/" in override flags`; ignored["build/out.js"] != want {
 		t.Errorf("reason = %q, want %q", ignored["build/out.js"], want)
 	}
+}
+
+// newWalker returns a walker reading ignore files, with base and override
+// patterns.
+func newWalker(base, override []string) *Walker {
+	return New(Options{Base: base, Override: override, IgnoreEnabled: true})
 }

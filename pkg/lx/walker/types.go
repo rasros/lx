@@ -1,5 +1,7 @@
 package walker
 
+import "strings"
+
 // Rule represents a single parsed line from the ignore file.
 type Rule struct {
 	Pattern  string
@@ -9,43 +11,51 @@ type Rule struct {
 
 	BasePathPrefix string
 	Spec           CompiledSpec
-
-	// PathOffset is set on rules loaded from a directory above the walk
-	// root: the walk root's path relative to that directory, with a trailing
-	// slash. Walk paths are prefixed with it before matching.
-	PathOffset string
 }
 
-// Walker configures the file traversal.
-type Walker struct {
-	BaseRules []Rule
-	// AncestorRules come from ignore files above the walk root, see
-	// LoadAncestorRules. They apply after BaseRules and before the walk's
-	// own ignore files.
-	AncestorRules []Rule
-	// RootIgnored reports that the walk root or a directory above it is
-	// ignored. As in git, nothing below an ignored directory is included.
-	RootIgnored bool
-	// FSRoot is the absolute directory the walked filesystem is rooted at.
-	// It lets a nested repository's .git file, which may point outside that
-	// filesystem, be followed to its info/exclude.
-	FSRoot        string
-	OverrideRules []Rule
+// Options configures a Walker.
+type Options struct {
+	// Base patterns apply below every ignore file of every repository, like
+	// git's core.excludesFile, matched relative to the repository root.
+	Base []string
+	// Override patterns apply after every ignore file, matched relative to
+	// the walk root. They apply whether or not IgnoreEnabled is set.
+	Override []string
+	// IgnoreEnabled reads .gitignore, .ignore and .lxignore files and the
+	// enclosing repository's info/exclude.
 	IgnoreEnabled bool
 	SkipHidden    bool
-
 	// FollowDirSymlinks descends into symlinks that resolve to directories.
 	// SkipFileSymlinks drops symlinks that resolve to files.
 	FollowDirSymlinks bool
 	SkipFileSymlinks  bool
-	OnIgnore          func(path string, reason string)
+	// Cache shares loaded ignore rules between the walkers of one run. Nil
+	// gives the walker a cache of its own, on the host filesystem.
+	Cache *Cache
+	// OnIgnore, when set, is told about every path the walk skips and why.
+	OnIgnore func(path, reason string)
 }
 
-// NewWalker initializes the walker.
-func NewWalker(basePatterns, overridePatterns []string) *Walker {
+// Walker traverses a directory tree, skipping what the ignore rules exclude.
+type Walker struct {
+	opts     Options
+	base     []Rule
+	baseKey  string
+	override []Rule
+	cache    *Cache
+}
+
+// New returns a Walker configured by opts.
+func New(opts Options) *Walker {
+	cache := opts.Cache
+	if cache == nil {
+		cache = NewCache(nil)
+	}
 	return &Walker{
-		BaseRules:     parseRules(basePatterns, "", "global/base"),
-		OverrideRules: parseRules(overridePatterns, "", "override flags"),
-		IgnoreEnabled: true,
+		opts:     opts,
+		base:     parseRules(opts.Base, "", "global/base"),
+		baseKey:  strings.Join(opts.Base, "\n"),
+		override: parseRules(opts.Override, "", "override flags"),
+		cache:    cache,
 	}
 }

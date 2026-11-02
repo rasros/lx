@@ -41,3 +41,6 @@ func setupStrayGitDirAboveFixture(t *testing.T) string {
 }
 func setupTreeFixture(t *testing.T) string      { return gf.SetupTreeFixture(t) }
 func setupPromptLibFixture(t *testing.T) string { return gf.SetupPromptLibFixture(t) }
+func setupNegatedIgnoredDirFixture(t *testing.T) string {
+	return gf.SetupNegatedIgnoredDirFixture(t)
+}

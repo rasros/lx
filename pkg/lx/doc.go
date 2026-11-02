@@ -37,9 +37,12 @@
 //
 // Walker methods:
 //
-//   - Walk traverses any fs.FS while applying .gitignore, .ignore, and .lxignore
-//     semantics (when enabled).
-//   - Base and override rules can be passed via NewWalker.
+//   - WalkPath traverses a path on the host while applying .gitignore, .ignore,
+//     .lxignore and info/exclude semantics (when enabled), including the rules
+//     of the directories above it.
+//   - Walk traverses any other fs.FS, such as an archive, on its own.
+//   - Base and override rules, and a RuleCache shared between walkers, are set
+//     in WalkerOptions.
 //
 // Archive and document helpers:
 //
@@ -62,6 +65,7 @@
 //		"context"
 //		"io/fs"
 //		"os"
+//		"path/filepath"
 //
 //		"github.com/rasros/lx/pkg/lx"
 //	)
@@ -73,9 +77,10 @@
 //			panic(err)
 //		}
 //
-//		w := lx.NewWalker(nil, nil)
-//		fsys := os.DirFS(".")
-//		_ = w.Walk(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+//		w := lx.NewWalker(lx.WalkerOptions{IgnoreEnabled: true})
+//		root, _ := filepath.Abs(".")
+//		fsys := os.DirFS(root)
+//		_, _ = w.WalkPath(root, func(path string, d fs.DirEntry, err error) error {
 //			if err != nil || d.IsDir() {
 //				return err
 //			}

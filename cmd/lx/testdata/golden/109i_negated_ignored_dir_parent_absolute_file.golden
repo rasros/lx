@@ -1,0 +1,9 @@
+--- STDOUT ---
+/ROOT/build/keep.js (1 rows)
+---
+```javascript
+re-included by the negation
+```
+
+
+--- STDERR ---

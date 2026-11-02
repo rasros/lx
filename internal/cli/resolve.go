@@ -47,16 +47,10 @@ type resolveContext struct {
 	outPath     string
 	debug       bool
 	cleanups    *[]func()
-	// ancestorRules caches Walker.LoadAncestorRules by walk filesystem root,
-	// so file arguments sharing a directory read its ancestors once. Nil
-	// disables the cache.
-	ancestorRules map[string]ancestorState
-}
-
-// ancestorState is what Walker.LoadAncestorRules computes for one root.
-type ancestorState struct {
-	rules       []lx.Rule
-	rootIgnored bool
+	// rules caches the ignore rules every walk of the run loads, so file
+	// arguments sharing directories read their ignore files once. Nil gives
+	// each walk its own.
+	rules *lx.RuleCache
 }
 
 // resolveOp discovers every input one file argument refers to. The content pass
@@ -100,14 +94,13 @@ func resolveOp(ctx context.Context, op Op, rc resolveContext) (files []lx.InputF
 		return nil, 1
 	}
 
-	fsys, fsysRoot, walkRoot, displayPrefix, ok := walkTarget(rawPath, absPath, stat.IsDir(), isForced, section)
+	fsys, walkRoot, displayPrefix, ok := walkTarget(rawPath, absPath, stat.IsDir(), isForced, section)
 	if !ok {
 		return nil, 0
 	}
 
 	return walkInputs(ctx, walkTargetArgs{
 		fsys:          fsys,
-		fsysRoot:      fsysRoot,
 		walkRoot:      walkRoot,
 		displayPrefix: displayPrefix,
 		absPath:       absPath,
@@ -151,37 +144,32 @@ func resolveURL(ctx context.Context, rawPath string, isForced, forceExpand bool,
 }
 
 // walkTarget decides which filesystem to walk and how discovered paths should be
-// displayed, applying the filters that reject a path outright. fsysRoot is
-// the absolute directory fsys is rooted at.
-func walkTarget(rawPath, absPath string, isDir, isForced bool, section Section) (fsys fs.FS, fsysRoot, walkRoot, displayPrefix string, ok bool) {
+// displayed, applying the filters that reject a path outright. A file is
+// opened as walkRoot within fsys.
+func walkTarget(rawPath, absPath string, isDir, isForced bool, section Section) (fsys fs.FS, walkRoot, displayPrefix string, ok bool) {
 	if isDir {
-		return os.DirFS(absPath), absPath, ".", filepath.Clean(rawPath), true
+		return os.DirFS(absPath), ".", filepath.Clean(rawPath), true
 	}
 
 	isExpandableArchive := section.RunCfg.ExpandArchives && lx.IsArchivePath(rawPath)
 	if !isForced && !isExpandableArchive && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
 		slog.Debug("Skipping file due to filters", "path", rawPath)
-		return nil, "", "", "", false
+		return nil, "", "", false
 	}
 	if !isForced && isExpandableArchive && !lx.IsKept(rawPath, nil, section.Excludes) {
 		slog.Debug("Skipping archive due to exclude filter", "path", rawPath)
-		return nil, "", "", "", false
+		return nil, "", "", false
 	}
 
 	rawPathClean := filepath.Clean(rawPath)
 	if !filepath.IsAbs(rawPathClean) && !strings.HasPrefix(rawPathClean, "..") {
-		cwd, err := os.Getwd()
-		if err != nil {
-			cwd = ""
-		}
-		return os.DirFS("."), cwd, filepath.ToSlash(rawPathClean), "", true
+		return os.DirFS("."), filepath.ToSlash(rawPathClean), "", true
 	}
-	return os.DirFS(filepath.Dir(absPath)), filepath.Dir(absPath), filepath.Base(absPath), filepath.Dir(rawPathClean), true
+	return os.DirFS(filepath.Dir(absPath)), filepath.Base(absPath), filepath.Dir(rawPathClean), true
 }
 
 type walkTargetArgs struct {
 	fsys          fs.FS
-	fsysRoot      string
 	walkRoot      string
 	displayPrefix string
 	absPath       string
@@ -214,46 +202,30 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 		"is_forced", t.isForced,
 	)
 
-	walker := lx.NewWalker(baseRules, overrideRules)
-	walker.IgnoreEnabled = ignoreEnabled
-	walker.FSRoot = t.fsysRoot
-	if walker.IgnoreEnabled && t.fsysRoot != "" {
-		if st, ok := rc.ancestorRules[t.fsysRoot]; ok {
-			walker.AncestorRules, walker.RootIgnored = st.rules, st.rootIgnored
-		} else {
-			walker.LoadAncestorRules(t.fsysRoot)
-			if rc.ancestorRules != nil {
-				rc.ancestorRules[t.fsysRoot] = ancestorState{walker.AncestorRules, walker.RootIgnored}
-			}
-		}
+	opts := lx.WalkerOptions{
+		Base:              baseRules,
+		Override:          overrideRules,
+		IgnoreEnabled:     ignoreEnabled,
+		SkipHidden:        !section.RunCfg.ShowHidden && !t.isForced,
+		FollowDirSymlinks: section.RunCfg.FollowDirSymlinks,
+		SkipFileSymlinks:  section.RunCfg.SkipFileSymlinks,
+		Cache:             rc.rules,
 	}
-	walker.SkipHidden = !section.RunCfg.ShowHidden && !t.isForced
-	walker.FollowDirSymlinks = section.RunCfg.FollowDirSymlinks
-	walker.SkipFileSymlinks = section.RunCfg.SkipFileSymlinks
 	if rc.debug {
-		walker.OnIgnore = func(p, reason string) {
+		opts.OnIgnore = func(p, reason string) {
 			slog.Debug("Ignored", "path", p, "reason", reason)
 		}
 	}
-
-	// A file named directly that is skipped would otherwise vanish without a
-	// trace. Walked directories stay quiet, as skipping is their normal job.
-	var rootSkipReason string
-	if t.warnSkipped && !t.isForced && !t.rootIsDir {
-		debugOnIgnore := walker.OnIgnore
-		walker.OnIgnore = func(p, reason string) {
-			if p == t.walkRoot {
-				rootSkipReason = reason
-			}
-			if debugOnIgnore != nil {
-				debugOnIgnore(p, reason)
-			}
-		}
-	}
+	walker := lx.NewWalker(opts)
 
 	var files []lx.InputFile
 
-	err := walker.Walk(t.fsys, t.walkRoot, func(path string, d fs.DirEntry, err error) error {
+	rootSkipReason, err := walker.WalkPath(t.absPath, func(path string, d fs.DirEntry, err error) error {
+		if !t.rootIsDir {
+			// The walker names a file root by its base name; t.fsys
+			// opens it as walkRoot.
+			path = t.walkRoot
+		}
 		if err != nil {
 			slog.Warn("Error accessing path during walk", "path", path, "error", err)
 			return nil
@@ -313,7 +285,9 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 	if err != nil {
 		slog.Error("Walker traversal failed", "error", err)
 	}
-	if rootSkipReason != "" {
+	// A file named directly that is skipped would otherwise vanish without a
+	// trace. Walked directories stay quiet, as skipping is their normal job.
+	if rootSkipReason != "" && t.warnSkipped && !t.isForced && !t.rootIsDir {
 		slog.Warn("Skipping path, use -f to include it",
 			"path", displayPath(t.walkRoot, t), "reason", rootSkipReason)
 	}
@@ -346,12 +320,13 @@ func inputAbsPath(path string, t walkTargetArgs) string {
 }
 
 func expandArchive(ctx context.Context, absPath, displayPath string, isForced bool, rc resolveContext, ignoreMsg string) []lx.InputFile {
-	archiveWalker := newArchiveWalker(rc.section.Excludes, rc.section.RunCfg.ShowHidden, isForced)
+	var onIgnore func(p, reason string)
 	if rc.debug {
-		archiveWalker.OnIgnore = func(p, reason string) {
+		onIgnore = func(p, reason string) {
 			slog.Debug(ignoreMsg, "path", displayPath+"/"+p, "reason", reason)
 		}
 	}
+	archiveWalker := newArchiveWalker(rc.section.Excludes, rc.section.RunCfg.ShowHidden, isForced, onIgnore)
 
 	includes := rc.section.Includes
 	if isForced {

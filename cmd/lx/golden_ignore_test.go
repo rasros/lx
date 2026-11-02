@@ -49,6 +49,27 @@ func TestGoldenStrayGitDir(t *testing.T) {
 	})
 }
 
+// Every way of naming a file below an ignored directory agrees with a walk:
+// a re-included file is kept and its sibling skipped, named relative to the
+// root, by an absolute path, or by a ../ path from a subdirectory.
+func TestGoldenNegatedIgnoredDir(t *testing.T) {
+	dir := setupNegatedIgnoredDirFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "109d_negated_ignored_dir_walk", args: []string{"."}},
+		{name: "109e_negated_ignored_dir_named_file", args: []string{"build/keep.js", "build/out.js"}},
+		{name: "109f_negated_ignored_dir_absolute_file", args: []string{filepath.Join(dir, "build", "keep.js"), filepath.Join(dir, "build", "out.js")}},
+	})
+}
+
+func TestGoldenNegatedIgnoredDirFromSubdir(t *testing.T) {
+	dir := setupNegatedIgnoredDirFixture(t)
+	runTestGolden(t, filepath.Join(dir, "x"), []goldenTestCase{
+		{name: "109g_negated_ignored_dir_parent_walk", args: []string{".."}},
+		{name: "109h_negated_ignored_dir_parent_relative_file", args: []string{"../build/keep.js", "../build/out.js"}},
+		{name: "109i_negated_ignored_dir_parent_absolute_file", args: []string{filepath.Join(dir, "build", "keep.js")}},
+	}, dir)
+}
+
 func TestGoldenStrayGitDirAbove(t *testing.T) {
 	dir := setupStrayGitDirAboveFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
