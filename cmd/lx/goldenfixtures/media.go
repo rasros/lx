@@ -58,6 +58,25 @@ func SetupMediaFixture(t *testing.T) string {
 	return dir
 }
 
+// SetupMediaLookalikeFixture holds text files that a name or a first few bytes
+// make resemble media, and a real image under an alternative extension. It is
+// kept apart from SetupMediaFixture so the directory golden there stays put.
+func SetupMediaLookalikeFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	// "BM" is a bitmap's magic, but here it starts a sentence.
+	writeFile(t, dir, "bm25", "BM25 notes on ranking\nscore = idf * tf\n", 0644)
+	// A Git LFS pointer checked out without the filter: text under an image name.
+	writeFile(t, dir, "x.png", "version https://git-lfs.github.com/spec/v1\n"+
+		"oid sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393\n"+
+		"size 12345\n", 0644)
+	copyFixture(t, dir, "sample.tiff", "x.tif")
+
+	return dir
+}
+
 func copyFixture(t *testing.T, dir, from, to string) {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "media", from))

@@ -24,6 +24,9 @@ func setupSkeletonFixture(t *testing.T) string   { return gf.SetupSkeletonFixtur
 func setupRelativePathsFixture(t *testing.T) (string, string) {
 	return gf.SetupRelativePathsFixture(t)
 }
+func setupMediaLookalikeFixture(t *testing.T) string {
+	return gf.SetupMediaLookalikeFixture(t)
+}
 func setupAncestorIgnoreFixture(t *testing.T) string  { return gf.SetupAncestorIgnoreFixture(t) }
 func setupWorktreeExcludeFixture(t *testing.T) string { return gf.SetupWorktreeExcludeFixture(t) }
 func setupTreeFixture(t *testing.T) string            { return gf.SetupTreeFixture(t) }

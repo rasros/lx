@@ -226,6 +226,25 @@ func parseWebP(b *byteReader) *MediaInfo {
 	return &MediaInfo{Image: img}
 }
 
+// bmpHeaderSizes are the DIB header versions that exist, from the 12-byte
+// BITMAPCOREHEADER to the 124-byte BITMAPV5HEADER.
+var bmpHeaderSizes = map[uint32]bool{12: true, 16: true, 40: true, 52: true, 56: true, 64: true, 108: true, 124: true}
+
+// bmpMaxDimension bounds a plausible side, well past any real bitmap; "BM"
+// followed by arbitrary bytes otherwise decodes to absurd sizes.
+const bmpMaxDimension = 1 << 16
+
+func validBMP(width, height, planes, bits int) bool {
+	if width <= 0 || width > bmpMaxDimension || height <= 0 || height > bmpMaxDimension || planes != 1 {
+		return false
+	}
+	switch bits {
+	case 1, 4, 8, 16, 24, 32:
+		return true
+	}
+	return false
+}
+
 func parseBMP(b *byteReader) *MediaInfo {
 	if !b.magic(0, "BM") {
 		return nil
@@ -234,35 +253,44 @@ func parseBMP(b *byteReader) *MediaInfo {
 	// later is at least 40 and stores them as signed 32-bit, height negative when
 	// the rows run top down. The two are read separately because a core-header
 	// file is too short to hold the longer one.
-	size, ok := b.at(14, 4)
+	sizeField, ok := b.at(14, 4)
 	if !ok {
 		return nil
 	}
-	if binary.LittleEndian.Uint32(size) == 12 {
+	headerSize := binary.LittleEndian.Uint32(sizeField)
+	if !bmpHeaderSizes[headerSize] {
+		return nil
+	}
+	var width, height, planes, bits int
+	if headerSize == 12 {
 		p, ok := b.at(18, 8)
 		if !ok {
 			return nil
 		}
-		return &MediaInfo{Image: &ImageInfo{
-			Width:      int(binary.LittleEndian.Uint16(p[:2])),
-			Height:     int(binary.LittleEndian.Uint16(p[2:4])),
-			BitDepth:   int(binary.LittleEndian.Uint16(p[6:8])),
-			ColorModel: "rgb",
-		}}
+		width = int(binary.LittleEndian.Uint16(p[:2]))
+		height = int(binary.LittleEndian.Uint16(p[2:4]))
+		planes = int(binary.LittleEndian.Uint16(p[4:6]))
+		bits = int(binary.LittleEndian.Uint16(p[6:8]))
+	} else {
+		p, ok := b.at(14, 16)
+		if !ok {
+			return nil
+		}
+		width = int(int32(binary.LittleEndian.Uint32(p[4:8])))
+		height = int(int32(binary.LittleEndian.Uint32(p[8:12])))
+		if height < 0 {
+			height = -height
+		}
+		planes = int(binary.LittleEndian.Uint16(p[12:14]))
+		bits = int(binary.LittleEndian.Uint16(p[14:16]))
 	}
-
-	p, ok := b.at(14, 16)
-	if !ok {
+	if !validBMP(width, height, planes, bits) {
 		return nil
 	}
-	height := int(int32(binary.LittleEndian.Uint32(p[8:12])))
-	if height < 0 {
-		height = -height
-	}
 	return &MediaInfo{Image: &ImageInfo{
-		Width:      int(int32(binary.LittleEndian.Uint32(p[4:8]))),
+		Width:      width,
 		Height:     height,
-		BitDepth:   int(binary.LittleEndian.Uint16(p[14:16])),
+		BitDepth:   bits,
 		ColorModel: "rgb",
 	}}
 }

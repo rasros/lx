@@ -1,0 +1,10 @@
+--- STDOUT ---
+bm25 (2 rows)
+---
+```
+BM25 notes on ranking
+score = idf * tf
+```
+
+
+--- STDERR ---

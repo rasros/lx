@@ -80,33 +80,8 @@ func MediaMetadata(container string, r io.ReaderAt, size int64) ([]byte, bool) {
 }
 
 func parseMedia(container string, b *byteReader) *MediaInfo {
-	switch container {
-	// AVIF and HEIC are the same boxes as an mp4, holding a still rather than a
-	// track.
-	case "mp4", "m4a", "mov", "avif", "heic":
-		return parseMP4(b)
-	case "mkv", "webm":
-		return parseMatroska(b)
-	case "wav":
-		return parseWAV(b)
-	case "flac":
-		return parseFLAC(b)
-	case "mp3":
-		return parseMP3(b)
-	case "png":
-		return parsePNG(b)
-	case "jpeg":
-		return parseJPEG(b)
-	case "gif":
-		return parseGIF(b)
-	case "webp":
-		return parseWebP(b)
-	case "bmp":
-		return parseBMP(b)
-	case "ico":
-		return parseICO(b)
-	case "tiff":
-		return parseTIFF(b)
+	if f := FormatByName(container); f != nil && f.parse != nil {
+		return f.parse(b)
 	}
 	return nil
 }
