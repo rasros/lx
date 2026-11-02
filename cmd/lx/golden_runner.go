@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/rasros/lx/internal/cli"
+	"github.com/rasros/lx/internal/osenv"
 )
 
 var update = flag.Bool("update", false, "update .golden files")
@@ -58,23 +59,7 @@ func runTestGoldenEnv(t *testing.T, workDir string, env map[string]string, cases
 // cases share their files, so a batch must not change them.
 func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 	t.Parallel()
-	vars := map[string]string{
-		// Goldens are plain text whatever color settings the shell has.
-		"NO_COLOR": "1",
-		// The user's own config never applies; lx/ignore is empty.
-		"XDG_CONFIG_HOME": mockConfigDir(t),
-		"LX_CONFIG":       "",
-		"LX_PROMPTS_DIR":  "",
-	}
-	for k, v := range run.env {
-		vars[k] = v
-	}
-	lookupEnv := func(key string) (string, bool) {
-		if v, ok := vars[key]; ok {
-			return v, v != ""
-		}
-		return os.LookupEnv(key)
-	}
+	lookupEnv := hermeticEnv(t, run.env)
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -147,17 +132,39 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 	}
 }
 
-// mockConfigDir returns a user config directory whose lx/ignore is empty.
-func mockConfigDir(t *testing.T) string {
+// hermeticEnv returns an environment of its own for a test: plain output and
+// an empty home, whose user config holds an empty lx/ignore, with the
+// variables in extra set on top. Nothing comes from the process environment.
+func hermeticEnv(t *testing.T, extra map[string]string) osenv.Lookup {
 	t.Helper()
-	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "lx"), 0755); err != nil {
+	home := t.TempDir()
+	vars := map[string]string{
+		// Goldens are plain text whatever color settings the shell has.
+		"NO_COLOR":        "1",
+		"HOME":            home,
+		"USERPROFILE":     home,
+		"home":            home,
+		"XDG_CONFIG_HOME": filepath.Join(home, ".config"),
+		"AppData":         filepath.Join(home, "AppData"),
+	}
+	for k, v := range extra {
+		vars[k] = v
+	}
+	lookup := osenv.Lookup(func(key string) (string, bool) {
+		v, ok := vars[key]
+		return v, ok
+	})
+	configDir, err := osenv.Config(lookup)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "lx", "ignore"), nil, 0644); err != nil {
+	if err := os.MkdirAll(filepath.Join(configDir, "lx"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	return dir
+	if err := os.WriteFile(filepath.Join(configDir, "lx", "ignore"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	return lookup
 }
 
 func firstDiffIndex(a, b string) int {

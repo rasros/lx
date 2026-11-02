@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,13 +17,7 @@ func TestLibraryMatchesCLI(t *testing.T) {
 	t.Parallel()
 	dir := setupAncestorIgnoreFixture(t)
 	cwd := filepath.Join(dir, "sub")
-	configDir := mockConfigDir(t)
-	lookupEnv := func(key string) (string, bool) {
-		if key == "XDG_CONFIG_HOME" {
-			return configDir, true
-		}
-		return os.LookupEnv(key)
-	}
+	lookupEnv := hermeticEnv(t, nil)
 	ctx := context.Background()
 
 	var want, stderr bytes.Buffer
