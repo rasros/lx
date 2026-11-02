@@ -263,6 +263,12 @@ func TestCouldMatchAnyDescendant(t *testing.T) {
 			want:     true,
 		},
 		{
+			name:     "brace alternative with a double star is kept",
+			patterns: []string{"a/{**,b}/c.go"},
+			dir:      "a/x/y",
+			want:     true,
+		},
+		{
 			name:     "brace alternative with a slash is kept",
 			patterns: []string{"{a/b,c}/x.go"},
 			dir:      "a",

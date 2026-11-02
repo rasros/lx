@@ -153,14 +153,15 @@ func CouldMatchAnyDescendant(specs []CompiledSpec, dirRelPath string) bool {
 // couldMatchDescendant reports whether spec could match a file below dir. A
 // pattern with a slash matches whole paths, so its leading segments must
 // match dir's directories one by one, and a file below dir has more segments
-// than dir; only a "**" segment spans any number of them.
+// than dir. A "**" segment, or a brace group holding "**" or a slash, can
+// span any number of them, so a pattern with one is not pruned past it.
 func couldMatchDescendant(spec CompiledSpec, dir string) bool {
 	// Floating patterns (e.g. "*.go") can match files in any subtree.
 	if !spec.Pattern.HasSlash && !spec.Anchored {
 		return true
 	}
 	pattern := spec.Pattern.Pattern
-	if slashInBraces(pattern) {
+	if bracesSpanDirs(pattern) {
 		return true
 	}
 	segs := strings.Split(pattern, "/")
@@ -183,9 +184,10 @@ func couldMatchDescendant(spec CompiledSpec, dir string) bool {
 	return true
 }
 
-// slashInBraces reports whether a brace alternative in pattern holds a
-// slash, which splitting the pattern into segments would break.
-func slashInBraces(pattern string) bool {
+// bracesSpanDirs reports whether a brace group in pattern holds a slash or
+// "**", either of which lets it match across directories, which splitting
+// the pattern into segments would miss.
+func bracesSpanDirs(pattern string) bool {
 	depth := 0
 	for i := 0; i < len(pattern); i++ {
 		switch pattern[i] {
@@ -199,6 +201,10 @@ func slashInBraces(pattern string) bool {
 			}
 		case '/':
 			if depth > 0 {
+				return true
+			}
+		case '*':
+			if depth > 0 && i+1 < len(pattern) && pattern[i+1] == '*' {
 				return true
 			}
 		}
