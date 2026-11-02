@@ -184,7 +184,7 @@ additions to a file.`,
 		Name:      "include",
 		Short:     "i",
 		Type:      CmdInterleaved,
-		ValueType: ValueAny,
+		ValueType: ValueGlob,
 		Usage:     "Keep files matching a glob for subsequent paths (rg -g)",
 		Long: `Keep what matches a glob for subsequent paths, as rg -g GLOB does.
 
@@ -214,7 +214,7 @@ Examples:
 		Name:      "exclude",
 		Short:     "e",
 		Type:      CmdInterleaved,
-		ValueType: ValueAny,
+		ValueType: ValueGlob,
 		Usage:     "Drop files matching a glob for subsequent paths (rg -g '!glob')",
 		Long: `Drop what matches a glob for subsequent paths, as rg -g '!GLOB' does.
 

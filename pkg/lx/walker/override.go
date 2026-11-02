@@ -1,6 +1,7 @@
 package walker
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -73,14 +74,10 @@ func compileOverrides(globs []Override) *overrides {
 	}
 	o := &overrides{}
 	for _, g := range globs {
-		p := g.Glob
-		if filepath.Separator == '\\' {
-			// As in ripgrep, a backslash is a separator on Windows.
-			p = strings.ReplaceAll(p, `\`, "/")
-		} else if strings.HasPrefix(p, `\!`) || strings.HasPrefix(p, `\#`) {
-			p = p[1:]
+		r, ok := g.rule()
+		if !ok {
+			continue
 		}
-		r := newRule(p, g.Kind != Exclude, "", "-i/-e globs")
 		o.rules = append(o.rules, r)
 		if g.Kind == Include {
 			o.whitelist = true
@@ -90,6 +87,35 @@ func compileOverrides(globs []Override) *overrides {
 		}
 	}
 	return o
+}
+
+// rule compiles o as ripgrep compiles a -g glob, a gitignore line: as
+// written, without cleaning "./", "//" or "..", and with trailing spaces
+// trimmed. The line of an Include is its glob, so an empty one or a "#"
+// comment adds nothing; that of an Exclude is "!" and its glob, and an empty
+// glob there matches every path.
+func (o Override) rule() (Rule, bool) {
+	p := trimTrailingSpaces(o.Glob)
+	if o.Kind == Include && (p == "" || strings.HasPrefix(p, "#")) {
+		return Rule{}, false
+	}
+	if p == "" {
+		p = "**"
+	}
+	if filepath.Separator == '\\' {
+		// As in ripgrep, a backslash is a separator on Windows.
+		p = strings.ReplaceAll(p, `\`, "/")
+	}
+	return newRule(p, o.Kind != Exclude, "", "-i/-e globs"), true
+}
+
+// Validate reports an error when o's glob cannot be parsed, as ripgrep does
+// for its -g globs, such as an unclosed "[" or "{" or a dangling "\".
+func (o Override) Validate() error {
+	if r, ok := o.rule(); ok && !r.Spec.Pattern.PatternValid {
+		return fmt.Errorf("invalid glob %q", o.Glob)
+	}
+	return nil
 }
 
 // match returns what the overrides say about the path p, from the working

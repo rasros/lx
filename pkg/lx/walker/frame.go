@@ -87,22 +87,26 @@ type Anchor struct {
 }
 
 // Anchor returns the anchor of root, a path named from the working
-// directory or absolutely. As in ripgrep, a relative root keeps its path as
-// written, cleaned, so the paths below "../x" start with "../x/". The
-// working directory may be named through a symlink and root by its real
-// path, or the other way round, so either name of it is stripped.
+// directory or absolutely. As in ripgrep, the root keeps its path as
+// written, without cleaning but for a leading "./" and trailing slashes, so
+// the paths below "../x" start with "../x/" and those below "src/../x" with
+// "src/../x/". The working directory may be named through a symlink and
+// root by its real path, or the other way round, so either name of it is
+// stripped.
 func (c *Cache) Anchor(root string) Anchor {
 	c.hostTree()
-	p := filepath.ToSlash(filepath.Clean(root))
+	p := filepath.ToSlash(root)
+	for strings.HasPrefix(p, "./") {
+		p = p[2:]
+	}
+	p = strings.TrimRight(p, "/")
 	if !filepath.IsAbs(root) {
-		if p == "." {
+		if p == "." || p == "" {
 			return Anchor{}
 		}
 		return Anchor{prefix: p + "/"}
 	}
-	if !strings.HasSuffix(p, "/") {
-		p += "/"
-	}
+	p += "/"
 	a := Anchor{prefix: p}
 	for _, wd := range []string{c.wd, c.ht.cwd} {
 		if wd == "" {

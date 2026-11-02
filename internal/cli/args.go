@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/rasros/lx/pkg/lx"
 )
 
 type CmdType int
@@ -22,6 +24,7 @@ const (
 	ValueNumber
 	ValueOptional
 	ValueSize
+	ValueGlob
 )
 
 type CommandDef struct {
@@ -225,6 +228,10 @@ func addOp(res *ParsedArgs, def CommandDef, val string, isShort bool) error {
 		}
 	case ValueSize:
 		if _, err := parseSizeLimit(val); err != nil {
+			return fmt.Errorf("flag %s%s: %w", prefix, def.Name, err)
+		}
+	case ValueGlob:
+		if err := lx.IncludeGlob(val).Validate(); err != nil {
 			return fmt.Errorf("flag %s%s: %w", prefix, def.Name, err)
 		}
 	}
