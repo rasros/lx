@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -73,6 +74,12 @@ func SetupMediaLookalikeFixture(t *testing.T) string {
 		"oid sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393\n"+
 		"size 12345\n", 0644)
 	copyFixture(t, dir, "sample.tiff", "x.tif")
+	// An image with no name to go on, as a URL or stdin often arrives.
+	copyFixture(t, dir, "sample.png", "avatar")
+	// Binary that starts with a weak magic but is not the format it suggests.
+	writeFile(t, dir, "counts.dat", "BM\xd2\x04"+strings.Repeat("\x00", 60), 0644)
+	writeFile(t, dir, "data.bin", "\x00\x00\x01\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b"+
+		"\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17", 0644)
 
 	return dir
 }

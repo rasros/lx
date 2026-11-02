@@ -211,14 +211,14 @@ var converters = []converter{
 	},
 }
 
-// applyConverters reports the format it converted from, or "" if none applied.
-// A converter that fails leaves the content untouched.
+// applyConverters reports whether a converter replaced the content, and the
+// format it converted from. A converter that fails leaves the content untouched.
 //
 // An image that is about to be embedded is left alone: the picture itself says
 // more than a description of it would.
-func applyConverters(file sources.InputFile, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string) {
+func applyConverters(file sources.InputFile, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool) {
 	if embedImages && format.IsImage() {
-		return reader, size, "", ""
+		return reader, size, "", "", false
 	}
 	for _, c := range converters {
 		if !c.applies(file, format) {
@@ -228,22 +228,29 @@ func applyConverters(file sources.InputFile, format *internal.Format, reader io.
 		if err != nil {
 			slog.Debug("Converter failed, keeping raw content",
 				"converter", c.name, "path", file.Path, "error", err)
-			return reader, size, "", ""
+			return reader, size, "", "", false
 		}
 		lang := ""
 		if c.language != nil {
 			lang = c.language(file)
 		}
-		return bytes.NewReader(text), int64(len(text)), fileFormat(file.Path), lang
+		from := fileFormat(file.Path)
+		if from == "" && format != nil {
+			from = format.Name // an extensionless input, named by its content
+		}
+		return bytes.NewReader(text), int64(len(text)), from, lang, true
 	}
-	return reader, size, "", ""
+	return reader, size, "", "", false
 }
 
 // classify reads the start of the file and decides its format before any
 // converter sees it, so that the content rather than the name has the last word.
-func classify(path string, reader io.ReaderAt, scratch []byte) *internal.Format {
+// It also reports whether the bytes bear the format out, which a name or a weak
+// signature alone does not; only such a file is rendered as a picture.
+func classify(path string, reader io.ReaderAt, scratch []byte) (*internal.Format, bool) {
 	n, _ := reader.ReadAt(scratch[:min(len(scratch), internal.SniffLen)], 0)
-	return internal.Classify(path, scratch[:n])
+	format := internal.Classify(path, scratch[:n])
+	return format, format.Verify(scratch[:n])
 }
 
 // detectContent sniffs the header for binary content and a language hint.
@@ -325,8 +332,9 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		scratch = make([]byte, 1024)
 	}
 
-	format := classify(file.Path, reader, scratch)
-	reader, size, convertedFrom, convertedLang := applyConverters(file, format, reader, size, p.engine.EmbedImages)
+	format, verified := classify(file.Path, reader, scratch)
+	reader, size, convertedFrom, convertedLang, converted := applyConverters(
+		file, format, reader, size, p.engine.EmbedImages && verified)
 
 	isBinary, lang := detectContent(file.Path, reader, scratch)
 	if convertedLang != "" {
@@ -334,7 +342,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	}
 	// A converted image is no longer an image but the text describing it, which
 	// the content templates render and the image template would discard.
-	isImage := format.IsImage() && convertedFrom == ""
+	isImage := format.IsImage() && verified && !converted
 	cfg := file.Config
 
 	reader, size, skeletonMode, originalRows := applySkeleton(cfg, lang, reader, size, isBinary, isImage)
