@@ -42,7 +42,7 @@ type langDef struct {
 	// of the wrapper before the declaration are kept like decorators.
 	unwrap func(c *langs.Ctx, n *gotreesitter.Node) *gotreesitter.Node
 
-	funcVisible func(node *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool
+	funcVisible func(c *langs.Ctx, node *gotreesitter.Node) bool
 
 	members    *langs.Members
 	emitFunc   langs.Emitter

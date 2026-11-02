@@ -5,8 +5,8 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-func KtFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	return !KotlinPrivate(&Ctx{Src: src, Lang: lang}, nil, n)
+func KtFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
+	return !KotlinPrivate(c, nil, n)
 }
 
 // KotlinPrivate reports a member with a private visibility modifier.

@@ -8,13 +8,12 @@ import (
 // CFuncVisible reports a C or C++ function definition, or a declaration
 // with a declarator that declares a function. A pointer to a function
 // (`int (*handler)(int);`) is a variable, not a function.
-func CFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	if n.Type(lang) != "declaration" {
+func CFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
+	if c.Type(n) != "declaration" {
 		return true
 	}
-	c := &Ctx{Src: src, Lang: lang}
 	for i := 0; i < n.ChildCount(); i++ {
-		if n.FieldNameForChild(i, lang) == "declarator" && declaresFunction(c, n.Child(i)) {
+		if n.FieldNameForChild(i, c.Lang) == "declarator" && declaresFunction(c, n.Child(i)) {
 			return true
 		}
 	}
@@ -49,12 +48,12 @@ func declaresFunction(c *Ctx, d *gotreesitter.Node) bool {
 	return function
 }
 
-// CEmitTypedef emits a typedef, kept only with types since it has no
+// cEmitTypedef emits a typedef, kept only with types since it has no
 // methods. Of `typedef struct { ... } Name;` (or union, or enum) the members
 // are walked: they belong to the specifier inside the typedef, but the header
 // and closing row are the typedef's own, so the name after the closing brace
 // is kept. Any other typedef is a type alias, kept whole.
-func CEmitTypedef(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+func cEmitTypedef(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	if !c.Structs {
 		return out
 	}

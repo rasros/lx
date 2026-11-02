@@ -116,7 +116,7 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 
 	switch {
 	case c.Functions && slices.Contains(def.funcTypes, nodeType):
-		if def.funcVisible == nil || def.funcVisible(node, c.Src, c.Lang) {
+		if def.funcVisible == nil || def.funcVisible(c, node) {
 			out = c.EmitLeadingDoc(out, outerStart)
 			out = langs.EmitDecorators(out, c.Lines, outerStart, sigStart)
 			if def.emitFunc != nil {

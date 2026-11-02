@@ -6,8 +6,8 @@ import (
 	"github.com/odvcencio/gotreesitter"
 )
 
-func SwiftFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	return !SwiftPrivate(&Ctx{Src: src, Lang: lang}, nil, n)
+func SwiftFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
+	return !SwiftPrivate(c, nil, n)
 }
 
 // SwiftPrivate reports a private or fileprivate member.
