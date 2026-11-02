@@ -37,6 +37,17 @@ type langDef struct {
 	// frames are preprocessor conditionals whose children are walked like
 	// top-level declarations, kept between their #if and #endif rows.
 	frames []string
+	// recoverErrors walks the declarations inside error nodes.
+	recoverErrors bool
+	// cppDialect is the language of C++ source given as this one: a .h file
+	// is read as C, but may be C++, which fails to parse as C (classes,
+	// templates, namespaces, references) and then leaks method bodies into
+	// the skeleton. Source whose parse has errors is reparsed as C++, which
+	// is kept when it leaves fewer bytes unparsed. Comparing beats trusting
+	// either side: C mostly parses as C++, but macro-heavy C (kernel code)
+	// and some C++ headers recover worse as C++, up to a tree that stops
+	// short of the end of the file.
+	cppDialect string
 	// unwrap returns the declaration a top-level node wraps (a C++
 	// template_declaration's class or function), or the node itself. Rows
 	// of the wrapper before the declaration are kept like decorators.
@@ -67,14 +78,6 @@ var (
 	// belong to the body around them; their #if, #else and #endif lines are
 	// kept around the members kept inside.
 	preprocGroups = []string{"preproc_if", "preproc_ifdef", "preproc_elif", "preproc_elifdef", "preproc_else"}
-
-	// cErrors are the nodes a C or C++ parse leaves around declarations it
-	// cannot fit in the tree, walked like top-level ones. The usual header
-	// leaves them: a guard around `#ifdef __cplusplus extern "C" { #endif`,
-	// whose brace closes in another #ifdef. C++ also wraps the declarations
-	// of an unclosed declaration list in its repeat nodes.
-	cErrors   = []string{"ERROR"}
-	cppErrors = []string{"ERROR", "declaration_list_repeat1"}
 
 	csharpMembers = &langs.Members{
 		BodyField: "body",
@@ -224,7 +227,7 @@ var langDefs = map[string]langDef{
 	"c": {
 		newLang:     grammars.CLanguage,
 		funcTypes:   []string{"function_definition", "declaration"},
-		structTypes: []string{"type_definition", "struct_specifier", "union_specifier", "enum_specifier"},
+		structTypes: []string{"type_definition", "declaration", "struct_specifier", "union_specifier", "enum_specifier"},
 		comments:    &langs.CComments,
 		funcVisible: langs.CFuncVisible,
 		namespaces:  []string{"linkage_specification"},
@@ -232,13 +235,14 @@ var langDefs = map[string]langDef{
 		unwrap:      langs.CppUnwrap,
 		emitStruct:  langs.CppEmitter(cppMembers),
 
-		iterateChildren: cErrors,
+		recoverErrors: true,
+		cppDialect:    "cpp",
 	},
 
 	"cpp": {
 		newLang:     grammars.CppLanguage,
 		funcTypes:   []string{"function_definition", "declaration"},
-		structTypes: []string{"type_definition", "alias_declaration", "struct_specifier", "class_specifier", "union_specifier", "enum_specifier"},
+		structTypes: []string{"type_definition", "alias_declaration", "declaration", "struct_specifier", "class_specifier", "union_specifier", "enum_specifier"},
 		comments:    &langs.CComments,
 		funcVisible: langs.CFuncVisible,
 		namespaces:  []string{"namespace_definition", "linkage_specification"},
@@ -246,7 +250,7 @@ var langDefs = map[string]langDef{
 		unwrap:      langs.CppUnwrap,
 		emitStruct:  langs.CppEmitter(cppMembers),
 
-		iterateChildren: cppErrors,
+		recoverErrors: true,
 	},
 
 	"java": {

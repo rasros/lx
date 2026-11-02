@@ -1,0 +1,20 @@
+--- STDOUT ---
+skeleton/widget.h (28 rows, type definitions)
+---
+```c
+#ifndef WIDGET_H
+...
+namespace ui {
+...
+// C++ in a .h file: parsed as C++.
+class Widget {
+...
+};
+...
+}  // namespace ui
+...
+#endif
+```
+
+
+--- STDERR ---
