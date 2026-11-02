@@ -22,6 +22,7 @@ type StatsContext = core.StatsContext
 type InputFile = sources.InputFile
 type DiscoverOptions = discover.Options
 type Collector = discover.Collector
+type URLError = discover.URLError
 
 type FileErrorHandler = streamingpkg.FileErrorHandler
 

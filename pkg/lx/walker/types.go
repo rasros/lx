@@ -23,9 +23,12 @@ type Options struct {
 	// to the root of the filesystem.
 	Base        []string
 	GitExcludes []string
-	// Override patterns apply after every ignore file, matched relative to
-	// the walk root. They apply whether or not IgnoreEnabled is set.
-	Override []string
+	// Override patterns apply after every ignore file, whether or not
+	// IgnoreEnabled is set. WalkPath matches them relative to the working
+	// directory; Walk relative to the walked fs.FS, with OverridePrefix, if
+	// any, before each path.
+	Override       []string
+	OverridePrefix string
 	// IgnoreEnabled reads .ignore and .lxignore files and, inside a git
 	// repository, .gitignore files and the repository's info/exclude.
 	IgnoreEnabled bool

@@ -10,8 +10,8 @@ import (
 
 // Walk walks root within fsys, which stands alone: ignore files apply from
 // its root down, and a .git file pointing outside it cannot be followed.
-// Paths passed to walkFn, and override rules, are relative to fsys. Use
-// WalkPath for the host filesystem.
+// Paths passed to walkFn are relative to fsys, and so are override rules,
+// after Options.OverridePrefix. Use WalkPath for the host filesystem.
 //
 // As in ripgrep, root itself is never filtered: a file is passed to walkFn
 // and a directory walked, whatever the rules say about it.
@@ -23,7 +23,7 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	if !info.IsDir() {
 		return walkFn(root, dirEntryAdapter{info}, nil)
 	}
-	return w.walkRoot(newRuleTree(fsTree{fsys}, w.opts.IgnoreEnabled), fsys, root, root, "", info, walkFn)
+	return w.walkRoot(newRuleTree(fsTree{fsys}, w.opts.IgnoreEnabled), fsys, root, root, w.opts.OverridePrefix, info, walkFn)
 }
 
 // WalkPath walks absRoot, an absolute path on the cache's host, with the
@@ -53,7 +53,7 @@ func (w *Walker) WalkPath(absRoot string, fn fs.WalkDirFunc) error {
 	if info, err = fs.Stat(fsys, "."); err != nil {
 		return fn(".", nil, err)
 	}
-	prefix := w.cache.overridePrefix(absRoot)
+	prefix := w.cache.OverridePrefix(absRoot)
 	if !w.opts.IgnoreEnabled {
 		return w.walkRoot(newRuleTree(fsTree{fsys}, false), fsys, ".", ".", prefix, info, fn)
 	}

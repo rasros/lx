@@ -25,6 +25,10 @@ func TestGoldenIncludePaths(t *testing.T) {
 		{name: "112h_walked_archive_include_archive_path", args: []string{"-n0", "-Z", "-i", "arch/a.zip/src/*.go", "."}},
 		{name: "112i_walked_archive_include_floating", args: []string{"-n0", "-Z", "-i", "*.go", "."}},
 		{name: "112j_named_archive_include_from_archive_root", args: []string{"-n0", "-Z", "-i", "src/*.go", "arch/a.zip"}},
+		{name: "112l_walked_archive_include_double_star", args: []string{"-n0", "-Z", "-i", "arch/a.zip/**", "."}},
+		{name: "112m_walked_archive_exclude_from_cwd", args: []string{"-n0", "-Z", "-i", "arch/a.zip/**", "-e", "arch/a.zip/src/a.go", "."}},
+		{name: "112n_walked_archive_exclude_from_cwd_in_named_dir", args: []string{"-n0", "-Z", "-e", "arch/a.zip/src/a.go", "arch"}},
+		{name: "112o_named_archive_exclude_from_archive_root", args: []string{"-n0", "-Z", "-e", "src/a.go", "arch/a.zip"}},
 	})
 }
 

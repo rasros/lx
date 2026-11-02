@@ -421,7 +421,7 @@ func TestCache_OverridePrefix(t *testing.T) {
 		{link, other, "../../other/"},
 		{real, other, "../../other/"},
 	} {
-		if got := NewCache(newTestHost(tt.cwd)).overridePrefix(tt.root); got != tt.want {
+		if got := NewCache(newTestHost(tt.cwd)).OverridePrefix(tt.root); got != tt.want {
 			t.Errorf("cwd %s, root %s: got %q, want %q", tt.cwd, tt.root, got, tt.want)
 		}
 	}

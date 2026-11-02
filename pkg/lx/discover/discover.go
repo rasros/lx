@@ -6,7 +6,6 @@ import (
 	"context"
 	"io/fs"
 	"log/slog"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,7 +23,10 @@ type Options struct {
 	// A named file is never filtered by them, nor by anything but OutPath.
 	Includes []string
 	// Excludes drops what matches these patterns, applied as ignore rules
-	// after every ignore file, relative to the walked directory or archive.
+	// after every ignore file. Below a directory they match relative to the
+	// working directory, as ripgrep's -g globs do, and so do the entries of
+	// an archive found in the walk, through the archive's path; those of a
+	// named archive match relative to the archive.
 	Excludes []string
 
 	// IgnoreRules apply everywhere, below every ignore file, and GitExcludes,
@@ -69,9 +71,11 @@ func NewCollector() *Collector {
 // the ignore rules of the directories above and below it, and by opts.
 // Problems with single entries are logged and the entries skipped; an error
 // means target itself could not be resolved, or ctx was done. A URL that
-// cannot be fetched or parsed fails with a *url.Error whose Op is "download"
-// or "parse".
+// cannot be downloaded or parsed fails with a *URLError.
 func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([]sources.InputFile, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	sel := newSelector(opts)
 	forceExpand := false
 	if rewritten, ok := sources.RewriteRepoURL(target); ok {
@@ -149,16 +153,19 @@ func collectURL(ctx context.Context, rawURL string, opts Options, sel selector, 
 	if (opts.ExpandArchives || forceExpand) && sources.IsHTTPArchiveURL(rawURL) {
 		tempPath, cleanup, err := sources.DownloadURLToTempFile(ctx, rawURL)
 		if err != nil {
-			return nil, &url.Error{Op: "download", URL: rawURL, Err: err}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			return nil, &URLError{URL: rawURL, Download: true, Err: err}
 		}
 		// Expansion reads the entries into memory.
 		defer cleanup()
-		return expandArchive(ctx, tempPath, rawURL, opts, sel, "Ignored in URL archive"), nil
+		return expandArchive(ctx, tempPath, rawURL, opts, sel, "", "Ignored in URL archive")
 	}
 
 	urlFile, err := sources.NewURLInputFile(rawURL)
 	if err != nil {
-		return nil, &url.Error{Op: "parse", URL: rawURL, Err: err}
+		return nil, &URLError{URL: rawURL, Err: err}
 	}
 	slog.Debug("URL accepted", "url", urlFile.Path)
 	return []sources.InputFile{urlFile}, nil
@@ -252,8 +259,8 @@ func (c *Collector) walk(ctx context.Context, r root, opts Options, sel selector
 			// as walkRoot.
 			path = r.walkRoot
 		}
-		if err := ctx.Err(); err != nil {
-			return err
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
 		}
 		if err != nil {
 			slog.Warn("Error accessing path during walk", "path", path, "error", err)
@@ -269,13 +276,16 @@ func (c *Collector) walk(ctx context.Context, r root, opts Options, sel selector
 		display := r.display(path)
 		if opts.ExpandArchives && sources.IsArchivePath(path) {
 			// The entries of an archive found in the walk are matched as
-			// files below its path; those of a named one as files below it.
-			archiveSel := sel
+			// files below its path, includes from the walked directory and
+			// excludes from the working directory; those of a named archive
+			// as files below it.
+			archiveSel, ovPrefix := sel, ""
 			if r.isDir {
-				archiveSel = sel.within(path)
+				archiveSel, ovPrefix = sel.within(path), c.cache.OverridePrefix(r.abs(path))
 			}
-			files = append(files, expandArchive(ctx, r.abs(path), display, opts, archiveSel, "Ignored in archive")...)
-			return nil
+			entries, err := expandArchive(ctx, r.abs(path), display, opts, archiveSel, ovPrefix, "Ignored in archive")
+			files = append(files, entries...)
+			return err
 		}
 		if r.isDir {
 			if !sel.Accept(path, display) {
@@ -320,12 +330,13 @@ func (c *Collector) walk(ctx context.Context, r root, opts Options, sel selector
 
 // expandArchive returns the entries of the archive at absPath, displayed
 // below displayPath, that opts and sel keep. Exclude patterns become override
-// rules relative to the archive root, the same way they are relative to a
-// walked directory.
-func expandArchive(ctx context.Context, absPath, displayPath string, opts Options, sel selector, ignoreMsg string) []sources.InputFile {
+// rules matched with ovPrefix before each entry's path in the archive. Its
+// only error is ctx's.
+func expandArchive(ctx context.Context, absPath, displayPath string, opts Options, sel selector, ovPrefix, ignoreMsg string) ([]sources.InputFile, error) {
 	wopts := walker.Options{
-		Override:   opts.Excludes,
-		SkipHidden: !opts.ShowHidden,
+		Override:       opts.Excludes,
+		OverridePrefix: ovPrefix,
+		SkipHidden:     !opts.ShowHidden,
 	}
 	if debugEnabled(ctx) {
 		wopts.OnIgnore = func(p, reason string) {
@@ -333,8 +344,28 @@ func expandArchive(ctx context.Context, absPath, displayPath string, opts Option
 		}
 	}
 	files, err := sources.ExpandArchive(ctx, absPath, displayPath, walker.New(wopts), sel)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
+	}
 	if err != nil {
 		slog.Error("Failed to expand archive", "path", displayPath, "error", err)
 	}
-	return files
+	return files, nil
 }
+
+// URLError reports a URL target that could not be downloaded, when Download
+// is set, or not parsed.
+type URLError struct {
+	URL      string
+	Download bool
+	Err      error
+}
+
+func (e *URLError) Error() string {
+	if e.Download {
+		return "download " + e.URL + ": " + e.Err.Error()
+	}
+	return "parse " + e.URL + ": " + e.Err.Error()
+}
+
+func (e *URLError) Unwrap() error { return e.Err }
