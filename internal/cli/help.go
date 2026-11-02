@@ -164,16 +164,14 @@ type flagGroup struct {
 // makeFuncs returns the help template functions, styled through p so they
 // emit plain text when color is off.
 func makeFuncs(p ansi.Painter) template.FuncMap {
-	cBold, cDim, cUnderline := p.Code(ansi.Bold), p.Code(ansi.Dim), p.Code(ansi.Underline)
-	cResetIntensity, cResetUnderline := p.Code(ansi.NoIntensity), p.Code(ansi.NoUnderline)
+	bold := func(s string) string { return p.Wrap(s, ansi.Bold, ansi.NoIntensity) }
+	underline := func(s string) string { return p.Wrap(s, ansi.Underline, ansi.NoUnderline) }
 	return template.FuncMap{
-		"bold":      func(s string) string { return cBold + s + cResetIntensity },
-		"underline": func(s string) string { return cUnderline + s + cResetUnderline },
-		"head":      func(s string) string { return cBold + cUnderline + s + cResetUnderline + cResetIntensity },
-		"dim":       func(s string) string { return cDim + s + cResetIntensity },
-		"groupHead": func(g flagGroup) string {
-			return cUnderline + g.TypeName + cResetUnderline
-		},
+		"bold":      bold,
+		"underline": underline,
+		"head":      func(s string) string { return bold(underline(s)) },
+		"dim":       func(s string) string { return p.Wrap(s, ansi.Dim, ansi.NoIntensity) },
+		"groupHead": func(g flagGroup) string { return underline(g.TypeName) },
 
 		"wrapIndent": func(indent string, width int, s string) string {
 			if s == "" {
@@ -231,17 +229,13 @@ func makeFuncs(p ansi.Painter) template.FuncMap {
 		},
 
 		"flagLine": func(d CommandDef) string {
+			name := "--" + d.Name
+			if d.Short != "" {
+				name = "-" + d.Short + ", " + name
+			}
 			var sb strings.Builder
 			sb.WriteString("  ")
-			sb.WriteString(cBold)
-			if d.Short != "" {
-				sb.WriteString("-")
-				sb.WriteString(d.Short)
-				sb.WriteString(", ")
-			}
-			sb.WriteString("--")
-			sb.WriteString(d.Name)
-			sb.WriteString(cResetIntensity)
+			sb.WriteString(bold(name))
 
 			switch d.ValueType {
 			case ValueAny:
@@ -284,7 +278,7 @@ func makeFuncs(p ansi.Painter) template.FuncMap {
 				flagPart += " "
 			}
 
-			return cBold + flagPart + cResetIntensity + d.Usage
+			return bold(flagPart) + d.Usage
 		},
 	}
 }
