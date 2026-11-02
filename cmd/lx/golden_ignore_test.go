@@ -18,6 +18,9 @@ func TestGoldenAncestorIgnore(t *testing.T) {
 		{name: "105f_stdin_named_ignored_file", args: []string{}, stdin: "sub/a.log\nsub/main.go"},
 		{name: "105i_stdin_include_filter", args: []string{"-i", "*.go"}, stdin: "sub/a.log\nsub/main.go\nsub/deep/util.go\nsub/keep.log"},
 		{name: "105j_stdin_exclude_filter", args: []string{"-e", "deep/"}, stdin: "sub/a.log\nsub/main.go\nsub/deep/util.go\nsub/keep.log"},
+		{name: "105k_stdin_include_filter_walks_dirs", args: []string{"-i", "*.go"}, stdin: "sub/a.log\nsub/deep\ndist"},
+		{name: "105l_stdin_include_filter_single_dir", args: []string{"-i", "*.go"}, stdin: "sub"},
+		{name: "105m_stdin_exclude_filter_drops_dir", args: []string{"-e", "deep/"}, stdin: "sub/deep\nsub/main.go"},
 		{name: "108_info_exclude_repo_root", args: []string{"."}},
 	})
 }

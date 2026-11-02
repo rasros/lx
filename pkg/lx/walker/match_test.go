@@ -12,10 +12,10 @@ func TestMatch_BasePathScopedRule(t *testing.T) {
 	}
 	rule := rules[0]
 
-	if !match(rule, "sub/foo.txt", false) {
+	if !newPathMatcher("sub/foo.txt").match(rule, false) {
 		t.Fatal("expected scoped rule to match path within base path")
 	}
-	if match(rule, "other/foo.txt", false) {
+	if newPathMatcher("other/foo.txt").match(rule, false) {
 		t.Fatal("expected scoped rule not to match path outside base path")
 	}
 }
@@ -27,10 +27,10 @@ func TestMatch_DirOnlyRequiresDirEntry(t *testing.T) {
 	}
 	rule := rules[0]
 
-	if !match(rule, "build", true) {
+	if !newPathMatcher("build").match(rule, true) {
 		t.Fatal("expected dir-only rule to match directory")
 	}
-	if match(rule, "build", false) {
+	if newPathMatcher("build").match(rule, false) {
 		t.Fatal("expected dir-only rule not to match non-directory entry")
 	}
 }
@@ -108,6 +108,15 @@ func TestParseRules_Escapes(t *testing.T) {
 		rules := parseRules([]string{tt.line}, "", "test")
 		if len(rules) != 1 || rules[0].Pattern != tt.pattern || rules[0].Negate != tt.negate {
 			t.Errorf("parseRules(%q) = %+v, want pattern %q negate %v", tt.line, rules, tt.pattern, tt.negate)
+		}
+	}
+}
+
+func TestCheckIgnore_BackslashEscapes(t *testing.T) {
+	rules := parseRules([]string{`\*.go`, `a\ b.go`}, "", ".gitignore")
+	for path, want := range map[string]bool{"*.go": true, "x.go": false, "a b.go": true, `a\ b.go`: false} {
+		if ignored, _ := checkIgnore(path, false, rules, false, "", false); ignored != want {
+			t.Errorf("%q ignored = %v, want %v", path, ignored, want)
 		}
 	}
 }

@@ -61,7 +61,9 @@ func parseRules(lines []string, basePath, source string) []Rule {
 			p = p[1:]
 		}
 
-		p = normalizePattern(p)
+		// Backslashes escape the next character, as in git, so they are
+		// kept for the matcher rather than read as separators.
+		p = cleanPattern(p)
 		spec := compileNormalizedSpec(p)
 
 		rules = append(rules, Rule{
@@ -117,11 +119,6 @@ func matchIgnoreSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 		return spec.Pattern.matchCandidate(ctx.relPath)
 	}
 	return spec.Pattern.matchCandidate(ctx.baseName)
-}
-
-func match(rule Rule, relPath string, isDir bool) bool {
-	m := newPathMatcher(relPath)
-	return m.match(rule, isDir)
 }
 
 // pathMatcher matches one path against rules. Rules loaded from the same

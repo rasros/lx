@@ -1,6 +1,7 @@
 package walker
 
 import (
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -19,6 +20,8 @@ func TestCompileSpecMetadata(t *testing.T) {
 		wantPrefix        string
 		wantSuffix        string
 		wantValid         bool
+		windowsOnly       bool
+		unixOnly          bool
 	}{
 		{
 			name:         "literal",
@@ -69,6 +72,7 @@ func TestCompileSpecMetadata(t *testing.T) {
 		},
 		{
 			name:         "windows slashes normalized",
+			windowsOnly:  true,
 			raw:          `\src\*.go`,
 			wantPattern:  "src/*.go",
 			wantAnchored: true,
@@ -78,6 +82,15 @@ func TestCompileSpecMetadata(t *testing.T) {
 			wantOnlyStar: true,
 			wantPrefix:   "src/",
 			wantSuffix:   ".go",
+		},
+		{
+			name:         "escaped star outside windows",
+			unixOnly:     true,
+			raw:          `\*.go`,
+			wantPattern:  `\*.go`,
+			wantLiteral:  false,
+			wantValid:    true,
+			wantOnlyStar: false,
 		},
 		{
 			name:         "invalid glob",
@@ -91,6 +104,10 @@ func TestCompileSpecMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			windows := filepath.Separator == '\\'
+			if (tt.windowsOnly && !windows) || (tt.unixOnly && windows) {
+				t.Skip("separator-specific case")
+			}
 			spec := compileSpec(tt.raw)
 			if spec.Pattern.Pattern != tt.wantPattern {
 				t.Fatalf("Pattern = %q, want %q", spec.Pattern.Pattern, tt.wantPattern)
