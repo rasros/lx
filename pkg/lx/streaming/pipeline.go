@@ -194,7 +194,7 @@ func (s *Stream) report(f sources.InputFile, issues render.FileIssues) {
 	if issues.ReadErr != nil && s.onFileError != nil {
 		s.onFileError(f, issues.ReadErr)
 	}
-	if ce := issues.ConvertErr; ce != nil {
+	if ce := issues.Convert; ce != nil {
 		s.log.Debug("Converter failed, keeping raw content",
 			"converter", ce.Converter, "path", f.Path, "error", ce.Err)
 	}

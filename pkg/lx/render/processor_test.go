@@ -333,10 +333,10 @@ func TestApplyConvertersKeepsContentOnFailure(t *testing.T) {
 	t.Cleanup(func() { converters = converters[:len(converters)-1] })
 
 	src := []byte("raw content")
-	reader, size, from, _, _, convErr := applyConverters(sources.NewBufferInputFile("doc.zzz", src), core.RenderOptions{}, nil, bytes.NewReader(src), int64(len(src)), false)
+	reader, size, from, _, _, failure := applyConverters(sources.NewBufferInputFile("doc.zzz", src), core.RenderOptions{}, nil, bytes.NewReader(src), int64(len(src)), false)
 
-	if convErr == nil || convErr.Converter != "failing" || convErr.Err != io.ErrUnexpectedEOF {
-		t.Errorf("convErr = %v, want the failing converter's error", convErr)
+	if failure == nil || failure.Converter != "failing" || failure.Err != io.ErrUnexpectedEOF {
+		t.Errorf("failure = %v, want the failing converter's error", failure)
 	}
 	if from != "" {
 		t.Errorf("convertedFrom = %q, want empty after a failure", from)
