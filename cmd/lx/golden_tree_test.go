@@ -10,10 +10,9 @@ import (
 )
 
 func TestGoldenTree(t *testing.T) {
-	pkgDir, _ := os.Getwd()
 	dir := setupTreeFixture(t)
 	server := httptest.NewServer(http.FileServer(http.Dir(dir)))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	runTestGolden(t, dir, []goldenTestCase{
 		// Tree-only: just the tree, no file content
@@ -53,11 +52,12 @@ func TestGoldenTree(t *testing.T) {
 		{name: "745_tree_only_url", args: []string{"-t", server.URL + "/main.go"}},
 		{name: "746_tree_url_with_content", args: []string{"-T", server.URL + "/main.go"}},
 	}, server.URL)
+}
 
-	if err := os.Chdir(pkgDir); err != nil {
-		t.Fatal(err)
-	}
-
+// The archive is added to a fixture of its own, so the walks of the tree
+// fixture above never see it.
+func TestGoldenTreeArchive(t *testing.T) {
+	dir := setupTreeFixture(t)
 	createZipFixture(t, filepath.Join(dir, "archive.zip"), map[string]string{
 		"hello.txt":       "Hello from archive!\n",
 		"nested/world.go": "package nested\n",

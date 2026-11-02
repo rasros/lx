@@ -2,12 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"runtime/pprof"
 )
 
-func setupProfiling(parsed *ParsedArgs) (func(), error) {
+func setupProfiling(parsed *ParsedArgs, env Env) (func(), error) {
 	var onExit []func()
 
 	cleanup := func() {
@@ -17,7 +16,7 @@ func setupProfiling(parsed *ParsedArgs) (func(), error) {
 	}
 
 	if path, ok := parsed.Globals["cpuprofile"]; ok {
-		f, err := os.Create(path)
+		f, err := env.create(path)
 		if err != nil {
 			return cleanup, fmt.Errorf("create cpu profile: %w", err)
 		}
@@ -35,9 +34,9 @@ func setupProfiling(parsed *ParsedArgs) (func(), error) {
 
 	if path, ok := parsed.Globals["memprofile"]; ok {
 		onExit = append(onExit, func() {
-			f, err := os.Create(path)
+			f, err := env.create(path)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "create mem profile: %v\n", err)
+				fmt.Fprintf(env.Stderr, "create mem profile: %v\n", err)
 				return
 			}
 			defer f.Close()
@@ -45,7 +44,7 @@ func setupProfiling(parsed *ParsedArgs) (func(), error) {
 			runtime.GC()
 
 			if err := pprof.WriteHeapProfile(f); err != nil {
-				fmt.Fprintf(os.Stderr, "write mem profile: %v\n", err)
+				fmt.Fprintf(env.Stderr, "write mem profile: %v\n", err)
 			}
 		})
 	}

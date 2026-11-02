@@ -34,28 +34,36 @@ type Painter struct {
 // New returns a Painter that styles text only when enabled is true.
 func New(enabled bool) Painter { return Painter{enabled: enabled} }
 
-// For returns a Painter for output written to w, see Enabled.
-func For(w io.Writer) Painter { return New(Enabled(w)) }
+// LookupEnv looks an environment variable up, as os.LookupEnv does.
+type LookupEnv func(key string) (string, bool)
 
-// Enabled reports whether output written to w should be colored:
+// For returns a Painter for output written to w, see Enabled.
+func For(w io.Writer, env LookupEnv) Painter { return New(Enabled(w, env)) }
+
+// Enabled reports whether output written to w should be colored, given the
+// environment variables env looks up:
 //
 //   - NO_COLOR, CLICOLOR=0 or TERM=dumb turn color off;
 //   - FORCE_COLOR turns it on, unless it is 0 or false, which turn it off;
 //   - CLICOLOR_FORCE, unless it is 0, turns it on;
-//   - otherwise only a terminal on stdout or stderr gets color, and outside
-//     Windows, whose consoles never set TERM, only when TERM is set.
-func Enabled(w io.Writer) bool {
-	if os.Getenv("NO_COLOR") != "" || os.Getenv("CLICOLOR") == "0" {
+//   - otherwise only a terminal gets color, and outside Windows, whose
+//     consoles never set TERM, only when TERM is set.
+func Enabled(w io.Writer, env LookupEnv) bool {
+	get := func(key string) string {
+		v, _ := env(key)
+		return v
+	}
+	if get("NO_COLOR") != "" || get("CLICOLOR") == "0" {
 		return false
 	}
-	term := os.Getenv("TERM")
+	term := get("TERM")
 	if term == "dumb" {
 		return false
 	}
-	if force, ok := os.LookupEnv("FORCE_COLOR"); ok {
+	if force, ok := env("FORCE_COLOR"); ok {
 		return force != "0" && !strings.EqualFold(force, "false")
 	}
-	if force := os.Getenv("CLICOLOR_FORCE"); force != "" && force != "0" {
+	if force := get("CLICOLOR_FORCE"); force != "" && force != "0" {
 		return true
 	}
 	if term == "" && runtime.GOOS != "windows" {
@@ -64,15 +72,10 @@ func Enabled(w io.Writer) bool {
 	return isTerminal(w)
 }
 
-// isTerminal reports whether w is stdout or stderr attached to a terminal.
+// isTerminal reports whether w is a file attached to a terminal.
 func isTerminal(w io.Writer) bool {
-	var f *os.File
-	switch w {
-	case os.Stderr:
-		f = os.Stderr
-	case os.Stdout:
-		f = os.Stdout
-	default:
+	f, ok := w.(*os.File)
+	if !ok {
 		return false
 	}
 	stat, err := f.Stat()

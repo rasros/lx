@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -42,10 +43,15 @@ func loadFrom(t *testing.T, yaml string) (*lx.Config, *CliConfig) {
 	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	t.Setenv("LX_CONFIG", "")
+	env, _, _ := testEnv(t)
+	env.LookupEnv = func(k string) (string, bool) {
+		if k == "XDG_CONFIG_HOME" {
+			return dir, true
+		}
+		return "", false
+	}
 
-	lxCfg, cliCfg, err := LoadConfigChain(path)
+	lxCfg, cliCfg, err := LoadConfigChain(env, slog.Default(), path)
 	if err != nil {
 		t.Fatalf("LoadConfigChain failed: %v", err)
 	}

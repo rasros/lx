@@ -10,20 +10,20 @@ import (
 // beside it up to the next section or tree-only boundary. The stream builds
 // the tree from the ones it admits. A tree-only op also marks its file ops so
 // their content is skipped.
-func assignTrees(sections []Section) {
+func assignTrees(log *slog.Logger, sections []Section) {
 	for i := range sections {
-		assignSectionTrees(&sections[i])
+		assignSectionTrees(log, &sections[i])
 	}
 }
 
-func assignSectionTrees(g *Section) {
+func assignSectionTrees(log *slog.Logger, g *Section) {
 	var subFileIdxs []int
 	var subTreeIdxs []int
 	subTreeOnly := false
 
 	flush := func() {
 		if len(subTreeIdxs) > 0 && len(subFileIdxs) == 0 {
-			slog.Warn("Tree options cover no files", "flags", flagNames(treeOps(g.Ops, subTreeIdxs)))
+			log.Warn("Tree options cover no files", "flags", flagNames(treeOps(g.Ops, subTreeIdxs)))
 		}
 		if len(subTreeIdxs) > 0 {
 			var files []lx.InputFile

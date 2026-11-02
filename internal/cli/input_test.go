@@ -7,17 +7,11 @@ import (
 )
 
 func TestReadFilenamesFromStdin_Piped(t *testing.T) {
-	origStdin := os.Stdin
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		os.Stdin = origStdin
-		r.Close()
-	}()
-
-	os.Stdin = r
+	defer r.Close()
 
 	input := "file1.txt\n\nfile2.txt \n  \nfile3\n"
 	go func() {
@@ -27,7 +21,7 @@ func TestReadFilenamesFromStdin_Piped(t *testing.T) {
 		}
 	}()
 
-	got, _, err := readFilenamesFromStdin(false)
+	got, _, err := readFilenamesFromStdin(r, false)
 	if err != nil {
 		t.Fatalf("readFilenamesFromStdin error: %v", err)
 	}
@@ -39,17 +33,11 @@ func TestReadFilenamesFromStdin_Piped(t *testing.T) {
 }
 
 func TestReadFilenamesFromStdin_Null(t *testing.T) {
-	origStdin := os.Stdin
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		os.Stdin = origStdin
-		r.Close()
-	}()
-
-	os.Stdin = r
+	defer r.Close()
 
 	input := []byte("file 1.txt\x00file\n2.txt\x00file3\x00")
 
@@ -60,7 +48,7 @@ func TestReadFilenamesFromStdin_Null(t *testing.T) {
 		}
 	}()
 
-	got, _, err := readFilenamesFromStdin(true)
+	got, _, err := readFilenamesFromStdin(r, true)
 	if err != nil {
 		t.Fatalf("readFilenamesFromStdin(true) error: %v", err)
 	}

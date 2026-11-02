@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -117,11 +116,6 @@ func TestGoldenGlobsURLArchive(t *testing.T) {
 // paths below it.
 func TestGoldenGlobsOutsideCwd(t *testing.T) {
 	dir := gf.SetupGlobsFixture(t)
-	pkgDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(pkgDir) })
-	if err := os.Chdir(filepath.Join(dir, "build")); err != nil {
-		t.Fatal(err)
-	}
 	canonical, _ := filepath.EvalSymlinks(dir)
 	runGoldenTests(t, []goldenTestCase{
 		{name: "940_glob_parent_root_as_written", args: []string{"-n0", "-i", "../build/*.js", ".."}},
@@ -134,5 +128,5 @@ func TestGoldenGlobsOutsideCwd(t *testing.T) {
 		// working directory paths are matched relative to it.
 		{name: "945_glob_stdin_absolute_dir_above_cwd", args: []string{"-n0", "-i", "sub/*", "-i", "/x.js"}, stdin: dir},
 		{name: "946_glob_stdin_absolute_path_parents_not_judged", args: []string{"-n0", "-e", "ovr", "-e", "drop.js"}, stdin: filepath.Join(dir, "ovr", "keep.js") + "\n" + filepath.Join(dir, "ovr", "drop.js")},
-	}, pkgDir, dir, canonical)
+	}, goldenRun{cwd: filepath.Join(dir, "build"), scrub: []string{dir, canonical}})
 }

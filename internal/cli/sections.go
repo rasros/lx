@@ -26,7 +26,7 @@ type Section struct {
 // before them in their section carry on into the section a -s starts, so
 // options before the first file belong to it however many prompts or -s
 // come first; options no file follows at all are reported.
-func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
+func parseSections(log *slog.Logger, ops []Op, defaultRender lx.RenderOptions) []Section {
 	var sections []Section
 	current := Section{Render: defaultRender}
 	hasFiles := false
@@ -44,7 +44,7 @@ func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 				current = Section{Render: defaultRender}
 				hasFiles, afterFiles = false, true
 			}
-			applyInterleaved(op, &current)
+			applyInterleaved(log, op, &current)
 			pending = append(pending, op)
 		case CmdAction:
 			switch op.Action {
@@ -55,7 +55,7 @@ func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 				next := Section{Render: defaultRender}
 				switch {
 				case afterFiles:
-					applyTrailing(pending, &sections[len(sections)-1])
+					applyTrailing(log, pending, &sections[len(sections)-1])
 					pending = nil
 				case !hasFiles:
 					next.Render, next.Discover = current.Render, current.Discover
@@ -72,9 +72,9 @@ func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 	}
 	switch {
 	case afterFiles:
-		applyTrailing(pending, &sections[len(sections)-1])
+		applyTrailing(log, pending, &sections[len(sections)-1])
 	case !hasFiles && len(pending) > 0:
-		slog.Warn("Interleaved options apply to no files", "flags", flagNames(pending))
+		log.Warn("Interleaved options apply to no files", "flags", flagNames(pending))
 	}
 	if len(current.Ops) > 0 {
 		sections = append(sections, current)
@@ -97,66 +97,66 @@ func flagNames(ops []Op) string {
 
 // applyTrailing applies interleaved options that no file follows to the
 // section of the files before them.
-func applyTrailing(ops []Op, s *Section) {
-	slog.Warn("Trailing interleaved options detected; applying to preceding files", "flags", flagNames(ops))
+func applyTrailing(log *slog.Logger, ops []Op, s *Section) {
+	log.Warn("Trailing interleaved options detected; applying to preceding files", "flags", flagNames(ops))
 	for _, op := range ops {
-		applyInterleaved(op, s)
+		applyInterleaved(log, op, s)
 	}
 }
 
-func applyInterleaved(op Op, s *Section) {
+func applyInterleaved(log *slog.Logger, op Op, s *Section) {
 	switch op.Action {
 	case "head":
 		val, _ := strconv.Atoi(op.Value)
-		slog.Debug("Setting head limit", "value", val)
+		log.Debug("Setting head limit", "value", val)
 		s.Render.Head, s.Render.Tail = val, 0
 	case "tail":
 		val, _ := strconv.Atoi(op.Value)
-		slog.Debug("Setting tail limit", "value", val)
+		log.Debug("Setting tail limit", "value", val)
 		s.Render.Tail, s.Render.Head = val, 0
 	case "lines":
 		val, _ := strconv.Atoi(op.Value)
-		slog.Debug("Setting lines limit", "value", val)
+		log.Debug("Setting lines limit", "value", val)
 		s.Render.Head, s.Render.Tail = (val+1)/2, val/2
 	case "max-size":
 		val, _ := parseSizeLimit(op.Value)
-		slog.Debug("Setting max file size", "bytes", val)
+		log.Debug("Setting max file size", "bytes", val)
 		s.Render.MaxSize = val
 	case "line-numbers":
-		slog.Debug("Enabling line numbers")
+		log.Debug("Enabling line numbers")
 		s.Render.LineNumbers = true
 	case "functions":
-		slog.Debug("Enabling function skeleton")
+		log.Debug("Enabling function skeleton")
 		s.Render.SkeletonFunctions = true
 	case "types":
-		slog.Debug("Enabling type skeleton")
+		log.Debug("Enabling type skeleton")
 		s.Render.SkeletonTypes = true
 	case "documents":
-		slog.Debug("Enabling document extraction")
+		log.Debug("Enabling document extraction")
 		s.Render.ExtractDocuments = true
 	case "media":
-		slog.Debug("Enabling media metadata extraction")
+		log.Debug("Enabling media metadata extraction")
 		s.Render.ExtractMedia = true
 	case "expand":
-		slog.Debug("Enabling archive expansion")
+		log.Debug("Enabling archive expansion")
 		s.Discover.ExpandArchives = true
 	case "hidden":
-		slog.Debug("Enabling show hidden files")
+		log.Debug("Enabling show hidden files")
 		s.Discover.ShowHidden = true
 	case "follow":
-		slog.Debug("Enabling follow dir symlinks")
+		log.Debug("Enabling follow dir symlinks")
 		s.Discover.FollowDirSymlinks = true
 	case "no-links":
-		slog.Debug("Enabling skip file symlinks")
+		log.Debug("Enabling skip file symlinks")
 		s.Discover.SkipFileSymlinks = true
 	case "no-ignore":
-		slog.Debug("Disabling gitignore filtering")
+		log.Debug("Disabling gitignore filtering")
 		s.Discover.NoIgnore = true
 	case "include":
-		slog.Debug("Adding include filter", "pattern", op.Value)
+		log.Debug("Adding include filter", "pattern", op.Value)
 		s.Discover.Globs = append(s.Discover.Globs, lx.IncludeGlob(op.Value))
 	case "exclude":
-		slog.Debug("Adding exclude filter", "pattern", op.Value)
+		log.Debug("Adding exclude filter", "pattern", op.Value)
 		s.Discover.Globs = append(s.Discover.Globs, lx.ExcludeGlob(op.Value))
 	}
 }
