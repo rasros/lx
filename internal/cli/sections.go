@@ -19,24 +19,21 @@ type Section struct {
 }
 
 // parseSections splits ops into sections, each with its own interleaved
-// options. An interleaved option after files, or a -s, starts a new section
-// with the options reset; options before the first file or -s belong to the
-// first section. Options that no file follows before the next -s or the end
-// apply to the files before them, with a warning.
+// options. An interleaved option after files, or a -s after files, starts a
+// new section with the options reset. Options no file has followed yet carry
+// on into the section a -s starts, so options before the first file belong
+// to it however many prompts or -s come first. Options that come right after
+// files and that no file follows before the next -s or the end apply to
+// those files, with a warning; options no file follows at all are reported.
 func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 	var sections []Section
 	current := Section{Render: defaultRender}
 	hasFiles := false
-	var trailingOps []Op
-
-	// closeTrailing ends the current section at a -s or the end of ops.
-	closeTrailing := func() {
-		if len(current.Ops) > 0 {
-			sections = append(sections, current)
-		} else if len(trailingOps) > 0 && len(sections) > 0 {
-			applyTrailing(trailingOps, &sections[len(sections)-1])
-		}
-	}
+	// pending are the interleaved options no file has followed yet, and
+	// afterFiles says they came right after files, which current was split
+	// from.
+	var pending []Op
+	afterFiles := false
 
 	for _, op := range ops {
 		switch op.Type {
@@ -44,32 +41,48 @@ func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 			if hasFiles {
 				sections = append(sections, current)
 				current = Section{Render: defaultRender}
-				hasFiles = false
-				trailingOps = nil
+				hasFiles, afterFiles = false, true
 			}
 			applyInterleaved(op, &current)
-			trailingOps = append(trailingOps, op)
+			pending = append(pending, op)
 		case CmdAction:
-			switch {
-			case op.Action == "section" && (len(current.Ops) > 0 || len(sections) > 0):
-				closeTrailing()
-				current = Section{Render: defaultRender}
-				hasFiles = false
-				trailingOps = nil
-			case op.Action == "FILE":
-				hasFiles = true
-				trailingOps = nil
+			switch op.Action {
+			case "FILE":
+				hasFiles, afterFiles = true, false
+				pending = nil
+			case "section":
+				next := Section{Render: defaultRender}
+				switch {
+				case afterFiles && len(current.Ops) == 0:
+					applyTrailing(pending, &sections[len(sections)-1])
+					pending = nil
+				case !hasFiles:
+					next.Render, next.Discover = current.Render, current.Discover
+				default:
+					pending = nil
+				}
+				if len(current.Ops) > 0 {
+					sections = append(sections, current)
+				}
+				current, hasFiles, afterFiles = next, false, false
 			}
 			current.Ops = append(current.Ops, op)
 		}
 	}
-	closeTrailing()
+	switch {
+	case afterFiles && len(current.Ops) == 0:
+		applyTrailing(pending, &sections[len(sections)-1])
+	case !hasFiles && len(pending) > 0:
+		slog.Warn("Interleaved options apply to no files", "flags", flagNames(pending))
+	}
+	if len(current.Ops) > 0 {
+		sections = append(sections, current)
+	}
 	return sections
 }
 
-// applyTrailing applies interleaved options that no file follows to the
-// section of the files before them.
-func applyTrailing(ops []Op, s *Section) {
+// flagNames names ops as they could be written on the command line.
+func flagNames(ops []Op) string {
 	names := make([]string, 0, len(ops))
 	for _, op := range ops {
 		desc := "--" + op.Action
@@ -78,8 +91,13 @@ func applyTrailing(ops []Op, s *Section) {
 		}
 		names = append(names, desc)
 	}
-	slog.Warn("Trailing interleaved options detected; applying to preceding files",
-		"flags", strings.Join(names, ", "))
+	return strings.Join(names, ", ")
+}
+
+// applyTrailing applies interleaved options that no file follows to the
+// section of the files before them.
+func applyTrailing(ops []Op, s *Section) {
+	slog.Warn("Trailing interleaved options detected; applying to preceding files", "flags", flagNames(ops))
 	for _, op := range ops {
 		applyInterleaved(op, s)
 	}
