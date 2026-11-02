@@ -261,3 +261,35 @@ func TestRanges_KeepsEverythingWhenNotReduced(t *testing.T) {
 		t.Errorf("empty source: %v", got)
 	}
 }
+
+func TestExtract_PassesUnreducedSourceThrough(t *testing.T) {
+	// No final newline: Extract must not add one to source it leaves alone.
+	src := []byte("a\nb\nc")
+	for _, tc := range []struct {
+		name               string
+		lang               string
+		functions, structs bool
+	}{
+		{"unsupported", "erlang", true, true},
+		{"no flags", "go", false, false},
+	} {
+		if got := Extract(tc.lang, src, tc.functions, tc.structs); string(got) != string(src) {
+			t.Errorf("%s: Extract = %q, want %q unchanged", tc.name, got, src)
+		}
+	}
+	if got := Extract("go", nil, true, true); len(got) != 0 {
+		t.Errorf("empty source: %q", got)
+	}
+}
+
+func TestExtract_MarksInlineCuts(t *testing.T) {
+	src := "def f(): return 1\ndef g(): return 2\ndef h(): return 3\n"
+	want := "def f(): \n...\ndef g(): \n...\ndef h(): \n"
+	if got := string(Extract("python", []byte(src), true, false)); got != want {
+		t.Errorf("Extract = %q, want %q", got, want)
+	}
+	k := Keep("python", []byte(src), true, false)
+	if want := []int{1, 2, 3}; !reflect.DeepEqual(k.Rows, want) {
+		t.Errorf("rows = %v, want %v", k.Rows, want)
+	}
+}

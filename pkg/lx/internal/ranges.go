@@ -2,8 +2,9 @@ package internal
 
 import "slices"
 
-// ElisionMarker is the line that stands in for source rows left out between
-// two kept lines. It echoes the "... (N rows skipped)" gap of a head and tail
+// ElisionMarker is the line that stands in for source left out between two
+// kept lines: rows between them, or the rest of a line cut short, such as a
+// one-line function's body. It echoes the "... (N rows skipped)" gap of a head and tail
 // excerpt, without the count: the cut rows are mostly function bodies, a
 // count on every one of them would cost more than it tells, and line numbers
 // (-l) give the exact positions.
@@ -52,6 +53,7 @@ func KeepPrefix(out []LineRange, lines [][]byte, row, cut int) []LineRange {
 type KeptLines struct {
 	Lines [][]byte // the kept text of each row, without its newline
 	Rows  []int    // the 1-based source row each line came from, ascending
+	Cut   []bool   // whether the line ends early, its rest left out
 }
 
 // MergeRanges returns ranges sorted by Start, with the ones that overlap or
@@ -86,20 +88,22 @@ func MergeRanges(ranges []LineRange) []LineRange {
 	return merged
 }
 
-// KeepRanges collects the rows that ranges keep from src, merged as
-// MergeRanges does, so ranges may come in any order and overlap.
-func KeepRanges(src []byte, ranges []LineRange) KeptLines {
-	lines := SplitLines(src)
+// KeepRanges collects the rows that ranges keep from lines, the source as
+// SplitLines splits it, merged as MergeRanges does, so ranges may come in any
+// order and overlap.
+func KeepRanges(lines [][]byte, ranges []LineRange) KeptLines {
 	var k KeptLines
 	for _, r := range MergeRanges(ranges) {
 		end := min(r.End, len(lines))
 		for row := max(r.Start, 0); row < end; row++ {
 			text := lines[row]
-			if row == r.End-1 && r.Cut > 0 && r.Cut < len(text) {
+			cut := row == r.End-1 && r.Cut > 0 && r.Cut < len(text)
+			if cut {
 				text = text[:r.Cut]
 			}
 			k.Lines = append(k.Lines, text)
 			k.Rows = append(k.Rows, row+1)
+			k.Cut = append(k.Cut, cut)
 		}
 	}
 	return k
@@ -108,15 +112,23 @@ func KeepRanges(src []byte, ranges []LineRange) KeptLines {
 // Len is the number of kept lines.
 func (k KeptLines) Len() int { return len(k.Lines) }
 
+// elidedBefore reports whether source was left out between lines i-1 and i:
+// rows between them, or the rest of line i-1 when it was cut short.
+func (k KeptLines) elidedBefore(i int) bool {
+	return k.Rows[i] != k.Rows[i-1]+1 || (k.Cut != nil && k.Cut[i-1])
+}
+
 // Render returns the kept lines from..to-1 as text, each ending in a newline,
-// with an ElisionMarker wherever two neighbouring lines are not neighbouring
-// source rows. rows gives the source row of each output line, 0 for a marker,
-// in the form LineNumberFormatter takes.
+// with one ElisionMarker between two neighbouring lines wherever source was
+// left out between them (see elidedBefore). Markers never open or close the
+// text: what lies beyond its first and last line is not shown either way.
+// rows gives the source row of each output line, 0 for a marker, in the form
+// LineNumberFormatter takes.
 func (k KeptLines) Render(from, to int) (text []byte, rows []int) {
 	from = max(from, 0)
 	to = min(to, len(k.Lines))
 	for i := from; i < to; i++ {
-		if i > from && k.Rows[i] != k.Rows[i-1]+1 {
+		if i > from && k.elidedBefore(i) {
 			text = append(text, ElisionMarker...)
 			rows = append(rows, 0)
 		}
@@ -125,6 +137,18 @@ func (k KeptLines) Render(from, to int) (text []byte, rows []int) {
 		rows = append(rows, k.Rows[i])
 	}
 	return text, rows
+}
+
+// Size is the length of Text, worked out without rendering it.
+func (k KeptLines) Size() int {
+	n := 0
+	for i, l := range k.Lines {
+		n += len(l) + 1
+		if i > 0 && k.elidedBefore(i) {
+			n += len(ElisionMarker)
+		}
+	}
+	return n
 }
 
 // Text renders all the kept lines; see Render.

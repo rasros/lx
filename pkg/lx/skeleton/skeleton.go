@@ -21,25 +21,40 @@ func Supported(lang string) bool {
 // internal.MergeRanges does. Source that cannot be parsed, an unsupported
 // lang, or asking for neither part keeps every row.
 func Ranges(lang string, src []byte, functions, structs bool) []Range {
+	ranges, _ := ranges(lang, src, internal.SplitLines(src), functions, structs)
+	return ranges
+}
+
+// ranges is Ranges over src already split into lines. It also reports whether
+// src was reduced at all.
+func ranges(lang string, src []byte, lines [][]byte, functions, structs bool) ([]Range, bool) {
 	if functions || structs {
-		if ranges, ok := extract(lang, src, functions, structs); ok {
-			return internal.MergeRanges(ranges)
+		if kept, ok := extract(lang, src, lines, functions, structs); ok {
+			return internal.MergeRanges(kept), true
 		}
 	}
 	if n := internal.CountLines(src); n > 0 {
-		return []Range{{Start: 0, End: n}}
+		return []Range{{Start: 0, End: n}}, false
 	}
-	return nil
+	return nil, false
 }
 
 // Keep returns the skeleton of src as kept source lines, ready to slice and
 // number by their source rows.
 func Keep(lang string, src []byte, functions, structs bool) Lines {
-	return internal.KeepRanges(src, Ranges(lang, src, functions, structs))
+	lines := internal.SplitLines(src)
+	r, _ := ranges(lang, src, lines, functions, structs)
+	return internal.KeepRanges(lines, r)
 }
 
 // Extract returns the skeleton of src as text, with an elision marker line
-// wherever source rows were left out between two kept ones.
+// wherever source was left out between two kept lines. Source it does not
+// reduce (see Ranges) comes back unchanged.
 func Extract(lang string, src []byte, functions, structs bool) []byte {
-	return Keep(lang, src, functions, structs).Text()
+	lines := internal.SplitLines(src)
+	r, reduced := ranges(lang, src, lines, functions, structs)
+	if !reduced {
+		return src
+	}
+	return internal.KeepRanges(lines, r).Text()
 }

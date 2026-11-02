@@ -77,7 +77,7 @@ func TestKeepPrefix(t *testing.T) {
 const fiveRows = "one\ntwo\nthree\nfour\nfive\n"
 
 func TestKeepRanges(t *testing.T) {
-	k := KeepRanges([]byte(fiveRows), []LineRange{
+	k := KeepRanges(SplitLines([]byte(fiveRows)), []LineRange{
 		{Start: 3, End: 5},
 		{Start: 0, End: 1},
 		{Start: 1, End: 2, Cut: 2}, // touches row 0, so no gap
@@ -97,7 +97,7 @@ func TestKeepRanges(t *testing.T) {
 }
 
 func TestKeptLinesRender(t *testing.T) {
-	k := KeepRanges([]byte(fiveRows), []LineRange{{Start: 0, End: 2}, {Start: 3, End: 4}, {Start: 4, End: 5}})
+	k := KeepRanges(SplitLines([]byte(fiveRows)), []LineRange{{Start: 0, End: 2}, {Start: 3, End: 4}, {Start: 4, End: 5}})
 
 	text, rows := k.Render(0, k.Len())
 	if want := "one\ntwo\n...\nfour\nfive\n"; string(text) != want {
@@ -123,12 +123,47 @@ func TestKeptLinesRender(t *testing.T) {
 	}
 }
 
-func TestKeepRangesCutLineKeepsNoMarker(t *testing.T) {
-	// A cut ends a row early but leaves out no rows, so the next row follows
-	// without a marker.
-	src := []byte("func f() { return 1 }\nfunc g() {\n}\n")
-	k := KeepRanges(src, []LineRange{{Start: 0, End: 1, Cut: 10}, {Start: 1, End: 2}})
-	if got, want := string(k.Text()), "func f() {\nfunc g() {\n"; got != want {
-		t.Errorf("text = %q, want %q", got, want)
+func TestKeptLinesMarkCutLines(t *testing.T) {
+	// A cut leaves out the rest of its row, so it is marked like left-out
+	// rows are, even though the next kept line is the next row.
+	src := "def f(): return 1\ndef g(): return 2\nclass A: pass\n\ndef h(): return 3\n"
+	k := KeepRanges(SplitLines([]byte(src)), []LineRange{
+		{Start: 0, End: 1, Cut: 9},
+		{Start: 1, End: 2, Cut: 9},
+		{Start: 2, End: 3},
+		{Start: 4, End: 5, Cut: 9},
+	})
+	text, rows := k.Render(0, k.Len())
+	// One marker after each cut and one for the blank row 4, never two in a
+	// row, and none after the last line though it is cut too.
+	want := "def f(): \n...\ndef g(): \n...\nclass A: pass\n...\ndef h(): \n"
+	if string(text) != want {
+		t.Errorf("text = %q, want %q", text, want)
+	}
+	if wantRows := []int{1, 0, 2, 0, 3, 0, 5}; !reflect.DeepEqual(rows, wantRows) {
+		t.Errorf("rows = %v, want %v", rows, wantRows)
+	}
+	if want := []bool{true, true, false, true}; !reflect.DeepEqual(k.Cut, want) {
+		t.Errorf("cut = %v, want %v", k.Cut, want)
+	}
+	// A cut row and a gap after it still make one marker.
+	text, _ = k.Render(1, 4)
+	if want := "def g(): \n...\nclass A: pass\n...\ndef h(): \n"; string(text) != want {
+		t.Errorf("slice text = %q, want %q", text, want)
+	}
+}
+
+func TestKeptLinesSize(t *testing.T) {
+	src := SplitLines([]byte("def f(): return 1\nx\ny\n\nz\n"))
+	for _, ranges := range [][]LineRange{
+		nil,
+		{{Start: 0, End: 1}},
+		{{Start: 0, End: 1, Cut: 9}, {Start: 1, End: 3}},
+		{{Start: 0, End: 2}, {Start: 4, End: 5}},
+	} {
+		k := KeepRanges(src, ranges)
+		if got, want := k.Size(), len(k.Text()); got != want {
+			t.Errorf("%v: Size() = %d, Text() is %d bytes", ranges, got, want)
+		}
 	}
 }
