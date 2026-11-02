@@ -40,6 +40,9 @@ type Op struct {
 	Value   string
 	Type    CmdType
 	IsShort bool
+	// Piped marks a path read from a file list on stdin, which the -i and
+	// -e patterns filter, unlike a path named on the command line.
+	Piped bool
 }
 
 type ParsedArgs struct {

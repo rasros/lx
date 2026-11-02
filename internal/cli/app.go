@@ -98,7 +98,7 @@ func gatherInputs(parsed *ParsedArgs) error {
 		if isPipe {
 			slog.Debug("Detected input from stdin pipe", "count", len(stdinFiles))
 			for _, f := range stdinFiles {
-				parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f, Type: CmdAction})
+				parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f, Type: CmdAction, Piped: true})
 			}
 			hasFiles = true
 		} else {

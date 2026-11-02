@@ -84,6 +84,14 @@ func resolveOp(ctx context.Context, op Op, rc resolveContext) (files []lx.InputF
 		return nil, 1
 	}
 
+	// A piped file list is filtered by the -i and -e patterns, matched
+	// against the path relative to the working directory as in a walk of
+	// it. Ignore files and hidden-file skipping are left to the lister.
+	if op.Piped && !lx.IsKept(cwdRelative(rawPath, absPath), rc.section.Includes, rc.section.Excludes) {
+		slog.Debug("Skipping piped path due to filters", "path", rawPath)
+		return nil, 0
+	}
+
 	stat, err := os.Stat(absPath)
 	if err != nil {
 		slog.Error("Failed to stat path", "path", absPath, "error", err)
@@ -102,6 +110,17 @@ func resolveOp(ctx context.Context, op Op, rc resolveContext) (files []lx.InputF
 
 // resolveURL fetches a named URL. Like a named path it is never filtered
 // itself; an archive's entries are.
+// cwdRelative returns absPath relative to the working directory, or rawPath
+// when it is outside it.
+func cwdRelative(rawPath, absPath string) string {
+	if cwd, err := os.Getwd(); err == nil {
+		if rel, err := filepath.Rel(cwd, absPath); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return filepath.ToSlash(rel)
+		}
+	}
+	return filepath.ToSlash(filepath.Clean(rawPath))
+}
+
 func resolveURL(ctx context.Context, rawPath string, forceExpand bool, rc resolveContext) ([]lx.InputFile, int) {
 	section := rc.section
 
