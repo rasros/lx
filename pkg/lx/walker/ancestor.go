@@ -1,16 +1,23 @@
 package walker
 
 import (
+	"bufio"
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-// LoadAncestorRules sets AncestorRules from the ignore files in the
-// directories above dir, the absolute path the walk's filesystem is rooted
-// at. It reads up to the enclosing git repository's root, or outside a
-// repository up to the working directory when dir is below it. dir's own
-// ignore files are left to the walk.
+// LoadAncestorRules sets AncestorRules from the ignore rules that live
+// outside dir, the absolute path the walk's filesystem is rooted at:
+//
+//   - the enclosing git repository's info/exclude file, which git ranks below
+//     every .gitignore, so it comes first;
+//   - the ignore files in the directories above dir, up to the repository
+//     root, or outside a repository up to the working directory when dir is
+//     below it.
+//
+// dir's own ignore files are left to the walk.
 //
 // It also sets RootIgnored when dir or a directory above it is ignored,
 // checking each directory from the top down with the rules that apply at its
@@ -19,17 +26,24 @@ func (w *Walker) LoadAncestorRules(dir string) {
 	w.AncestorRules = nil
 	w.RootIgnored = false
 	dir = filepath.Clean(dir)
+
+	levels := make([]int, len(w.BaseRules))
+	if repo, ok := findRepoRoot(dir); ok {
+		for _, r := range loadInfoExclude(repo, dir) {
+			w.AncestorRules = append(w.AncestorRules, r)
+			levels = append(levels, 0)
+		}
+	}
+
 	root, ok := ancestorRoot(dir)
 	if !ok || root == dir {
 		return
 	}
-	rel, err := filepath.Rel(root, dir)
-	if err != nil {
+	parts, ok := relParts(root, dir)
+	if !ok {
 		return
 	}
 
-	parts := strings.Split(filepath.ToSlash(rel), "/")
-	levels := make([]int, len(w.BaseRules))
 	cur := root
 	for i, part := range parts {
 		offset := strings.Join(parts[i:], "/") + "/"
@@ -64,6 +78,93 @@ func (w *Walker) dirIgnored(parts []string, i int, levels []int) bool {
 		}
 	}
 	return ignored
+}
+
+// loadInfoExclude reads the info/exclude rules of the repository rooted at
+// repo, offset so they match paths relative to dir.
+func loadInfoExclude(repo, dir string) []Rule {
+	gitDir, ok := resolveGitDir(repo)
+	if !ok {
+		return nil
+	}
+	path := filepath.Join(commonGitDir(gitDir), "info", "exclude")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+
+	var lines []string
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		lines = append(lines, sc.Text())
+	}
+	rules := parseRules(lines, ".", path)
+
+	if repo != dir {
+		parts, ok := relParts(repo, dir)
+		if !ok {
+			return nil
+		}
+		offset := strings.Join(parts, "/") + "/"
+		for i := range rules {
+			rules[i].PathOffset = offset
+		}
+	}
+	return rules
+}
+
+// resolveGitDir returns the git directory for the repository rooted at repo.
+// In linked worktrees and submodules .git is a file holding a "gitdir:" line.
+func resolveGitDir(repo string) (string, bool) {
+	dotGit := filepath.Join(repo, ".git")
+	info, err := os.Stat(dotGit)
+	if err != nil {
+		return "", false
+	}
+	if info.IsDir() {
+		return dotGit, true
+	}
+
+	data, err := os.ReadFile(dotGit)
+	if err != nil {
+		return "", false
+	}
+	line := strings.TrimSpace(strings.SplitN(string(data), "\n", 2)[0])
+	target, ok := strings.CutPrefix(line, "gitdir:")
+	if !ok {
+		return "", false
+	}
+	target = strings.TrimSpace(target)
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(repo, target)
+	}
+	return filepath.Clean(target), true
+}
+
+// commonGitDir returns the directory shared by all worktrees of gitDir,
+// which holds info/exclude. Without a commondir file it is gitDir itself.
+func commonGitDir(gitDir string) string {
+	data, err := os.ReadFile(filepath.Join(gitDir, "commondir"))
+	if err != nil {
+		return gitDir
+	}
+	common := strings.TrimSpace(string(data))
+	if common == "" {
+		return gitDir
+	}
+	if !filepath.IsAbs(common) {
+		common = filepath.Join(gitDir, common)
+	}
+	return filepath.Clean(common)
+}
+
+// relParts splits dir's path relative to root into slash-free components.
+func relParts(root, dir string) ([]string, bool) {
+	rel, err := filepath.Rel(root, dir)
+	if err != nil || rel == "." {
+		return nil, false
+	}
+	return strings.Split(filepath.ToSlash(rel), "/"), true
 }
 
 // ancestorRoot picks the highest directory whose ignore files apply to dir.

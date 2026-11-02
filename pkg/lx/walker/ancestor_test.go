@@ -170,3 +170,82 @@ func TestLoadAncestorRules_OutsideRepoUsesWorkingDir(t *testing.T) {
 		t.Fatalf("expected no rules for a directory outside the working dir, got %+v", w.AncestorRules)
 	}
 }
+
+func TestResolveGitDir_Layouts(t *testing.T) {
+	base := t.TempDir()
+
+	for _, d := range []string{"plain/.git/info", "plain/.git/worktrees/wt", "plain/.git/modules/mod/info", "plain/mod", "wt"} {
+		mustMkdir(t, base, d)
+	}
+	plain := filepath.Join(base, "plain")
+	mustWriteFile(t, plain, ".git/info/exclude", "*.a\n")
+
+	wt := filepath.Join(base, "wt")
+	mustWriteFile(t, plain, ".git/worktrees/wt/commondir", "../..\n")
+	mustWriteFile(t, wt, ".git", "gitdir: ../plain/.git/worktrees/wt\n")
+
+	sub := filepath.Join(plain, "mod")
+	mustWriteFile(t, plain, ".git/modules/mod/info/exclude", "*.b\n")
+	mustWriteFile(t, sub, ".git", "gitdir: ../.git/modules/mod\n")
+
+	tests := []struct {
+		name, repo, want string
+	}{
+		{"plain repository", plain, filepath.Join(plain, ".git")},
+		{"linked worktree shares the main git dir", wt, filepath.Join(plain, ".git")},
+		{"submodule uses its own git dir", sub, filepath.Join(plain, ".git", "modules", "mod")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gitDir, ok := resolveGitDir(tt.repo)
+			if !ok {
+				t.Fatal("expected git dir to resolve")
+			}
+			if got := commonGitDir(gitDir); got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadAncestorRules_InfoExcludeComesFirst(t *testing.T) {
+	repo := t.TempDir()
+	mustMkdir(t, repo, ".git/info")
+	mustMkdir(t, repo, "sub")
+	mustWriteFile(t, repo, ".git/info/exclude", "*.md\n")
+	mustWriteFile(t, repo, ".gitignore", "!README.md\n")
+	sub := filepath.Join(repo, "sub")
+
+	w := NewWalker(nil, nil)
+	w.LoadAncestorRules(sub)
+	if len(w.AncestorRules) != 2 {
+		t.Fatalf("expected 2 rules, got %+v", w.AncestorRules)
+	}
+	if w.AncestorRules[0].Pattern != "*.md" || w.AncestorRules[0].PathOffset != "sub/" {
+		t.Fatalf("expected info/exclude rule first with offset sub/, got %+v", w.AncestorRules[0])
+	}
+	if ignored, _ := checkIgnore("README.md", false, w.AncestorRules, false, false); ignored {
+		t.Fatal("expected .gitignore negation to override info/exclude")
+	}
+	if ignored, _ := checkIgnore("notes.md", false, w.AncestorRules, false, false); !ignored {
+		t.Fatal("expected info/exclude to ignore notes.md")
+	}
+
+	w.LoadAncestorRules(repo)
+	if len(w.AncestorRules) != 1 || w.AncestorRules[0].PathOffset != "" {
+		t.Fatalf("expected only the unoffset info/exclude rule at the repo root, got %+v", w.AncestorRules)
+	}
+}
+
+func TestLoadAncestorRules_InfoExcludeIgnoresParentDir(t *testing.T) {
+	repo := t.TempDir()
+	mustMkdir(t, repo, ".git/info")
+	mustMkdir(t, repo, "scratch/x")
+	mustWriteFile(t, repo, ".git/info/exclude", "/scratch/\n")
+
+	w := NewWalker(nil, nil)
+	w.LoadAncestorRules(filepath.Join(repo, "scratch", "x"))
+	if !w.RootIgnored {
+		t.Fatal("expected a directory below an info/exclude entry to be ignored")
+	}
+}

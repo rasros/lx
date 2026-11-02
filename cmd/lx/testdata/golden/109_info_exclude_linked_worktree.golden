@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] app.go (1 rows)
+---
+```go
+package app
+```
+
+[2/2] pkg/util.go (1 rows)
+---
+```go
+package pkg
+```
+
+
+--- STDERR ---
