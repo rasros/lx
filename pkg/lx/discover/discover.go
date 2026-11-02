@@ -46,10 +46,10 @@ type Options struct {
 	// is written to.
 	OutPath string
 	// Piped marks a target taken from a list of paths, as piped to lx. Unlike
-	// a named target it is itself filtered by Globs, as a walk from the
-	// working directory would filter it: dropped when it or a directory
-	// above it is excluded, or, when some -i glob must keep a file, it is a
-	// file none keeps.
+	// a named target it is cleaned, as a path a walk finds, and itself
+	// filtered by Globs, as a walk from the working directory would filter
+	// it: dropped when it or a directory above it is excluded, or, when some
+	// -i glob must keep a file, it is a file none keeps.
 	Piped bool
 }
 
@@ -86,6 +86,12 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 		return collectURL(ctx, target, opts, forceExpand)
 	}
 
+	if opts.Piped {
+		// A named root is matched as written, as ripgrep matches it, but a
+		// piped path stands for a path a walk finds, which has no "//",
+		// "./" or "..".
+		target = filepath.Clean(target)
+	}
 	absPath, err := filepath.Abs(target)
 	if err != nil {
 		return nil, err
