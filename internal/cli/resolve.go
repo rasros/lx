@@ -113,6 +113,7 @@ func resolveOp(ctx context.Context, op Op, rc resolveContext) (files []lx.InputF
 		absPath:       absPath,
 		rootIsDir:     stat.IsDir(),
 		isForced:      isForced,
+		warnSkipped:   !op.FromStdin,
 	}, rc), 0
 }
 
@@ -186,14 +187,20 @@ type walkTargetArgs struct {
 	absPath       string
 	rootIsDir     bool
 	isForced      bool
+	// warnSkipped reports a file root that is skipped as ignored. Paths
+	// piped in as a file list stay quiet, since they are often unfiltered.
+	warnSkipped bool
 }
 
 func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.InputFile {
 	section := rc.section
 	includeSpecs := lx.CompileSpecs(section.Includes)
 
+	// A forced path (-f) bypasses ignore rules entirely, as in git's add -f.
+	ignoreEnabled := !section.RunCfg.NoIgnore && !t.isForced
+
 	var baseRules, overrideRules []string
-	if !section.RunCfg.NoIgnore {
+	if ignoreEnabled {
 		baseRules = append(baseRules, rc.ignoreRules...)
 	}
 	if !t.isForced {
@@ -208,7 +215,7 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 	)
 
 	walker := lx.NewWalker(baseRules, overrideRules)
-	walker.IgnoreEnabled = !section.RunCfg.NoIgnore
+	walker.IgnoreEnabled = ignoreEnabled
 	if walker.IgnoreEnabled && t.fsysRoot != "" {
 		if st, ok := rc.ancestorRules[t.fsysRoot]; ok {
 			walker.AncestorRules, walker.RootIgnored = st.rules, st.rootIgnored
@@ -225,6 +232,21 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 	if rc.debug {
 		walker.OnIgnore = func(p, reason string) {
 			slog.Debug("Ignored", "path", p, "reason", reason)
+		}
+	}
+
+	// A file named directly that is skipped would otherwise vanish without a
+	// trace. Walked directories stay quiet, as skipping is their normal job.
+	var rootSkipReason string
+	if t.warnSkipped && !t.isForced && !t.rootIsDir {
+		debugOnIgnore := walker.OnIgnore
+		walker.OnIgnore = func(p, reason string) {
+			if p == t.walkRoot {
+				rootSkipReason = reason
+			}
+			if debugOnIgnore != nil {
+				debugOnIgnore(p, reason)
+			}
 		}
 	}
 
@@ -289,6 +311,10 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 	})
 	if err != nil {
 		slog.Error("Walker traversal failed", "error", err)
+	}
+	if rootSkipReason != "" {
+		slog.Warn("Skipping path, use -f to include it",
+			"path", displayPath(t.walkRoot, t), "reason", rootSkipReason)
 	}
 	slog.Debug("Walker finished", "root", t.walkRoot, "files_matched", len(files))
 

@@ -1,0 +1,9 @@
+--- STDOUT ---
+dist/out.js (1 rows)
+---
+```javascript
+console.log(1)
+```
+
+
+--- STDERR ---

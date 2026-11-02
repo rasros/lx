@@ -3,3 +3,4 @@
 
 
 --- STDERR ---
+[1;33mWarning:[0m Skipping path, use -f to include it (path=../.gitignore reason=hidden path)
