@@ -114,9 +114,15 @@ func matchCompiledSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 // above a path is ignored before entering it, so the directories' names are
 // not matched again here, and the contents of a re-included directory, such
 // as tags/ after "tags" and "!tags/", are not ignored by the first rule.
+// A pattern ending in "/**" matches what is inside a directory, not the
+// directory itself, so "*" and "!src/**" leave src/ ignored, as in git and
+// ripgrep.
 func matchIgnoreSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 	if spec.Pattern.HasSlash || spec.Anchored {
-		return spec.Pattern.matchCandidate(ctx.relPath)
+		if !spec.Pattern.matchCandidate(ctx.relPath) {
+			return false
+		}
+		return spec.Pattern.Dir == "" || !doublestar.MatchUnvalidated(spec.Pattern.Dir, ctx.relPath)
 	}
 	return spec.Pattern.matchCandidate(ctx.baseName)
 }
@@ -170,7 +176,7 @@ func whitelisted(relPath string, isDir bool, rules []Rule) (matched, negated boo
 }
 
 // checkIgnore applies rules to a path, continuing from the state ignored
-// and its reason, as carried from the parent directory or from earlier rules.
+// and its reason left by earlier rules.
 // The last matching rule decides.
 func checkIgnore(relPath string, isDir bool, rules []Rule, ignored bool, reason string, wantReason bool) (bool, string) {
 	if len(rules) == 0 {
@@ -194,59 +200,4 @@ func checkIgnore(relPath string, isDir bool, rules []Rule, ignored bool, reason 
 		}
 	}
 	return ignored, reason
-}
-
-func hasNestedException(walkDirPath string, rules []Rule) bool {
-	dirPath, dirParts := walkDirPath, strings.Split(walkDirPath, "/")
-
-	for _, rule := range rules {
-		if !rule.Negate {
-			continue
-		}
-
-		if rule.BasePath != "" && rule.BasePath != "." {
-			if !strings.HasPrefix(dirPath, rule.BasePath) && !strings.HasPrefix(rule.BasePath, dirPath) {
-				continue
-			}
-		}
-
-		pattern := rule.Spec.Pattern
-
-		// Floating patterns (e.g. "*.go") match files in any subdirectory.
-		if !pattern.HasSlash && !rule.Spec.Anchored {
-			return true
-		}
-
-		// Anchored patterns.
-		fullPattern := pattern.Pattern
-		if rule.BasePathPrefix != "" {
-			fullPattern = rule.BasePathPrefix + fullPattern
-		}
-
-		if pattern.HasDoubleStar {
-			return true
-		}
-
-		ruleParts := strings.Split(fullPattern, "/")
-		if len(dirParts) >= len(ruleParts) {
-			continue
-		}
-
-		isParent := true
-		for i, part := range dirParts {
-			rulePart := ruleParts[i]
-			if rulePart == part {
-				continue
-			}
-			if !doublestar.ValidatePattern(rulePart) || !doublestar.MatchUnvalidated(rulePart, part) {
-				isParent = false
-				break
-			}
-		}
-
-		if isParent {
-			return true
-		}
-	}
-	return false
 }

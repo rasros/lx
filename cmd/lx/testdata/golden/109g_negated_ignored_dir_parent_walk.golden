@@ -1,11 +1,5 @@
 --- STDOUT ---
-[1/2] ../build/keep.js (1 rows)
----
-```javascript
-re-included by the negation
-```
-
-[2/2] ../x/main.go (1 rows)
+../x/main.go (1 rows)
 ---
 ```go
 package x

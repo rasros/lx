@@ -80,18 +80,6 @@ func TestCheckIgnore_OmitsReasonWhenNotRequested(t *testing.T) {
 	}
 }
 
-func TestHasNestedException(t *testing.T) {
-	rules := parseRules([]string{"!build/output.txt"}, "", ".gitignore")
-	if !hasNestedException("build", rules) {
-		t.Fatal("expected nested exception for parent directory")
-	}
-
-	rules = parseRules([]string{"!docs/*.md"}, "", ".gitignore")
-	if hasNestedException("build", rules) {
-		t.Fatal("did not expect nested exception for unrelated directory")
-	}
-}
-
 func TestParseRules_Escapes(t *testing.T) {
 	tests := []struct {
 		line, pattern string

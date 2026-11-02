@@ -32,29 +32,6 @@ func TestWalker_NestedIgnores(t *testing.T) {
 	assertContains(t, files, "nested/important.log")
 }
 
-func TestWalker_WildcardException(t *testing.T) {
-	tmp := t.TempDir()
-	mustMkdir(t, tmp, "logs/app")
-	mustMkdir(t, tmp, "logs/db")
-
-	mustWriteFile(t, tmp, "logs/app/junk.txt", "trash")
-	mustWriteFile(t, tmp, "logs/app/keep.txt", "treasure")
-	mustWriteFile(t, tmp, "logs/db/junk.txt", "trash")
-	mustWriteFile(t, tmp, "logs/db/keep.txt", "treasure")
-
-	w := newWalker(
-		[]string{"logs"},
-		[]string{"!logs/*/keep.txt"},
-	)
-
-	files := collectPaths(t, w, tmp)
-
-	assertNotContains(t, files, "logs/app/junk.txt")
-	assertNotContains(t, files, "logs/db/junk.txt")
-	assertContains(t, files, "logs/app/keep.txt")
-	assertContains(t, files, "logs/db/keep.txt")
-}
-
 func TestWalker_StartOnFile(t *testing.T) {
 	tmp := t.TempDir()
 	mustWriteFile(t, tmp, "hello.txt", "world")
