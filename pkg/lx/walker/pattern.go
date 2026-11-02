@@ -150,33 +150,60 @@ func CouldMatchAnyDescendant(specs []CompiledSpec, dirRelPath string) bool {
 	return false
 }
 
+// couldMatchDescendant reports whether spec could match a file below dir. A
+// pattern with a slash matches whole paths, so its leading segments must
+// match dir's directories one by one, and a file below dir has more segments
+// than dir; only a "**" segment spans any number of them.
 func couldMatchDescendant(spec CompiledSpec, dir string) bool {
 	// Floating patterns (e.g. "*.go") can match files in any subtree.
 	if !spec.Pattern.HasSlash && !spec.Anchored {
 		return true
 	}
-
 	pattern := spec.Pattern.Pattern
-	if spec.Pattern.HasDoubleStar {
+	if slashInBraces(pattern) {
 		return true
 	}
+	segs := strings.Split(pattern, "/")
+	for i, name := range strings.Split(dir, "/") {
+		if segs[i] == "**" {
+			return true
+		}
+		if i == len(segs)-1 {
+			// What is left of the pattern names the file itself.
+			return false
+		}
+		ok, err := doublestar.Match(segs[i], name)
+		if err != nil {
+			return true
+		}
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
 
-	literalPrefix := prefixBeforeMeta(pattern)
-	if literalPrefix != pattern {
-		// Only whole directory names before the first wildcard are literal:
-		// "src*/x.go" can match below srcfoo.
-		literalPrefix = literalPrefix[:strings.LastIndexByte(literalPrefix, '/')+1]
+// slashInBraces reports whether a brace alternative in pattern holds a
+// slash, which splitting the pattern into segments would break.
+func slashInBraces(pattern string) bool {
+	depth := 0
+	for i := 0; i < len(pattern); i++ {
+		switch pattern[i] {
+		case '\\':
+			i++
+		case '{':
+			depth++
+		case '}':
+			if depth > 0 {
+				depth--
+			}
+		case '/':
+			if depth > 0 {
+				return true
+			}
+		}
 	}
-	if literalPrefix == "" {
-		return true
-	}
-	prefix := strings.TrimSuffix(normalizePathForMatch(literalPrefix), "/")
-	if prefix == "." || prefix == "" {
-		return true
-	}
-
-	// Keep traversal if either side is an ancestor of the other.
-	return dir == prefix || strings.HasPrefix(dir, prefix+"/") || strings.HasPrefix(prefix, dir+"/")
+	return false
 }
 
 func hasOnlyStarWildcards(pattern string) bool {
@@ -196,18 +223,6 @@ func starWildcardPrefixSuffix(pattern string) (string, string) {
 	}
 	lastStar := strings.LastIndexByte(pattern, '*')
 	return pattern[:firstStar], pattern[lastStar+1:]
-}
-
-// prefixBeforeMeta returns the literal start of pattern, up to its first
-// wildcard or escape.
-func prefixBeforeMeta(pattern string) string {
-	for i := 0; i < len(pattern); i++ {
-		switch pattern[i] {
-		case '*', '?', '[', '{', '\\':
-			return pattern[:i]
-		}
-	}
-	return pattern
 }
 
 func (cp CompiledPattern) matchCandidate(candidate string) bool {

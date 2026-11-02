@@ -239,9 +239,33 @@ func TestCouldMatchAnyDescendant(t *testing.T) {
 			want:     true,
 		},
 		{
-			name:     "star with fixed prefix keeps matching subtree",
+			name:     "wildcard in the first segment prunes what it cannot match",
+			patterns: []string{"src*/x.go"},
+			dir:      "lib",
+			want:     false,
+		},
+		{
+			name:     "escape matches only the literal name",
+			patterns: []string{`lit\*/a.go`},
+			dir:      "litfoo",
+			want:     false,
+		},
+		{
+			name:     "file segment prunes deeper directories",
 			patterns: []string{"scripts/*bpf_doc.py"},
 			dir:      "scripts/tools",
+			want:     false,
+		},
+		{
+			name:     "double-star segment keeps every directory below it",
+			patterns: []string{"scripts/**/x.py"},
+			dir:      "scripts/a/b",
+			want:     true,
+		},
+		{
+			name:     "brace alternative with a slash is kept",
+			patterns: []string{"{a/b,c}/x.go"},
+			dir:      "a",
 			want:     true,
 		},
 		{
