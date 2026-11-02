@@ -32,5 +32,9 @@ func setupWorktreeExcludeFixture(t *testing.T) string { return gf.SetupWorktreeE
 func setupIgnoredParentDirFixture(t *testing.T) string {
 	return gf.SetupIgnoredParentDirFixture(t)
 }
+func setupStrayGitDirFixture(t *testing.T) string { return gf.SetupStrayGitDirFixture(t) }
+func setupStrayGitDirAboveFixture(t *testing.T) string {
+	return gf.SetupStrayGitDirAboveFixture(t)
+}
 func setupTreeFixture(t *testing.T) string      { return gf.SetupTreeFixture(t) }
 func setupPromptLibFixture(t *testing.T) string { return gf.SetupPromptLibFixture(t) }

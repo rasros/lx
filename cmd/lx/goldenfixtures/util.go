@@ -27,6 +27,18 @@ func writeFile(t *testing.T, dir, path, content string, perm os.FileMode) {
 	}
 }
 
+// makeGitDir creates a minimal git directory at dir/path: a HEAD and the
+// objects and refs directories git requires before it treats one as a repository.
+func makeGitDir(t *testing.T, dir, path string) {
+	t.Helper()
+	for _, sub := range []string{"objects", "refs"} {
+		if err := os.MkdirAll(filepath.Join(dir, path, sub), 0755); err != nil {
+			t.Fatalf("mkdir %s: %v", sub, err)
+		}
+	}
+	writeFile(t, dir, filepath.Join(path, "HEAD"), "ref: refs/heads/main\n", 0644)
+}
+
 func makeSymlink(dir, target, name string) {
 	fp := filepath.Join(dir, name)
 	os.MkdirAll(filepath.Dir(fp), 0755)
