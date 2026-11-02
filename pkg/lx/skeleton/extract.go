@@ -1,6 +1,7 @@
 package skeleton
 
 import (
+	"bytes"
 	"slices"
 	"sync"
 
@@ -32,21 +33,18 @@ func extract(langName string, src []byte, lines [][]byte, functions, structs boo
 	if !found {
 		return nil, false
 	}
-	tree, lang, err := parse(langName, def, src)
-	if err != nil {
-		return nil, false
-	}
-	// A .h file is C or C++ (see cppDialect).
-	if def.cppDialect != "" && tree.RootNode().HasError() {
-		retryDef := langDefs[def.cppDialect]
-		if retry, retryLang, err := parse(def.cppDialect, retryDef, src); err == nil {
-			if unparsed(retryLang, retry.RootNode(), src) < unparsed(lang, tree.RootNode(), src) {
-				tree.Release()
-				tree, lang, def = retry, retryLang, retryDef
-			} else {
-				retry.Release()
-			}
+	var tree *gotreesitter.Tree
+	var lang *gotreesitter.Language
+	if def.cppDialect != "" && langs.LooksLikeCpp(src) {
+		tree, lang, def = def.dialect(langName, src)
+	} else {
+		var err error
+		if tree, lang, err = parse(langName, def, src); err != nil {
+			return nil, false
 		}
+	}
+	if tree == nil {
+		return nil, false
 	}
 	defer tree.Release()
 
@@ -63,38 +61,86 @@ func extract(langName string, src []byte, lines [][]byte, functions, structs boo
 		out = def.processNode(c, out, root.Child(i))
 	}
 	if len(def.frames) > 0 {
-		out = langs.BalanceConditionals(lines, out)
+		out = langs.BalanceConditionals(lines, out, literalRows(c, root))
 	}
 	return out, true
 }
 
-// unparsed counts the bytes of src the tree rooted at root could not fit:
-// the loose tokens and names error nodes hold (not the declarations they
-// still hold), nodes the grammar hides that error recovery left outside an
-// error node, and anything past the tree's end.
-func unparsed(lang *gotreesitter.Language, root *gotreesitter.Node, src []byte) int {
-	return unparsedBytes(lang, root, false) + len(src) - int(root.EndByte())
+// dialect parses src, C with C++-only syntax in it, as C++ or C (see
+// cppDialect): C++ when that parses cleanly or leaves under 5% of src
+// unparsed (sparing the C parse), C when that parses cleanly, and else the
+// one that leaves clearly fewer bytes unparsed: C unless C++ leaves less
+// than half as many. It returns a nil tree when neither parses.
+func (def langDef) dialect(langName string, src []byte) (*gotreesitter.Tree, *gotreesitter.Language, langDef) {
+	cppDef := langDefs[def.cppDialect]
+	cpp, cppLang, err := parse(def.cppDialect, cppDef, src)
+	if err == nil && cpp.RootNode().ChildCount() > 0 && (!cpp.RootNode().HasError() || 20*unparsed(cppLang, cpp.RootNode(), src) < len(src)) {
+		return cpp, cppLang, cppDef
+	}
+	tree, lang, cErr := parse(langName, def, src)
+	switch {
+	case cErr != nil && err != nil:
+		return nil, nil, def
+	case cErr != nil:
+		return cpp, cppLang, cppDef
+	case err != nil:
+		return tree, lang, def
+	}
+	if tree.RootNode().HasError() && 2*unparsed(cppLang, cpp.RootNode(), src) < unparsed(lang, tree.RootNode(), src) {
+		tree.Release()
+		return cpp, cppLang, cppDef
+	}
+	cpp.Release()
+	return tree, lang, def
 }
 
-func unparsedBytes(lang *gotreesitter.Language, n *gotreesitter.Node, inError bool) int {
-	size := int(n.EndByte() - n.StartByte())
-	switch {
-	case n.IsError():
-		inError = true
-	case hidden(lang, n):
-		if !inError {
-			return size
-		}
-	case inError && (!n.IsNamed() || n.ChildCount() == 0):
-		return size
-	default:
-		inError = false
+// unparsed counts the bytes of src the tree rooted at root could not fit:
+// the whole span of its outermost error nodes and of nodes the grammar hides
+// (which only error recovery leaves in a tree, at times without an error
+// node around them), and anything past the tree's end. A tree with nothing
+// in it fits nothing.
+func unparsed(lang *gotreesitter.Language, root *gotreesitter.Node, src []byte) int {
+	if root.ChildCount() == 0 {
+		return len(bytes.TrimSpace(src))
+	}
+	return unparsedBytes(lang, root) + len(src) - int(root.EndByte())
+}
+
+func unparsedBytes(lang *gotreesitter.Language, n *gotreesitter.Node) int {
+	if n.IsError() || hidden(lang, n) {
+		return int(n.EndByte() - n.StartByte())
 	}
 	sum := 0
 	for i := 0; i < n.ChildCount(); i++ {
-		sum += unparsedBytes(lang, n.Child(i), inError)
+		sum += unparsedBytes(lang, n.Child(i))
 	}
 	return sum
+}
+
+// literalRows reports the rows inside comments and string literals that
+// span several rows (all but their first), where a line that reads like a
+// preprocessor directive is none.
+func literalRows(c *langs.Ctx, root *gotreesitter.Node) []bool {
+	rows := make([]bool, len(c.Lines))
+	var walk func(n *gotreesitter.Node)
+	walk = func(n *gotreesitter.Node) {
+		first, last := int(n.StartPoint().Row), int(n.EndPoint().Row)
+		if first == last {
+			return
+		}
+		switch c.Type(n) {
+		case "comment", "string_literal", "raw_string_literal", "concatenated_string":
+			for row := first + 1; row <= last && row < len(rows); row++ {
+				rows[row] = true
+			}
+			return
+		}
+		for i := 0; i < n.ChildCount(); i++ {
+			walk(n.Child(i))
+		}
+	}
+	walk(root)
+	return rows
 }
 
 func parse(langName string, def langDef, src []byte) (*gotreesitter.Tree, *gotreesitter.Language, error) {
@@ -129,7 +175,7 @@ func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*got
 func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *gotreesitter.Node) []internal.LineRange {
 	nodeType := c.Type(node)
 
-	if def.recoverErrors && node.IsError() {
+	if def.recoverErrors && (node.IsError() || hidden(c.Lang, node)) {
 		return def.processError(c, out, node)
 	}
 
@@ -236,7 +282,8 @@ func (def *langDef) processFrame(c *langs.Ctx, out []internal.LineRange, n *gotr
 // guard around `#ifdef __cplusplus extern "C" { #endif`, whose brace closes
 // in another #ifdef, leaves one. Error recovery also surfaces nodes the
 // grammar hides (its repeat helpers, supertypes, rules named with a leading
-// underscore); their children are walked in their place.
+// underscore), inside error nodes or not; their children are walked in their
+// place.
 func (def *langDef) processError(c *langs.Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	for i := 0; i < n.ChildCount(); i++ {
 		child := n.Child(i)

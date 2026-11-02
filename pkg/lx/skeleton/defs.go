@@ -42,11 +42,13 @@ type langDef struct {
 	// cppDialect is the language of C++ source given as this one: a .h file
 	// is read as C, but may be C++, which fails to parse as C (classes,
 	// templates, namespaces, references) and then leaks method bodies into
-	// the skeleton. Source whose parse has errors is reparsed as C++, which
-	// is kept when it leaves fewer bytes unparsed. Comparing beats trusting
-	// either side: C mostly parses as C++, but macro-heavy C (kernel code)
-	// and some C++ headers recover worse as C++, up to a tree that stops
-	// short of the end of the file.
+	// the skeleton. Only source that holds C++-only syntax
+	// (langs.LooksLikeCpp, a cheap scan that C files without it pass
+	// through) is also parsed as C++, and kept as C++ when that parses
+	// (nearly) cleanly, or when C fails too and C++ leaves less than half as
+	// many bytes unparsed (see dialect). The C++ grammar is no sure win: it
+	// recovers worse from macro-heavy code, at times with a tree that stops
+	// short of the end of the file or holds nothing at all.
 	cppDialect string
 	// unwrap returns the declaration a top-level node wraps (a C++
 	// template_declaration's class or function), or the node itself. Rows

@@ -2,6 +2,8 @@
 skeleton/toplevel.h (45 rows, type definitions)
 ---
 ```c
+#ifndef TOPLEVEL_H
+...
 /* Plain struct, not a typedef. */
 struct buffer {
     char *data;
@@ -18,6 +20,8 @@ typedef enum {
 // Callback type: a type alias, not a function.
 typedef int (*handler_fn)(int code);
 typedef unsigned long size_type;
+...
+#endif
 ```
 
 

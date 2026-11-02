@@ -2,6 +2,8 @@
 skeleton/toplevel.h (45 rows, definitions)
 ---
 ```c
+#ifndef TOPLEVEL_H
+...
 /* Plain struct, not a typedef. */
 struct buffer {
     char *data;
@@ -29,6 +31,8 @@ int (*pick_handler(int kind))(int code);
 int win_only(void);
 #else
 int posix_only(void);
+#endif
+...
 #endif
 ```
 
