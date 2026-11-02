@@ -55,17 +55,18 @@ func TestCheckIgnore_NegationOverridesPreviousRule(t *testing.T) {
 	}
 }
 
-func TestCheckIgnore_ParentIgnoredWithNegation(t *testing.T) {
-	rules := parseRules([]string{"!keep.go"}, "", ".gitignore")
+// The override rules continue from the state the ignore-file rules left.
+func TestCheckIgnore_ChainsFromEarlierRules(t *testing.T) {
+	rules := parseRules([]string{"!keep.go"}, "", "override flags")
 
 	ignored, _ := checkIgnore("other.go", false, rules, true, "", false)
 	if !ignored {
-		t.Fatal("expected parent ignored state to persist when negation does not match")
+		t.Fatal("expected the earlier rules' ignored state to persist when the negation does not match")
 	}
 
 	ignored, _ = checkIgnore("keep.go", false, rules, true, "", false)
 	if ignored {
-		t.Fatal("expected matching negation to clear parent ignored state")
+		t.Fatal("expected a matching negation to clear the earlier rules' ignored state")
 	}
 }
 

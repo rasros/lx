@@ -1,0 +1,39 @@
+--- STDOUT ---
+[1/6] any/z.txt (1 rows)
+---
+```text
+z.txt under a/**/**
+```
+
+[2/6] deep/keep.js (1 rows)
+---
+```javascript
+re-included: deep/** leaves deep/ itself alone
+```
+
+[3/6] glob/keep.js (1 rows)
+---
+```javascript
+re-included: glob/* leaves glob/ itself alone
+```
+
+[4/6] ovr/keep.js (1 rows)
+---
+```javascript
+ovr keep
+```
+
+[5/6] ovr/out.js (1 rows)
+---
+```javascript
+ovr out
+```
+
+[6/6] two/z.txt (1 rows)
+---
+```text
+z.txt under a/**/*/**
+```
+
+
+--- STDERR ---

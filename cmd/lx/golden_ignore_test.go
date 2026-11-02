@@ -86,6 +86,7 @@ func TestGoldenIgnoredDirNegations(t *testing.T) {
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "109x_ignored_dir_negations_walk", args: []string{"-e", "ovr/*", "-e", "!ovr/keep.js", "."}},
 		{name: "109y_ignored_dir_negations_override_prunes", args: []string{"-e", "ovr", "-e", "!ovr/keep.js", "."}},
+		{name: "109z_override_trailing_doublestar", args: []string{"-e", "src/**/**", "-e", "two/**/*/**", "."}},
 	})
 }
 

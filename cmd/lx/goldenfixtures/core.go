@@ -216,7 +216,7 @@ func SetupComplexFixture(t *testing.T) string {
 	writeFile(t, dir, "parent_ignore_test/level1/level2/ignore_me.tmp", "ignore", 0644)
 	writeFile(t, dir, "parent_ignore_test/level1/level2/keep_me.go", "package level2", 0644)
 
-	ignoreContent := "*\n!/src/**\n!/migrations/**\n!/assets/**\n!/data/**/*.data.xlsx\n!/data/**/index.json\n!langgraph.json\n!pyproject.toml\n!uv.lock\n"
+	ignoreContent := "*\n!*/\n!/src/**\n!/migrations/**\n!/assets/**\n!/data/**/*.data.xlsx\n!/data/**/index.json\n!langgraph.json\n!pyproject.toml\n!uv.lock\n"
 	writeFile(t, dir, "ignore_exception_test/.gitignore", ignoreContent, 0644)
 	writeFile(t, dir, "ignore_exception_test/src/main.go", "package main", 0644)
 	writeFile(t, dir, "ignore_exception_test/migrations/001_init.sql", "SELECT 1;", 0644)
