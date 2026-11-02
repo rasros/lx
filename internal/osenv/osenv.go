@@ -1,7 +1,7 @@
-// Package userdir finds the user's home and config directories from an
-// environment given as a lookup function, the way os.UserHomeDir and
-// os.UserConfigDir find them from the process environment.
-package userdir
+// Package osenv is the environment of a run as a lookup function, and the
+// user's home and config directories found through it, the way
+// os.UserHomeDir and os.UserConfigDir find them in the process environment.
+package osenv
 
 import (
 	"errors"
@@ -9,16 +9,17 @@ import (
 	"runtime"
 )
 
-// LookupEnv looks an environment variable up, as os.LookupEnv does.
-type LookupEnv func(key string) (string, bool)
+// Lookup looks an environment variable up, as os.LookupEnv does.
+type Lookup func(key string) (string, bool)
 
-func get(env LookupEnv, key string) string {
+// Get returns the value of key, or "" when it is unset.
+func (env Lookup) Get(key string) string {
 	v, _ := env(key)
 	return v
 }
 
 // Home returns the user's home directory, as os.UserHomeDir does.
-func Home(env LookupEnv) (string, error) {
+func Home(env Lookup) (string, error) {
 	key := "HOME"
 	switch runtime.GOOS {
 	case "windows":
@@ -26,7 +27,7 @@ func Home(env LookupEnv) (string, error) {
 	case "plan9":
 		key = "home"
 	}
-	if v := get(env, key); v != "" {
+	if v := env.Get(key); v != "" {
 		return v, nil
 	}
 	switch runtime.GOOS {
@@ -39,33 +40,33 @@ func Home(env LookupEnv) (string, error) {
 }
 
 // Config returns the user's config directory, as os.UserConfigDir does.
-func Config(env LookupEnv) (string, error) {
+func Config(env Lookup) (string, error) {
 	switch runtime.GOOS {
 	case "windows":
-		if dir := get(env, "AppData"); dir != "" {
+		if dir := env.Get("AppData"); dir != "" {
 			return dir, nil
 		}
 		return "", errors.New("%AppData% is not defined")
 	case "darwin", "ios":
-		home := get(env, "HOME")
+		home := env.Get("HOME")
 		if home == "" {
 			return "", errors.New("$HOME is not defined")
 		}
 		return filepath.Join(home, "Library", "Application Support"), nil
 	case "plan9":
-		home := get(env, "home")
+		home := env.Get("home")
 		if home == "" {
 			return "", errors.New("$home is not defined")
 		}
 		return filepath.Join(home, "lib"), nil
 	}
-	if dir := get(env, "XDG_CONFIG_HOME"); dir != "" {
+	if dir := env.Get("XDG_CONFIG_HOME"); dir != "" {
 		if !filepath.IsAbs(dir) {
 			return "", errors.New("path in $XDG_CONFIG_HOME is relative")
 		}
 		return dir, nil
 	}
-	home := get(env, "HOME")
+	home := env.Get("HOME")
 	if home == "" {
 		return "", errors.New("neither $XDG_CONFIG_HOME nor $HOME are defined")
 	}

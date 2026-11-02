@@ -8,6 +8,8 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/rasros/lx/internal/osenv"
 )
 
 // Code is an SGR escape sequence.
@@ -34,11 +36,8 @@ type Painter struct {
 // New returns a Painter that styles text only when enabled is true.
 func New(enabled bool) Painter { return Painter{enabled: enabled} }
 
-// LookupEnv looks an environment variable up, as os.LookupEnv does.
-type LookupEnv func(key string) (string, bool)
-
 // For returns a Painter for output written to w, see Enabled.
-func For(w io.Writer, env LookupEnv) Painter { return New(Enabled(w, env)) }
+func For(w io.Writer, env osenv.Lookup) Painter { return New(Enabled(w, env)) }
 
 // Enabled reports whether output written to w should be colored, given the
 // environment variables env looks up:
@@ -48,11 +47,8 @@ func For(w io.Writer, env LookupEnv) Painter { return New(Enabled(w, env)) }
 //   - CLICOLOR_FORCE, unless it is 0, turns it on;
 //   - otherwise only a terminal gets color, and outside Windows, whose
 //     consoles never set TERM, only when TERM is set.
-func Enabled(w io.Writer, env LookupEnv) bool {
-	get := func(key string) string {
-		v, _ := env(key)
-		return v
-	}
+func Enabled(w io.Writer, env osenv.Lookup) bool {
+	get := env.Get
 	if get("NO_COLOR") != "" || get("CLICOLOR") == "0" {
 		return false
 	}
