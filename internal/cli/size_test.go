@@ -100,7 +100,7 @@ func TestMaxSizeFlagRejectsInvalidValue(t *testing.T) {
 }
 
 // A second -m after a file argument opens a new section, so the limit is
-// re-derived from the default RunnerConfig rather than inherited.
+// re-derived from the default RenderOptions rather than inherited.
 func TestMaxSizeIsPerSection(t *testing.T) {
 	defaultRender := lx.RenderOptions{Head: -1, Tail: 0}
 	parsed, err := Parse([]string{"-m", "20", ".", "-m", "1k", "large.txt"}, definitions)

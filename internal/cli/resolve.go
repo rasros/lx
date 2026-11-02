@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
+	"net/url"
 
 	"github.com/rasros/lx/pkg/lx"
 )
@@ -45,9 +46,15 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) i
 
 func logUnresolved(target string, err error) {
 	var pe *fs.PathError
-	if errors.As(err, &pe) && pe.Op == "stat" {
+	var ue *url.Error
+	switch {
+	case errors.As(err, &pe) && pe.Op == "stat":
 		slog.Error("Failed to stat path", "path", pe.Path, "error", err)
-		return
+	case errors.As(err, &ue) && ue.Op == "download":
+		slog.Error("Failed to download URL archive", "url", ue.URL, "error", ue.Err)
+	case errors.As(err, &ue) && ue.Op == "parse":
+		slog.Error("Failed to create URL input", "url", ue.URL, "error", ue.Err)
+	default:
+		slog.Error("Failed to resolve path", "path", target, "error", err)
 	}
-	slog.Error("Failed to resolve path", "path", target, "error", err)
 }

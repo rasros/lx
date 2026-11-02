@@ -16,6 +16,9 @@ type selector struct {
 	includes []walker.CompiledSpec
 	excludes []walker.CompiledSpec
 	outPath  string
+	// prefix places the paths Descend and Accept are given within the
+	// walked root, as for the entries of an archive found in a walk.
+	prefix string
 }
 
 func newSelector(opts Options) selector {
@@ -39,16 +42,23 @@ func (s selector) AcceptRoot(rel string, isDir bool) bool {
 	return walker.IsMatchAnyCompiled(s.includes, rel)
 }
 
+// within returns the selector for the entries of the archive at rel from the
+// walked root, which are matched as the files below a directory there are.
+func (s selector) within(rel string) selector {
+	s.prefix = rel + "/"
+	return s
+}
+
 // Descend reports whether a walk enters dir, relative to the walked root: not
 // when no include could match anything below it.
 func (s selector) Descend(dir string) bool {
-	return walker.CouldMatchAnyDescendant(s.includes, dir)
+	return walker.CouldMatchAnyDescendant(s.includes, s.prefix+dir)
 }
 
 // Accept reports whether the file at rel, relative to the walked root and
 // displayed as path, is collected.
 func (s selector) Accept(rel, path string) bool {
-	if !walker.IsMatchAnyCompiled(s.includes, rel) {
+	if !walker.IsMatchAnyCompiled(s.includes, s.prefix+rel) {
 		slog.Debug("Ignored by include filter (-i)", "path", path)
 		return false
 	}

@@ -84,7 +84,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 			return nil
 		}
 		if d.IsDir() {
-			if sel != nil && entryPath != "." && !sel.Descend(entryPath) {
+			if dir := normalizeArchiveEntryPath(entryPath); sel != nil && dir != "" && !sel.Descend(dir) {
 				return fs.SkipDir
 			}
 			return nil

@@ -44,7 +44,8 @@
 //   - GetGlobalContext exposes aggregate statistics.
 //   - WithConcurrency / WithOnFileError customize processing.
 //
-// Example, rendering a directory as lx <dir> does:
+// Example, rendering a directory as lx <dir> does when no project or user
+// lx config changes the output and stats are off:
 //
 //	package main
 //

@@ -1,0 +1,11 @@
+--- STDOUT ---
+[1/7] arch/a.zip/src/a.go (1 rows)
+[2/7] lib/x.go (1 rows)
+[3/7] lit1/a.go (1 rows)
+[4/7] lit[1]/a.go (1 rows)
+[5/7] proj/src/c.go (1 rows)
+[6/7] src/b.go (1 rows)
+[7/7] srcfoo/x.go (1 rows)
+
+
+--- STDERR ---
