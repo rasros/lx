@@ -2,6 +2,8 @@ package osenv
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -29,5 +31,21 @@ func TestReadsOnlyTheGivenEnv(t *testing.T) {
 	}
 	if config, err := Config(env); err != nil || config == "" {
 		t.Errorf("Config = %q, %v; want a directory below /h", config, err)
+	}
+}
+
+// A relative $XDG_CONFIG_HOME is ignored, as the XDG spec says.
+func TestRelativeXDGConfigHomeIsIgnored(t *testing.T) {
+	env := func(k string) (string, bool) {
+		v, ok := map[string]string{"HOME": "/h", "USERPROFILE": "/h", "home": "/h", "XDG_CONFIG_HOME": "rel"}[k]
+		return v, ok
+	}
+	if got, want := XDGConfigHome(env), filepath.Join("/h", ".config"); got != want {
+		t.Errorf("XDGConfigHome = %q, want %q", got, want)
+	}
+	if runtime.GOOS == "linux" {
+		if got, err := Config(env); err != nil || got != filepath.Join("/h", ".config") {
+			t.Errorf("Config = %q, %v; want ~/.config", got, err)
+		}
 	}
 }

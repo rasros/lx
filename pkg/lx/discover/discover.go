@@ -146,25 +146,15 @@ func expands(opts Options, path string) bool {
 // in the user config directory, and git's global excludes. It finds them
 // through env, which looks variables up as os.LookupEnv does, and logs to
 // log, or slog.Default() when log is nil.
-func UserIgnoreRules(env func(key string) (string, bool), log *slog.Logger) (ignoreRules, gitExcludes []string) {
+func UserIgnoreRules(env osenv.Lookup, log *slog.Logger) (ignoreRules, gitExcludes []string) {
 	if log == nil {
 		log = slog.Default()
 	}
-	home, _ := osenv.Home(env)
 	if configDir, err := osenv.Config(env); err == nil {
 		ignoreRules = readIgnorePatterns(log, filepath.Join(configDir, "lx", "ignore"))
 	}
-
-	// A relative XDG_CONFIG_HOME is invalid, as the XDG spec says, rather
-	// than relative to some working directory.
-	xdgConfig, _ := env("XDG_CONFIG_HOME")
-	if !filepath.IsAbs(xdgConfig) {
-		xdgConfig = ""
-	}
-	if xdgConfig == "" && home != "" {
-		xdgConfig = filepath.Join(home, ".config")
-	}
-	if xdgConfig != "" {
+	// Git looks in the XDG location on every system.
+	if xdgConfig := osenv.XDGConfigHome(env); xdgConfig != "" {
 		gitExcludes = readIgnorePatterns(log, filepath.Join(xdgConfig, "git", "ignore"))
 	}
 	return ignoreRules, gitExcludes
