@@ -1,0 +1,8 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: prompt file "./missing.md" not found: stat ./missing.md: FILE_NOT_FOUND
+
+--- bundle.md ---
+an earlier bundle

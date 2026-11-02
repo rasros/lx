@@ -1,0 +1,5 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: open nodir/bundle.md: FILE_NOT_FOUND

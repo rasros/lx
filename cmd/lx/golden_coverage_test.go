@@ -7,18 +7,33 @@ import (
 )
 
 // --output redirects the bundle to a file, which moves stats to stdout and
-// makes the output file itself a walk candidate. The file is there from an
-// earlier run: the cases replace it as they finish, and none walks it.
+// makes the output file itself a walk candidate. Each case has a fixture of
+// its own, where an earlier bundle may already be.
 func TestGoldenOutputFile(t *testing.T) {
-	dir := setupWalkFixture(t)
-	if err := os.WriteFile(filepath.Join(dir, "bundle.md"), []byte("an earlier bundle\n"), 0644); err != nil {
-		t.Fatal(err)
+	t.Parallel()
+	for _, c := range []struct {
+		earlier bool
+		tc      goldenTestCase
+	}{
+		{false, goldenTestCase{name: "170_output_file_stats_to_stdout", args: []string{"--stats", "-o", "bundle.md", "main.go"}}},
+		{true, goldenTestCase{name: "171_output_file_excluded_from_own_walk", args: []string{"--stats", "-o", "bundle.md", "."}}},
+		{false, goldenTestCase{name: "172_output_file_quiet", args: []string{"-q", "-o", "bundle.md", "main.go"}}},
+		// A bad path fails before any work, so no input is reported missing.
+		{false, goldenTestCase{name: "172b_output_file_missing_dir", args: []string{"-o", "nodir/bundle.md", "missing.go"}}},
+		// A failed run leaves the earlier bundle as it was.
+		{true, goldenTestCase{name: "172c_output_file_kept_on_failure", args: []string{"-o", "bundle.md", "-P", "./missing.md", "main.go"}, outFile: "bundle.md"}},
+		{true, goldenTestCase{name: "172d_output_file_replaced", args: []string{"-q", "-o", "bundle.md", "main.go"}, outFile: "bundle.md"}},
+	} {
+		t.Run(c.tc.name, func(t *testing.T) {
+			dir := setupWalkFixture(t)
+			if c.earlier {
+				if err := os.WriteFile(filepath.Join(dir, "bundle.md"), []byte("an earlier bundle\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			runTestGolden(t, dir, []goldenTestCase{c.tc})
+		})
 	}
-	runTestGolden(t, dir, []goldenTestCase{
-		{name: "170_output_file_stats_to_stdout", args: []string{"--stats", "-o", "bundle.md", "main.go"}},
-		{name: "171_output_file_excluded_from_own_walk", args: []string{"--stats", "-o", "bundle.md", "."}},
-		{name: "172_output_file_quiet", args: []string{"-q", "-o", "bundle.md", "main.go"}},
-	})
 }
 
 // bare deliberately emits content only: trees, prompts, sections and error rows

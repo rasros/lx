@@ -21,6 +21,9 @@ type goldenTestCase struct {
 	args     []string
 	stdin    string
 	autoStat bool
+	// outFile, when set, is a file in the working directory whose content
+	// follows the output, or "(missing)".
+	outFile string
 }
 
 // goldenRun is what the cases of one batch share: the working directory they
@@ -106,6 +109,13 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 			}
 
 			fullOutput := normalizeOutput(stdoutBuf.String(), stderrBuf.String(), run.scrub...)
+			if tc.outFile != "" {
+				content := "(missing)\n"
+				if data, err := os.ReadFile(filepath.Join(run.cwd, tc.outFile)); err == nil {
+					content = string(data)
+				}
+				fullOutput += "\n--- " + tc.outFile + " ---\n" + content
+			}
 
 			goldenPath := filepath.Join("testdata", "golden", tc.name+".golden")
 			if *update {
