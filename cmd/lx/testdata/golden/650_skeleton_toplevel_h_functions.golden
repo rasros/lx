@@ -2,6 +2,8 @@
 skeleton/toplevel.h (45 rows, function signatures)
 ---
 ```c
+#ifndef TOPLEVEL_H
+...
 // Open a buffer.
 struct buffer *buffer_open(const char *path);
 ...
@@ -12,6 +14,8 @@ int (*pick_handler(int kind))(int code);
 int win_only(void);
 #else
 int posix_only(void);
+#endif
+...
 #endif
 ```
 

@@ -223,6 +223,28 @@ trait T {
 	}
 }
 
+func TestLooksLikeCpp(t *testing.T) {
+	for _, tc := range []struct {
+		src  string
+		want bool
+	}{
+		{"class Widget {};", true},
+		{"namespace ui {}", true},
+		{"template <typename T> T id(T);", true},
+		{"void f() { std::move(x); }", true},
+		{"struct S {\npublic:\n int x; };", true},
+		{"int f(void);", false},
+		{"static struct class foo_class = {0};", false},
+		{"// class Widget, std::string\n/* namespace x */ int f(void);", false},
+		{`const char *s = "a::b class X";`, false},
+		{"int x = c ? a : b;", false},
+	} {
+		if got := LooksLikeCpp([]byte(tc.src)); got != tc.want {
+			t.Errorf("LooksLikeCpp(%q) = %v, want %v", tc.src, got, tc.want)
+		}
+	}
+}
+
 // TestCFuncVisible checks which top-level C declarations declare a
 // function. The C grammar reads a C++ default argument as an initializer,
 // which must not hide the function.
