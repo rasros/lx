@@ -9,4 +9,4 @@
 
 ## Testing
 
-<!-- Simple sentences. How you verified it. -->
+<!-- Simple sentences. Only describe test code added or changed. Leave empty if none. Do not mention running tests or CI. -->
