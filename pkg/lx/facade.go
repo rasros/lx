@@ -9,6 +9,7 @@ import (
 	"github.com/rasros/lx/pkg/lx/discover"
 	"github.com/rasros/lx/pkg/lx/sources"
 	streamingpkg "github.com/rasros/lx/pkg/lx/streaming"
+	"github.com/rasros/lx/pkg/lx/walker"
 )
 
 type GlobalContext = core.GlobalContext
@@ -21,7 +22,21 @@ type StatsContext = core.StatsContext
 
 type InputFile = sources.InputFile
 type DiscoverOptions = discover.Options
-type Glob = discover.Glob
+
+// Glob is one -i or -e glob in DiscoverOptions.Globs, of a GlobKind.
+type Glob = walker.Override
+type GlobKind = walker.OverrideKind
+
+const (
+	// GlobInclude keeps what it matches, as ripgrep's -g glob, and once
+	// there is one a file must be kept by some glob.
+	GlobInclude = walker.Include
+	// GlobExclude drops what it matches, as ripgrep's -g '!glob'.
+	GlobExclude = walker.Exclude
+	// GlobKeep keeps what it matches without requiring that of every file.
+	GlobKeep = walker.Keep
+)
+
 type Collector = discover.Collector
 type URLError = discover.URLError
 
@@ -35,13 +50,14 @@ func Merge(dst *Config, src *Config) { core.Merge(dst, src) }
 // one run as lx does.
 func NewCollector() *Collector { return discover.NewCollector() }
 
-// IncludeGlob returns lx's -i pattern p for DiscoverOptions.Globs. It works
-// as ripgrep's -g p.
-func IncludeGlob(p string) Glob { return discover.IncludeGlob(p) }
+// IncludeGlob returns lx's -i pattern p, ripgrep's -g p: a GlobInclude, or a
+// GlobExclude of what follows a leading "!". Glob.Validate reports a glob
+// that cannot be parsed.
+var IncludeGlob = walker.IncludeOverride
 
-// ExcludeGlob returns lx's -e pattern p for DiscoverOptions.Globs. It works
-// as ripgrep's -g '!p', and a leading "!" keeps what it matches instead.
-func ExcludeGlob(p string) Glob { return discover.ExcludeGlob(p) }
+// ExcludeGlob returns lx's -e pattern p, ripgrep's -g '!p': a GlobExclude,
+// or a GlobKeep of what follows a leading "!".
+var ExcludeGlob = walker.ExcludeOverride
 
 // UserIgnoreRules reads the ignore files lx applies everywhere, for
 // DiscoverOptions.IgnoreRules and GitExcludes.

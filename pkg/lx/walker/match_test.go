@@ -35,7 +35,7 @@ func TestMatch_DirOnlyRequiresDirEntry(t *testing.T) {
 	}
 }
 
-func TestCheckIgnore_NegationOverridesPreviousRule(t *testing.T) {
+func TestLastMatch_NegationOverridesPreviousRule(t *testing.T) {
 	rules := parseRules([]string{"*.log", "!keep.log"}, "", ".gitignore")
 
 	m, reason := lastMatch("app.log", false, rules, true)
@@ -55,7 +55,7 @@ func TestCheckIgnore_NegationOverridesPreviousRule(t *testing.T) {
 	}
 }
 
-func TestCheckIgnore_OmitsReasonWhenNotRequested(t *testing.T) {
+func TestLastMatch_OmitsReasonWhenNotRequested(t *testing.T) {
 	rules := parseRules([]string{"*.log"}, "", ".gitignore")
 	m, reason := lastMatch("app.log", false, rules, false)
 	if m != matchIgnore {
@@ -86,7 +86,7 @@ func TestParseRules_Escapes(t *testing.T) {
 	}
 }
 
-func TestCheckIgnore_BackslashEscapes(t *testing.T) {
+func TestLastMatch_BackslashEscapes(t *testing.T) {
 	rules := parseRules([]string{`\*.go`, `a\ b.go`}, "", ".gitignore")
 	for path, want := range map[string]bool{"*.go": true, "x.go": false, "a b.go": true, `a\ b.go`: false} {
 		if ignored := isIgnored(path, false, rules); ignored != want {
@@ -95,7 +95,7 @@ func TestCheckIgnore_BackslashEscapes(t *testing.T) {
 	}
 }
 
-func TestCheckIgnore_FloatingPatternMatchesBaseNameOnly(t *testing.T) {
+func TestLastMatch_FloatingPatternMatchesBaseNameOnly(t *testing.T) {
 	rules := parseRules([]string{"tags", "!tags/"}, "", ".gitignore")
 	if isIgnored("tags", true, rules) {
 		t.Fatal("expected the negated directory to be re-included")
