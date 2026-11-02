@@ -11,6 +11,22 @@ type pathMatchInfo struct {
 	relPath  string
 	baseName string
 	parts    []string
+	// floatFrom is the first directory component a floating pattern may
+	// match. Components before it lead to the walk root, which was named
+	// explicitly and so is never excluded by a rule from above it.
+	floatFrom int
+}
+
+// offsetPathInfo rewrites a walk-relative path for a rule loaded above the
+// walk root.
+func offsetPathInfo(offset string, ctx pathMatchInfo) pathMatchInfo {
+	full := offset + ctx.relPath
+	if ctx.relPath == "." {
+		full = strings.TrimSuffix(offset, "/")
+	}
+	info := buildPathMatchInfo(full)
+	info.floatFrom = strings.Count(offset, "/")
+	return info
 }
 
 var dotPathMatchInfo = pathMatchInfo{
@@ -82,7 +98,7 @@ func matchCompiledSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 		return true
 	}
 
-	for i := 0; i < len(ctx.parts)-1; i++ {
+	for i := ctx.floatFrom; i < len(ctx.parts)-1; i++ {
 		if spec.Pattern.matchCandidate(ctx.parts[i]) {
 			return true
 		}
@@ -101,7 +117,9 @@ func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool) bool {
 	}
 
 	target := ctx
-	if rule.BasePathPrefix != "" {
+	if rule.PathOffset != "" {
+		target = offsetPathInfo(rule.PathOffset, ctx)
+	} else if rule.BasePathPrefix != "" {
 		if !strings.HasPrefix(ctx.relPath, rule.BasePathPrefix) && ctx.relPath != rule.BasePath {
 			return false
 		}
@@ -142,12 +160,18 @@ func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool, w
 	return ignored, reason
 }
 
-func hasNestedException(dirPath string, rules []Rule) bool {
-	dirParts := strings.Split(dirPath, "/")
+func hasNestedException(walkDirPath string, rules []Rule) bool {
+	walkDirParts := strings.Split(walkDirPath, "/")
 
 	for _, rule := range rules {
 		if !rule.Negate {
 			continue
+		}
+
+		dirPath, dirParts := walkDirPath, walkDirParts
+		if rule.PathOffset != "" {
+			dirPath = rule.PathOffset + walkDirPath
+			dirParts = strings.Split(dirPath, "/")
 		}
 
 		if rule.BasePath != "" && rule.BasePath != "." {

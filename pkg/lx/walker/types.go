@@ -9,11 +9,20 @@ type Rule struct {
 
 	BasePathPrefix string
 	Spec           CompiledSpec
+
+	// PathOffset is set on rules loaded from a directory above the walk
+	// root: the walk root's path relative to that directory, with a trailing
+	// slash. Walk paths are prefixed with it before matching.
+	PathOffset string
 }
 
 // Walker configures the file traversal.
 type Walker struct {
-	BaseRules     []Rule
+	BaseRules []Rule
+	// AncestorRules come from ignore files above the walk root, see
+	// LoadAncestorRules. They apply after BaseRules and before the walk's
+	// own ignore files.
+	AncestorRules []Rule
 	OverrideRules []Rule
 	IgnoreEnabled bool
 	SkipHidden    bool

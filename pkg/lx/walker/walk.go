@@ -43,8 +43,9 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 			}
 		}
 
-		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(localRules)+len(w.OverrideRules))
+		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(w.AncestorRules)+len(localRules)+len(w.OverrideRules))
 		effectiveRules = append(effectiveRules, w.BaseRules...)
+		effectiveRules = append(effectiveRules, w.AncestorRules...)
 		effectiveRules = append(effectiveRules, localRules...)
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 
@@ -58,8 +59,9 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 		return walkFn(root, dirEntryAdapter{info}, nil)
 	}
 
-	initialRules := make([]Rule, 0, len(w.BaseRules))
+	initialRules := make([]Rule, 0, len(w.BaseRules)+len(w.AncestorRules))
 	initialRules = append(initialRules, w.BaseRules...)
+	initialRules = append(initialRules, w.AncestorRules...)
 	return w.recursiveWalk(fsys, root, initialRules, walkFn, false, []fs.FileInfo{info})
 }
 
