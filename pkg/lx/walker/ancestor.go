@@ -118,8 +118,16 @@ func infoExcludeRules(repo, basePath string) []Rule {
 
 // infoExclude reads the info/exclude rules shared by the worktrees of gitDir,
 // scoped to basePath within the walk.
+// An empty gitDir, one the walk cannot reach, has none.
 func infoExclude(g gitFS, gitDir, basePath string) []Rule {
-	p := g.Join(commonDir(g, gitDir), "info", "exclude")
+	if gitDir == "" {
+		return nil
+	}
+	common, ok := commonDir(g, gitDir)
+	if !ok {
+		return nil
+	}
+	p := g.Join(common, "info", "exclude")
 	data, err := g.ReadFile(p)
 	logReadError(p, err)
 	if err != nil {
@@ -146,6 +154,8 @@ func logReadError(path string, err error) {
 // filesystem, or a walked fs.FS that has no host path.
 type gitFS interface {
 	Stat(name string) (fs.FileInfo, error)
+	Lstat(name string) (fs.FileInfo, error)
+	ReadLink(name string) (string, error)
 	ReadFile(name string) ([]byte, error)
 	Join(elem ...string) string
 	// Resolve resolves a path read from a .git or commondir file against
@@ -156,9 +166,11 @@ type gitFS interface {
 // osGitFS looks git directories up on the host filesystem.
 type osGitFS struct{}
 
-func (osGitFS) Stat(name string) (fs.FileInfo, error) { return os.Stat(name) }
-func (osGitFS) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) }
-func (osGitFS) Join(elem ...string) string            { return filepath.Join(elem...) }
+func (osGitFS) Stat(name string) (fs.FileInfo, error)  { return os.Stat(name) }
+func (osGitFS) Lstat(name string) (fs.FileInfo, error) { return os.Lstat(name) }
+func (osGitFS) ReadLink(name string) (string, error)   { return os.Readlink(name) }
+func (osGitFS) ReadFile(name string) ([]byte, error)   { return os.ReadFile(name) }
+func (osGitFS) Join(elem ...string) string             { return filepath.Join(elem...) }
 func (osGitFS) Resolve(base, target string) (string, bool) {
 	return resolveRelative(base, target), true
 }
@@ -167,9 +179,11 @@ func (osGitFS) Resolve(base, target string) (string, bool) {
 // it, absolute or through "..", cannot be followed.
 type subGitFS struct{ fsys fs.FS }
 
-func (g subGitFS) Stat(name string) (fs.FileInfo, error) { return fs.Stat(g.fsys, name) }
-func (g subGitFS) ReadFile(name string) ([]byte, error)  { return fs.ReadFile(g.fsys, name) }
-func (subGitFS) Join(elem ...string) string              { return path.Join(elem...) }
+func (g subGitFS) Stat(name string) (fs.FileInfo, error)  { return fs.Stat(g.fsys, name) }
+func (g subGitFS) Lstat(name string) (fs.FileInfo, error) { return fs.Lstat(g.fsys, name) }
+func (g subGitFS) ReadLink(name string) (string, error)   { return fs.ReadLink(g.fsys, name) }
+func (g subGitFS) ReadFile(name string) ([]byte, error)   { return fs.ReadFile(g.fsys, name) }
+func (subGitFS) Join(elem ...string) string               { return path.Join(elem...) }
 func (subGitFS) Resolve(base, target string) (string, bool) {
 	target = filepath.ToSlash(target)
 	if path.IsAbs(target) || filepath.IsAbs(target) {
@@ -189,6 +203,10 @@ func resolveGitDir(repo string) (string, bool) {
 // git, it accepts a .git directory only when it looks like a git directory,
 // and a .git file only when its "gitdir:" line, as used by linked worktrees
 // and submodules, points at one. Anything else named .git is not a repository.
+//
+// A gitdir the walked filesystem cannot reach, absolute or outside it, cannot
+// be checked. The .git file still marks a repository boundary, as it did in
+// the repository the walk came from, and the git directory is returned empty.
 func findGitDir(g gitFS, repo string) (string, bool) {
 	dotGit := g.Join(repo, ".git")
 	info, err := g.Stat(dotGit)
@@ -211,8 +229,8 @@ func findGitDir(g gitFS, repo string) (string, bool) {
 			return "", false
 		}
 		if gitDir, ok = g.Resolve(repo, target); !ok {
-			slog.Debug("Ignoring .git file whose gitdir cannot be followed", "path", dotGit)
-			return "", false
+			slog.Debug("Keeping .git file whose gitdir cannot be followed as a repository root", "path", dotGit)
+			return "", true
 		}
 	}
 	if !isGitDir(g, gitDir) {
@@ -224,13 +242,16 @@ func findGitDir(g gitFS, repo string) (string, bool) {
 
 // isGitDir reports whether dir looks like a git directory, following git's
 // is_git_directory: a valid HEAD, and objects and refs directories in the
-// directory shared by all worktrees.
+// directory shared by all worktrees. A shared directory the walked filesystem
+// cannot reach is taken on trust.
 func isGitDir(g gitFS, dir string) bool {
-	head, err := g.ReadFile(g.Join(dir, "HEAD"))
-	if err != nil || !validHead(head) {
+	if !validHead(g, g.Join(dir, "HEAD")) {
 		return false
 	}
-	common := commonDir(g, dir)
+	common, ok := commonDir(g, dir)
+	if !ok {
+		return true
+	}
 	for _, name := range []string{"objects", "refs"} {
 		info, err := g.Stat(g.Join(common, name))
 		if err != nil || !info.IsDir() {
@@ -240,17 +261,39 @@ func isGitDir(g gitFS, dir string) bool {
 	return true
 }
 
-// validHead reports whether data is a HEAD git accepts: a symbolic ref into
-// refs/, or a detached object id.
-func validHead(data []byte) bool {
-	s := strings.TrimSpace(string(data))
-	if ref, ok := strings.CutPrefix(s, "ref:"); ok {
-		return strings.HasPrefix(strings.TrimSpace(ref), "refs/")
-	}
-	if len(s) != 40 && len(s) != 64 {
+// validHead reports whether the file at p is a HEAD git accepts, following
+// git's validate_headref: a symlink into refs/, which need not exist on an
+// unborn branch or after the refs are packed, or a file holding a symbolic
+// ref into refs/ or starting with an object id.
+func validHead(g gitFS, p string) bool {
+	info, err := g.Lstat(p)
+	if err != nil {
 		return false
 	}
-	for _, c := range s {
+	if info.Mode()&fs.ModeSymlink != 0 {
+		target, err := g.ReadLink(p)
+		return err == nil && strings.HasPrefix(filepath.ToSlash(target), "refs/")
+	}
+	data, err := g.ReadFile(p)
+	return err == nil && validHeadContent(data)
+}
+
+// validHeadContent reports whether data is a HEAD git accepts: a symbolic ref
+// into refs/, or text starting with a full SHA-1 or SHA-256 object id.
+func validHeadContent(data []byte) bool {
+	s := string(data)
+	if ref, ok := strings.CutPrefix(s, "ref:"); ok {
+		return strings.HasPrefix(strings.TrimLeft(ref, " \t\r\n"), "refs/")
+	}
+	return hexPrefix(s, 64) || hexPrefix(s, 40)
+}
+
+// hexPrefix reports whether s starts with n hex digits.
+func hexPrefix(s string, n int) bool {
+	if len(s) < n {
+		return false
+	}
+	for _, c := range s[:n] {
 		if !strings.ContainsRune("0123456789abcdefABCDEF", c) {
 			return false
 		}
@@ -261,24 +304,24 @@ func validHead(data []byte) bool {
 // commonGitDir returns the directory shared by all worktrees of gitDir,
 // which holds info/exclude. Without a commondir file it is gitDir itself.
 func commonGitDir(gitDir string) string {
-	return commonDir(osGitFS{}, gitDir)
+	common, _ := commonDir(osGitFS{}, gitDir)
+	return common
 }
 
-func commonDir(g gitFS, gitDir string) string {
+// commonDir returns the directory shared by all worktrees of gitDir,
+// reporting false when its commondir file points where g cannot reach.
+func commonDir(g gitFS, gitDir string) (string, bool) {
 	p := g.Join(gitDir, "commondir")
 	data, err := g.ReadFile(p)
 	if err != nil {
 		logReadError(p, err)
-		return gitDir
+		return gitDir, true
 	}
 	common := strings.TrimSpace(string(data))
 	if common == "" {
-		return gitDir
+		return gitDir, true
 	}
-	if resolved, ok := g.Resolve(gitDir, common); ok {
-		return resolved
-	}
-	return gitDir
+	return g.Resolve(gitDir, common)
 }
 
 // resolveRelative resolves target against base the way the filesystem does.
