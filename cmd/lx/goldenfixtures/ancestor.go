@@ -13,9 +13,7 @@ func SetupAncestorIgnoreFixture(t *testing.T) string {
 	setupMockConfig(t)
 	dir := t.TempDir()
 
-	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
-		t.Fatal(err)
-	}
+	makeGitDir(t, dir, ".git")
 	writeFile(t, dir, ".gitignore", "*.log\ndist\n/build\n/sub/skip.txt\n!keep.log\n", 0644)
 	writeFile(t, dir, "build/gen.go", "package build", 0644)
 	writeFile(t, dir, "sub/a.log", "ignored by root pattern", 0644)
@@ -47,9 +45,7 @@ func SetupIgnoredParentDirFixture(t *testing.T) string {
 	setupMockConfig(t)
 	dir := t.TempDir()
 
-	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
-		t.Fatal(err)
-	}
+	makeGitDir(t, dir, ".git")
 	writeFile(t, dir, ".gitignore", "build/\n", 0644)
 	writeFile(t, dir, "build/out.js", "console.log(1)", 0644)
 	writeFile(t, dir, "main.go", "package main", 0644)
@@ -65,7 +61,9 @@ func SetupWorktreeExcludeFixture(t *testing.T) string {
 	setupMockConfig(t)
 	dir := t.TempDir()
 
+	makeGitDir(t, dir, "main/.git")
 	writeFile(t, dir, "main/.git/info/exclude", "*.secret\n", 0644)
+	writeFile(t, dir, "main/.git/worktrees/wt/HEAD", "ref: refs/heads/wt\n", 0644)
 	writeFile(t, dir, "main/.git/worktrees/wt/commondir", "../..\n", 0644)
 	writeFile(t, dir, "wt/.git", "gitdir: ../main/.git/worktrees/wt\n", 0644)
 	writeFile(t, dir, "wt/app.go", "package app", 0644)
@@ -74,4 +72,47 @@ func SetupWorktreeExcludeFixture(t *testing.T) string {
 	writeFile(t, dir, "wt/pkg/token.secret", "excluded by the shared info/exclude", 0644)
 
 	return filepath.Join(dir, "wt")
+}
+
+// SetupStrayGitDirFixture builds a repository holding directories with a
+// .git that is not a git directory: an empty one, as a stray mkdir leaves,
+// and one with only an info/exclude. Neither is a repository root, so the
+// enclosing repository's rules keep applying below them and the stray
+// info/exclude is never read. It returns the repository root.
+func SetupStrayGitDirFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	makeGitDir(t, dir, ".git")
+	writeFile(t, dir, ".gitignore", "*.log\n", 0644)
+	if err := os.MkdirAll(filepath.Join(dir, "empty", ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, "empty/main.go", "package empty", 0644)
+	writeFile(t, dir, "empty/debug.log", "ignored by the repository .gitignore", 0644)
+	writeFile(t, dir, "bogus/.git/info/exclude", "*.go\n", 0644)
+	writeFile(t, dir, "bogus/util.go", "package bogus", 0644)
+	writeFile(t, dir, "bogus/trace.log", "ignored by the repository .gitignore", 0644)
+
+	return dir
+}
+
+// SetupStrayGitDirAboveFixture builds a project below a directory holding an
+// empty .git and a .gitignore. The empty .git does not make that directory a
+// repository, so outside one its .gitignore does not reach a walk started in
+// the project. It returns the project directory.
+func SetupStrayGitDirAboveFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, ".gitignore", "*.log\n", 0644)
+	writeFile(t, dir, "proj/main.go", "package main", 0644)
+	writeFile(t, dir, "proj/run.log", "kept: no repository applies the parent .gitignore", 0644)
+
+	return filepath.Join(dir, "proj")
 }

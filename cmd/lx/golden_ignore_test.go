@@ -41,3 +41,17 @@ func TestGoldenWorktreeInfoExclude(t *testing.T) {
 		{name: "109_info_exclude_linked_worktree", args: []string{"."}},
 	}, filepath.Dir(dir))
 }
+
+func TestGoldenStrayGitDir(t *testing.T) {
+	dir := setupStrayGitDirFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "109b_stray_git_dirs_keep_repo_rules", args: []string{"."}},
+	})
+}
+
+func TestGoldenStrayGitDirAbove(t *testing.T) {
+	dir := setupStrayGitDirAboveFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "109c_stray_git_dir_above_is_not_a_repo", args: []string{"."}},
+	}, filepath.Dir(dir))
+}

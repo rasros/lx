@@ -95,7 +95,8 @@ func TestLoadAncestorRules_StopsAtRepoRoot(t *testing.T) {
 	mustWriteFile(t, outer, ".gitignore", "outer.txt\n")
 	mustMkdir(t, outer, "repo/a/b")
 	repo := filepath.Join(outer, "repo")
-	mustWriteFile(t, repo, ".git", "gitdir: /elsewhere\n")
+	mustGitDir(t, outer, "gitdirs/repo")
+	mustWriteFile(t, repo, ".git", "gitdir: "+filepath.Join(outer, "gitdirs", "repo")+"\n")
 	mustWriteFile(t, repo, ".gitignore", "*.log\n")
 	mustWriteFile(t, repo, "a/.ignore", "tmp/\n")
 
@@ -119,7 +120,7 @@ func TestLoadAncestorRules_StopsAtRepoRoot(t *testing.T) {
 
 func TestLoadAncestorRules_RootIgnored(t *testing.T) {
 	repo := t.TempDir()
-	mustMkdir(t, repo, ".git")
+	mustGitDir(t, repo, ".git")
 	mustWriteFile(t, repo, ".gitignore", "/build\ndist\ngen/**\nout\nlib/*\n!lib/keep\n")
 	for _, d := range []string{"build/x", "pkg/dist", "gen", "out/keep", "src/a", "lib/keep", "node_modules/pkg"} {
 		mustMkdir(t, repo, d)
@@ -179,9 +180,12 @@ func TestResolveGitDir_Layouts(t *testing.T) {
 		mustMkdir(t, base, d)
 	}
 	plain := filepath.Join(base, "plain")
+	mustGitDir(t, plain, ".git")
+	mustGitDir(t, plain, ".git/modules/mod")
 	mustWriteFile(t, plain, ".git/info/exclude", "*.a\n")
 
 	wt := filepath.Join(base, "wt")
+	mustWriteFile(t, plain, ".git/worktrees/wt/HEAD", "ref: refs/heads/wt\n")
 	mustWriteFile(t, plain, ".git/worktrees/wt/commondir", "../..\n")
 	mustWriteFile(t, wt, ".git", "gitdir: ../plain/.git/worktrees/wt\n")
 
@@ -211,6 +215,7 @@ func TestResolveGitDir_Layouts(t *testing.T) {
 
 func TestLoadAncestorRules_InfoExcludeComesFirst(t *testing.T) {
 	repo := t.TempDir()
+	mustGitDir(t, repo, ".git")
 	mustMkdir(t, repo, ".git/info")
 	mustMkdir(t, repo, "sub")
 	mustWriteFile(t, repo, ".git/info/exclude", "*.md\n")
@@ -249,6 +254,9 @@ func TestWalk_RepoBoundaries(t *testing.T) {
 	top := t.TempDir()
 	for _, d := range []string{"repo/.git/info", "repo/.git/modules/mod/info", "repo/sub/mod", "repo/sub/inner/.git/info"} {
 		mustMkdir(t, top, d)
+	}
+	for _, d := range []string{"repo/.git", "repo/.git/modules/mod", "repo/sub/inner/.git"} {
+		mustGitDir(t, top, d)
 	}
 	mustWriteFile(t, top, "repo/.git/info/exclude", "*.local\n")
 	mustWriteFile(t, top, "repo/.gitignore", "*.tmp\n")
@@ -294,7 +302,7 @@ func TestWalk_RepoBoundaries(t *testing.T) {
 
 func TestResolveRelative_FollowsSymlinkedBase(t *testing.T) {
 	top := t.TempDir()
-	mustMkdir(t, top, "data/proj/.git/modules/mod")
+	mustGitDir(t, top, "data/proj/.git/modules/mod")
 	mustMkdir(t, top, "data/proj/mod")
 	mustMkdir(t, top, "links")
 	if err := os.Symlink(filepath.Join(top, "data", "proj", "mod"), filepath.Join(top, "links", "mod")); err != nil {
@@ -322,6 +330,7 @@ func TestParseRuleFile_LongLine(t *testing.T) {
 
 func TestLoadAncestorRules_InfoExcludeIgnoresParentDir(t *testing.T) {
 	repo := t.TempDir()
+	mustGitDir(t, repo, ".git")
 	mustMkdir(t, repo, ".git/info")
 	mustMkdir(t, repo, "scratch/x")
 	mustWriteFile(t, repo, ".git/info/exclude", "/scratch/\n")
@@ -330,5 +339,118 @@ func TestLoadAncestorRules_InfoExcludeIgnoresParentDir(t *testing.T) {
 	w.LoadAncestorRules(filepath.Join(repo, "scratch", "x"))
 	if !w.RootIgnored {
 		t.Fatal("expected a directory below an info/exclude entry to be ignored")
+	}
+}
+
+func TestFindGitDir_Validity(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, base, repo string)
+		want  bool
+	}{
+		{"no .git", func(t *testing.T, base, repo string) {}, false},
+		{"empty .git directory", func(t *testing.T, base, repo string) {
+			mustMkdir(t, repo, ".git")
+		}, false},
+		{".git directory with only HEAD", func(t *testing.T, base, repo string) {
+			mustMkdir(t, repo, ".git")
+			mustWriteFile(t, repo, ".git/HEAD", "ref: refs/heads/main\n")
+		}, false},
+		{".git directory without objects", func(t *testing.T, base, repo string) {
+			mustMkdir(t, repo, ".git/refs")
+			mustWriteFile(t, repo, ".git/HEAD", "ref: refs/heads/main\n")
+		}, false},
+		{".git directory with an invalid HEAD", func(t *testing.T, base, repo string) {
+			mustGitDir(t, repo, ".git")
+			mustWriteFile(t, repo, ".git/HEAD", "garbage\n")
+		}, false},
+		{"valid .git directory", func(t *testing.T, base, repo string) {
+			mustGitDir(t, repo, ".git")
+		}, true},
+		{"valid .git directory with a detached HEAD", func(t *testing.T, base, repo string) {
+			mustGitDir(t, repo, ".git")
+			mustWriteFile(t, repo, ".git/HEAD", strings.Repeat("ab", 20)+"\n")
+		}, true},
+		{".git file with a valid relative gitdir", func(t *testing.T, base, repo string) {
+			mustGitDir(t, base, "store")
+			mustWriteFile(t, repo, ".git", "gitdir: ../store\n")
+		}, true},
+		{".git file with a valid absolute gitdir", func(t *testing.T, base, repo string) {
+			mustGitDir(t, base, "store")
+			mustWriteFile(t, repo, ".git", "gitdir: "+filepath.Join(base, "store")+"\n")
+		}, true},
+		{".git file with a missing gitdir", func(t *testing.T, base, repo string) {
+			mustWriteFile(t, repo, ".git", "gitdir: ../missing\n")
+		}, false},
+		{".git file pointing at an invalid gitdir", func(t *testing.T, base, repo string) {
+			mustMkdir(t, base, "store")
+			mustWriteFile(t, repo, ".git", "gitdir: ../store\n")
+		}, false},
+		{".git file without a gitdir line", func(t *testing.T, base, repo string) {
+			mustGitDir(t, base, "store")
+			mustWriteFile(t, repo, ".git", "../store\n")
+		}, false},
+		{"empty .git file", func(t *testing.T, base, repo string) {
+			mustWriteFile(t, repo, ".git", "")
+		}, false},
+		{"linked worktree using commondir", func(t *testing.T, base, repo string) {
+			mustGitDir(t, base, "main/.git")
+			mustMkdir(t, base, "main/.git/worktrees/repo")
+			mustWriteFile(t, base, "main/.git/worktrees/repo/HEAD", "ref: refs/heads/wt\n")
+			mustWriteFile(t, base, "main/.git/worktrees/repo/commondir", "../..\n")
+			mustWriteFile(t, repo, ".git", "gitdir: ../main/.git/worktrees/repo\n")
+		}, true},
+		{"linked worktree whose commondir is not a git dir", func(t *testing.T, base, repo string) {
+			mustMkdir(t, base, "main/.git/worktrees/repo")
+			mustWriteFile(t, base, "main/.git/worktrees/repo/HEAD", "ref: refs/heads/wt\n")
+			mustWriteFile(t, base, "main/.git/worktrees/repo/commondir", "../..\n")
+			mustWriteFile(t, repo, ".git", "gitdir: ../main/.git/worktrees/repo\n")
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			base := t.TempDir()
+			mustMkdir(t, base, "repo/sub")
+			repo := filepath.Join(base, "repo")
+			tt.setup(t, base, repo)
+
+			if _, got := resolveGitDir(repo); got != tt.want {
+				t.Errorf("resolveGitDir = %v, want %v", got, tt.want)
+			}
+			root, found := findRepoRoot(filepath.Join(repo, "sub"))
+			if got := found && root == repo; got != tt.want {
+				t.Errorf("findRepoRoot found %q (%v), want repo root %v", root, found, tt.want)
+			}
+
+			// Without a host path the walk resolves .git within its fs.FS,
+			// where an absolute gitdir cannot be followed.
+			w := NewWalker(nil, nil)
+			_, got := w.repoRules(os.DirFS(base), "repo")
+			if want := tt.want && !strings.Contains(tt.name, "absolute"); got != want {
+				t.Errorf("repoRules without FSRoot = %v, want %v", got, want)
+			}
+			w.FSRoot = base
+			if _, got := w.repoRules(os.DirFS(base), "repo"); got != tt.want {
+				t.Errorf("repoRules with FSRoot = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadAncestorRules_StrayGitDirIsNotARepo(t *testing.T) {
+	cwd := t.TempDir()
+	mustMkdir(t, cwd, "proj/.git/info")
+	mustWriteFile(t, cwd, "proj/.git/info/exclude", "*.go\n")
+	mustWriteFile(t, cwd, ".lxignore", "*.tmp\n")
+	mustMkdir(t, cwd, "proj/sub")
+	if repo, ok := findRepoRoot(cwd); ok {
+		t.Skipf("temp dir is inside git repository %s", repo)
+	}
+	t.Chdir(cwd)
+
+	w := NewWalker(nil, nil)
+	w.LoadAncestorRules(filepath.Join(cwd, "proj", "sub"))
+	if len(w.AncestorRules) != 1 || w.AncestorRules[0].Pattern != "*.tmp" {
+		t.Fatalf("expected only the working directory's rule, not the stray info/exclude, got %+v", w.AncestorRules)
 	}
 }

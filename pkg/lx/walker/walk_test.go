@@ -274,6 +274,15 @@ func mustMkdir(t *testing.T, dir, name string) {
 	}
 }
 
+// mustGitDir creates a minimal git directory at dir/name: a HEAD and the
+// objects and refs directories git requires before it treats one as a repository.
+func mustGitDir(t *testing.T, dir, name string) {
+	t.Helper()
+	mustMkdir(t, dir, filepath.Join(name, "objects"))
+	mustMkdir(t, dir, filepath.Join(name, "refs"))
+	mustWriteFile(t, dir, filepath.Join(name, "HEAD"), "ref: refs/heads/main\n")
+}
+
 func assertContains(t *testing.T, list []string, item string) {
 	t.Helper()
 	for _, v := range list {
@@ -561,6 +570,7 @@ func TestWalker_NamedFileInIgnoredDir(t *testing.T) {
 	tests := []struct {
 		name     string
 		files    map[string]string
+		repos    []string
 		target   string
 		included bool
 		reason   string
@@ -653,19 +663,29 @@ func TestWalker_NamedFileInIgnoredDir(t *testing.T) {
 			name: "nested repository resets the rules",
 			files: map[string]string{
 				".gitignore":     "out/\n",
-				"sub/.git/HEAD":  "ref: refs/heads/main\n",
 				"sub/out/out.js": "x",
 			},
+			repos:    []string{"sub"},
 			target:   "sub/out/out.js",
 			included: true,
 		},
 		{
+			name: "stray .git directory keeps the rules",
+			files: map[string]string{
+				".gitignore":     "out/\n",
+				"sub/.git/HEAD":  "ref: refs/heads/main\n",
+				"sub/out/out.js": "x",
+			},
+			target: "sub/out/out.js",
+			reason: `parent directory sub/out: rule "out/" in .gitignore`,
+		},
+		{
 			name: "nested repository itself ignored",
 			files: map[string]string{
-				".gitignore":    "sub/\n",
-				"sub/.git/HEAD": "ref: refs/heads/main\n",
-				"sub/main.go":   "x",
+				".gitignore":  "sub/\n",
+				"sub/main.go": "x",
 			},
+			repos:  []string{"sub"},
 			target: "sub/main.go",
 			reason: `parent directory sub: rule "sub/" in .gitignore`,
 		},
@@ -676,6 +696,9 @@ func TestWalker_NamedFileInIgnoredDir(t *testing.T) {
 			for p, content := range tt.files {
 				mustMkdir(t, dir, filepath.Dir(p))
 				mustWriteFile(t, dir, p, content)
+			}
+			for _, r := range tt.repos {
+				mustGitDir(t, dir, filepath.Join(r, ".git"))
 			}
 			got, ignored := walkNamed(t, NewWalker(nil, nil), dir, tt.target)
 			if tt.included {

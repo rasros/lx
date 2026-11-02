@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] main.go (1 rows)
+---
+```go
+package main
+```
+
+[2/2] run.log (1 rows)
+---
+```text
+kept: no repository applies the parent .gitignore
+```
+
+
+--- STDERR ---

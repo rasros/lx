@@ -91,21 +91,18 @@ func (w *Walker) dirIgnored(parts []string, i int, levels []int) bool {
 // the repository's own info/exclude. Git never applies one repository's
 // ignore rules inside another, including submodules.
 func (w *Walker) repoRules(fsys fs.FS, dir string) ([]Rule, bool) {
-	if _, err := fs.Stat(fsys, path.Join(dir, ".git")); err != nil {
+	var g gitFS = osGitFS{}
+	repo := filepath.Join(w.FSRoot, filepath.FromSlash(dir))
+	if w.FSRoot == "" {
+		g, repo = subGitFS{fsys}, dir
+	}
+	gitDir, ok := findGitDir(g, repo)
+	if !ok {
 		return nil, false
 	}
 	rules := make([]Rule, 0, len(w.BaseRules))
 	rules = append(rules, w.BaseRules...)
-	if w.FSRoot != "" {
-		rules = append(rules, infoExcludeRules(filepath.Join(w.FSRoot, filepath.FromSlash(dir)), dir)...)
-	} else {
-		p := path.Join(dir, ".git", "info", "exclude")
-		data, err := fs.ReadFile(fsys, p)
-		logReadError(p, err)
-		if err == nil {
-			rules = append(rules, parseRuleFile(data, dir, p)...)
-		}
-	}
+	rules = append(rules, infoExclude(g, gitDir, dir)...)
 	return rules, true
 }
 
@@ -116,8 +113,14 @@ func infoExcludeRules(repo, basePath string) []Rule {
 	if !ok {
 		return nil
 	}
-	p := filepath.Join(commonGitDir(gitDir), "info", "exclude")
-	data, err := os.ReadFile(p)
+	return infoExclude(osGitFS{}, gitDir, basePath)
+}
+
+// infoExclude reads the info/exclude rules shared by the worktrees of gitDir,
+// scoped to basePath within the walk.
+func infoExclude(g gitFS, gitDir, basePath string) []Rule {
+	p := g.Join(commonDir(g, gitDir), "info", "exclude")
+	data, err := g.ReadFile(p)
 	logReadError(p, err)
 	if err != nil {
 		return nil
@@ -139,38 +142,131 @@ func logReadError(path string, err error) {
 	}
 }
 
-// resolveGitDir returns the git directory for the repository rooted at repo.
-// In linked worktrees and submodules .git is a file holding a "gitdir:" line.
-func resolveGitDir(repo string) (string, bool) {
-	dotGit := filepath.Join(repo, ".git")
-	info, err := os.Stat(dotGit)
-	if err != nil {
-		logReadError(dotGit, err)
-		return "", false
-	}
-	if info.IsDir() {
-		return dotGit, true
-	}
+// gitFS is the filesystem a git directory is looked up in: the host
+// filesystem, or a walked fs.FS that has no host path.
+type gitFS interface {
+	Stat(name string) (fs.FileInfo, error)
+	ReadFile(name string) ([]byte, error)
+	Join(elem ...string) string
+	// Resolve resolves a path read from a .git or commondir file against
+	// base, reporting false when it cannot be reached.
+	Resolve(base, target string) (string, bool)
+}
 
-	data, err := os.ReadFile(dotGit)
+// osGitFS looks git directories up on the host filesystem.
+type osGitFS struct{}
+
+func (osGitFS) Stat(name string) (fs.FileInfo, error) { return os.Stat(name) }
+func (osGitFS) ReadFile(name string) ([]byte, error)  { return os.ReadFile(name) }
+func (osGitFS) Join(elem ...string) string            { return filepath.Join(elem...) }
+func (osGitFS) Resolve(base, target string) (string, bool) {
+	return resolveRelative(base, target), true
+}
+
+// subGitFS looks git directories up within a walked fs.FS. Paths that leave
+// it, absolute or through "..", cannot be followed.
+type subGitFS struct{ fsys fs.FS }
+
+func (g subGitFS) Stat(name string) (fs.FileInfo, error) { return fs.Stat(g.fsys, name) }
+func (g subGitFS) ReadFile(name string) ([]byte, error)  { return fs.ReadFile(g.fsys, name) }
+func (subGitFS) Join(elem ...string) string              { return path.Join(elem...) }
+func (subGitFS) Resolve(base, target string) (string, bool) {
+	target = filepath.ToSlash(target)
+	if path.IsAbs(target) || filepath.IsAbs(target) {
+		return "", false
+	}
+	p := path.Join(base, target)
+	return p, fs.ValidPath(p)
+}
+
+// resolveGitDir returns the git directory for the repository rooted at the
+// absolute path repo, reporting false when repo is not a repository root.
+func resolveGitDir(repo string) (string, bool) {
+	return findGitDir(osGitFS{}, repo)
+}
+
+// findGitDir returns the git directory of the repository rooted at repo. Like
+// git, it accepts a .git directory only when it looks like a git directory,
+// and a .git file only when its "gitdir:" line, as used by linked worktrees
+// and submodules, points at one. Anything else named .git is not a repository.
+func findGitDir(g gitFS, repo string) (string, bool) {
+	dotGit := g.Join(repo, ".git")
+	info, err := g.Stat(dotGit)
 	if err != nil {
 		logReadError(dotGit, err)
 		return "", false
 	}
-	line := strings.TrimSpace(strings.SplitN(string(data), "\n", 2)[0])
-	target, ok := strings.CutPrefix(line, "gitdir:")
-	if !ok {
-		slog.Debug("Ignoring .git file without a gitdir line", "path", dotGit)
+	gitDir := dotGit
+	if !info.IsDir() {
+		data, err := g.ReadFile(dotGit)
+		if err != nil {
+			logReadError(dotGit, err)
+			return "", false
+		}
+		line := strings.TrimSpace(strings.SplitN(string(data), "\n", 2)[0])
+		target, ok := strings.CutPrefix(line, "gitdir:")
+		target = strings.TrimSpace(target)
+		if !ok || target == "" {
+			slog.Debug("Ignoring .git file without a gitdir line", "path", dotGit)
+			return "", false
+		}
+		if gitDir, ok = g.Resolve(repo, target); !ok {
+			slog.Debug("Ignoring .git file whose gitdir cannot be followed", "path", dotGit)
+			return "", false
+		}
+	}
+	if !isGitDir(g, gitDir) {
+		slog.Debug("Ignoring .git that is not a valid git directory", "path", dotGit, "gitdir", gitDir)
 		return "", false
 	}
-	return resolveRelative(repo, strings.TrimSpace(target)), true
+	return gitDir, true
+}
+
+// isGitDir reports whether dir looks like a git directory, following git's
+// is_git_directory: a valid HEAD, and objects and refs directories in the
+// directory shared by all worktrees.
+func isGitDir(g gitFS, dir string) bool {
+	head, err := g.ReadFile(g.Join(dir, "HEAD"))
+	if err != nil || !validHead(head) {
+		return false
+	}
+	common := commonDir(g, dir)
+	for _, name := range []string{"objects", "refs"} {
+		info, err := g.Stat(g.Join(common, name))
+		if err != nil || !info.IsDir() {
+			return false
+		}
+	}
+	return true
+}
+
+// validHead reports whether data is a HEAD git accepts: a symbolic ref into
+// refs/, or a detached object id.
+func validHead(data []byte) bool {
+	s := strings.TrimSpace(string(data))
+	if ref, ok := strings.CutPrefix(s, "ref:"); ok {
+		return strings.HasPrefix(strings.TrimSpace(ref), "refs/")
+	}
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	for _, c := range s {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", c) {
+			return false
+		}
+	}
+	return true
 }
 
 // commonGitDir returns the directory shared by all worktrees of gitDir,
 // which holds info/exclude. Without a commondir file it is gitDir itself.
 func commonGitDir(gitDir string) string {
-	p := filepath.Join(gitDir, "commondir")
-	data, err := os.ReadFile(p)
+	return commonDir(osGitFS{}, gitDir)
+}
+
+func commonDir(g gitFS, gitDir string) string {
+	p := g.Join(gitDir, "commondir")
+	data, err := g.ReadFile(p)
 	if err != nil {
 		logReadError(p, err)
 		return gitDir
@@ -179,7 +275,10 @@ func commonGitDir(gitDir string) string {
 	if common == "" {
 		return gitDir
 	}
-	return resolveRelative(gitDir, common)
+	if resolved, ok := g.Resolve(gitDir, common); ok {
+		return resolved
+	}
+	return gitDir
 }
 
 // resolveRelative resolves target against base the way the filesystem does.
@@ -222,11 +321,12 @@ func ancestorRoot(dir string) (root string, isRepo, ok bool) {
 	return cwd, false, true
 }
 
-// findRepoRoot returns the nearest directory at or above dir that holds a
-// .git entry. In a linked worktree .git is a file, which still marks the root.
+// findRepoRoot returns the nearest directory at or above dir that is a git
+// repository root, see findGitDir. In a linked worktree .git is a file, which
+// still marks the root.
 func findRepoRoot(dir string) (string, bool) {
 	for {
-		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+		if _, ok := resolveGitDir(dir); ok {
 			return dir, true
 		}
 		parent := filepath.Dir(dir)
