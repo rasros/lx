@@ -6,11 +6,15 @@ skeleton/main.groovy (27 rows, definitions)
 class Animal {
     String name
     String species // taxonomy
+...
     // Make the animal speak.
     def speak() {
+...
 }
+...
 // Standalone increment.
 def standalone(x) {
+...
 /* Combine two values. */
 def combine(
     x,

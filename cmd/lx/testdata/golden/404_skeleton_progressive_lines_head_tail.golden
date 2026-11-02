@@ -4,7 +4,7 @@
 ```go
 // Person represents a named individual.
 type Person struct {
-... (13 rows skipped)
+... (23 rows skipped)
 func (p Person) Greet() string {
 ```
 

@@ -6,6 +6,7 @@ skeleton/main.groovy (27 rows, type definitions)
 class Animal {
     String name
     String species // taxonomy
+...
 }
 ```
 

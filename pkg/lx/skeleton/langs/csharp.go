@@ -7,17 +7,17 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-func CSharpEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func CSharpEmitClass(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	body := n.ChildByFieldName("body", lang)
 	if body == nil {
 		body = findChildByType(n, "declaration_list", lang)
 	}
 	if body == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		if csIsPrivate(child, src, lang) {
@@ -37,7 +37,7 @@ func CSharpEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }

@@ -5,11 +5,15 @@ skeleton/main.jsx (24 rows, definitions)
 /* Card component with a title. */
 export class Card extends React.Component {
     title = "default"; // fallback title
+...
     // Render the card.
     render() {
+...
 }
+...
 /** Create a card element. */
 export function makeCard(name) {
+...
 // Build a card with explicit name and title.
 export function buildCard(
     name,

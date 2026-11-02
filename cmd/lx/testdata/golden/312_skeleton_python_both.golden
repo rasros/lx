@@ -4,10 +4,14 @@ skeleton/main.py (31 rows, definitions)
 ```python
 class Animal:
     """Base class for all animals."""
+...
     species = "unknown"
+...
     def speak(self):
         """Return the animal's sound."""
+...
 def top_level():
+...
 # factory helper
 def create(
     name: str,

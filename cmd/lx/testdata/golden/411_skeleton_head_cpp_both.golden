@@ -4,6 +4,7 @@ skeleton/main.cpp (24 rows, definitions)
 ```cpp
 // UI widget with a single integer value.
 class Widget {
+...
     int value; // current value
 ```
 

@@ -4,12 +4,14 @@ skeleton/main.c (21 rows, function signatures)
 ```c
 // Add two integers and return the sum.
 int add(int a, int b) {
+...
 /* Subtract b from a over
    multiple lines. */
 int subtract(
     int a,
     int b
 ) {
+...
 void greet(const char *name); // forward declaration
 ```
 

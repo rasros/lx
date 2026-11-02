@@ -4,7 +4,7 @@ skeleton/main.php (41 rows, definitions)
 ```php
 /** Geometric shape contract. */
 interface Shape {
-... (20 rows skipped)
+... (35 rows skipped)
 ): int {
 ```
 

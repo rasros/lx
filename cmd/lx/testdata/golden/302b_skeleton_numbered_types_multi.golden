@@ -1,0 +1,72 @@
+--- STDOUT ---
+[1/4] skeleton/main.go (32 rows, type definitions)
+---
+```go
+ 3: // Person represents a named individual.
+ 4: type Person struct {
+ 5: 	Name string
+...
+ 7: }
+...
+ 9: /* Worker defines the work contract. */
+10: type Worker interface {
+...
+13: }
+```
+
+[2/4] skeleton/main.py (31 rows, type definitions)
+---
+```python
+ 4: class Animal:
+ 5:     """Base class for all animals."""
+...
+ 7:     species = "unknown"
+```
+
+[3/4] skeleton/main.ts (45 rows, type definitions)
+---
+```typescript
+ 1: /** Geometric shape contract. */
+ 2: export interface Shape {
+ 3:     area(): number;
+ 4:     name: string; // display label
+ 5: }
+...
+ 7: /**
+ 8:  * Immutable 2-D point.
+ 9:  */
+10: export class Point {
+11:     public x: number;
+12:     public y: number;
+...
+27: }
+```
+
+[4/4] skeleton/main.rs (44 rows, type definitions)
+---
+```rust
+ 1: /// A registered user with a public name.
+ 2: pub struct User {
+ 3:     pub name: String,
+...
+ 5: }
+...
+ 7: // Possible roles for a user.
+ 8: pub enum Role {
+ 9:     Admin,
+10:     User,
+11: }
+...
+13: /// Greeting behaviour.
+14: pub trait Greet {
+...
+16: }
+...
+18: /* User method implementations. */
+19: impl User {
+...
+29: }
+```
+
+
+--- STDERR ---

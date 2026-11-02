@@ -4,6 +4,7 @@ skeleton/main.dart (30 rows, function signatures)
 ```dart
 /* Greet a person by name. */
 String greet(String name) {
+...
 /// Combine name and greeting.
 String combine(
   String name,

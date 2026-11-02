@@ -9,13 +9,20 @@ import (
 )
 
 // LineNumberFormatter prefixes each line of a head, gap and tail with its row
-// number. Tail rows are counted back from TotalRows; when that count is an
-// estimate, Approximate marks each tail number with "~" so it is not mistaken
-// for an exact position.
+// number. By default head rows count up from 1 and tail rows are counted back
+// from TotalRows; when that count is an estimate, Approximate marks each tail
+// number with "~" so it is not mistaken for an exact position.
+//
+// HeadRows and TailRows, when set, give the number of each line of Head and
+// Tail instead, for text whose lines are not consecutive rows, such as a
+// skeleton. A 0 leaves that line unnumbered, as the Gap is. Explicit numbers
+// are exact, so Approximate does not mark them.
 type LineNumberFormatter struct {
 	Head        []byte
 	Gap         []byte
 	Tail        []byte
+	HeadRows    []int
+	TailRows    []int
 	TotalRows   int
 	Approximate bool
 }
@@ -33,11 +40,19 @@ func (lnf LineNumberFormatter) String() string {
 }
 
 func (lnf LineNumberFormatter) writeTo(out io.Writer) {
-	width := 1
-	if lnf.TotalRows > 9 {
-		width = int(math.Log10(float64(lnf.TotalRows))) + 1
+	maxRow := lnf.TotalRows
+	for _, r := range lnf.HeadRows {
+		maxRow = max(maxRow, r)
 	}
-	if lnf.Approximate && len(lnf.Tail) > 0 {
+	for _, r := range lnf.TailRows {
+		maxRow = max(maxRow, r)
+	}
+	width := 1
+	if maxRow > 9 {
+		width = int(math.Log10(float64(maxRow))) + 1
+	}
+	approximate := lnf.Approximate && lnf.TailRows == nil
+	if approximate && len(lnf.Tail) > 0 {
 		width++ // room for the "~" on tail numbers, so the columns line up
 	}
 
@@ -45,18 +60,31 @@ func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 	spaces := []byte("          ")
 	colon := []byte(": ")
 
-	printChunk := func(data []byte, startRow int, mark []byte) {
+	// printChunk numbers the lines of data from startRow up, or by rows when
+	// that is set.
+	printChunk := func(data []byte, startRow int, rows []int, mark []byte) {
 		currentRow := startRow
 		offset := 0
 		write := func(b []byte) { out.Write(b) }
 
-		for offset < len(data) {
+		for line := 0; offset < len(data); line++ {
 			idx := bytes.IndexByte(data[offset:], '\n')
 			end := offset + idx
 			if idx == -1 {
 				end = len(data)
 			} else {
 				end++
+			}
+
+			if rows != nil {
+				if line < len(rows) {
+					currentRow = rows[line]
+				}
+				if currentRow <= 0 {
+					write(data[offset:end])
+					offset = end
+					continue
+				}
 			}
 
 			numBuf = strconv.AppendInt(numBuf[:0], int64(currentRow), 10)
@@ -79,7 +107,7 @@ func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 	}
 
 	if len(lnf.Head) > 0 {
-		printChunk(lnf.Head, 1, nil)
+		printChunk(lnf.Head, 1, lnf.HeadRows, nil)
 	}
 
 	if len(lnf.Gap) > 0 {
@@ -93,34 +121,16 @@ func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 			startRow = 1
 		}
 		var mark []byte
-		if lnf.Approximate {
+		if approximate {
 			mark = []byte("~")
 		}
-		printChunk(lnf.Tail, startRow, mark)
+		printChunk(lnf.Tail, startRow, lnf.TailRows, mark)
 	}
 }
 
 // SplitLines splits src into lines on \n boundaries.
 func SplitLines(src []byte) [][]byte {
 	return bytes.Split(src, []byte("\n"))
-}
-
-// AppendLines appends lines[from..to] (inclusive) to out, each followed by \n.
-func AppendLines(out []byte, lines [][]byte, from, to int) []byte {
-	for i := from; i <= to && i < len(lines); i++ {
-		out = append(out, lines[i]...)
-		out = append(out, '\n')
-	}
-	return out
-}
-
-// AppendLine appends lines[row] to out followed by \n.
-func AppendLine(out []byte, lines [][]byte, row int) []byte {
-	if row >= 0 && row < len(lines) {
-		out = append(out, lines[row]...)
-		out = append(out, '\n')
-	}
-	return out
 }
 
 func CountLines(data []byte) int {

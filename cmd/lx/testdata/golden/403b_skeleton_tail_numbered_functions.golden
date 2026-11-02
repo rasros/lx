@@ -1,0 +1,20 @@
+--- STDOUT ---
+[1/2] skeleton/main.go (32 rows, function signatures)
+---
+```go
+23: 	role string,
+24: ) Person {
+...
+28: func (p Person) Greet() string {
+```
+
+[2/2] skeleton/main.py (31 rows, function signatures)
+---
+```python
+25:     name: str,
+26:     tag: str = "default",
+27: ) -> "Animal":
+```
+
+
+--- STDERR ---

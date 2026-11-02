@@ -4,7 +4,9 @@ skeleton/main.scala (37 rows, type definitions)
 ```scala
 /** Geometric shape abstraction. */
 trait Shape {
+...
 }
+...
 /**
  * Immutable 2-D point.
  *
@@ -13,10 +15,13 @@ trait Shape {
  */
 case class Point(x: Double, y: Double) {
     val label: String = "" // display label
+...
 }
+...
 // Singleton calculator.
 object Calculator {
     val Max: Int = 100
+...
 }
 ```
 

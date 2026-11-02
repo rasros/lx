@@ -3,6 +3,7 @@ package skeleton
 import (
 	"github.com/odvcencio/gotreesitter"
 	"github.com/odvcencio/gotreesitter/grammars"
+	"github.com/rasros/lx/pkg/lx/internal"
 	"github.com/rasros/lx/pkg/lx/skeleton/langs"
 )
 
@@ -22,8 +23,8 @@ type langDef struct {
 
 	funcVisible func(node *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool
 
-	emitFunc   func(out, src []byte, lines [][]byte, node *gotreesitter.Node, lang *gotreesitter.Language) []byte
-	emitStruct func(out, src []byte, lines [][]byte, node *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte
+	emitFunc   func(out []internal.LineRange, src []byte, lines [][]byte, node *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange
+	emitStruct func(out []internal.LineRange, src []byte, lines [][]byte, node *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange
 }
 
 var langDefs = map[string]langDef{

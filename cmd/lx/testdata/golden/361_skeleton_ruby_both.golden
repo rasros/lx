@@ -6,11 +6,16 @@ skeleton/main.rb (37 rows, definitions)
 class Animal
   attr_reader :name
   MAX = 100 # class constant
+...
   def initialize(name)
+...
   # Make the animal speak.
   def speak
+...
 end
+...
 def standalone(x)
+...
 # Combine two values.
 def combine(
   x,

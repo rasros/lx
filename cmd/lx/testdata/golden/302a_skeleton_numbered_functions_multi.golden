@@ -1,0 +1,59 @@
+--- STDOUT ---
+[1/4] skeleton/main.go (32 rows, function signatures)
+---
+```go
+15: // NewPerson creates a Person with the given name.
+16: func NewPerson(name string) Person {
+...
+20: // NewWorker creates a worker with name and role.
+21: func NewWorker(
+22: 	name string,
+23: 	role string,
+24: ) Person {
+...
+28: func (p Person) Greet() string {
+```
+
+[2/4] skeleton/main.py (31 rows, function signatures)
+---
+```python
+20: def top_level():
+...
+23: # factory helper
+24: def create(
+25:     name: str,
+26:     tag: str = "default",
+27: ) -> "Animal":
+```
+
+[3/4] skeleton/main.ts (45 rows, function signatures)
+---
+```typescript
+29: // Top-level utility.
+30: export function topLevel(x: number): number {
+...
+34: /** Combine two numbers. */
+35: export function combine(
+36:     x: number,
+37:     y: number,
+38: ): number {
+...
+42: // Arrow function handler.
+43: export const handler = async (req: Request): Promise<void> => {
+```
+
+[4/4] skeleton/main.rs (44 rows, function signatures)
+---
+```rust
+31: /// Create a User from a name alone.
+32: pub fn create(name: String) -> User {
+...
+36: /// Create a User with both fields.
+37: pub fn combine(
+38:     name: String,
+39:     email: String,
+40: ) -> User {
+```
+
+
+--- STDERR ---

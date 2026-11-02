@@ -17,7 +17,9 @@ lx -u -Y -i '*.{ts,tsx}' -e 'node_modules/' web/ # combining filters
 
 Skeletons (`-u` functions, `-Y` types) cover 19 languages (Go, Python,
 TypeScript, Java, Rust, C/C++, …); other file types pass through unchanged.
-Find the declaration you care about, then Read its body.
+Find the declaration you care about, then Read its body. A `...` line marks
+left-out code; with `-l` skeleton lines keep their source line numbers, so the
+number is where to Read from.
 
 `-i`/`-e` are repeatable and additive; excludes win on conflict. Patterns
 match basenames and full paths; a trailing slash matches directories, so

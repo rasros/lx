@@ -1,3 +1,8 @@
+// Package langs holds the per-language skeleton emitters. An emitter does not
+// write text: it appends the source rows it keeps to out as
+// internal.LineRanges, in any order and overlapping freely, and the skeleton
+// package merges them and renders the text, so every kept line still knows
+// its source row.
 package langs
 
 import (
@@ -37,11 +42,13 @@ func hasDescendantOfType(n *gotreesitter.Node, typ string, lang *gotreesitter.La
 	return false
 }
 
-// EmitFuncSig appends a function signature (without body) to out.
-func EmitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string, singleLineSig bool) []byte {
+// EmitFuncSig appends the rows of a function signature (without body) to out.
+// A body that starts and ends on the signature's own line is cut from it,
+// keeping an opening brace.
+func EmitFuncSig(out []internal.LineRange, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string, singleLineSig bool) []internal.LineRange {
 	startRow := int(n.StartPoint().Row)
 	if singleLineSig {
-		return internal.AppendLine(out, lines, startRow)
+		return internal.KeepLine(out, lines, startRow)
 	}
 
 	body := n.ChildByFieldName("body", lang)
@@ -49,7 +56,7 @@ func EmitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotrees
 		body = findChildByType(n, bodyChildType, lang)
 	}
 	if body == nil {
-		return internal.AppendLines(out, lines, startRow, int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, startRow, int(n.EndPoint().Row))
 	}
 
 	bodyStartRow := int(body.StartPoint().Row)
@@ -67,16 +74,14 @@ func EmitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotrees
 		if col < len(line) && line[col] == '{' {
 			endCol = col + 1
 		}
-		out = append(out, line[:endCol]...)
-		out = append(out, '\n')
-		return out
+		return internal.KeepPrefix(out, lines, startRow, endCol)
 	}
 
 	endRow := bodyStartRow
 	if indentBody {
 		endRow = sigEndRow(n, body, lang, startRow)
 	}
-	return internal.AppendLines(out, lines, startRow, endRow)
+	return internal.KeepLines(out, lines, startRow, endRow)
 }
 
 // sigEndRow returns the last row of n's signature, skipping any comment
@@ -100,14 +105,14 @@ func sigEndRow(n, body *gotreesitter.Node, lang *gotreesitter.Language, startRow
 	return end
 }
 
-func emitFuncSig(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string) []byte {
+func emitFuncSig(out []internal.LineRange, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string) []internal.LineRange {
 	return EmitFuncSig(out, lines, n, lang, indentBody, bodyChildType, false)
 }
 
 // EmitDecorators appends the decorator/annotation lines in [fromRow, sigRow-1].
-func EmitDecorators(out []byte, lines [][]byte, fromRow, sigRow int) []byte {
+func EmitDecorators(out []internal.LineRange, lines [][]byte, fromRow, sigRow int) []internal.LineRange {
 	if fromRow < sigRow {
-		return internal.AppendLines(out, lines, fromRow, sigRow-1)
+		return internal.KeepLines(out, lines, fromRow, sigRow-1)
 	}
 	return out
 }

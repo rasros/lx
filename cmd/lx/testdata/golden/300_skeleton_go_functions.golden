@@ -4,11 +4,13 @@ skeleton/main.go (32 rows, function signatures)
 ```go
 // NewPerson creates a Person with the given name.
 func NewPerson(name string) Person {
+...
 // NewWorker creates a worker with name and role.
 func NewWorker(
 	name string,
 	role string,
 ) Person {
+...
 func (p Person) Greet() string {
 ```
 

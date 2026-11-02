@@ -3,7 +3,7 @@ skeleton/main.py (31 rows, definitions)
 ---
 ```python
 class Animal:
-... (9 rows skipped)
+... (22 rows skipped)
 ) -> "Animal":
 ```
 

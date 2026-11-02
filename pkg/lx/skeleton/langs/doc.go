@@ -43,31 +43,31 @@ func LeadingDocStart(lines [][]byte, row int) int {
 }
 
 // EmitWithDoc appends [LeadingDocStart(lines, startRow) .. endRow] to out.
-func EmitWithDoc(out []byte, lines [][]byte, startRow, endRow int) []byte {
-	return internal.AppendLines(out, lines, LeadingDocStart(lines, startRow), endRow)
+func EmitWithDoc(out []internal.LineRange, lines [][]byte, startRow, endRow int) []internal.LineRange {
+	return internal.KeepLines(out, lines, LeadingDocStart(lines, startRow), endRow)
 }
 
 // EmitLineWithDoc appends the leading doc block plus row itself.
-func EmitLineWithDoc(out []byte, lines [][]byte, row int) []byte {
+func EmitLineWithDoc(out []internal.LineRange, lines [][]byte, row int) []internal.LineRange {
 	return EmitWithDoc(out, lines, row, row)
 }
 
 // EmitLeadingDoc appends only the leading doc block above row, if any.
-func EmitLeadingDoc(out []byte, lines [][]byte, row int) []byte {
+func EmitLeadingDoc(out []internal.LineRange, lines [][]byte, row int) []internal.LineRange {
 	docStart := LeadingDocStart(lines, row)
 	if docStart < row {
-		return internal.AppendLines(out, lines, docStart, row-1)
+		return internal.KeepLines(out, lines, docStart, row-1)
 	}
 	return out
 }
 
 // AppendPyDocstring appends the Python docstring (if any) of n's body to out.
-func AppendPyDocstring(out []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []byte {
+func AppendPyDocstring(out []internal.LineRange, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
 	start, end := PyDocstring(n, lang)
 	if start < 0 {
 		return out
 	}
-	return internal.AppendLines(out, lines, start, end)
+	return internal.KeepLines(out, lines, start, end)
 }
 
 // PyDocstring returns the row range of a Python docstring (the first string

@@ -6,12 +6,17 @@ skeleton/main.dart (30 rows, definitions)
 class Animal {
   final String name;
   final String species; // taxonomy
+...
   Animal(this.name, this.species);
+...
   // Make the animal speak.
   String speak() {
+...
 }
+...
 /* Greet a person by name. */
 String greet(String name) {
+...
 /// Combine name and greeting.
 String combine(
   String name,

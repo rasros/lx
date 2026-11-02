@@ -6,11 +6,15 @@ skeleton/Main.java (35 rows, definitions)
  * Simple calculator with a running value.
  */
 public class Calculator {
+...
     public static final int MAX = 100; // upper bound
+...
     /** Initialise with a starting value. */
     public Calculator(int initial) {
+...
     // Add x to the current value.
     public int add(int x) {
+...
     /**
      * Combine value with two operands.
      *
@@ -21,6 +25,7 @@ public class Calculator {
         int x,
         int y
     ) {
+...
 }
 ```
 

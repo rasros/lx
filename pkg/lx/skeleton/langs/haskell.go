@@ -5,6 +5,6 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-func HaskellEmitType(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
-	return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+func HaskellEmitType(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
+	return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 }

@@ -265,22 +265,53 @@ func detectContent(path string, reader io.ReaderAt, scratch []byte) (isBinary bo
 	return internal.IsBinary(scratch[:n]), internal.DetectLanguage(path, scratch[:n])
 }
 
-// applySkeleton reduces source to signatures and definitions. Unlike a
-// converter it runs after detection, because it needs the detected language. It
-// also reports the pre-filter row count, so headers can describe the whole file.
-func applySkeleton(cfg core.RunnerConfig, lang string, reader io.ReaderAt, size int64, isBinary, isImage bool) (io.ReaderAt, int64, string, int) {
+// skeletonView is a file reduced to its skeleton: the lines kept from the
+// source, each with the source row it came from.
+type skeletonView struct {
+	lines internal.KeptLines
+	rows  int    // rows in the whole source, which the header reports
+	mode  string // what the skeleton shows, for the header
+}
+
+// applySkeleton reduces source to signatures and definitions, or returns nil
+// when the file is not reduced. Unlike a converter it runs after detection,
+// because it needs the detected language.
+func applySkeleton(cfg core.RunnerConfig, lang string, reader io.ReaderAt, size int64, isBinary, isImage bool) *skeletonView {
 	if isBinary || isImage || (!cfg.SkeletonFunctions && !cfg.SkeletonTypes) || !skeleton.Supported(lang) {
-		return reader, size, "", -1
+		return nil
 	}
 
 	allData := make([]byte, size)
 	if _, err := reader.ReadAt(allData, 0); err != nil {
-		return reader, size, "", -1
+		return nil
 	}
 
-	filtered := skeleton.Extract(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes)
-	return bytes.NewReader(filtered), int64(len(filtered)),
-		skeletonModeLabel(cfg.SkeletonFunctions, cfg.SkeletonTypes), internal.CountLines(allData)
+	return &skeletonView{
+		lines: skeleton.Keep(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes),
+		rows:  internal.CountLines(allData),
+		mode:  skeletonModeLabel(cfg.SkeletonFunctions, cfg.SkeletonTypes),
+	}
+}
+
+// skeletonSlices cuts what cfg asks for from a skeleton. Head and tail count
+// skeleton lines, as they count the lines of any other content, but each line
+// keeps its source row, and the gap between them counts the source rows it
+// leaves out, the same rows the header and line numbers count.
+func skeletonSlices(sk *skeletonView, cfg core.RunnerConfig) excerpt {
+	n := sk.lines.Len()
+	sl := excerpt{rows: sk.rows, exact: true}
+	head, tail := cfg.Head, max(cfg.Tail, 0)
+	if head < 0 || head+tail >= n {
+		sl.head, sl.headRows = sk.lines.Render(0, n)
+		return sl
+	}
+	sl.head, sl.headRows = sk.lines.Render(0, head)
+	sl.tail, sl.tailRows = sk.lines.Render(n-tail, n)
+	if head > 0 && tail > 0 {
+		skipped := sk.lines.Rows[n-tail] - sk.lines.Rows[head-1] - 1
+		sl.gap = []byte(fmt.Sprintf("... (%d rows skipped)\n", skipped))
+	}
+	return sl
 }
 
 // imageDataURI encodes the image from the bytes already open here. Reading them
@@ -347,7 +378,12 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	isImage := format.IsImage() && verified && !converted
 	cfg := file.Config
 
-	reader, size, skeletonMode, originalRows := applySkeleton(cfg, lang, reader, size, isBinary, isImage)
+	skel := applySkeleton(cfg, lang, reader, size, isBinary, isImage)
+	var skeletonMode string
+	if skel != nil {
+		skeletonMode = skel.mode
+		size = int64(len(skel.lines.Text()))
+	}
 
 	var dataURI string
 	if isImage && p.engine.EmbedImages {
@@ -361,7 +397,15 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		totalRows    int
 		rowsAreExact = true
 	)
-	if !isBinary && !isImage {
+	switch {
+	case skel != nil:
+		// The header reports the whole source's rows, which line numbers and
+		// gaps count too.
+		totalRows = skel.rows
+		if !isCompact {
+			content = formatContent(skeletonSlices(skel, cfg), cfg.LineNumbers)
+		}
+	case !isBinary && !isImage:
 		lines := internal.NewLineSource(reader, size)
 		var sl excerpt
 		if isCompact {
@@ -379,20 +423,13 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		}
 	}
 
-	// In skeleton mode the header should report the original file's row
-	// count, not the filtered output's; slicing still uses totalRows.
-	displayRows, displayExact := totalRows, rowsAreExact
-	if originalRows >= 0 {
-		displayRows, displayExact = originalRows, true
-	}
-
 	fCtx := core.FileContext{
 		Path:          file.Path,
 		AbsPath:       file.AbsPath,
 		Size:          size,
 		OriginalSize:  file.Size,
-		TotalRows:     displayRows,
-		IsEstimate:    !displayExact,
+		TotalRows:     totalRows,
+		IsEstimate:    !rowsAreExact,
 		Language:      lang,
 		Content:       content,
 		IsBinary:      isBinary,
@@ -414,6 +451,10 @@ type excerpt struct {
 	head, gap, tail []byte
 	rows            int  // lines in the whole file
 	exact           bool // whether rows is a count rather than an estimate
+
+	// headRows and tailRows number the lines of head and tail when they are
+	// not consecutive rows, as in a skeleton; nil numbers them in sequence.
+	headRows, tailRows []int
 }
 
 // readSlices reads what cfg asks for from lines. A head and tail that meet or
@@ -479,6 +520,8 @@ func formatContent(sl excerpt, lineNumbers bool) string {
 			Head:        sl.head,
 			Gap:         sl.gap,
 			Tail:        sl.tail,
+			HeadRows:    sl.headRows,
+			TailRows:    sl.tailRows,
 			TotalRows:   sl.rows,
 			Approximate: !sl.exact,
 		}.String()

@@ -6,7 +6,9 @@ skeleton/Main.java (35 rows, type definitions)
  * Simple calculator with a running value.
  */
 public class Calculator {
+...
     public static final int MAX = 100; // upper bound
+...
 }
 ```
 

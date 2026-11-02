@@ -17,22 +17,24 @@ var (
 	parserInitMu   sync.Mutex
 )
 
-func extract(langName string, src []byte, functions, structs bool) (out []byte) {
+// extract returns the rows of src that make up its skeleton, unmerged, or
+// ok=false when src cannot be parsed.
+func extract(langName string, src []byte, functions, structs bool) (out []internal.LineRange, ok bool) {
 	defer func() {
 		if r := recover(); r != nil {
-			out = src
+			out, ok = nil, false
 		}
 	}()
 
-	def, ok := langDefs[langName]
-	if !ok {
-		return src
+	def, found := langDefs[langName]
+	if !found {
+		return nil, false
 	}
 	pool, lang := parserPoolFor(langName, def.newLang)
 
 	tree, err := pool.Parse(src)
 	if err != nil {
-		return src
+		return nil, false
 	}
 	defer tree.Release()
 
@@ -42,7 +44,7 @@ func extract(langName string, src []byte, functions, structs bool) (out []byte) 
 	for i := 0; i < root.ChildCount(); i++ {
 		out = def.processNode(root.Child(i), out, src, lines, lang, functions, structs)
 	}
-	return out
+	return out, true
 }
 
 func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*gotreesitter.ParserPool, *gotreesitter.Language) {
@@ -68,7 +70,7 @@ func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*got
 	return rt.pool, rt.lang
 }
 
-func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines [][]byte, lang *gotreesitter.Language, functions, structs bool) []byte {
+func (def *langDef) processNode(node *gotreesitter.Node, out []internal.LineRange, src []byte, lines [][]byte, lang *gotreesitter.Language, functions, structs bool) []internal.LineRange {
 	nodeType := node.Type(lang)
 
 	if len(def.iterateChildren) > 0 && containsStr(def.iterateChildren, nodeType) {
@@ -109,12 +111,8 @@ func (def *langDef) processNode(node *gotreesitter.Node, out, src []byte, lines 
 	return out
 }
 
-func prependDoc(out []byte, lines [][]byte, startRow int) []byte {
-	docStart := langs.LeadingDocStart(lines, startRow)
-	if docStart < startRow {
-		return internal.AppendLines(out, lines, docStart, startRow-1)
-	}
-	return out
+func prependDoc(out []internal.LineRange, lines [][]byte, startRow int) []internal.LineRange {
+	return langs.EmitLeadingDoc(out, lines, startRow)
 }
 
 func containsStr(ss []string, s string) bool {

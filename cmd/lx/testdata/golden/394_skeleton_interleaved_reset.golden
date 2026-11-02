@@ -4,10 +4,14 @@
 ```python
 class Animal:
     """Base class for all animals."""
+...
     species = "unknown"
+...
     def speak(self):
         """Return the animal's sound."""
+...
 def top_level():
+...
 # factory helper
 def create(
     name: str,
@@ -19,6 +23,7 @@ def create(
 ---
 ```python
 def top_level():
+...
 # factory helper
 def create(
     name: str,
