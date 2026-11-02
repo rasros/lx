@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/rasros/lx/internal/ansi"
 	"github.com/rasros/lx/internal/cli"
@@ -35,5 +37,14 @@ func runOS() error {
 	if err != nil {
 		return err
 	}
-	return cli.Run(context.Background(), os.Args[1:], env)
+	// The first interrupt or SIGTERM cancels the run, which then cleans up
+	// after itself, dropping a partial -o file and stopping profiling. A
+	// second one kills the process as usual.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+	return cli.Run(ctx, os.Args[1:], env)
 }
