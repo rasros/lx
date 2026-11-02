@@ -35,6 +35,16 @@ type Stream struct {
 
 	skippedBySize int
 	skeletons     bool
+	lastTree      builtTree
+}
+
+// builtTree remembers the last tree AddTree built, so tree ops over the same
+// files share it.
+type builtTree struct {
+	files    []sources.InputFile
+	maxSize  int64
+	admitted int
+	body     string
 }
 
 // workers is the worker count for executing the queued files.
@@ -114,10 +124,17 @@ func (s *Stream) AddPrompt(text string) *Stream {
 	return s
 }
 
-// AddTree enqueues a directory tree of the files Admit keeps under opts. The
-// files need not be added with AddFile, so a tree can stand in for content.
-// A tree with no admitted files is left out.
+// AddTree enqueues a directory tree of the files Admit keeps under opts; only
+// opts.MaxSize applies. The files need not be added with AddFile, so a tree can
+// stand in for content. A tree with no admitted files is left out. Repeated
+// calls with the same files slice and MaxSize share one built tree.
 func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *Stream {
+	if t := s.lastTree; len(files) > 0 && len(files) == len(t.files) &&
+		&files[0] == &t.files[0] && opts.MaxSize == t.maxSize {
+		slog.Debug("Adding tree", "files", t.admitted)
+		s.items = append(s.items, core.TreeContext{Body: t.body})
+		return s
+	}
 	var paths []string
 	for _, f := range files {
 		if s.Admit(f, opts) {
@@ -125,9 +142,12 @@ func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *St
 		}
 	}
 	if len(paths) == 0 {
+		slog.Debug("Skipping empty tree (no admitted files)")
 		return s
 	}
-	s.items = append(s.items, core.TreeContext{Body: buildTree(paths)})
+	s.lastTree = builtTree{files: files, maxSize: opts.MaxSize, admitted: len(paths), body: buildTree(paths)}
+	slog.Debug("Adding tree", "files", len(paths))
+	s.items = append(s.items, core.TreeContext{Body: s.lastTree.body})
 	return s
 }
 

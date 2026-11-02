@@ -213,7 +213,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 				}
 
 			case "tree", "tree-only":
-				slog.Debug("Adding tree", "files", len(section.treeFiles[oi]))
 				stream.AddTree(section.treeFiles[oi], section.Render)
 			case "section":
 				slog.Debug("Adding section", "title", op.Value)
