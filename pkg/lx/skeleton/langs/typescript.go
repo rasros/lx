@@ -8,21 +8,21 @@ import (
 )
 
 // TSEmitClassOrInterface emits skeleton for TypeScript/JavaScript class and interface declarations.
-func TSEmitClassOrInterface(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func TSEmitClassOrInterface(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	if n.Type(lang) == "interface_declaration" {
 		return tsEmitInterface(out, src, lines, n, lang)
 	}
 	return tsEmitClass(out, src, lines, n, lang, functions)
 }
 
-func tsEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func tsEmitClass(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	body := findChildByType(n, "class_body", lang)
 	if body == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		if tsIsPrivate(child, src, lang) {
@@ -41,22 +41,22 @@ func tsEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *go
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }
 
-func tsEmitInterface(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []byte {
+func tsEmitInterface(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
 	body := n.ChildByFieldName("body", lang)
 	if body == nil {
 		body = findChildByType(n, "interface_body", lang)
 	}
 	if body == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		switch child.Type(lang) {
@@ -65,7 +65,7 @@ func tsEmitInterface(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }
@@ -79,7 +79,7 @@ func tsIsPrivate(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) 
 }
 
 // TSEmitFunc handles top-level function_declaration and lexical_declaration (arrow/const functions).
-func TSEmitFunc(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []byte {
+func TSEmitFunc(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
 	if n.Type(lang) == "function_declaration" {
 		return emitFuncSig(out, lines, n, lang, false, "")
 	}
@@ -98,7 +98,7 @@ func TSEmitFunc(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *got
 	body := val.ChildByFieldName("body", lang)
 	startRow := int(n.StartPoint().Row)
 	if body != nil && body.Type(lang) == "statement_block" {
-		return internal.AppendLines(out, lines, startRow, int(body.StartPoint().Row))
+		return internal.KeepLines(out, lines, startRow, int(body.StartPoint().Row))
 	}
-	return internal.AppendLines(out, lines, startRow, int(n.EndPoint().Row))
+	return internal.KeepLines(out, lines, startRow, int(n.EndPoint().Row))
 }

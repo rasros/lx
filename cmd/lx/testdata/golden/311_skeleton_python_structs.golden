@@ -4,6 +4,7 @@ skeleton/main.py (31 rows, type definitions)
 ```python
 class Animal:
     """Base class for all animals."""
+...
     species = "unknown"
 ```
 

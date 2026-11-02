@@ -3,6 +3,7 @@ skeleton/main.go (32 rows, definitions)
 ---
 ```go
 ) Person {
+...
 func (p Person) Greet() string {
 ```
 

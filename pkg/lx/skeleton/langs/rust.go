@@ -14,7 +14,7 @@ func RustFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Langua
 	return false
 }
 
-func RustEmitItem(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func RustEmitItem(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	switch n.Type(lang) {
 	case "struct_item":
 		return rustEmitStruct(out, src, lines, n, lang)
@@ -35,14 +35,14 @@ func rustIsPublic(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language)
 	return false
 }
 
-func rustEmitStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []byte {
+func rustEmitStruct(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
 	fieldList := findChildByType(n, "field_declaration_list", lang)
 	if fieldList == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(fieldList.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < fieldList.ChildCount(); i++ {
 		child := fieldList.Child(i)
 		if child.Type(lang) == "field_declaration" && rustIsPublic(child, src, lang) {
@@ -50,19 +50,19 @@ func rustEmitStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang 
 		}
 	}
 	if closingRow := int(fieldList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }
 
-func rustEmitEnum(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []byte {
+func rustEmitEnum(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
 	variantList := findChildByType(n, "enum_variant_list", lang)
 	if variantList == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(variantList.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < variantList.ChildCount(); i++ {
 		child := variantList.Child(i)
 		if child.Type(lang) == "enum_variant" {
@@ -70,19 +70,19 @@ func rustEmitEnum(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *g
 		}
 	}
 	if closingRow := int(variantList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }
 
-func rustEmitTrait(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func rustEmitTrait(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	declList := findChildByType(n, "declaration_list", lang)
 	if declList == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(declList.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	if functions {
 		for i := 0; i < declList.ChildCount(); i++ {
 			child := declList.Child(i)
@@ -94,19 +94,19 @@ func rustEmitTrait(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		}
 	}
 	if closingRow := int(declList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }
 
-func rustEmitImpl(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func rustEmitImpl(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	declList := findChildByType(n, "declaration_list", lang)
 	if declList == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(declList.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	if functions {
 		for i := 0; i < declList.ChildCount(); i++ {
 			child := declList.Child(i)
@@ -117,7 +117,7 @@ func rustEmitImpl(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *g
 		}
 	}
 	if closingRow := int(declList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }

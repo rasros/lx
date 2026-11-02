@@ -5,8 +5,10 @@ skeleton/deco.py (12 rows, definitions)
 @dataclass
 class Config:
     name: str
+...
     @property
     def label(self) -> str:
+...
 @cache
 def load() -> Config:
 ```

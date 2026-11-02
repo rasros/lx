@@ -14,7 +14,7 @@ func CppFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Languag
 	return true
 }
 
-func CppEmitClassOrStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func CppEmitClassOrStruct(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	if n.Type(lang) == "type_definition" {
 		return CEmitTypedef(out, src, lines, n, lang, functions)
 	}
@@ -25,7 +25,7 @@ func CppEmitClassOrStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node,
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(fieldList.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 
 	isPrivateSection := n.Type(lang) == "class_specifier"
 
@@ -59,7 +59,7 @@ func CppEmitClassOrStruct(out, src []byte, lines [][]byte, n *gotreesitter.Node,
 		}
 	}
 	if closingRow := int(fieldList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }

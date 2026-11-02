@@ -4,6 +4,7 @@ skeleton/main.hs (20 rows, type definitions)
 ```haskell
 -- | Animals supported by the system.
 data Animal = Dog | Cat
+...
 {- A newtype wrapper for names.
    Avoids mixing up plain strings. -}
 newtype Name = Name String

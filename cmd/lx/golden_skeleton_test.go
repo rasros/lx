@@ -9,6 +9,8 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "300_skeleton_go_functions", args: []string{"-u", "skeleton/main.go"}},
 		{name: "301_skeleton_go_structs", args: []string{"-Y", "skeleton/main.go"}},
 		{name: "302_skeleton_go_both", args: []string{"-u", "-Y", "skeleton/main.go"}},
+		{name: "302a_skeleton_numbered_functions_multi", args: []string{"-l", "-u", "skeleton/main.go", "skeleton/main.py", "skeleton/main.ts", "skeleton/main.rs"}},
+		{name: "302b_skeleton_numbered_types_multi", args: []string{"-l", "-Y", "skeleton/main.go", "skeleton/main.py", "skeleton/main.ts", "skeleton/main.rs"}},
 
 		// 310-319: Python
 		{name: "310_skeleton_python_functions", args: []string{"-u", "skeleton/main.py"}},
@@ -108,6 +110,9 @@ func TestGoldenSkeletonSlicing(t *testing.T) {
 		{name: "401_skeleton_head_go_both", args: []string{"-u", "-Y", "--head", "2", "skeleton/main.go"}},
 		{name: "402_skeleton_tail_go_both", args: []string{"-u", "-Y", "--tail", "2", "skeleton/main.go"}},
 		{name: "403_skeleton_head_tail_go_both", args: []string{"-u", "-Y", "--head", "2", "--tail", "2", "skeleton/main.go"}},
+		{name: "403a_skeleton_head_numbered_functions", args: []string{"-l", "-u", "--head", "3", "skeleton/main.go", "skeleton/main.py"}},
+		{name: "403b_skeleton_tail_numbered_functions", args: []string{"-l", "-u", "--tail", "3", "skeleton/main.go", "skeleton/main.py"}},
+		{name: "403c_skeleton_lines_functions", args: []string{"-u", "--lines", "4", "skeleton/main.go", "skeleton/main.py"}},
 		{name: "404_skeleton_progressive_lines_head_tail", args: []string{"-u", "-Y", "--lines", "3", "skeleton/main.go", "--head", "1", "skeleton/main.go", "--tail", "1", "skeleton/main.go"}},
 
 		// 410-419: Existing language slicing parity

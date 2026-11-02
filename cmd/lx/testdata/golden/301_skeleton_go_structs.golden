@@ -5,9 +5,12 @@ skeleton/main.go (32 rows, type definitions)
 // Person represents a named individual.
 type Person struct {
 	Name string
+...
 }
+...
 /* Worker defines the work contract. */
 type Worker interface {
+...
 }
 ```
 

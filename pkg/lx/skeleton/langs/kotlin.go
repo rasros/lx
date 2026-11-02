@@ -9,7 +9,7 @@ func KtFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language
 	return !ktIsPrivate(n, src, lang)
 }
 
-func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func KotlinEmitClass(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	// "object : ..." parses as infix_expression with object_literal first child.
 	if n.Type(lang) == "infix_expression" {
 		first := n.Child(0)
@@ -21,11 +21,11 @@ func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 
 	body := findChildByType(n, "class_body", lang)
 	if body == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		if ktIsPrivate(child, src, lang) {
@@ -45,18 +45,18 @@ func KotlinEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }
 
-func kotlinEmitObject(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func kotlinEmitObject(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	body := findChildByType(n, "lambda_literal", lang)
 	if body == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerEnd := int(body.StartPoint().Row)
-	out = internal.AppendLines(out, lines, int(n.StartPoint().Row), headerEnd)
+	out = internal.KeepLines(out, lines, int(n.StartPoint().Row), headerEnd)
 
 	stmts := findChildByType(body, "statements", lang)
 	if stmts != nil {
@@ -78,7 +78,7 @@ func kotlinEmitObject(out, src []byte, lines [][]byte, n *gotreesitter.Node, lan
 	}
 
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }

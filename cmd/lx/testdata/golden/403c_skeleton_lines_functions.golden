@@ -1,0 +1,25 @@
+--- STDOUT ---
+[1/2] skeleton/main.go (32 rows, function signatures)
+---
+```go
+// NewPerson creates a Person with the given name.
+func NewPerson(name string) Person {
+... (7 rows skipped)
+) Person {
+...
+func (p Person) Greet() string {
+```
+
+[2/2] skeleton/main.py (31 rows, function signatures)
+---
+```python
+def top_level():
+...
+# factory helper
+... (2 rows skipped)
+    tag: str = "default",
+) -> "Animal":
+```
+
+
+--- STDERR ---

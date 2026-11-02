@@ -11,7 +11,7 @@ func SwiftFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Langu
 	return !swiftIsPrivate(n, src, lang)
 }
 
-func SwiftEmitType(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func SwiftEmitType(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	var body *gotreesitter.Node
 	if n.Type(lang) == "protocol_declaration" {
 		body = findChildByType(n, "protocol_body", lang)
@@ -19,11 +19,11 @@ func SwiftEmitType(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		body = findChildByType(n, "class_body", lang)
 	}
 	if body == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(body.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < body.ChildCount(); i++ {
 		child := body.Child(i)
 		if swiftIsPrivate(child, src, lang) {
@@ -45,7 +45,7 @@ func SwiftEmitType(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *
 		}
 	}
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }

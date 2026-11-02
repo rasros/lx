@@ -12,16 +12,16 @@ func PyFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language
 	return name != nil && !isPrivateName(name.Text(src))
 }
 
-func PyEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func PyEmitClass(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	nameNode := n.ChildByFieldName("name", lang)
 	if nameNode == nil || isPrivateName(nameNode.Text(src)) {
 		return out
 	}
 	bodyNode := n.ChildByFieldName("body", lang)
 	if bodyNode == nil {
-		return internal.AppendLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
 	}
-	out = internal.AppendLines(out, lines, int(n.StartPoint().Row), int(bodyNode.StartPoint().Row)-1)
+	out = internal.KeepLines(out, lines, int(n.StartPoint().Row), int(bodyNode.StartPoint().Row)-1)
 	out = AppendPyDocstring(out, lines, n, lang)
 	for i := 0; i < bodyNode.ChildCount(); i++ {
 		out = pyProcessMember(out, src, lines, bodyNode.Child(i), lang, functions)
@@ -29,7 +29,7 @@ func PyEmitClass(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *go
 	return out
 }
 
-func pyProcessMember(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func pyProcessMember(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	actual := n
 	if n.Type(lang) == "decorated_definition" {
 		if defNode := n.ChildByFieldName("definition", lang); defNode != nil {

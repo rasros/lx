@@ -5,6 +5,7 @@ skeleton/main.hs (20 rows, function signatures)
 -- | Greet by name, with a fallback.
 greet :: String -> String
 greet name
+...
 -- | Add two integers.
 add :: Int -> Int -> Int
 add x y

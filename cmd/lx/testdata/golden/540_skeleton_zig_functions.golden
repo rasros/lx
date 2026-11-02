@@ -4,6 +4,7 @@ skeleton/main.zig (20 rows, function signatures)
 ```zig
 /// Greet by printing a name.
 pub fn greet(name: []const u8) void {
+...
 // Add two i32 values.
 pub fn add(
     a: i32,

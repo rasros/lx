@@ -3,6 +3,7 @@ skeleton/main.py (31 rows, function signatures)
 ---
 ```python
 def top_level():
+...
 # factory helper
 def create(
     name: str,

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -44,14 +45,8 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 	}
 }
 
-func TestProcessor_RenderFile_SkeletonSlicingUsesFilteredRows(t *testing.T) {
-	cfg := core.NewConfig()
-	engine, _ := templatex.Compile(cfg)
-	global := core.GlobalContext{TotalFiles: 1}
-
-	proc := NewProcessor(engine, global, nil)
-
-	file := sources.NewBufferInputFile("skeleton.go", []byte(`package p
+// skeletonThreeFuncs keeps rows 3, 7 and 11 in a function skeleton.
+const skeletonThreeFuncs = `package p
 
 func A() {
 	println(1)
@@ -64,22 +59,53 @@ func B() {
 func C() {
 	println(3)
 }
-`))
-	file.Config = core.RunnerConfig{Head: 1, Tail: 1, SkeletonFunctions: true}
+`
 
+func renderSkeleton(t *testing.T, rc core.RunnerConfig) string {
+	t.Helper()
+	cfg := core.NewConfig()
+	engine, _ := templatex.Compile(cfg)
+	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1}, nil)
+
+	file := sources.NewBufferInputFile("skeleton.go", []byte(skeletonThreeFuncs))
+	file.Config = rc
 	item := PreparedItem{Raw: file, Section: &core.SectionContext{}, FileIndexGlobal: 1}
 
 	var buf bytes.Buffer
 	if _, err := proc.RenderPrepared(&buf, item, nil); err != nil {
 		t.Fatal(err)
 	}
+	return buf.String()
+}
 
-	got := buf.String()
+func TestProcessor_RenderFile_SkeletonSlicingKeepsSourceRows(t *testing.T) {
+	got := renderSkeleton(t, core.RunnerConfig{Head: 1, Tail: 1, SkeletonFunctions: true})
 	if !strings.Contains(got, "(13 rows, function signatures)") {
 		t.Fatalf("expected original row count in header, got:\n%s", got)
 	}
-	if !strings.Contains(got, "... (1 rows skipped)") {
-		t.Fatalf("expected gap based on filtered rows, got:\n%s", got)
+	// Head keeps A (row 3), tail keeps C (row 11): rows 4-10 lie between.
+	if !strings.Contains(got, "func A() {\n... (7 rows skipped)\nfunc C() {\n") {
+		t.Fatalf("expected a gap counted in source rows, got:\n%s", got)
+	}
+}
+
+func TestProcessor_RenderFile_SkeletonNumbersSourceRows(t *testing.T) {
+	got := renderSkeleton(t, core.RunnerConfig{Head: -1, SkeletonFunctions: true, LineNumbers: true})
+	want := " 3: func A() {\n...\n 7: func B() {\n...\n11: func C() {\n"
+	if !strings.Contains(got, want) {
+		t.Fatalf("want source row numbers and elision markers\n%s\ngot:\n%s", want, got)
+	}
+
+	got = renderSkeleton(t, core.RunnerConfig{Head: 1, Tail: 1, SkeletonFunctions: true, LineNumbers: true})
+	want = " 3: func A() {\n... (7 rows skipped)\n11: func C() {\n"
+	if !strings.Contains(got, want) {
+		t.Fatalf("want sliced lines to keep source rows\n%s\ngot:\n%s", want, got)
+	}
+
+	got = renderSkeleton(t, core.RunnerConfig{Head: 0, Tail: 2, SkeletonFunctions: true, LineNumbers: true})
+	want = " 7: func B() {\n...\n11: func C() {\n"
+	if !strings.Contains(got, want) {
+		t.Fatalf("want tail numbered by source rows, not counted back\n%s\ngot:\n%s", want, got)
 	}
 }
 
@@ -321,20 +347,21 @@ func TestApplySkeletonReportsOriginalRowCount(t *testing.T) {
 	src := []byte("package main\n\nfunc Alpha() int {\n\treturn 1\n}\n")
 	cfg := core.RunnerConfig{Head: -1, SkeletonFunctions: true}
 
-	reader, size, mode, originalRows := applySkeleton(
-		cfg, "go", bytes.NewReader(src), int64(len(src)), false, false)
-
-	if mode != "function signatures" {
-		t.Errorf("mode = %q", mode)
+	sk := applySkeleton(cfg, "go", bytes.NewReader(src), int64(len(src)), false, false)
+	if sk == nil {
+		t.Fatal("skeleton did not run")
 	}
-	if originalRows != 5 {
-		t.Errorf("originalRows = %d, want 5", originalRows)
+	if sk.mode != "function signatures" {
+		t.Errorf("mode = %q", sk.mode)
 	}
-	if size >= int64(len(src)) {
-		t.Errorf("filtered size %d should be smaller than %d", size, len(src))
+	if sk.rows != 5 {
+		t.Errorf("rows = %d, want 5", sk.rows)
 	}
-	if reader == nil {
-		t.Error("reader is nil")
+	if got := string(sk.lines.Text()); got != "func Alpha() int {\n" {
+		t.Errorf("text = %q", got)
+	}
+	if want := []int{3}; !slices.Equal(sk.lines.Rows, want) {
+		t.Errorf("rows = %v, want %v", sk.lines.Rows, want)
 	}
 }
 
@@ -349,10 +376,8 @@ func TestApplySkeletonSkipsBinaryAndImages(t *testing.T) {
 		{"binary", true, false},
 		{"image", false, true},
 	} {
-		_, size, mode, originalRows := applySkeleton(
-			cfg, "go", bytes.NewReader(src), int64(len(src)), tc.isBinary, tc.isImage)
-		if mode != "" || originalRows != -1 || size != int64(len(src)) {
-			t.Errorf("%s: skeleton ran anyway (mode=%q rows=%d size=%d)", tc.name, mode, originalRows, size)
+		if sk := applySkeleton(cfg, "go", bytes.NewReader(src), int64(len(src)), tc.isBinary, tc.isImage); sk != nil {
+			t.Errorf("%s: skeleton ran anyway (mode=%q)", tc.name, sk.mode)
 		}
 	}
 }

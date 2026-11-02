@@ -2,11 +2,12 @@
 skeleton/main.go (32 rows, definitions)
 ---
 ```go
- 1: // Person represents a named individual.
- 2: type Person struct {
-... (12 rows skipped)
-15: ) Person {
-16: func (p Person) Greet() string {
+ 3: // Person represents a named individual.
+ 4: type Person struct {
+... (19 rows skipped)
+24: ) Person {
+...
+28: func (p Person) Greet() string {
 ```
 
 

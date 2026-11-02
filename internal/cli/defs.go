@@ -384,7 +384,8 @@ This flag disables that filtering so ignored files are included.`,
 		Long: `Filter files in the next section to show only function and method signatures.
 
 Uses an AST-based parser to extract function definitions from source files.
-The filtered lines are then subject to normal head/tail slicing.
+A "..." line marks where source lines were left out. Head/tail slicing counts
+the kept lines; line numbers (-l) and the skipped-rows gap count source rows.
 
 Pairs with --types (-Y) to show a full code skeleton.`,
 	},
@@ -399,7 +400,8 @@ Pairs with --types (-Y) to show a full code skeleton.`,
 including their field/variable declarations.
 
 Uses an AST-based parser to extract type definitions from source files.
-The filtered lines are then subject to normal head/tail slicing.
+A "..." line marks where source lines were left out. Head/tail slicing counts
+the kept lines; line numbers (-l) and the skipped-rows gap count source rows.
 
 Pairs with --functions (-u) to show a full code skeleton.`,
 	},

@@ -4,12 +4,17 @@ skeleton/main.cpp (24 rows, definitions)
 ```cpp
 // UI widget with a single integer value.
 class Widget {
+...
     int value; // current value
     void set(int v) {
+...
     int secret; /* internal state */
+...
 };
+...
 /* Free function - no class needed. */
 int FreeFn(int v) {
+...
 // Combine two values.
 int Combine(
     int a,

@@ -12,7 +12,7 @@ func CFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language)
 	return true
 }
 
-func CEmitTypedef(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, _ bool) []byte {
+func CEmitTypedef(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, _ bool) []internal.LineRange {
 	var specifier *gotreesitter.Node
 	for i := 0; i < n.ChildCount(); i++ {
 		child := n.Child(i)
@@ -31,7 +31,7 @@ func CEmitTypedef(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *g
 	}
 	headerStart := int(n.StartPoint().Row)
 	headerEnd := int(fieldList.StartPoint().Row)
-	out = internal.AppendLines(out, lines, headerStart, headerEnd)
+	out = internal.KeepLines(out, lines, headerStart, headerEnd)
 	for i := 0; i < fieldList.ChildCount(); i++ {
 		child := fieldList.Child(i)
 		if child.Type(lang) == "field_declaration" {
@@ -39,7 +39,7 @@ func CEmitTypedef(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *g
 		}
 	}
 	if closingRow := int(n.EndPoint().Row); closingRow > headerEnd {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }

@@ -12,9 +12,9 @@ func GoFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language
 	return name != nil && isUppercase(name.Text(src))
 }
 
-func GoEmitTypeDecl(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func GoEmitTypeDecl(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	grouped := goIsGroupedTypeDecl(n, lang)
-	groupMembers := make([]byte, 0)
+	var groupMembers []internal.LineRange
 
 	for i := 0; i < n.ChildCount(); i++ {
 		spec := n.Child(i)
@@ -26,12 +26,7 @@ func GoEmitTypeDecl(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang 
 			before := len(groupMembers)
 			groupMembers = goEmitTypeSpec(groupMembers, src, lines, spec, lang, functions)
 			if len(groupMembers) > before {
-				doc := EmitLeadingDoc(nil, lines, int(spec.StartPoint().Row))
-				if len(doc) > 0 {
-					tail := append([]byte{}, groupMembers[before:]...)
-					groupMembers = append(groupMembers[:before], doc...)
-					groupMembers = append(groupMembers, tail...)
-				}
+				groupMembers = EmitLeadingDoc(groupMembers, lines, int(spec.StartPoint().Row))
 			}
 		} else {
 			out = goEmitTypeSpec(out, src, lines, spec, lang, functions)
@@ -39,14 +34,14 @@ func GoEmitTypeDecl(out, src []byte, lines [][]byte, n *gotreesitter.Node, lang 
 	}
 
 	if grouped && len(groupMembers) > 0 {
-		out = internal.AppendLine(out, lines, int(n.StartPoint().Row))
+		out = internal.KeepLine(out, lines, int(n.StartPoint().Row))
 		out = append(out, groupMembers...)
-		out = internal.AppendLine(out, lines, int(n.EndPoint().Row))
+		out = internal.KeepLine(out, lines, int(n.EndPoint().Row))
 	}
 	return out
 }
 
-func goEmitTypeSpec(out, src []byte, lines [][]byte, spec *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func goEmitTypeSpec(out []internal.LineRange, src []byte, lines [][]byte, spec *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	nameNode := spec.ChildByFieldName("name", lang)
 	if nameNode == nil || !isUppercase(nameNode.Text(src)) {
 		return out
@@ -63,17 +58,17 @@ func goEmitTypeSpec(out, src []byte, lines [][]byte, spec *gotreesitter.Node, la
 	case "interface_type":
 		return goEmitInterface(out, src, lines, spec, typeNode, lang, functions)
 	default:
-		return internal.AppendLines(out, lines, int(spec.StartPoint().Row), int(spec.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(spec.StartPoint().Row), int(spec.EndPoint().Row))
 	}
 }
 
-func goEmitStruct(out, src []byte, lines [][]byte, specNode, structNode *gotreesitter.Node, lang *gotreesitter.Language) []byte {
+func goEmitStruct(out []internal.LineRange, src []byte, lines [][]byte, specNode, structNode *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
 	fieldList := findChildByType(structNode, "field_declaration_list", lang)
 	if fieldList == nil {
-		return internal.AppendLines(out, lines, int(specNode.StartPoint().Row), int(specNode.EndPoint().Row))
+		return internal.KeepLines(out, lines, int(specNode.StartPoint().Row), int(specNode.EndPoint().Row))
 	}
 	headerStart := int(specNode.StartPoint().Row)
-	out = internal.AppendLine(out, lines, headerStart)
+	out = internal.KeepLine(out, lines, headerStart)
 
 	for i := 0; i < fieldList.ChildCount(); i++ {
 		child := fieldList.Child(i)
@@ -83,14 +78,14 @@ func goEmitStruct(out, src []byte, lines [][]byte, specNode, structNode *gotrees
 	}
 
 	if closingRow := int(fieldList.EndPoint().Row); closingRow > headerStart {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }
 
-func goEmitInterface(out, src []byte, lines [][]byte, specNode, ifaceNode *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []byte {
+func goEmitInterface(out []internal.LineRange, src []byte, lines [][]byte, specNode, ifaceNode *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
 	headerStart := int(specNode.StartPoint().Row)
-	out = internal.AppendLine(out, lines, headerStart)
+	out = internal.KeepLine(out, lines, headerStart)
 
 	if functions {
 		for i := 0; i < ifaceNode.ChildCount(); i++ {
@@ -107,7 +102,7 @@ func goEmitInterface(out, src []byte, lines [][]byte, specNode, ifaceNode *gotre
 	}
 
 	if closingRow := int(ifaceNode.EndPoint().Row); closingRow > headerStart {
-		out = internal.AppendLine(out, lines, closingRow)
+		out = internal.KeepLine(out, lines, closingRow)
 	}
 	return out
 }

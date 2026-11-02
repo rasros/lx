@@ -6,6 +6,7 @@ skeleton/deco.dart (7 rows, definitions)
 class Widget {
     @override
     String build() {
+...
 }
 ```
 
