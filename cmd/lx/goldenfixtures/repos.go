@@ -10,7 +10,6 @@ import (
 // decide. It returns the outer repository root.
 func SetupNestedReposInIgnoredDirsFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, ".git")
@@ -40,7 +39,6 @@ func SetupNestedReposInIgnoredDirsFixture(t *testing.T) string {
 // directory holding them.
 func SetupSymlinkedRootsFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, "repo/.git")
@@ -62,7 +60,6 @@ func SetupSymlinkedRootsFixture(t *testing.T) string {
 // It returns the repository root.
 func SetupIgnoreSyntaxFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, ".git")

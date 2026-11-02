@@ -14,7 +14,6 @@ import (
 
 func SetupArchiveFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	createTestZip(filepath.Join(dir, "archive.zip"), [][2]string{
@@ -49,7 +48,6 @@ func SetupArchiveFixture(t *testing.T) string {
 
 func SetupDocumentsFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "sample.html", htmlFixture, 0644)

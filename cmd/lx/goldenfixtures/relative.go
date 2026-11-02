@@ -8,7 +8,6 @@ import (
 
 func SetupRelativePathsFixture(t *testing.T) (workDir, srcDir string) {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)

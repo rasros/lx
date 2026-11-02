@@ -11,7 +11,6 @@ import (
 // an escape in a pattern has to match.
 func SetupIncludePathsFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "src/b.go", "package src", 0644)

@@ -225,7 +225,7 @@ func TestGoldenArchive(t *testing.T) {
 func TestGoldenDocumentURLMediaType(t *testing.T) {
 	dir := setupDocumentsFixture(t)
 	server := httptest.NewServer(http.FileServer(http.Dir(dir)))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "139e_url_html_by_media_type", args: []string{"-D", server.URL + "/suffixless"}},
@@ -321,7 +321,7 @@ func TestGoldenMediaURL(t *testing.T) {
 		w.(http.Flusher).Flush()
 		w.Write(data)
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	u := server.URL
 	runTestGolden(t, dir, []goldenTestCase{

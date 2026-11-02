@@ -10,7 +10,6 @@ import (
 
 func SetupWalkFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := repoTempDir(t)
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)
@@ -27,7 +26,6 @@ func SetupWalkFixture(t *testing.T) string {
 
 func SetupFormattingFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)
@@ -42,7 +40,6 @@ func SetupFormattingFixture(t *testing.T) string {
 
 func SetupSectionsFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)
@@ -56,7 +53,6 @@ func SetupSectionsFixture(t *testing.T) string {
 
 func SetupFilteringFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := repoTempDir(t)
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)
@@ -76,7 +72,6 @@ func SetupFilteringFixture(t *testing.T) string {
 
 func SetupSlicingFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)
@@ -94,7 +89,6 @@ func SetupSlicingFixture(t *testing.T) string {
 // from, and a file with CRLF line endings.
 func SetupLargeSlicingFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	var big strings.Builder
@@ -109,7 +103,6 @@ func SetupLargeSlicingFixture(t *testing.T) string {
 
 func SetupSymlinksFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
@@ -124,7 +117,6 @@ func SetupSymlinksFixture(t *testing.T) string {
 
 func SetupErrorsFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
@@ -147,7 +139,6 @@ func SetupErrorsFixture(t *testing.T) string {
 
 func SetupStatsFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
@@ -159,7 +150,6 @@ func SetupStatsFixture(t *testing.T) string {
 
 func SetupDetectionFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "bin/data.bin", string([]byte{0x00, 0x01, 0xFF, 0xFE}), 0644)
@@ -176,7 +166,6 @@ func SetupDetectionFixture(t *testing.T) string {
 
 func SetupConfigFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := repoTempDir(t)
 
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
@@ -199,7 +188,6 @@ func SetupConfigFixture(t *testing.T) string {
 
 func SetupComplexFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := repoTempDir(t)
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)

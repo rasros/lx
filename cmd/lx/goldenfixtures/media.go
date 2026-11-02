@@ -34,7 +34,6 @@ var mediaFixtures = []string{
 
 func SetupMediaFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	for _, name := range mediaFixtures {
@@ -64,7 +63,6 @@ func SetupMediaFixture(t *testing.T) string {
 // kept apart from SetupMediaFixture so the directory golden there stays put.
 func SetupMediaLookalikeFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	// "BM" is a bitmap's magic, but here it starts a sentence.

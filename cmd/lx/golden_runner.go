@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
 	"strings"
 	"testing"
 
@@ -25,34 +24,59 @@ type goldenTestCase struct {
 }
 
 // goldenRun is what the cases of one batch share: the working directory they
-// run in and the paths their output names as /ROOT.
+// run in, the environment variables set for them and the paths their output
+// names as /ROOT.
 type goldenRun struct {
 	cwd   string
+	env   map[string]string
 	scrub []string
 }
 
 // runTestGolden runs cases in workDir, naming it /ROOT.
 func runTestGolden(t *testing.T, workDir string, cases []goldenTestCase, extraScrub ...string) {
 	t.Helper()
+	runTestGoldenEnv(t, workDir, nil, cases, extraScrub...)
+}
+
+// runTestGoldenEnv runs cases in workDir, as runTestGolden, with the
+// environment variables env set.
+func runTestGoldenEnv(t *testing.T, workDir string, env map[string]string, cases []goldenTestCase, extraScrub ...string) {
+	t.Helper()
 	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
 	runGoldenTests(t, cases, goldenRun{
 		cwd:   workDir,
+		env:   env,
 		scrub: append([]string{workDir, canonicalWorkDir}, extraScrub...),
 	})
 }
 
-// runGoldenTests runs every case with an Env of its own.
+// runGoldenTests runs every case in parallel, each with an Env of its own, so
+// nothing a case sees of the process can leak between them. The test and its
+// cases share their files, so a batch must not change them.
 func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
-	lookupEnv := func(key string) (string, bool) {
+	t.Parallel()
+	vars := map[string]string{
 		// Goldens are plain text whatever color settings the shell has.
-		if key == "NO_COLOR" {
-			return "1", true
+		"NO_COLOR": "1",
+		// The user's own config never applies; lx/ignore is empty.
+		"XDG_CONFIG_HOME": mockConfigDir(t),
+		"LX_CONFIG":       "",
+		"LX_PROMPTS_DIR":  "",
+	}
+	for k, v := range run.env {
+		vars[k] = v
+	}
+	lookupEnv := func(key string) (string, bool) {
+		if v, ok := vars[key]; ok {
+			return v, v != ""
 		}
 		return os.LookupEnv(key)
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Force deterministic output unless explicitly requested otherwise.
 			runArgs := append([]string{}, tc.args...)
 			hasStatsControl := false
@@ -111,6 +135,19 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 			}
 		})
 	}
+}
+
+// mockConfigDir returns a user config directory whose lx/ignore is empty.
+func mockConfigDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "lx"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "lx", "ignore"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }
 
 func firstDiffIndex(a, b string) int {
@@ -182,12 +219,11 @@ func normalizeOutput(stdout, stderr string, roots ...string) string {
 		sb.WriteString("\n")
 	}
 
+	// Stderr is kept in the order it was written: a run logs from one
+	// goroutine, so the order is deterministic and part of the behavior.
 	sb.WriteString("\n--- STDERR ---\n")
-	stderrClean := clean(stderr)
-	lines := strings.Split(strings.TrimSpace(stderrClean), "\n")
-	sort.Strings(lines)
-	if len(lines) > 0 && lines[0] != "" {
-		sb.WriteString(strings.Join(lines, "\n"))
+	if s := strings.TrimSpace(clean(stderr)); s != "" {
+		sb.WriteString(s)
 		sb.WriteString("\n")
 	}
 

@@ -11,7 +11,6 @@ import (
 // ignored by git, and .hdir/ and src/.hidden.go are hidden.
 func SetupGlobsFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 	makeGitDir(t, dir, ".git")
 
@@ -37,7 +36,6 @@ func SetupGlobsFixture(t *testing.T) string {
 // needs a filesystem that allows a backslash in a name.
 func SetupGlobClassFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 	for _, name := range []string{`\`, `x\y`, "]", "a", "x]", "[", "-", "q"} {
 		writeFile(t, dir, name, "x\n", 0644)

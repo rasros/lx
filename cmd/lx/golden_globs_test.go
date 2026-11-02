@@ -104,7 +104,7 @@ func TestGoldenGlobClasses(t *testing.T) {
 func TestGoldenGlobsURLArchive(t *testing.T) {
 	dir := gf.SetupGlobsFixture(t)
 	server := httptest.NewServer(http.FileServer(http.Dir(filepath.Join(dir, "arch"))))
-	defer server.Close()
+	t.Cleanup(server.Close)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "933_glob_url_archive_entries", args: []string{"-n0", "-Z", "-i", server.URL + "/a.zip/src/*.go", "-i", "notes.txt", server.URL + "/a.zip"}},
 	}, server.URL)

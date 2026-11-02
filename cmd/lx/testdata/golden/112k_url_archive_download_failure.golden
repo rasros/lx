@@ -3,7 +3,7 @@
 
 
 --- STDERR ---
-  1 failed
-  ~2 tokens
 Error: Failed to download URL archive: GET "/ROOT/missing.zip": unexpected status 404 Not Found (url=/ROOT/missing.zip)
 ▎ 0 files · 0 rows · 1 section · 0 B
+  ~2 tokens
+  1 failed
