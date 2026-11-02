@@ -19,7 +19,7 @@ func TestGoldenGlobs(t *testing.T) {
 	dir := gf.SetupGlobsFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "900_glob_exclude_then_include", args: []string{"-n0", "-e", "build/*", "-i", "build/keep.js", "."}},
-		{name: "901_glob_include_then_exclude", args: []string{"-n0", "-i", "build/keep.js", "-e", "build/*", "."}},
+		{name: "901_glob_include_then_exclude", args: []string{"-n0", "-i", "build/keep.js", "-e", "build/*", "-i", "b.txt", "."}},
 		{name: "902_glob_include_bang_excludes", args: []string{"-n0", "-i", "*.go", "-i", "!src/**", "."}},
 		// rg has no glob that keeps a path without also dropping the files
 		// no glob keeps; lx's -e '!glob' is that.
@@ -29,10 +29,10 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "906_glob_include_overrides_hidden_file", args: []string{"-n0", "-i", "*.go", "."}},
 		{name: "907_glob_include_hidden_dir", args: []string{"-n0", "-i", ".hdir", "-i", "*.go", "."}},
 		{name: "908_glob_include_gitignored_dir", args: []string{"-n0", "-i", "ign", "-i", "*.go", "."}},
-		{name: "909_glob_include_dir_keeps_no_files", args: []string{"-n0", "-i", "build", "."}},
-		{name: "910_glob_excluded_dir_not_entered", args: []string{"-n0", "-e", "build", "-i", "build/keep.js", "."}},
+		// A glob matches a directory only as itself, and no later glob keeps
+		// anything below an excluded directory, which is not entered.
+		{name: "909_glob_dirs_match_only_as_themselves", args: []string{"-n0", "-i", "build", "-e", "build/**", "-i", "build/sub/y.js", "-e", "src", "-i", "src/a.go", "-i", "b.txt", "."}},
 		{name: "911_glob_excluded_contents_reincluded", args: []string{"-n0", "-e", "build/**", "-i", "build/keep.js", "."}},
-		{name: "912_glob_excluded_subdir_not_entered", args: []string{"-n0", "-e", "build/**", "-i", "build/sub/y.js", "."}},
 		{name: "913_glob_named_file_not_filtered", args: []string{"-n0", "-e", "a.go", "-i", "zzz", "a.go"}},
 		{name: "914_glob_named_dir_not_filtered", args: []string{"-n0", "-e", "ign", "ign"}},
 		{name: "915_glob_absolute_root_below_cwd", args: []string{"-n0", "-i", "build/*.js", filepath.Join(dir, "build")}},
@@ -56,7 +56,7 @@ func TestGoldenGlobs(t *testing.T) {
 		// working directory would keep it.
 		{name: "920_glob_stdin_exclude_bang_keeps", args: []string{"-n0", "-e", "ovr/**", "-e", "!ovr/keep.js"}, stdin: "ovr"},
 		{name: "921_glob_stdin_last_match_wins", args: []string{"-n0", "-e", "build/*", "-i", "build/keep.js"}, stdin: "build/x.js\nbuild"},
-		{name: "922_glob_stdin_excluded_parent_dir", args: []string{"-n0", "-e", "build"}, stdin: "build/keep.js\nbuild/sub"},
+		{name: "922_glob_stdin_excluded_parent_dir", args: []string{"-n0", "-e", "build"}, stdin: "build/keep.js\nbuild/sub\nsrc/a.go"},
 		{name: "923_stdin_file_and_its_dir_listed_once", args: []string{"-n0"}, stdin: "build/keep.js\nbuild"},
 
 		// rg does not expand archives; lx matches an expanded archive as a
@@ -92,7 +92,7 @@ func TestGoldenGlobsOutsideCwd(t *testing.T) {
 	canonical, _ := filepath.EvalSymlinks(dir)
 	runGoldenTests(t, []goldenTestCase{
 		{name: "940_glob_parent_root_as_written", args: []string{"-n0", "-i", "../build/*.js", ".."}},
-		{name: "941_glob_parent_root_misses_cwd_glob", args: []string{"-n0", "-i", "build/*.js", ".."}},
+		{name: "941_glob_parent_root_misses_cwd_glob", args: []string{"-n0", "-i", "build/*.js", "-i", "../a.go", ".."}},
 		{name: "942_glob_absolute_root_above_cwd", args: []string{"-n0", "-i", "/x.js", dir}},
 		{name: "943_glob_absolute_root_outside_cwd", args: []string{"-n0", "-i", "**/ovr/keep.js", "-i", "ovr/drop.js", filepath.Join(dir, "ovr")}},
 		{name: "944_glob_absolute_archive_outside_cwd", args: []string{"-n0", "-Z", "-i", "**/a.zip/src/*.go", "-i", "arch/a.zip/notes.txt", filepath.Join(dir, "arch", "a.zip")}},
