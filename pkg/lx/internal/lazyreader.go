@@ -19,6 +19,10 @@ const (
 	// before the current read are dropped.
 	lazyWindowCap  = 4 << 20
 	lazyWindowKeep = 256 << 10
+	// lazyMaxStep bounds how much buffer one step of a fill reserves, so that
+	// memory grows with the bytes that arrive rather than with what was asked
+	// for or declared.
+	lazyMaxStep = 4 << 20
 )
 
 var (
@@ -59,9 +63,11 @@ type LazyReader struct {
 
 // NewLazyReader reads src on demand. A non-negative size is the length the
 // stream declares, such as an HTTP Content-Length: Size reports it without
-// reading anything, the stream is never read past it, and a stream that ends
-// sooner fails with io.ErrUnexpectedEOF. A negative size leaves the length to
-// be found by reading to the end.
+// reading anything, and the stream is never read past it. The declared length
+// is only a claim, so nothing is allocated on its strength: a stream that ends
+// sooner (io.EOF or io.ErrUnexpectedEOF) shrinks to what arrived, as a file
+// truncated while it is read does. A negative size leaves the length to be
+// found by reading to the end.
 func NewLazyReader(src io.Reader, size int64) *LazyReader {
 	r := &LazyReader{src: src, size: -1}
 	if c, ok := src.(io.Closer); ok {
@@ -158,7 +164,10 @@ func (r *LazyReader) ensure(off, end int64) error {
 		return nil
 	}
 	if !r.windowed {
-		if r.skipping == 0 || off < int64(len(r.prefix)) || end <= lazyPrefixCap {
+		// While skipping, the prefix stops at its cap even for a read that
+		// starts inside it; the rest of such a read goes to the window, which
+		// copyOut joins on.
+		if r.skipping == 0 || end <= lazyPrefixCap {
 			r.fillPrefix(end)
 			return nil
 		}
@@ -211,9 +220,6 @@ func (r *LazyReader) shortErr() error {
 }
 
 func (r *LazyReader) fillPrefix(end int64) {
-	if end >= 0 && end == r.size {
-		r.prefix = slices.Grow(r.prefix, int(end)-len(r.prefix))
-	}
 	r.prefix = r.fill(r.prefix, end)
 }
 
@@ -223,7 +229,7 @@ func (r *LazyReader) fill(buf []byte, end int64) []byte {
 	for (end < 0 || r.pos < end) && r.readable() {
 		want := lazyChunk
 		if end >= 0 && end-r.pos > int64(want) {
-			want = int(end - r.pos)
+			want = int(min(end-r.pos, lazyMaxStep))
 		}
 		buf = slices.Grow(buf, want)
 		n, err := r.src.Read(buf[len(buf) : len(buf)+want])
@@ -259,10 +265,12 @@ func (r *LazyReader) readable() bool {
 func (r *LazyReader) noteErr(err error) {
 	switch {
 	case err == nil:
-	case errors.Is(err, io.EOF):
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+		// An HTTP body shorter than its Content-Length ends with
+		// ErrUnexpectedEOF. Either way the content is what arrived.
 		r.eof = true
-		if r.size >= 0 && r.pos < r.size {
-			r.err = io.ErrUnexpectedEOF
+		if r.size > r.pos {
+			r.size = r.pos
 		}
 	default:
 		r.err = err

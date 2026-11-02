@@ -292,8 +292,8 @@ func applySkeleton(cfg core.RunnerConfig, lang string, reader io.ReaderAt, size 
 		return nil
 	}
 
-	allData := make([]byte, size)
-	if _, err := reader.ReadAt(allData, 0); err != nil {
+	allData, err := internal.ReadAllAt(reader, size)
+	if err != nil {
 		return nil
 	}
 
@@ -332,8 +332,8 @@ func imageDataURI(format *internal.Format, reader io.ReaderAt, size int64) strin
 	if size <= 0 {
 		return ""
 	}
-	data := make([]byte, size)
-	if _, err := reader.ReadAt(data, 0); err != nil {
+	data, err := internal.ReadAllAt(reader, size)
+	if err != nil {
 		return ""
 	}
 	return internal.DataURIWithType(format.MIME, data)

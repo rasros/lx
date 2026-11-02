@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -139,15 +140,48 @@ func TestLazyReaderDeclaredSize(t *testing.T) {
 }
 
 func TestLazyReaderStreamShorterThanDeclared(t *testing.T) {
-	r := NewLazyReader(strings.NewReader("short"), 100)
-	buf := make([]byte, 10)
-	n, err := r.ReadAt(buf, 0)
-	if n != 5 || !errors.Is(err, io.ErrUnexpectedEOF) {
-		t.Fatalf("ReadAt = %d, %v; want 5, ErrUnexpectedEOF", n, err)
+	// A declared length is a claim. A stream that ends sooner, cleanly or as an
+	// HTTP body does with ErrUnexpectedEOF, shrinks to what arrived.
+	for _, end := range []error{io.EOF, io.ErrUnexpectedEOF} {
+		r := NewLazyReader(&failingReader{data: []byte("short"), err: end}, 100)
+		buf := make([]byte, 10)
+		n, err := r.ReadAt(buf, 0)
+		if n != 5 || err != io.EOF {
+			t.Fatalf("%v: ReadAt = %d, %v; want 5, EOF", end, n, err)
+		}
+		if n, err := r.ReadAt(buf[:5], 0); n != 5 || err != nil || string(buf[:5]) != "short" {
+			t.Fatalf("%v: ReadAt of what arrived = %d %q, %v", end, n, buf[:5], err)
+		}
+		if got := r.Size(); got != 5 {
+			t.Errorf("%v: Size = %d after the stream ended, want 5", end, got)
+		}
 	}
-	// What did arrive stays readable.
-	if n, err := r.ReadAt(buf[:5], 0); n != 5 || err != nil || string(buf[:5]) != "short" {
-		t.Fatalf("ReadAt of what arrived = %d %q, %v", n, buf[:5], err)
+}
+
+func TestLazyReaderLyingLengthAllocatesWhatArrives(t *testing.T) {
+	// 1 TiB declared, 2 KB sent. Neither a read across the whole declared
+	// length nor reading it all may allocate on the claim's strength.
+	data := bytes.Repeat([]byte("x"), 2048)
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+
+	r := NewLazyReader(bytes.NewReader(data), 1<<40)
+	got, err := ReadAllAt(r, r.Size())
+	if err != io.EOF || !bytes.Equal(got, data) {
+		t.Fatalf("ReadAllAt = %d bytes, %v; want the 2048 that arrived", len(got), err)
+	}
+	tail := make([]byte, 16)
+	if n, err := r.ReadAt(tail, 1<<40-16); n != 0 || err != io.EOF {
+		t.Errorf("ReadAt at the declared end = %d, %v", n, err)
+	}
+	lines := NewLineSource(NewLazyReader(bytes.NewReader(data), 1<<40), 1<<40)
+	if all, err := lines.All(); err != nil || len(all) != len(data) {
+		t.Errorf("LineSource.All = %d bytes, %v", len(all), err)
+	}
+
+	runtime.ReadMemStats(&after)
+	if alloc := after.TotalAlloc - before.TotalAlloc; alloc > 3*maxPrealloc {
+		t.Errorf("allocated %d bytes for 2 KB of content", alloc)
 	}
 }
 
@@ -431,5 +465,80 @@ func TestByteReaderReadsAheadOnMatroskaWalk(t *testing.T) {
 	}
 	if want := len(data)/mediaReadAhead + 4; ra.calls > want {
 		t.Errorf("%d ReadAt calls over a %d-byte Matroska file, want at most %d", ra.calls, len(data), want)
+	}
+}
+
+// freeBoxes is a run of MP4 free boxes just under the read-ahead apart, so
+// that nearly every read-ahead straddles the end of what was read before.
+type freeBoxes struct {
+	left int
+	buf  []byte
+}
+
+func (f *freeBoxes) Read(p []byte) (int, error) {
+	if len(f.buf) == 0 {
+		if f.left == 0 {
+			return 0, io.EOF
+		}
+		f.left--
+		f.buf = append(append(be32(65532), "free"...), zeros(65532-8)...)
+	}
+	n := copy(p, f.buf)
+	f.buf = f.buf[n:]
+	return n, nil
+}
+
+func TestLazyReaderBoundedWhenReadsStraddle(t *testing.T) {
+	const boxes = 1024 // 64 MiB
+	full := mp4File(
+		mvhd(1000, 2000),
+		trak(tkhd(1920, 1080), hdlr("vide"), mdhd(1000, 2000),
+			stbl(videoSampleEntry("avc1", 1920, 1080), stts(60, 33))),
+	)
+	ftyp := box("ftyp", []byte("isom"), zeros(4))
+	moov := full[len(ftyp):]
+	total := int64(len(ftyp)) + boxes*65532 + int64(len(moov))
+
+	r := NewLazyReader(io.MultiReader(bytes.NewReader(ftyp), &freeBoxes{left: boxes}, bytes.NewReader(moov)), total)
+	out, ok := MediaMetadata("mp4", r, r.Size())
+	if !ok || !strings.Contains(string(out), "Video: h264, 1920x1080") {
+		t.Fatalf("unexpected metadata:\n%s", out)
+	}
+	if held := len(r.prefix) + len(r.win); held > lazyPrefixCap+lazyWindowCap+mediaReadAhead {
+		t.Errorf("held %d bytes of a %d-byte stream", held, total)
+	}
+	if cap(r.prefix) > 2*lazyPrefixCap {
+		t.Errorf("prefix grew to %d bytes", cap(r.prefix))
+	}
+}
+
+func TestMediaMetadataTIFFStreamMatchesFile(t *testing.T) {
+	// The bit depths come first, then 2 MiB of pixels, then the directory that
+	// points back at them. A stream must not have discarded them by then.
+	order := binary.LittleEndian
+	var buf bytes.Buffer
+	buf.WriteString("II")
+	buf.Write(putU16(order, 42))
+	pixels := 2 << 20
+	ifdAt := uint32(8 + 6 + pixels)
+	buf.Write(putU32(order, ifdAt))
+	buf.Write(putU16(order, 8))
+	buf.Write(putU16(order, 8))
+	buf.Write(putU16(order, 8))
+	buf.Write(zeros(pixels))
+	buf.Write(putU16(order, 3))
+	for _, e := range [][4]uint32{{256, 4, 1, 640}, {257, 4, 1, 480}, {258, 3, 3, 8}} {
+		buf.Write(putU16(order, uint16(e[0])))
+		buf.Write(putU16(order, uint16(e[1])))
+		buf.Write(putU32(order, e[2]))
+		buf.Write(putU32(order, e[3]))
+	}
+	data := buf.Bytes()
+
+	local, _ := MediaMetadata("tiff", bytes.NewReader(data), int64(len(data)))
+	r := NewLazyReader(bytes.NewReader(data), int64(len(data)))
+	streamed, _ := MediaMetadata("tiff", r, r.Size())
+	if !strings.Contains(string(local), "640x480, rgb, 8-bit") || string(streamed) != string(local) {
+		t.Errorf("streamed:\n%s\nlocal:\n%s", streamed, local)
 	}
 }

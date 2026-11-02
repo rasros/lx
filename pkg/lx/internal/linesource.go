@@ -45,13 +45,38 @@ func (s *LineSource) All() ([]byte, error) {
 	if s.data != nil || s.size == 0 {
 		return s.data, nil
 	}
-	buf := make([]byte, s.size)
-	n, err := s.readAt(buf, 0)
-	if err != nil {
+	buf, err := ReadAllAt(s.r, s.size)
+	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
-	s.keep(buf[:n])
+	s.keep(buf)
 	return s.data, nil
+}
+
+// maxPrealloc bounds what ReadAllAt allocates before any bytes arrive.
+const maxPrealloc = 64 << 20
+
+// ReadAllAt reads the first size bytes of r. A size can be a claim, such as a
+// Content-Length, rather than a fact, so the buffer grows as the bytes arrive
+// and only up to maxPrealloc is reserved in advance. Content that ends sooner
+// is returned with io.EOF.
+func ReadAllAt(r io.ReaderAt, size int64) ([]byte, error) {
+	buf := make([]byte, 0, max(min(size, maxPrealloc), 0))
+	for int64(len(buf)) < size {
+		want := int(min(size-int64(len(buf)), maxPrealloc))
+		buf = slices.Grow(buf, want)
+		n, err := r.ReadAt(buf[len(buf):len(buf)+want], int64(len(buf)))
+		buf = buf[:len(buf)+n]
+		switch {
+		case n == want:
+			// A reader may report EOF along with the last bytes.
+		case err != nil:
+			return buf, err
+		default:
+			return buf, io.EOF
+		}
+	}
+	return buf, nil
 }
 
 // Head returns the first n lines, or all of them when n is negative.
@@ -207,6 +232,12 @@ func (s *LineSource) estimate() (int, bool, error) {
 	got, err := s.readAt(buf, 0)
 	if err != nil {
 		return 0, false, err
+	}
+	if got < len(buf) {
+		// The content ended within the chunk, so it was shorter than promised
+		// and has now been read whole.
+		s.keep(buf[:got])
+		return s.count, true, nil
 	}
 	newlines := bytes.Count(buf[:got], []byte{'\n'})
 	if newlines == 0 {
