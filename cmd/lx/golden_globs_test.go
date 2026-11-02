@@ -62,6 +62,7 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "921_glob_stdin_last_match_wins", args: []string{"-n0", "-e", "build/*", "-i", "build/keep.js"}, stdin: "build/x.js\nbuild"},
 		{name: "922_glob_stdin_excluded_parent_dir", args: []string{"-n0", "-e", "build"}, stdin: "build/keep.js\nbuild/sub\nsrc/a.go"},
 		{name: "923_stdin_file_and_its_dir_listed_once", args: []string{"-n0"}, stdin: "build/keep.js\nbuild"},
+		{name: "924_glob_stdin_paths_cleaned", args: []string{"-n0", "-i", "src/*.go", "-i", "build/**", "-e", "build/sub", "-e", "build/x.js"}, stdin: "build//sub/y.js\nsrc/../build/x.js\nsrc//a.go\n./build/keep.js"},
 
 		// rg does not expand archives; lx matches an expanded archive as a
 		// directory and its entries as the paths below it.

@@ -1,0 +1,6 @@
+--- STDOUT ---
+[1/2] src/a.go (1 rows)
+[2/2] build/keep.js (1 rows)
+
+
+--- STDERR ---
