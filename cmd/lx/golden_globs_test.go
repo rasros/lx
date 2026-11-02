@@ -1,0 +1,72 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
+)
+
+// -i and -e work as ripgrep's -g glob and -g '!glob': the last one to match
+// a path decides it, ahead of .gitignore and hidden-file skipping, and once
+// there is an -i, a file must be kept by some glob. They match the path from
+// the working directory as the root was named. Every listing here is what
+// rg --files lists with the same globs, except where a case says otherwise.
+func TestGoldenGlobs(t *testing.T) {
+	dir := gf.SetupGlobsFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "900_glob_exclude_then_include", args: []string{"-n0", "-e", "build/*", "-i", "build/keep.js", "."}},
+		{name: "901_glob_include_then_exclude", args: []string{"-n0", "-i", "build/keep.js", "-e", "build/*", "."}},
+		{name: "902_glob_include_bang_excludes", args: []string{"-n0", "-i", "*.go", "-i", "!src/**", "."}},
+		// rg has no glob that keeps a path without also dropping the files
+		// no glob keeps; lx's -e '!glob' is that.
+		{name: "903_glob_exclude_bang_keeps", args: []string{"-n0", "-e", "ovr/**", "-e", "!ovr/keep.js", "."}},
+		{name: "904_glob_include_anchored_at_cwd", args: []string{"-n0", "-i", "build/*.js", "build"}},
+		{name: "905_glob_include_overrides_gitignore", args: []string{"-n0", "-i", "*.log", "."}},
+		{name: "906_glob_include_overrides_hidden_file", args: []string{"-n0", "-i", "*.go", "."}},
+		{name: "907_glob_include_hidden_dir", args: []string{"-n0", "-i", ".hdir", "-i", "*.go", "."}},
+		{name: "908_glob_include_gitignored_dir", args: []string{"-n0", "-i", "ign", "-i", "*.go", "."}},
+		{name: "909_glob_include_dir_keeps_no_files", args: []string{"-n0", "-i", "build", "."}},
+		{name: "910_glob_excluded_dir_not_entered", args: []string{"-n0", "-e", "build", "-i", "build/keep.js", "."}},
+		{name: "911_glob_excluded_contents_reincluded", args: []string{"-n0", "-e", "build/**", "-i", "build/keep.js", "."}},
+		{name: "912_glob_excluded_subdir_not_entered", args: []string{"-n0", "-e", "build/**", "-i", "build/sub/y.js", "."}},
+		{name: "913_glob_named_file_not_filtered", args: []string{"-n0", "-e", "a.go", "-i", "zzz", "a.go"}},
+		{name: "914_glob_named_dir_not_filtered", args: []string{"-n0", "-e", "ign", "ign"}},
+		{name: "915_glob_absolute_root_below_cwd", args: []string{"-n0", "-i", "build/*.js", filepath.Join(dir, "build")}},
+		{name: "916_glob_trailing_exclude_matches_last", args: []string{"-n0", "-i", "*.go", ".", "-e", "/a.go"}},
+
+		// rg takes no paths on stdin; a piped path is kept as a walk of the
+		// working directory would keep it.
+		{name: "920_glob_stdin_exclude_bang_keeps", args: []string{"-n0", "-e", "ovr/**", "-e", "!ovr/keep.js"}, stdin: "ovr"},
+		{name: "921_glob_stdin_last_match_wins", args: []string{"-n0", "-e", "build/*", "-i", "build/keep.js"}, stdin: "build/x.js\nbuild"},
+		{name: "922_glob_stdin_excluded_parent_dir", args: []string{"-n0", "-e", "build"}, stdin: "build/keep.js\nbuild/sub"},
+
+		// rg does not expand archives; lx matches an expanded archive as a
+		// directory and its entries as the paths below it.
+		{name: "930_glob_walked_archive_entries", args: []string{"-n0", "-Z", "-e", "arch/a.zip/src/*", "-i", "arch/a.zip/src/a.go", "."}},
+		{name: "931_glob_named_archive_entries", args: []string{"-n0", "-Z", "-i", "arch/a.zip/src/*.go", "arch/a.zip"}},
+		{name: "932_glob_include_enters_archive", args: []string{"-n0", "-Z", "-i", "*.go", "."}},
+	})
+}
+
+// Below the working directory, a relative root keeps its path as written,
+// so globs anchored at the working directory cannot match below "..", while
+// an absolute root has the working directory stripped from the front of the
+// paths below it.
+func TestGoldenGlobsOutsideCwd(t *testing.T) {
+	dir := gf.SetupGlobsFixture(t)
+	pkgDir, _ := os.Getwd()
+	t.Cleanup(func() { os.Chdir(pkgDir) })
+	if err := os.Chdir(filepath.Join(dir, "build")); err != nil {
+		t.Fatal(err)
+	}
+	canonical, _ := filepath.EvalSymlinks(dir)
+	runGoldenTests(t, []goldenTestCase{
+		{name: "940_glob_parent_root_as_written", args: []string{"-n0", "-i", "../build/*.js", ".."}},
+		{name: "941_glob_parent_root_misses_cwd_glob", args: []string{"-n0", "-i", "build/*.js", ".."}},
+		{name: "942_glob_absolute_root_above_cwd", args: []string{"-n0", "-i", "/x.js", dir}},
+		{name: "943_glob_absolute_root_outside_cwd", args: []string{"-n0", "-i", "**/ovr/keep.js", "-i", "ovr/drop.js", filepath.Join(dir, "ovr")}},
+		{name: "944_glob_absolute_archive_outside_cwd", args: []string{"-n0", "-Z", "-i", "**/a.zip/src/*.go", "-i", "arch/a.zip/notes.txt", filepath.Join(dir, "arch", "a.zip")}},
+	}, pkgDir, dir, canonical)
+}

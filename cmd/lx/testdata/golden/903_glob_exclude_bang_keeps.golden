@@ -1,0 +1,13 @@
+--- STDOUT ---
+[1/9] a.go (1 rows)
+[2/9] arch/a.zip - binary file skipped (283 B)
+[3/9] b.txt (1 rows)
+[4/9] build/keep.js (1 rows)
+[5/9] build/sub/y.js (1 rows)
+[6/9] build/x.js (1 rows)
+[7/9] ovr/keep.js (1 rows)
+[8/9] src/a.go (1 rows)
+[9/9] src/a_test.go (1 rows)
+
+
+--- STDERR ---

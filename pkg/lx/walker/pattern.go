@@ -2,7 +2,6 @@ package walker
 
 import (
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -28,10 +27,7 @@ type CompiledSpec struct {
 	Pattern  CompiledPattern
 }
 
-var (
-	compiledPatternCache sync.Map // map[string]CompiledPattern
-	compiledSpecCache    sync.Map // map[string]CompiledSpec (key: normalized pattern)
-)
+var compiledPatternCache sync.Map // map[string]CompiledPattern
 
 func compilePattern(pattern string) CompiledPattern {
 	if v, ok := compiledPatternCache.Load(pattern); ok {
@@ -54,29 +50,6 @@ func compilePattern(pattern string) CompiledPattern {
 	return actual.(CompiledPattern)
 }
 
-func compileSpec(rawPattern string) CompiledSpec {
-	normalized := normalizePattern(rawPattern)
-	if v, ok := compiledSpecCache.Load(normalized); ok {
-		return v.(CompiledSpec)
-	}
-
-	spec := compileNormalizedSpec(normalized)
-	actual, _ := compiledSpecCache.LoadOrStore(normalized, spec)
-	return actual.(CompiledSpec)
-}
-
-// CompileSpecs compiles all filter patterns.
-func CompileSpecs(rawPatterns []string) []CompiledSpec {
-	if len(rawPatterns) == 0 {
-		return nil
-	}
-	specs := make([]CompiledSpec, 0, len(rawPatterns))
-	for _, p := range rawPatterns {
-		specs = append(specs, compileSpec(p))
-	}
-	return specs
-}
-
 func compileNormalizedSpec(normalizedPattern string) CompiledSpec {
 	dirOnly := strings.HasSuffix(normalizedPattern, "/")
 	trimmed := strings.TrimSuffix(normalizedPattern, "/")
@@ -90,16 +63,6 @@ func compileNormalizedSpec(normalizedPattern string) CompiledSpec {
 	}
 }
 
-// normalizePattern cleans an -i or -e pattern. On Windows a backslash there
-// is a path separator; elsewhere, as in an ignore file, it escapes the next
-// character.
-func normalizePattern(raw string) string {
-	if filepath.Separator == '\\' {
-		raw = strings.ReplaceAll(raw, "\\", "/")
-	}
-	return cleanPattern(raw)
-}
-
 // cleanPattern cleans a pattern, keeping a trailing slash, which makes it
 // match directories only.
 func cleanPattern(raw string) string {
@@ -109,45 +72,6 @@ func cleanPattern(raw string) string {
 		cleaned += "/"
 	}
 	return cleaned
-}
-
-func normalizePathForMatch(raw string) string {
-	if filepath.Separator == '\\' {
-		raw = strings.ReplaceAll(raw, "\\", "/")
-	}
-	return path.Clean(raw)
-}
-
-// IsMatchAnyCompiled checks whether relPath matches at least one compiled pattern.
-func IsMatchAnyCompiled(specs []CompiledSpec, relPath string) bool {
-	if len(specs) == 0 {
-		return true
-	}
-	ctx := buildPathMatchInfo(normalizePathForMatch(relPath))
-	for _, spec := range specs {
-		if matchCompiledSpec(spec, ctx) {
-			return true
-		}
-	}
-	return false
-}
-
-// CouldMatchAnyDescendant reports whether at least one compiled pattern might match
-// a file at or under dirRelPath. Returning false is a safe prune signal.
-func CouldMatchAnyDescendant(specs []CompiledSpec, dirRelPath string) bool {
-	if len(specs) == 0 {
-		return true
-	}
-	dir := normalizePathForMatch(dirRelPath)
-	if dir == "." {
-		return true
-	}
-	for _, spec := range specs {
-		if couldMatchDescendant(spec, dir) {
-			return true
-		}
-	}
-	return false
 }
 
 // couldMatchDescendant reports whether spec could match a file below dir. A

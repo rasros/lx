@@ -267,41 +267,32 @@ func assertNotContains(t *testing.T, list []string, item string) {
 	}
 }
 
-func TestIsMatch(t *testing.T) {
+// An -i glob matches a path as a gitignore pattern does: by its base name
+// without a slash, as a whole path with one, and never by a directory above
+// it, which the walk judges on its own.
+func TestIncludeMatch(t *testing.T) {
 	tests := []struct {
 		pattern string
 		path    string
 		want    bool
 	}{
-		// Basename / floating patterns match at any depth
-		{"*.go", "main.go", true},
 		{"*.go", "sub/main.go", true},
 		{"*.go", "main.txt", false},
-		// Anchored pattern only matches at root
 		{"/foo.txt", "foo.txt", true},
 		{"/foo.txt", "sub/foo.txt", false},
-		// Path pattern (contains slash) is matched against full path
 		{"src/*.go", "src/main.go", true},
-		{"src/*.go", "pkg/main.go", false},
-		// Double star spans directories
+		{"src/*.go", "pkg/src/main.go", false},
 		{"**/test", "a/b/test", true},
 		{"**/test", "test", true},
-		{"**/test", "a/b/other", false},
-		// Literal floating name matches any segment
-		{"target", "target", true},
 		{"target", "src/target", true},
-		{"target", "other", false},
-		// Dir-only pattern: last segment of a plain path is excluded from matching
-		{"node_modules/", "node_modules/pkg/foo.go", true},
-		{"node_modules/", "other/foo.go", false},
+		{"target", "target/main.go", false},
+		{"node_modules/", "node_modules/pkg/foo.go", false},
 	}
 	for _, tt := range tests {
-		t.Run(tt.pattern+"|"+tt.path, func(t *testing.T) {
-			got := IsMatchAnyCompiled(CompileSpecs([]string{tt.pattern}), tt.path)
-			if got != tt.want {
-				t.Errorf("match(%q, %q) = %v, want %v", tt.pattern, tt.path, got, tt.want)
-			}
-		})
+		o := compileOverrides([]Override{IncludeOverride(tt.pattern)})
+		if m, _ := o.match(tt.path, false, false); (m == matchKeep) != tt.want {
+			t.Errorf("match(%q, %q) = %v, want %v", tt.pattern, tt.path, m == matchKeep, tt.want)
+		}
 	}
 }
 
@@ -541,7 +532,7 @@ func TestWalker_NamedFileIsNeverFiltered(t *testing.T) {
 	mustWriteFile(t, dir, "a.log", "x")
 	mustWriteFile(t, dir, ".env", "x")
 
-	w := New(Options{Override: []string{"*.js"}, IgnoreEnabled: true, SkipHidden: true})
+	w := New(Options{Overrides: []Override{ExcludeOverride("*.js")}, IgnoreEnabled: true, SkipHidden: true})
 	for _, name := range []string{"build/out.js", "a.log", ".env"} {
 		if got := walkNamed(t, w, dir, name); !reflect.DeepEqual(got, []string{name}) {
 			t.Errorf("got %v, want %s included", got, name)
@@ -551,5 +542,9 @@ func TestWalker_NamedFileIsNeverFiltered(t *testing.T) {
 
 // patterns.
 func newWalker(base, override []string) *Walker {
-	return New(Options{Base: base, Override: override, IgnoreEnabled: true})
+	var overrides []Override
+	for _, p := range override {
+		overrides = append(overrides, ExcludeOverride(p))
+	}
+	return New(Options{Base: base, Overrides: overrides, IgnoreEnabled: true})
 }

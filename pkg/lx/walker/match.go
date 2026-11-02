@@ -32,11 +32,6 @@ func buildPathMatchInfo(relPath string) pathMatchInfo {
 
 func parseRules(lines []string, basePath, source string) []Rule {
 	var rules []Rule
-	basePathPrefix := ""
-	if basePath != "" && basePath != "." {
-		basePathPrefix = basePath + "/"
-	}
-
 	for _, p := range lines {
 		p = trimTrailingSpaces(strings.TrimLeft(strings.TrimSuffix(p, "\r"), " \t"))
 		if p == "" || strings.HasPrefix(p, "#") {
@@ -51,28 +46,36 @@ func parseRules(lines []string, basePath, source string) []Rule {
 			// An escaped leading ! or # is part of the pattern.
 			p = p[1:]
 		}
-
-		// Backslashes escape the next character, as in git, so they are
-		// kept for the matcher rather than read as separators.
-		p = cleanPattern(p)
-		spec := compileNormalizedSpec(p)
-		// A trailing "/**" matches everything inside a directory but not the
-		// directory itself, as in git and ripgrep, so "*" and "!src/**"
-		// leave src/ ignored: at least one component must follow.
-		if dir, ok := strings.CutSuffix(spec.Pattern.Pattern, "/**"); ok {
-			spec.Pattern = compilePattern(dir + "/*/**")
-		}
-
-		rules = append(rules, Rule{
-			Pattern:        p,
-			Negate:         negate,
-			BasePath:       basePath,
-			Source:         source,
-			BasePathPrefix: basePathPrefix,
-			Spec:           spec,
-		})
+		rules = append(rules, newRule(p, negate, basePath, source))
 	}
 	return rules
+}
+
+// newRule compiles the pattern p, without a leading "!", matched relative to
+// basePath.
+func newRule(p string, negate bool, basePath, source string) Rule {
+	basePathPrefix := ""
+	if basePath != "" && basePath != "." {
+		basePathPrefix = basePath + "/"
+	}
+	// Backslashes escape the next character, as in git, so they are kept
+	// for the matcher rather than read as separators.
+	p = cleanPattern(p)
+	spec := compileNormalizedSpec(p)
+	// A trailing "/**" matches everything inside a directory but not the
+	// directory itself, as in git and ripgrep, so "*" and "!src/**" leave
+	// src/ ignored: at least one component must follow.
+	if dir, ok := strings.CutSuffix(spec.Pattern.Pattern, "/**"); ok {
+		spec.Pattern = compilePattern(dir + "/*/**")
+	}
+	return Rule{
+		Pattern:        p,
+		Negate:         negate,
+		BasePath:       basePath,
+		Source:         source,
+		BasePathPrefix: basePathPrefix,
+		Spec:           spec,
+	}
 }
 
 // trimTrailingSpaces strips the trailing spaces of an ignore file line, as
@@ -86,24 +89,6 @@ func trimTrailingSpaces(p string) string {
 		end--
 	}
 	return p[:end]
-}
-
-func matchCompiledSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
-	if spec.Pattern.HasSlash || spec.Anchored {
-		return spec.Pattern.matchCandidate(ctx.relPath)
-	}
-
-	if spec.Pattern.matchCandidate(ctx.baseName) {
-		return true
-	}
-
-	for i := 0; i < len(ctx.parts)-1; i++ {
-		if spec.Pattern.matchCandidate(ctx.parts[i]) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // matchIgnoreSpec matches an ignore rule as git does: a pattern without a
@@ -154,41 +139,25 @@ func (m *pathMatcher) match(rule Rule, isDir bool) bool {
 	return m.under && matchIgnoreSpec(rule.Spec, m.target)
 }
 
-// whitelisted reports whether the last of rules to match a path is a
-// negation, which re-includes it even when it is hidden, as in ripgrep.
-func whitelisted(relPath string, isDir bool, rules []Rule) (matched, negated bool) {
-	m := newPathMatcher(relPath)
-	for _, rule := range rules {
-		if m.match(rule, isDir) {
-			matched, negated = true, rule.Negate
-		}
-	}
-	return matched, negated
-}
-
-// checkIgnore applies rules to a path, continuing from the state ignored
-// and its reason left by earlier rules.
-// The last matching rule decides.
-func checkIgnore(relPath string, isDir bool, rules []Rule, ignored bool, reason string, wantReason bool) (bool, string) {
+// lastMatch returns what rules say about a path: the last of them to match
+// it decides, ignoring it, or keeping it when it is a negation.
+func lastMatch(relPath string, isDir bool, rules []Rule, wantReason bool) (match, string) {
 	if len(rules) == 0 {
-		return ignored, reason
+		return matchNone, ""
 	}
 	m := newPathMatcher(relPath)
-
-	for _, rule := range rules {
-		if m.match(rule, isDir) {
-			if rule.Negate {
-				ignored = false
-				if wantReason {
-					reason = ""
-				}
-			} else {
-				ignored = true
-				if wantReason {
-					reason = fmt.Sprintf("rule %q in %s", rule.Pattern, rule.Source)
-				}
-			}
+	for i := len(rules) - 1; i >= 0; i-- {
+		rule := &rules[i]
+		if !m.match(*rule, isDir) {
+			continue
 		}
+		if rule.Negate {
+			return matchKeep, ""
+		}
+		if wantReason {
+			return matchIgnore, fmt.Sprintf("rule %q in %s", rule.Pattern, rule.Source)
+		}
+		return matchIgnore, ""
 	}
-	return ignored, reason
+	return matchNone, ""
 }

@@ -225,10 +225,10 @@ func TestFrame_InfoExcludeComesFirst(t *testing.T) {
 	if got := rulePatterns(f.rules, repo); !reflect.DeepEqual(got, []string{"*.md@.", "!README.md@."}) {
 		t.Fatalf("expected info/exclude before .gitignore, got %v", got)
 	}
-	if ignored, _ := checkIgnore(treeRel(repo)+"/sub/README.md", false, f.rules, false, "", false); ignored {
+	if isIgnored(treeRel(repo)+"/sub/README.md", false, f.rules) {
 		t.Fatal("expected .gitignore negation to override info/exclude")
 	}
-	if ignored, _ := checkIgnore(treeRel(repo)+"/sub/notes.md", false, f.rules, false, "", false); !ignored {
+	if !isIgnored(treeRel(repo)+"/sub/notes.md", false, f.rules) {
 		t.Fatal("expected info/exclude to ignore notes.md")
 	}
 }
@@ -395,9 +395,10 @@ func TestWalkPath_NamedPathsAreNotFiltered(t *testing.T) {
 	}
 }
 
-// -e patterns are anchored at the working directory however it and the root
-// are named: through a symlink or by their real paths.
-func TestCache_OverridePrefix(t *testing.T) {
+// Overrides match a path as its root was named, as ripgrep's -g globs do:
+// a relative root as written, an absolute one with the working directory,
+// by either of its names, stripped from the front.
+func TestCache_Anchor(t *testing.T) {
 	top, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -411,18 +412,22 @@ func TestCache_OverridePrefix(t *testing.T) {
 	}
 
 	other := filepath.Join(top, "other")
-	for _, tt := range []struct{ cwd, root, want string }{
-		{link, link, ""},
-		{link, real, ""},
-		{real, link, ""},
-		{link, filepath.Join(real, "sub"), "sub/"},
-		{link, filepath.Join(link, "sub"), "sub/"},
-		{real, filepath.Join(link, "sub"), "sub/"},
-		{link, other, "../../other/"},
-		{real, other, "../../other/"},
+	slash := filepath.ToSlash
+	for _, tt := range []struct{ cwd, root, rel, want string }{
+		{link, link, ".", "."},
+		{link, real, "x", "x"},
+		{link, filepath.Join(real, "sub"), "x", "sub/x"},
+		{link, filepath.Join(link, "sub"), "x", "sub/x"},
+		{link, other, "x", slash(other) + "/x"},
+		{real, top, "real/e1/sub/x", "sub/x"},
+		{real, top, "real/e1", "."},
+		{real, top, "other/x", slash(top) + "/other/x"},
+		{real, "../x", "y", "../x/y"},
+		{real, "./sub/", "y", "sub/y"},
+		{real, "sub", ".", "sub"},
 	} {
-		if got := NewCache(newTestHost(tt.cwd)).OverridePrefix(tt.root); got != tt.want {
-			t.Errorf("cwd %s, root %s: got %q, want %q", tt.cwd, tt.root, got, tt.want)
+		if got := NewCache(newTestHost(tt.cwd)).Anchor(tt.root).Path(tt.rel); got != tt.want {
+			t.Errorf("cwd %s, root %s, path %s: got %q, want %q", tt.cwd, tt.root, tt.rel, got, tt.want)
 		}
 	}
 }

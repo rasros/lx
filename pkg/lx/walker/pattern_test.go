@@ -108,7 +108,7 @@ func TestCompileSpecMetadata(t *testing.T) {
 			if (tt.windowsOnly && !windows) || (tt.unixOnly && windows) {
 				t.Skip("separator-specific case")
 			}
-			spec := compileSpec(tt.raw)
+			spec := compileOverrides([]Override{{Glob: tt.raw}}).rules[0].Spec
 			if spec.Pattern.Pattern != tt.wantPattern {
 				t.Fatalf("Pattern = %q, want %q", spec.Pattern.Pattern, tt.wantPattern)
 			}
@@ -180,7 +180,7 @@ func TestParseRulesUsesCompiledSpec(t *testing.T) {
 		t.Fatalf("expected 5 rules, got %d", len(rules))
 	}
 	for i, rule := range rules {
-		want := compileSpec(rule.Pattern)
+		want := compileNormalizedSpec(rule.Pattern)
 		if !reflect.DeepEqual(rule.Spec, want) {
 			t.Fatalf("rule[%d] spec mismatch: got %#v want %#v", i, rule.Spec, want)
 		}
@@ -190,24 +190,7 @@ func TestParseRulesUsesCompiledSpec(t *testing.T) {
 	}
 }
 
-func TestCompileSpecsAndMatchAnyCompiled(t *testing.T) {
-	specs := CompileSpecs([]string{"*.go", "docs/*.md"})
-	if len(specs) != 2 {
-		t.Fatalf("CompileSpecs len = %d, want 2", len(specs))
-	}
-
-	if !IsMatchAnyCompiled(specs, "main.go") {
-		t.Fatal("expected compiled include specs to match main.go")
-	}
-	if !IsMatchAnyCompiled(specs, "docs/readme.md") {
-		t.Fatal("expected compiled include specs to match docs/readme.md")
-	}
-	if IsMatchAnyCompiled(specs, "scripts/build.sh") {
-		t.Fatal("did not expect compiled include specs to match scripts/build.sh")
-	}
-}
-
-func TestCouldMatchAnyDescendant(t *testing.T) {
+func TestReachBelow(t *testing.T) {
 	tests := []struct {
 		name     string
 		patterns []string
@@ -290,9 +273,12 @@ func TestCouldMatchAnyDescendant(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			specs := CompileSpecs(tt.patterns)
-			if got := CouldMatchAnyDescendant(specs, tt.dir); got != tt.want {
-				t.Fatalf("CouldMatchAnyDescendant(%v, %q) = %v, want %v", tt.patterns, tt.dir, got, tt.want)
+			var globs []Override
+			for _, p := range tt.patterns {
+				globs = append(globs, IncludeOverride(p))
+			}
+			if got := compileOverrides(globs).reachBelow(tt.dir); got != tt.want {
+				t.Fatalf("reachBelow(%v, %q) = %v, want %v", tt.patterns, tt.dir, got, tt.want)
 			}
 		})
 	}

@@ -1,0 +1,8 @@
+--- STDOUT ---
+[1/4] a.go (1 rows)
+[2/4] src/.hidden.go (1 rows)
+[3/4] src/a.go (1 rows)
+[4/4] src/a_test.go (1 rows)
+
+
+--- STDERR ---

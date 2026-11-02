@@ -10,7 +10,8 @@
 //
 // DiscoverOptions decide what Collector.Collect finds:
 //
-//   - Includes / Excludes filter the files below a directory or in an archive.
+//   - Globs filter the files below a directory or in an archive as ripgrep's
+//     -g globs do; IncludeGlob and ExcludeGlob make them from lx's -i and -e.
 //   - IgnoreRules / GitExcludes apply everywhere; UserIgnoreRules reads the
 //     ones lx uses. Ignore files (.gitignore inside a git repository,
 //     .ignore and .lxignore everywhere) apply from every directory above the
