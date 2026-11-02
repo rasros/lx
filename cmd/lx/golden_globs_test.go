@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,6 +43,15 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "918_section_trailing_glob_applies_to_last", args: []string{"-s", "A", "-n0", "build", "-s", "B", "-n0", "src", "-e", "*_test.go"}},
 		{name: "919_section_glob_before_next_section", args: []string{"-s", "A", "-n0", "src", "-e", "*_test.go", "-s", "B", "-n0", "src"}},
 
+		// Globs and roots are matched as written, as rg matches them: no
+		// cleaning of "./", "//" or "..". An -i that is empty or starts with
+		// "#" adds no glob, and one that cannot be parsed is an error.
+		{name: "950_glob_dot_slash_as_written", args: []string{"-n0", "-i", "./src/*.go", "-i", "src//*.go", "-i", "b.txt", "."}},
+		{name: "951_glob_dot_dot_as_written", args: []string{"-n0", "-i", "src/../a.go", "-i", "b.txt", "."}},
+		{name: "952_glob_root_as_written", args: []string{"-n0", "-i", "src/../build/*.js", "-i", "build/sub/*", "src/../build"}},
+		{name: "953_glob_comment_and_empty_add_nothing", args: []string{"-n0", "-i", "#b.txt", "-i", "", "-e", "*.go", "-e", "*.js", "."}},
+		{name: "954_glob_invalid", args: []string{"-n0", "-i", "src/[ab", "."}},
+
 		// rg takes no paths on stdin; a piped path is kept as a walk of the
 		// working directory would keep it.
 		{name: "920_glob_stdin_exclude_bang_keeps", args: []string{"-n0", "-e", "ovr/**", "-e", "!ovr/keep.js"}, stdin: "ovr"},
@@ -54,6 +65,17 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "931_glob_named_archive_entries", args: []string{"-n0", "-Z", "-i", "arch/a.zip/src/*.go", "arch/a.zip"}},
 		{name: "932_glob_include_enters_archive", args: []string{"-n0", "-Z", "-i", "*.go", "."}},
 	})
+}
+
+// The entries of a URL archive are matched below the URL as written, "//"
+// and all, so a glob spelling out an entry's displayed path keeps it.
+func TestGoldenGlobsURLArchive(t *testing.T) {
+	dir := gf.SetupGlobsFixture(t)
+	server := httptest.NewServer(http.FileServer(http.Dir(filepath.Join(dir, "arch"))))
+	defer server.Close()
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "933_glob_url_archive_entries", args: []string{"-n0", "-Z", "-i", server.URL + "/a.zip/src/*.go", "-i", "notes.txt", server.URL + "/a.zip"}},
+	}, server.URL)
 }
 
 // Below the working directory, a relative root keeps its path as written,

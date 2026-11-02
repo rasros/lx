@@ -396,7 +396,7 @@ func TestWalkPath_NamedPathsAreNotFiltered(t *testing.T) {
 }
 
 // Overrides match a path as its root was named, as ripgrep's -g globs do:
-// a relative root as written, an absolute one with the working directory,
+// a relative root as written, uncleaned, an absolute one with the working directory,
 // by either of its names, stripped from the front.
 func TestCache_Anchor(t *testing.T) {
 	top, err := filepath.EvalSymlinks(t.TempDir())
@@ -424,6 +424,7 @@ func TestCache_Anchor(t *testing.T) {
 		{real, top, "other/x", slash(top) + "/other/x"},
 		{real, "../x", "y", "../x/y"},
 		{real, "./sub/", "y", "sub/y"},
+		{real, "src/../x", "y", "src/../x/y"},
 		{real, "sub", ".", "sub"},
 	} {
 		if got := NewCache(newTestHost(tt.cwd)).Anchor(tt.root).Path(tt.rel); got != tt.want {

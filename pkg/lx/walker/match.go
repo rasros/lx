@@ -46,7 +46,9 @@ func parseRules(lines []string, basePath, source string) []Rule {
 			// An escaped leading ! or # is part of the pattern.
 			p = p[1:]
 		}
-		rules = append(rules, newRule(p, negate, basePath, source))
+		// Backslashes escape the next character, as in git, so they are
+		// kept for the matcher rather than read as separators.
+		rules = append(rules, newRule(cleanPattern(p), negate, basePath, source))
 	}
 	return rules
 }
@@ -58,9 +60,6 @@ func newRule(p string, negate bool, basePath, source string) Rule {
 	if basePath != "" && basePath != "." {
 		basePathPrefix = basePath + "/"
 	}
-	// Backslashes escape the next character, as in git, so they are kept
-	// for the matcher rather than read as separators.
-	p = cleanPattern(p)
 	spec := compileNormalizedSpec(p)
 	// A trailing "/**" matches everything inside a directory but not the
 	// directory itself, as in git and ripgrep, so "*" and "!src/**" leave

@@ -210,7 +210,7 @@ Interleaved option:
           
           Useful for log files, append-only journals, or checking the most
           recent additions to a file.
-  -i, --include <value>
+  -i, --include <glob>
           Keep what matches a glob for subsequent paths, as rg -g GLOB does.
           
           -i and -e globs apply in command-line order, and the last one to match
@@ -235,7 +235,7 @@ Interleaved option:
             -i "*.go" (Keep only Go files)
             -i "src/**" (Keep the files inside src)
             -i "*.{js,ts}" (Keep JS and TS files)
-  -e, --exclude <value>
+  -e, --exclude <glob>
           Drop what matches a glob for subsequent paths, as rg -g '!GLOB' does.
           
           -e globs match as -i globs do, and the last -i or -e to match a path

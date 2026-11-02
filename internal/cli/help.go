@@ -250,6 +250,8 @@ func makeFuncs(p ansi.Painter) template.FuncMap {
 				sb.WriteString(" <n>")
 			case ValueSize:
 				sb.WriteString(" <size>")
+			case ValueGlob:
+				sb.WriteString(" <glob>")
 			case ValueOptional:
 				sb.WriteString(" [value]")
 			}
@@ -272,6 +274,8 @@ func makeFuncs(p ansi.Painter) template.FuncMap {
 				flagPart += " <n>"
 			case ValueSize:
 				flagPart += " <size>"
+			case ValueGlob:
+				flagPart += " <glob>"
 			case ValueOptional:
 				flagPart += " [value]"
 			case ValueNone:
