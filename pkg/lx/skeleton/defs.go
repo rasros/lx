@@ -60,6 +60,11 @@ var (
 
 	csharpTypes = []string{"class_declaration", "interface_declaration", "struct_declaration", "enum_declaration", "record_declaration"}
 
+	// preprocGroups are conditional compilation blocks, whose members
+	// belong to the body around them; their #if, #else and #endif lines are
+	// kept around the members kept inside.
+	preprocGroups = []string{"preproc_if", "preproc_ifdef", "preproc_elif", "preproc_elifdef", "preproc_else"}
+
 	csharpMembers = &langs.Members{
 		BodyField: "body",
 		Bodies:    []string{"declaration_list"},
@@ -68,6 +73,8 @@ var (
 		Methods: []string{"method_declaration", "constructor_declaration", "destructor_declaration", "operator_declaration",
 			"conversion_operator_declaration", "indexer_declaration"},
 		Nested:       csharpTypes,
+		Groups:       preprocGroups,
+		Frames:       preprocGroups,
 		MethodBodies: []string{"accessor_list"},
 		Private:      langs.CSharpPrivate,
 	}
@@ -151,19 +158,27 @@ var (
 		SkipBodiless:     true,
 		Unwrap:           langs.CppUnwrap,
 		Kind:             langs.CppMember,
+		Groups:           preprocGroups,
+		Frames:           preprocGroups,
 		Section:          "access_specifier",
 		SectionPrivate:   langs.CppSectionPrivate,
 		PrivateByDefault: []string{"class_specifier"},
 	}
 
+	objcGroups = append([]string{"instance_variables", "qualified_protocol_interface_declaration"}, preprocGroups...)
+
 	// objcMembers walks an @interface or @protocol, whose members are its
 	// own children between the header row and @end. Instance variables in
-	// the `{ ... }` block are fields, hidden after @private or @package.
+	// the `{ ... }` block are fields (a struct_declaration, or a declaration
+	// inside #if), hidden after @private or @package. A protocol's
+	// @required and @optional sections are groups.
 	objcMembers = &langs.Members{
 		BodyIsNode:     true,
-		Groups:         []string{"instance_variables"},
+		Groups:         objcGroups,
+		Frames:         objcGroups,
+		SectionScopes:  []string{"instance_variables"},
 		Unwrap:         langs.ObjCUnwrap,
-		Fields:         []string{"property_declaration", "struct_declaration"},
+		Fields:         []string{"property_declaration", "struct_declaration", "declaration"},
 		Methods:        []string{"method_declaration"},
 		Section:        "visibility_specification",
 		SectionPrivate: langs.ObjCSectionPrivate,

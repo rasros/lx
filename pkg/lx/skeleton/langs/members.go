@@ -63,10 +63,20 @@ type Members struct {
 	// with it like annotations.
 	Unwrap func(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node
 	// Groups are member node types whose children are members of the same
-	// body (Java's enum_body_declarations after the enum constants,
-	// Objective-C's instance variable block). An access section inside a
-	// group ends with it.
+	// body: Java's enum_body_declarations after the enum constants,
+	// Objective-C's instance variable block and @optional sections, and
+	// preprocessor conditionals (#if ... #endif).
 	Groups []string
+	// Frames are groups whose delimiter rows are kept around the members
+	// kept inside them, so the output stays well-formed: the first row (#if,
+	// #else, @optional, "{") and, when the group ends in a token, the last
+	// (#endif, "}"). A frame that opens on the header's row is always kept
+	// whole.
+	Frames []string
+	// SectionScopes are groups that end the access sections opened inside
+	// them (Objective-C's instance variable block: @private there says
+	// nothing about the methods after it).
+	SectionScopes []string
 
 	// MethodBodies are the child types of a method's body when the grammar
 	// has no "body" field for it (Kotlin's function_body, Groovy's closure),
@@ -80,8 +90,8 @@ type Members struct {
 	Private func(c *Ctx, parent, n *gotreesitter.Node) bool
 	// Section is the node type of an access section label (C++
 	// "public:"): it sets the visibility of the members after it, as
-	// SectionPrivate reports. Members of a type in PrivateByDefault start
-	// out private.
+	// SectionPrivate reports, and its row is kept when a member after it is.
+	// Members of a type in PrivateByDefault start out private.
 	Section          string
 	SectionPrivate   func(c *Ctx, label *gotreesitter.Node) bool
 	PrivateByDefault []string
@@ -120,9 +130,10 @@ func (m *Members) body(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node {
 // of body and whose members are the children of items (usually body itself).
 func (m *Members) Walk(c *Ctx, out []internal.LineRange, n, body, items *gotreesitter.Node) []internal.LineRange {
 	headerEnd := startRow(body)
-	w := memberWalk{m: m, c: c, parent: n, private: slices.Contains(m.PrivateByDefault, c.Type(n))}
+	w := memberWalk{m: m, c: c, parent: n, headerEnd: headerEnd, label: -1,
+		private: slices.Contains(m.PrivateByDefault, c.Type(n))}
 	w.walk(items)
-	if !c.Structs && len(w.out) == 0 {
+	if !c.Structs && w.kept == 0 {
 		return out
 	}
 
@@ -136,11 +147,14 @@ func (m *Members) Walk(c *Ctx, out []internal.LineRange, n, body, items *gotrees
 
 // memberWalk is one pass over the members of a type body.
 type memberWalk struct {
-	m       *Members
-	c       *Ctx
-	parent  *gotreesitter.Node
-	private bool // inside a private access section
-	out     []internal.LineRange
+	m         *Members
+	c         *Ctx
+	parent    *gotreesitter.Node
+	headerEnd int
+	private   bool // inside a private access section
+	label     int  // row of the access section label no member has been kept under yet, or -1
+	kept      int  // members kept
+	out       []internal.LineRange
 }
 
 func (w *memberWalk) walk(items *gotreesitter.Node) {
@@ -154,13 +168,11 @@ func (w *memberWalk) walk(items *gotreesitter.Node) {
 		t := c.Type(decl)
 		if m.Section != "" && t == m.Section {
 			w.private = m.SectionPrivate(c, decl)
+			w.label = startRow(decl)
 			continue
 		}
 		if slices.Contains(m.Groups, t) {
-			// Access sections inside a group end with it.
-			private := w.private
-			w.walk(decl)
-			w.private = private
+			w.group(decl, t)
 			continue
 		}
 		if w.private || (m.Private != nil && m.Private(c, w.parent, child)) {
@@ -173,22 +185,56 @@ func (w *memberWalk) walk(items *gotreesitter.Node) {
 		switch m.kind(c, decl) {
 		case Field:
 			if c.Structs {
+				w.keep()
 				w.out = c.EmitWithDoc(w.out, from, endRow(child))
 			}
 		case Method:
 			if c.Functions {
+				w.keep()
 				w.out = c.EmitLeadingDoc(w.out, from)
 				w.out = EmitDecorators(w.out, c.Lines, from, startRow(decl))
 				w.out = EmitFuncSig(w.out, c.Lines, decl, c.Lang, false, m.methodBody(c, decl))
 			}
 		case Nested:
 			if sub := m.Emit(c, nil, decl); len(sub) > 0 {
+				w.keep()
 				w.out = c.EmitLeadingDoc(w.out, from)
 				w.out = EmitDecorators(w.out, c.Lines, from, startRow(decl))
 				w.out = append(w.out, sub...)
 			}
 		}
 	}
+}
+
+// keep counts a kept member, keeping the label of its access section first.
+func (w *memberWalk) keep() {
+	w.kept++
+	if w.label >= 0 {
+		w.out = internal.KeepLine(w.out, w.c.Lines, w.label)
+		w.label = -1
+	}
+}
+
+// group walks the members inside g, a node of group type t, and keeps its
+// frame rows around them.
+func (w *memberWalk) group(g *gotreesitter.Node, t string) {
+	m, c := w.m, w.c
+	private, label, outer, keptBefore := w.private, w.label, w.out, w.kept
+	w.out = nil
+	w.walk(g)
+	inner := w.out
+	w.out = outer
+	if slices.Contains(m.SectionScopes, t) {
+		w.private, w.label = private, label
+	}
+	first, last := startRow(g), endRow(g)
+	if slices.Contains(m.Frames, t) && (w.kept > keptBefore || first <= w.headerEnd) {
+		w.out = internal.KeepLine(w.out, c.Lines, first)
+		if n := g.ChildCount(); n > 0 && !g.Child(n-1).IsNamed() && last > first {
+			w.out = internal.KeepLine(w.out, c.Lines, last)
+		}
+	}
+	w.out = append(w.out, inner...)
 }
 
 // methodBody returns the first of MethodBodies that n has a child of.

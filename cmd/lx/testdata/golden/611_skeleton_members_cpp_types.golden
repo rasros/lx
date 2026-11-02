@@ -1,9 +1,11 @@
 --- STDOUT ---
-skeleton/members.cpp (57 rows, type definitions)
+skeleton/members.cpp (63 rows, type definitions)
 ---
 ```cpp
 // Widget holds a value.
 class Widget {
+...
+public:
 ...
     // Nested type: walked with its own (struct, public) access.
     struct Inner {
@@ -15,6 +17,8 @@ class Widget {
     };
     void (*callback)(int);
     int plain;
+...
+    friend class WidgetFactory;
 ...
 };
 ...

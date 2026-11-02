@@ -67,6 +67,9 @@ public:
     C();
     template <typename T> T get(T x) { return x; }
     enum class E { A };
+    operator int() const;
+    friend bool operator==(const C& a, const C& b);
+    friend class F;
 };
 `)
 	_, ms := members(t, c, root, "class_specifier")
@@ -86,6 +89,9 @@ public:
 		{"C();", Method},
 		{"template <typename T> T get(T x) { return x; }", Method},
 		{"enum class E { A };", Nested},
+		{"operator int() const;", Method},
+		{"friend bool operator==(const C& a, const C& b);", Method},
+		{"friend class F;", Field},
 	}
 	if len(ms) != len(want) {
 		for _, m := range ms {
