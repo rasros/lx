@@ -115,53 +115,86 @@ func (o Override) rule() (Rule, bool) {
 		// As in ripgrep, a backslash is a separator on Windows.
 		p = strings.ReplaceAll(p, `\`, "/")
 	}
-	return newRule(escapeClassBrackets(p), o.Kind != Exclude, "", "-i/-e globs"), true
+	p, valid := translateClasses(p)
+	r := newRule(p, o.Kind != Exclude, "", "-i/-e globs")
+	r.invalid = !valid
+	return r, true
 }
 
-// escapeClassBrackets escapes a "]" that opens a character class, "[]a]" or
-// "[!]a]", which ripgrep reads as a literal "]" and the matcher would read as
-// closing the class.
-func escapeClassBrackets(p string) string {
-	if !strings.Contains(p, "[]") && !strings.Contains(p, "[!]") && !strings.Contains(p, "[^]") {
-		return p
+// translateClasses rewrites the character classes of p from ripgrep's
+// syntax to the matcher's: a "]" opening a class, as in "[]a]" or "[!]a]", is
+// part of it, and a backslash inside one is a literal character, both of
+// which the matcher would read otherwise. It reports false for a class
+// ripgrep rejects: an inverted range such as "[z-a]".
+func translateClasses(p string) (string, bool) {
+	if !strings.Contains(p, "[") {
+		return p, true
 	}
 	var b strings.Builder
+	valid := true
 	for i := 0; i < len(p); i++ {
-		b.WriteByte(p[i])
-		switch p[i] {
-		case '\\':
+		c := p[i]
+		if c == '\\' {
+			b.WriteByte(c)
 			if i+1 < len(p) {
 				i++
 				b.WriteByte(p[i])
 			}
-		case '[':
-			if i+1 < len(p) && (p[i+1] == '!' || p[i+1] == '^') {
-				i++
-				b.WriteByte(p[i])
+			continue
+		}
+		if c != '[' {
+			b.WriteByte(c)
+			continue
+		}
+		// Find the class's closing "]", after an optional negation and a
+		// "]" that is part of the class.
+		start := i + 1
+		if start < len(p) && (p[start] == '!' || p[start] == '^') {
+			start++
+		}
+		end := start
+		if end < len(p) && p[end] == ']' {
+			end++
+		}
+		for end < len(p) && p[end] != ']' {
+			end++
+		}
+		if end >= len(p) {
+			// An unclosed class; the matcher rejects it.
+			b.WriteString(p[i:])
+			break
+		}
+		b.WriteString(p[i:start])
+		chars := p[start:end]
+		for k := 0; k < len(chars); k++ {
+			if k+2 < len(chars) && chars[k+1] == '-' && chars[k+2] < chars[k] {
+				valid = false
 			}
-			if i+1 < len(p) && p[i+1] == ']' {
-				i++
-				b.WriteString(`\]`)
+			switch chars[k] {
+			case '\\', ']':
+				b.WriteByte('\\')
 			}
-			// The rest of the class, up to its closing "]", is copied as is.
-			for i+1 < len(p) && p[i+1] != ']' {
-				i++
-				b.WriteByte(p[i])
-				if p[i] == '\\' && i+1 < len(p) {
-					i++
-					b.WriteByte(p[i])
+			b.WriteByte(chars[k])
+			if k+2 < len(chars) && chars[k+1] == '-' {
+				b.WriteByte('-')
+				k += 2
+				if chars[k] == '\\' || chars[k] == ']' {
+					b.WriteByte('\\')
 				}
+				b.WriteByte(chars[k])
 			}
 		}
+		b.WriteByte(']')
+		i = end
 	}
-	return b.String()
+	return b.String(), valid
 }
 
 // Validate reports an error when o's glob cannot be parsed, as ripgrep does
 // for its -g globs, such as an unclosed "[" or "{", an unopened "}" or a
 // dangling "\".
 func (o Override) Validate() error {
-	if r, ok := o.rule(); ok && !doublestar.ValidatePattern(r.Spec.Pattern.Pattern) {
+	if r, ok := o.rule(); ok && (r.invalid || !doublestar.ValidatePattern(r.Spec.Pattern.Pattern)) {
 		return fmt.Errorf("invalid glob %q", o.Glob)
 	}
 	return nil

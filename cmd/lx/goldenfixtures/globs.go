@@ -31,3 +31,16 @@ func SetupGlobsFixture(t *testing.T) string {
 	})
 	return dir
 }
+
+// SetupGlobClassFixture builds a directory of names holding the backslashes,
+// brackets and dashes that character classes in -i and -e globs match. It
+// needs a filesystem that allows a backslash in a name.
+func SetupGlobClassFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+	for _, name := range []string{`\`, `x\y`, "]", "a", "x]", "[", "-", "q"} {
+		writeFile(t, dir, name, "x\n", 0644)
+	}
+	return dir
+}

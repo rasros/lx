@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
@@ -81,6 +82,21 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "930_glob_walked_archive_entries", args: []string{"-n0", "-Z", "-e", "arch/a.zip/src/*", "-i", "arch/a.zip/src/a.go", "."}},
 		{name: "931_glob_named_archive_entries", args: []string{"-n0", "-Z", "-i", "arch/a.zip/src/*.go", "arch/a.zip"}},
 		{name: "932_glob_include_enters_archive", args: []string{"-n0", "-Z", "-i", "*.go", "."}},
+	})
+}
+
+// Inside a character class a backslash is a literal character and a "]"
+// right after the opening "[" is part of the class, as in rg, and an
+// inverted range is an error.
+func TestGoldenGlobClasses(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("names with a backslash")
+	}
+	dir := gf.SetupGlobClassFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "960_glob_class_backslash_is_literal", args: []string{"-n0", "-i", `[\]`, "-i", `x[\]y`, "-i", `[\-a]`, "."}},
+		{name: "961_glob_class_leading_bracket", args: []string{"-n0", "-i", `[]\]`, "-i", `[!\]]`, "-i", `[\[]`, "."}},
+		{name: "962_glob_class_inverted_range", args: []string{"-n0", "-i", "[b-a]*", "."}},
 	})
 }
 
