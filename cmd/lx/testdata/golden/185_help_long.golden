@@ -389,7 +389,10 @@ Interleaved option:
   -u, --functions
           Filter files in the next section to show only function and method
           signatures. A method keeps the header and closing line of the type
-          around it for context; fields and types without methods are left out.
+          around it for context; fields and types without methods are left out,
+          and so are function pointers, which are variables. The directive rows
+          of a C/C++ preprocessor conditional (#if ... #elif ... #else ...
+          #endif) around kept lines are kept.
           
           Uses an AST-based parser to extract function definitions from source
           files. A "..." line marks where source lines were left out. Head/tail
@@ -400,7 +403,9 @@ Interleaved option:
   -Y, --types
           Filter files in the next section to show only type and class
           definitions, including their field/variable declarations. Methods are
-          left out.
+          left out. Type aliases (type X = ..., typedef, using X = ...) are
+          types, kept whole. The directive rows of a C/C++ preprocessor
+          conditional (#if ... #endif) around kept lines are kept.
           
           Uses an AST-based parser to extract type definitions from source
           files. A "..." line marks where source lines were left out. Head/tail
