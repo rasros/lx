@@ -15,8 +15,8 @@ const shortHelpTmpl = `A program to discover and format files for LLM prompting
 
 {{ "Arguments:" | head }}
   [path]...   the file or directory to process (defaults to current dir)
-  [action]... interleaved options and action flags; only -s starts a new section,
-              resetting interleaved options to their defaults
+  [action]... interleaved options and action flags; an option after a path, or a
+              -s after a path, starts a new section with the options reset
 
 {{ "Options:" | head }}
 {{ range $i, $g := . }}{{ if $i }}
@@ -52,7 +52,9 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
     1. An interleaved option appears {{ "after" | underline }} files: all interleaved options
        reset to defaults before the new option takes effect.
     2. A {{ "-s" | bold }} (section) action is used: this also resets all interleaved
-       options to defaults for the files that follow.
+       options to defaults for the files that follow. Options that no file
+       has followed yet, such as those before the first file, carry on into
+       the new section.
 
   Example: last 50 lines of app.log, then src/ with line numbers:
     lx --tail 50 app.log -l src/

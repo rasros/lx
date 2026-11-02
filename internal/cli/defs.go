@@ -204,11 +204,12 @@ the absolute path is matched. A glob matches a directory only as itself, so
 so no later glob keeps anything below it: -e build -i build/keep.js keeps
 nothing, -e "build/**" -i build/keep.js keeps it.
 
-As in rg, globs and roots are matched as written, without cleaning: neither
-"./src/*.go" nor "src//*.go" matches src/main.go, and below the root
-src/../build paths start with "src/../build/". An -i that is empty or starts
-with "#" adds no glob, and a glob that cannot be parsed, such as "src/[ab",
-is an error.
+As in rg, globs and the roots you name are matched as written, without
+cleaning: neither "./src/*.go" nor "src//*.go" matches src/main.go, and the
+files below the root src/../build are matched as "src/../build/...", though
+lx displays them as build/.... Paths piped on stdin are cleaned first. An -i
+that is empty or starts with "#" adds no glob, and a glob that cannot be
+parsed, such as "src/[ab", is an error.
 
 Examples:
   -i "*.go"       (Keep only Go files)
@@ -225,7 +226,10 @@ Examples:
 		Long: `Drop what matches a glob for subsequent paths, as rg -g '!GLOB' does.
 
 -e globs match as -i globs do, and the last -i or -e to match a path decides
-it, ahead of ignore files.
+it, ahead of ignore files. As rg reads -g '!GLOB', two things differ from -i:
+an empty -e matches every path, so -e "" drops everything no later glob
+keeps, and a leading "#" is part of the glob, so -e "#x" drops a file named
+#x.
 
 A leading "!" keeps what matches, even when an ignore file ignores it or it is
 hidden, without requiring every other file to match some glob as -i does:

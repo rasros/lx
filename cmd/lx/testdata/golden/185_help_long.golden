@@ -23,7 +23,9 @@ Description:
     1. An interleaved option appears after files: all interleaved options
        reset to defaults before the new option takes effect.
     2. A -s (section) action is used: this also resets all interleaved
-       options to defaults for the files that follow.
+       options to defaults for the files that follow. Options that no file
+       has followed yet, such as those before the first file, carry on into
+       the new section.
 
   Example: last 50 lines of app.log, then src/ with line numbers:
     lx --tail 50 app.log -l src/
@@ -231,11 +233,13 @@ Interleaved option:
           keeps anything below it: -e build -i build/keep.js keeps nothing, -e
           "build/**" -i build/keep.js keeps it.
           
-          As in rg, globs and roots are matched as written, without cleaning:
-          neither "./src/*.go" nor "src//*.go" matches src/main.go, and below
-          the root src/../build paths start with "src/../build/". An -i that is
-          empty or starts with "#" adds no glob, and a glob that cannot be
-          parsed, such as "src/[ab", is an error.
+          As in rg, globs and the roots you name are matched as written, without
+          cleaning: neither "./src/*.go" nor "src//*.go" matches src/main.go,
+          and the files below the root src/../build are matched as
+          "src/../build/...", though lx displays them as build/.... Paths piped
+          on stdin are cleaned first. An -i that is empty or starts with "#"
+          adds no glob, and a glob that cannot be parsed, such as "src/[ab", is
+          an error.
           
           Examples:
             -i "*.go" (Keep only Go files)
@@ -245,7 +249,10 @@ Interleaved option:
           Drop what matches a glob for subsequent paths, as rg -g '!GLOB' does.
           
           -e globs match as -i globs do, and the last -i or -e to match a path
-          decides it, ahead of ignore files.
+          decides it, ahead of ignore files. As rg reads -g '!GLOB', two things
+          differ from -i: an empty -e matches every path, so -e "" drops
+          everything no later glob keeps, and a leading "#" is part of the glob,
+          so -e "#x" drops a file named #x.
           
           A leading "!" keeps what matches, even when an ignore file ignores it
           or it is hidden, without requiring every other file to match some glob

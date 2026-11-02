@@ -5,8 +5,8 @@ Usage: lx [OPTIONS] [path|action]...
 
 Arguments:
   [path]...   the file or directory to process (defaults to current dir)
-  [action]... interleaved options and action flags; only -s starts a new section,
-              resetting interleaved options to their defaults
+  [action]... interleaved options and action flags; an option after a path, or a
+              -s after a path, starts a new section with the options reset
 
 Options:
   Global option:
