@@ -1,0 +1,21 @@
+--- STDOUT ---
+skeleton/toplevel.cpp (33 rows, type definitions)
+---
+```cpp
+extern "C" {
+// Opaque handle for C callers.
+struct Handle {
+    int id;
+};
+...
+typedef void (*callback_t)(Handle *h);
+}
+...
+// Aliases are types.
+using Id = unsigned long;
+template <typename T>
+using Vec = std::vector<T>;
+```
+
+
+--- STDERR ---

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.ts (19 rows, definitions)
+skeleton/members.ts (22 rows, definitions)
 ---
 ```typescript
 /** Base shape. */
@@ -12,6 +12,9 @@ export abstract class Shape {
     describe(): string {
 ...
 }
+...
+/** Sides keyed by kind: an alias is a type. */
+export type Sides = { [k in Kind]: number };
 ...
 export enum Kind {
     Square,

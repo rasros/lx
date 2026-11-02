@@ -2,6 +2,9 @@ use std::fmt;
 
 pub struct Meters(f64);
 
+/// Distances in meters: an alias is a type.
+pub type Distance = Meters;
+
 impl Meters {
     pub fn new(v: f64) -> Self {
         Meters(v)

@@ -61,18 +61,6 @@ func findChildByType(n *gotreesitter.Node, typ string, lang *gotreesitter.Langua
 	return nil
 }
 
-func hasDescendantOfType(n *gotreesitter.Node, typ string, lang *gotreesitter.Language) bool {
-	if n.Type(lang) == typ {
-		return true
-	}
-	for i := 0; i < n.ChildCount(); i++ {
-		if hasDescendantOfType(n.Child(i), typ, lang) {
-			return true
-		}
-	}
-	return false
-}
-
 // EmitFuncSig appends the rows of a function signature (without body) to out.
 // A body that starts and ends on the signature's own line is cut from it,
 // keeping an opening brace.

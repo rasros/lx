@@ -7,6 +7,9 @@ data Animal = Dog | Cat
    Avoids mixing up plain strings. -}
 newtype Name = Name String
 
+-- | An alias is a type.
+type Greeting = String
+
 -- | Greet by name, with a fallback.
 greet :: String -> String
 greet name

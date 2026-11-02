@@ -88,8 +88,16 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 		return out
 	}
 
+	if slices.Contains(def.frames, nodeType) {
+		return def.processFrame(c, out, node)
+	}
+
+	// A namespace without a declaration list (extern "C" int f(void);)
+	// wraps a single declaration, left to unwrap.
 	if slices.Contains(def.namespaces, nodeType) {
-		return def.processNamespace(c, out, node)
+		if body := node.ChildByFieldName("body", c.Lang); body != nil && c.Type(body) == "declaration_list" {
+			return def.processNamespace(c, out, node, body)
+		}
 	}
 
 	outerStart := int(node.StartPoint().Row)
@@ -136,11 +144,7 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 // processNamespace walks the declarations in the body of a namespace like
 // top-level ones. The namespace's doc, header and closing row are kept
 // around them for context when any of them keeps something.
-func (def *langDef) processNamespace(c *langs.Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
-	body := n.ChildByFieldName("body", c.Lang)
-	if body == nil {
-		return out
-	}
+func (def *langDef) processNamespace(c *langs.Ctx, out []internal.LineRange, n, body *gotreesitter.Node) []internal.LineRange {
 	var inner []internal.LineRange
 	for i := 0; i < body.ChildCount(); i++ {
 		inner = def.processNode(c, inner, body.Child(i))
@@ -154,6 +158,27 @@ func (def *langDef) processNamespace(c *langs.Ctx, out []internal.LineRange, n *
 	out = append(out, inner...)
 	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
 		out = internal.KeepLine(out, c.Lines, closingRow)
+	}
+	return out
+}
+
+// processFrame walks the children of a preprocessor conditional like
+// top-level declarations. Its first row (#if, #ifdef, #else) and, when it ends
+// in a token, its last (#endif) are kept around them when any of them keeps
+// something. An #elif or #else is a child frame of its #if.
+func (def *langDef) processFrame(c *langs.Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+	var inner []internal.LineRange
+	for i := 0; i < n.ChildCount(); i++ {
+		inner = def.processNode(c, inner, n.Child(i))
+	}
+	if len(inner) == 0 {
+		return out
+	}
+	first, last := int(n.StartPoint().Row), int(n.EndPoint().Row)
+	out = internal.KeepLine(out, c.Lines, first)
+	out = append(out, inner...)
+	if k := n.ChildCount(); k > 0 && !n.Child(k-1).IsNamed() && last > first {
+		out = internal.KeepLine(out, c.Lines, last)
 	}
 	return out
 }

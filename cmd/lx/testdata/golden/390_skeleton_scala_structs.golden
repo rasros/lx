@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.scala (37 rows, type definitions)
+skeleton/main.scala (40 rows, type definitions)
 ---
 ```scala
 /** Geometric shape abstraction. */
@@ -17,6 +17,9 @@ case class Point(x: Double, y: Double) {
     val label: String = "" // display label
 ...
 }
+...
+// An alias is a type.
+type Coord = (Double, Double)
 ...
 // Singleton calculator.
 object Calculator {

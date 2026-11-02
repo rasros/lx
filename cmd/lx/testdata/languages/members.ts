@@ -13,6 +13,9 @@ export abstract class Shape {
     #helper(): void {}
 }
 
+/** Sides keyed by kind: an alias is a type. */
+export type Sides = { [k in Kind]: number };
+
 export enum Kind {
     Square,
     Circle = 2,

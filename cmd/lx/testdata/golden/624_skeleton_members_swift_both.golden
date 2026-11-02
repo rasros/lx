@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.swift (24 rows, definitions)
+skeleton/members.swift (27 rows, definitions)
 ---
 ```swift
 public struct Grid {
@@ -8,6 +8,9 @@ public struct Grid {
     public subscript(i: Int) -> Int {
 ...
 }
+...
+// An alias is a type.
+public typealias Width = Int
 ...
 public class Resource {
     deinit {

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.kt (28 rows, type definitions)
+skeleton/members.kt (31 rows, type definitions)
 ---
 ```kotlin
 class K(val a: Int) {
@@ -11,6 +11,9 @@ class K(val a: Int) {
     }
 ...
 }
+...
+// An alias is a type.
+typealias Dirs = List<Dir>
 ...
 enum class Dir {
     N,

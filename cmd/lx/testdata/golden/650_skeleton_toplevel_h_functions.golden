@@ -1,0 +1,19 @@
+--- STDOUT ---
+skeleton/toplevel.h (45 rows, function signatures)
+---
+```c
+// Open a buffer.
+struct buffer *buffer_open(const char *path);
+...
+// Returns a pointer to a function: a function.
+int (*pick_handler(int kind))(int code);
+...
+#ifdef _WIN32
+int win_only(void);
+#else
+int posix_only(void);
+#endif
+```
+
+
+--- STDERR ---

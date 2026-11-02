@@ -20,6 +20,9 @@ case class Point(x: Double, y: Double) {
     private def helper(): Unit = ()
 }
 
+// An alias is a type.
+type Coord = (Double, Double)
+
 // Singleton calculator.
 object Calculator {
     val Max: Int = 100

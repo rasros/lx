@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.scala (37 rows, definitions)
+skeleton/main.scala (40 rows, definitions)
 ---
 ```scala
 /** Geometric shape abstraction. */
@@ -21,6 +21,9 @@ case class Point(x: Double, y: Double) {
     def scale(factor: Double): Point = 
 ...
 }
+...
+// An alias is a type.
+type Coord = (Double, Double)
 ...
 // Singleton calculator.
 object Calculator {
