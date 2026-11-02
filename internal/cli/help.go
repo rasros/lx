@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	cResetIntensity = "\033[22m"
-	cResetUnderline = "\033[24m"
-	cBold           = "\033[1m"
-	cDim            = "\033[2m"
-	cUnderline      = "\033[4m"
+	ansiResetIntensity = "\033[22m"
+	ansiResetUnderline = "\033[24m"
+	ansiBold           = "\033[1m"
+	ansiDim            = "\033[2m"
+	ansiUnderline      = "\033[4m"
 )
 
 const shortHelpTmpl = `A program to discover and format files for LLM prompting
@@ -97,6 +97,7 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
 
 {{ "Global option:" | head }}
   Settings that apply to the whole operation, regardless of position.
+  Color is auto-detected; set NO_COLOR=1 to disable or FORCE_COLOR=1 to force.
 {{ range .Formatting }}
 {{ . | flagLine }}
 {{ .Long | wrapIndent "          " 80 }}
@@ -166,7 +167,14 @@ type flagGroup struct {
 	Flags    []CommandDef
 }
 
-func makeFuncs() template.FuncMap {
+// makeFuncs returns the help template functions. When color is false the
+// styling helpers emit plain text so no ANSI escape sequences are written.
+func makeFuncs(color bool) template.FuncMap {
+	var cBold, cDim, cUnderline, cResetIntensity, cResetUnderline string
+	if color {
+		cBold, cDim, cUnderline = ansiBold, ansiDim, ansiUnderline
+		cResetIntensity, cResetUnderline = ansiResetIntensity, ansiResetUnderline
+	}
 	return template.FuncMap{
 		"bold":      func(s string) string { return cBold + s + cResetIntensity },
 		"underline": func(s string) string { return cUnderline + s + cResetUnderline },
@@ -312,7 +320,7 @@ func printShortHelp() {
 		}
 	}
 
-	t := template.Must(template.New("short-help").Funcs(makeFuncs()).Parse(shortHelpTmpl))
+	t := template.Must(template.New("short-help").Funcs(makeFuncs(shouldColor(os.Stdout))).Parse(shortHelpTmpl))
 	if err := t.Execute(os.Stdout, groups); err != nil {
 		fmt.Fprintf(os.Stderr, "template error: %v\n", err)
 	}
@@ -344,7 +352,7 @@ func printLongHelp() {
 		Config      []CommandDef
 	}{formatting, interleaved, actions, config}
 
-	t := template.Must(template.New("long-help").Funcs(makeFuncs()).Parse(longHelpTmpl))
+	t := template.Must(template.New("long-help").Funcs(makeFuncs(shouldColor(os.Stdout))).Parse(longHelpTmpl))
 	if err := t.Execute(os.Stdout, data); err != nil {
 		fmt.Fprintf(os.Stderr, "template error: %v\n", err)
 	}

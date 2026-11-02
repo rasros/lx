@@ -356,7 +356,7 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 
 		err := stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
 			Global:       global,
-			ColorEnabled: shouldColorStats(debugOut),
+			ColorEnabled: shouldColor(debugOut),
 		})
 		if err != nil {
 			slog.Error("Failed to render stats", "error", err)
@@ -364,9 +364,9 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 	}
 }
 
-// shouldColorStats honors NO_COLOR / CLICOLOR / FORCE_COLOR / TERM so AI agents
+// shouldColor honors NO_COLOR / CLICOLOR / FORCE_COLOR / TERM so AI agents
 // and CI runners that capture stdout/stderr through pipes get clean output.
-func shouldColorStats(w io.Writer) bool {
+func shouldColor(w io.Writer) bool {
 	if os.Getenv("NO_COLOR") != "" {
 		return false
 	}
