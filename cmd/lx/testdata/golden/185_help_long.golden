@@ -54,9 +54,10 @@ Arguments:
 
           Archive URLs (.zip, .tar.gz, etc.) are expanded when -Z is active.
 
-          As in rg, a path you name, or pipe in as a file list, is never
-          filtered itself: ignore files, hidden-file skipping and -i/-e do
-          not apply to it. They filter what a named directory contains.
+          As in rg, a path you name is never filtered itself: ignore files,
+          hidden-file skipping and -i/-e do not apply to it. They filter what
+          a named directory contains. Paths piped on stdin are filtered by
+          -i/-e only.
 
           If no actions are provided, lx walks the current directory ".".
 
