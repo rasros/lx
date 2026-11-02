@@ -1,0 +1,29 @@
+--- STDOUT ---
+[1/3] /ROOT/chunked/sample.mp4 (5 rows)
+---
+```
+Container: mp4
+Duration: 00:00:01.000
+Bitrate: 55 kbps
+Video: h264, 32x32, 10.00 fps
+Audio: aac, 8000 Hz, mono
+```
+
+[2/3] /ROOT/chunked/sample.mkv (5 rows)
+---
+```
+Container: mkv
+Duration: 00:00:01.128
+Bitrate: 45 kbps
+Video: h264, 32x32
+Audio: aac, 8000 Hz, mono
+```
+
+[3/3] /ROOT/chunked/notes.txt (1 rows)
+---
+```text
+beside the media
+```
+
+
+--- STDERR ---

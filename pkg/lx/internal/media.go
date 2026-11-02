@@ -52,7 +52,15 @@ type ImageInfo struct {
 // out to be media at all, which is false only when neither the name nor the
 // bytes said so. A named container that will not parse still describes itself,
 // since the name is evidence enough that the file was meant to be one.
+//
+// A stream (LazyReader) is read only as far as the parser walks, and the gaps
+// it steps over are discarded rather than kept: a parser that must find a
+// header at the end, as MP4 must find a trailing moov, reads the stream through
+// without holding it.
 func MediaMetadata(container string, r io.ReaderAt, size int64) ([]byte, bool) {
+	if lr, ok := r.(*LazyReader); ok {
+		defer lr.skipGaps()()
+	}
 	b := &byteReader{r: r, size: size}
 
 	info := parseMedia(container, b)
@@ -86,22 +94,47 @@ func parseMedia(container string, b *byteReader) *MediaInfo {
 	return nil
 }
 
+// mediaReadAhead is how much byteReader reads at once. Parsers read a few
+// bytes at a time, walking blocks and elements in order, so one read serves
+// many of them.
+const mediaReadAhead = 64 << 10
+
 // byteReader bounds every read to the file, so a truncated or lying header can
-// only cut a parse short rather than run off the end.
+// only cut a parse short rather than run off the end. It reads ahead, so that a
+// walk over many small blocks does not make a read of the source for each.
 type byteReader struct {
 	r    io.ReaderAt
 	size int64
+	// buf holds the bytes from bufOff read ahead. It is never written to after
+	// it is read, so slices handed out of it stay valid.
+	buf    []byte
+	bufOff int64
 }
 
+// at returns n bytes from off. The slice may share memory with others at
+// returns and must not be modified.
 func (b *byteReader) at(off, n int64) ([]byte, bool) {
 	if off < 0 || n < 0 || off+n > b.size {
 		return nil, false
 	}
-	buf := make([]byte, n)
-	if _, err := b.r.ReadAt(buf, off); err != nil {
+	if off >= b.bufOff && off+n <= b.bufOff+int64(len(b.buf)) {
+		i := off - b.bufOff
+		return b.buf[i : i+n : i+n], true
+	}
+	if n > mediaReadAhead {
+		buf := make([]byte, n)
+		if _, err := b.r.ReadAt(buf, off); err != nil {
+			return nil, false
+		}
+		return buf, true
+	}
+	buf := make([]byte, min(mediaReadAhead, b.size-off))
+	got, _ := b.r.ReadAt(buf, off)
+	if int64(got) < n {
 		return nil, false
 	}
-	return buf, true
+	b.buf, b.bufOff = buf[:got], off
+	return buf[:n:n], true
 }
 
 func (b *byteReader) magic(off int64, want string) bool {

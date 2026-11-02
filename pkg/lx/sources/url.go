@@ -57,10 +57,20 @@ func NewURLInputFile(raw string) (InputFile, error) {
 				return nil, fmt.Errorf("GET %q: unexpected status %s", uri, resp.Status)
 			}
 			*mediaType = resp.Header.Get("Content-Type")
-			return resp.Body, nil
+			return urlBody{ReadCloser: resp.Body, length: resp.ContentLength}, nil
 		},
 	}, nil
 }
+
+// urlBody is a response body that declares its length, so it can be read only
+// as far as it is needed. The length is -1 when the response did not state it,
+// or when the transport decompressed the body.
+type urlBody struct {
+	io.ReadCloser
+	length int64
+}
+
+func (b urlBody) ContentLength() int64 { return b.length }
 
 // DownloadURLToTempFile downloads a URL with HTTP GET to a temporary file.
 // Caller must invoke cleanup after processing completes.
