@@ -87,7 +87,17 @@ func TestGoldenIgnoredDirNegations(t *testing.T) {
 		{name: "109x_ignored_dir_negations_walk", args: []string{"-e", "ovr/*", "-e", "!ovr/keep.js", "."}},
 		{name: "109y_ignored_dir_negations_override_prunes", args: []string{"-e", "ovr", "-e", "!ovr/keep.js", "."}},
 		{name: "109z_override_trailing_doublestar", args: []string{"-e", "src/**/**", "-e", "two/**/*/**", "."}},
+		{name: "109za_override_anchored_at_cwd_named_dir", args: []string{"-e", "ovr/*", "ovr", "src"}},
 	})
+}
+
+// As ripgrep's -g globs, -e patterns are anchored at the working directory,
+// not at the directory walked, so ovr/** cannot match below "..".
+func TestGoldenOverrideAnchoredAtCwdFromSubdir(t *testing.T) {
+	dir := gf.SetupIgnoredDirNegationsFixture(t)
+	runTestGolden(t, filepath.Join(dir, "src"), []goldenTestCase{
+		{name: "109zb_override_anchored_at_cwd_parent_walk", args: []string{"-e", "ovr/**", "-e", "**/glob/**", "-e", "/deep/**", ".."}},
+	}, dir)
 }
 
 // The ignore files above the directory lx runs in apply as they do below it:

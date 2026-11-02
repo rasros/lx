@@ -23,15 +23,16 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	if !info.IsDir() {
 		return walkFn(root, dirEntryAdapter{info}, nil)
 	}
-	return w.walkRoot(newRuleTree(fsTree{fsys}, w.opts.IgnoreEnabled), fsys, root, root, info, walkFn)
+	return w.walkRoot(newRuleTree(fsTree{fsys}, w.opts.IgnoreEnabled), fsys, root, root, "", info, walkFn)
 }
 
 // WalkPath walks absRoot, an absolute path on the cache's host, with the
 // ignore rules of every directory above it, as ripgrep does: .ignore and
 // .lxignore everywhere, and git's rules inside a repository, which start over
 // at its root. Paths passed to fn are relative to absRoot when it is a
-// directory; a file root is passed as its base name. Override rules match
-// relative to absRoot.
+// directory; a file root is passed as its base name. As ripgrep's -g globs,
+// override rules match relative to the host's working directory, whether
+// absRoot is it, below it, or above it.
 //
 // As in ripgrep, absRoot itself is never filtered: a file is passed to fn
 // and a directory walked, whatever the rules say about it or the directories
@@ -52,13 +53,14 @@ func (w *Walker) WalkPath(absRoot string, fn fs.WalkDirFunc) error {
 	if info, err = fs.Stat(fsys, "."); err != nil {
 		return fn(".", nil, err)
 	}
+	prefix := w.cache.overridePrefix(absRoot)
 	if !w.opts.IgnoreEnabled {
-		return w.walkRoot(newRuleTree(fsTree{fsys}, false), fsys, ".", ".", info, fn)
+		return w.walkRoot(newRuleTree(fsTree{fsys}, false), fsys, ".", ".", prefix, info, fn)
 	}
 	// Like ripgrep, the rules of the directories above a symlinked root are
 	// those above its target.
 	rt := w.cache.hostTree()
-	return w.walkRoot(rt, fsys, w.cache.ht.real(absRoot), ".", info, fn)
+	return w.walkRoot(rt, fsys, w.cache.ht.real(absRoot), ".", prefix, info, fn)
 }
 
 func (w *Walker) ignore(p, reason string) {
@@ -68,17 +70,18 @@ func (w *Walker) ignore(p, reason string) {
 }
 
 // walkRoot walks the directory dir of rt, which is root within fsys. The
-// directory itself is not judged, only the entries below it.
-func (w *Walker) walkRoot(rt *ruleTree, fsys fs.FS, dir, root string, info fs.FileInfo, fn fs.WalkDirFunc) error {
-	return w.walkDir(rt, fsys, rt.frame(w, dir), root, fn, []fs.FileInfo{info})
+// directory itself is not judged, only the entries below it. prefix goes
+// before a path within fsys to match it against the override rules.
+func (w *Walker) walkRoot(rt *ruleTree, fsys fs.FS, dir, root, prefix string, info fs.FileInfo, fn fs.WalkDirFunc) error {
+	return w.walkDir(rt, fsys, rt.frame(w, dir), root, prefix, fn, []fs.FileInfo{info})
 }
 
 // whitelisted reports whether a negation is the rule that decides the entry
-// at rel in the directory of frame f, at walkRel for the override rules. As
+// at rel in the directory of frame f, at ovRel for the override rules. As
 // in ripgrep, that includes a hidden entry.
-func (w *Walker) whitelisted(f *frame, rel, walkRel string, isDir bool) bool {
+func (w *Walker) whitelisted(f *frame, rel, ovRel string, isDir bool) bool {
 	matched, negated := whitelisted(rel, isDir, f.rules)
-	if m, n := whitelisted(walkRel, isDir, w.override); m {
+	if m, n := whitelisted(ovRel, isDir, w.override); m {
 		matched, negated = true, n
 	}
 	return matched && negated
@@ -120,8 +123,9 @@ func (w *Walker) resolveEntry(fsys fs.FS, path string, d fs.DirEntry, ancestors 
 	return true, info, false, ""
 }
 
-// walkDir walks the directory at dir within fsys, whose frame is f.
-func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, walkFn fs.WalkDirFunc, ancestors []fs.FileInfo) error {
+// walkDir walks the directory at dir within fsys, whose frame is f. prefix
+// goes before a path within fsys to match it against the override rules.
+func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir, prefix string, walkFn fs.WalkDirFunc, ancestors []fs.FileInfo) error {
 	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
 		return walkFn(dir, nil, err)
@@ -133,15 +137,19 @@ func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, walkFn 
 		if dir != "." {
 			childPath = path.Join(dir, d.Name())
 		}
+		ovPath := childPath
+		if prefix != "" && len(w.override) > 0 {
+			ovPath = prefix + childPath
+		}
 
 		hidden := w.opts.SkipHidden && isHiddenName(d.Name())
-		if hidden && d.Type()&fs.ModeSymlink == 0 && !w.whitelisted(f, joinRel(f.node.rel, d.Name()), childPath, d.IsDir()) {
+		if hidden && d.Type()&fs.ModeSymlink == 0 && !w.whitelisted(f, joinRel(f.node.rel, d.Name()), ovPath, d.IsDir()) {
 			w.ignore(childPath, "hidden path")
 			continue
 		}
 
 		isDir, target, skip, skipReason := w.resolveEntry(fsys, childPath, d, ancestors)
-		if hidden && !skip && d.Type()&fs.ModeSymlink != 0 && !w.whitelisted(f, joinRel(f.node.rel, d.Name()), childPath, isDir) {
+		if hidden && !skip && d.Type()&fs.ModeSymlink != 0 && !w.whitelisted(f, joinRel(f.node.rel, d.Name()), ovPath, isDir) {
 			skip, skipReason = true, "hidden path"
 		}
 		if skip {
@@ -166,7 +174,7 @@ func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, walkFn 
 		rel := joinRel(f.node.rel, d.Name())
 		if isDir {
 			childDir := rt.t.child(f.node.dir, d.Name())
-			if ign, r := judgeDir(f.rules, rel, w.override, childPath); ign {
+			if ign, r := judgeDir(f.rules, rel, w.override, ovPath); ign {
 				w.ignore(childPath, r)
 				continue
 			}
@@ -180,14 +188,14 @@ func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, walkFn 
 				}
 				return err
 			}
-			if err := w.walkDir(rt, fsys, rt.frame(w, childDir), childPath, walkFn, childAncestors); err != nil {
+			if err := w.walkDir(rt, fsys, rt.frame(w, childDir), childPath, prefix, walkFn, childAncestors); err != nil {
 				return err
 			}
 			continue
 		}
 
 		ign, r := checkIgnore(rel, false, f.rules, false, "", wantReason)
-		ign, r = checkIgnore(childPath, false, w.override, ign, r, wantReason)
+		ign, r = checkIgnore(ovPath, false, w.override, ign, r, wantReason)
 		if ign {
 			w.ignore(childPath, r)
 			continue

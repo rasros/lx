@@ -1,0 +1,9 @@
+--- STDOUT ---
+src/main.go (1 rows)
+---
+```go
+package src
+```
+
+
+--- STDERR ---

@@ -41,6 +41,7 @@ func (OSHost) EvalSymlinks(path string) (string, error) {
 type Cache struct {
 	host Host
 	once sync.Once
+	wd   string // the working directory as the host names it
 	ht   hostTree
 	tree *ruleTree
 }
@@ -63,6 +64,7 @@ func (c *Cache) hostTree() *ruleTree {
 		} else {
 			cwd = filepath.Clean(cwd)
 		}
+		c.wd = cwd
 		c.ht = hostTree{h: c.host}
 		if cwd != "" {
 			c.ht.cwd = c.ht.real(cwd)
@@ -70,6 +72,22 @@ func (c *Cache) hostTree() *ruleTree {
 		c.tree = newRuleTree(c.ht, true)
 	})
 	return c.tree
+}
+
+// overridePrefix returns what to put before a path below absRoot to name it
+// relative to the working directory, where ripgrep anchors its -g globs: a
+// path outside it, such as one below "..", keeps its leading "../", which an
+// anchored glob cannot match.
+func (c *Cache) overridePrefix(absRoot string) string {
+	c.hostTree()
+	if c.wd == "" {
+		return ""
+	}
+	rel, err := filepath.Rel(c.wd, absRoot)
+	if err != nil || rel == "." {
+		return ""
+	}
+	return filepath.ToSlash(rel) + "/"
 }
 
 // tree is a namespace of directories that frames are built over: absolute
@@ -342,9 +360,9 @@ func rebase(rules []Rule, rel string) []Rule {
 
 // judgeDir reports whether a directory is ignored, and why: rules are those
 // in effect in its parent, matched at rel, and override those of the walk,
-// matched at walkRel. As in git and ripgrep, an ignored directory is not
+// matched at ovRel. As in git and ripgrep, an ignored directory is not
 // entered, so no negation can re-include anything below it.
-func judgeDir(rules []Rule, rel string, override []Rule, walkRel string) (bool, string) {
+func judgeDir(rules []Rule, rel string, override []Rule, ovRel string) (bool, string) {
 	ignored, reason := checkIgnore(rel, true, rules, false, "", true)
-	return checkIgnore(walkRel, true, override, ignored, reason, true)
+	return checkIgnore(ovRel, true, override, ignored, reason, true)
 }
