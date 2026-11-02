@@ -219,8 +219,9 @@ func normalizeOutput(stdout, stderr string, roots ...string) string {
 		sb.WriteString("\n")
 	}
 
-	// Stderr is kept in the order it was written: a run logs from one
-	// goroutine, so the order is deterministic and part of the behavior.
+	// Stderr is kept in the order it was written, which is part of the
+	// behavior: render workers log nothing but hand what went wrong back to
+	// the goroutine writing the output, so the order is deterministic.
 	sb.WriteString("\n--- STDERR ---\n")
 	if s := strings.TrimSpace(clean(stderr)); s != "" {
 		sb.WriteString(s)
