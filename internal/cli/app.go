@@ -137,14 +137,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 	applyOutputFormatOverrides(cfg, parsed)
 
 	out := determineOutput(parsed.Globals, cliOpts.OutputMode, env, log)
-	if out.path != "" {
-		f, err := env.create(out.name)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		out.w = f
-	}
 
 	stream, err := lx.NewStream(cfg)
 	if err != nil {
@@ -233,15 +225,29 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 		}
 	}
 
+	w := out.w
+	var sink *fileSink
 	if out.path != "" {
+		// The output file is only replaced once the whole bundle is written,
+		// so a failed run leaves an earlier one in place.
+		if sink, err = createFileSink(out.path, out.name); err != nil {
+			return err
+		}
+		defer sink.Abort()
 		log.Info("Writing output to file", "path", out.name)
+		w = sink
 	}
 
 	log.Info("Executing stream pipeline...")
-	err = stream.Execute(ctx, out.w)
+	err = stream.Execute(ctx, w)
 	if err != nil {
 		log.Error("Pipeline execution failed", "error", err)
 		return err
+	}
+	if sink != nil {
+		if err := sink.Commit(); err != nil {
+			return err
+		}
 	}
 
 	if out.clip != nil {
@@ -395,7 +401,7 @@ func applyOutputFormatOverrides(cfg *lx.Config, parsed *ParsedArgs) {
 
 // output is where a run writes its bundle and its stats.
 type output struct {
-	// w receives the bundle.
+	// w receives the bundle, unless it goes to the file at path.
 	w io.Writer
 	// path is the absolute path of the output file, if any, and name that
 	// path as given.

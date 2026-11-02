@@ -267,3 +267,29 @@ func TestDetermineOutput_OutputWinsOverStdoutAndCopy(t *testing.T) {
 		t.Fatalf("debug should be stdout when output file is used")
 	}
 }
+
+// A run that fails leaves the file -o names as it was.
+func TestRun_FailedRunKeepsOutputFile(t *testing.T) {
+	env, _, _ := testEnv(t)
+	if err := os.WriteFile(filepath.Join(env.Cwd, "main.go"), []byte("package main\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(env.Cwd, "bundle.md")
+	if err := os.WriteFile(out, []byte("earlier bundle\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Run(context.Background(), []string{"-o", "bundle.md", "-P", "./missing.md", "main.go"}, env); err == nil {
+		t.Fatal("Run succeeded with a missing prompt file")
+	}
+	if got, _ := os.ReadFile(out); string(got) != "earlier bundle\n" {
+		t.Fatalf("output file = %q after a failed run, want it untouched", got)
+	}
+
+	if err := Run(context.Background(), []string{"-q", "-o", "bundle.md", "main.go"}, env); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(out); !strings.Contains(string(got), "package main") {
+		t.Fatalf("output file = %q after a run, want the bundle", got)
+	}
+}
