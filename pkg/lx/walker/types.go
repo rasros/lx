@@ -14,6 +14,10 @@ type Rule struct {
 	// root: the walk root's path relative to that directory, with a trailing
 	// slash. Walk paths are prefixed with it before matching.
 	PathOffset string
+	// offsetFloats lets floating patterns match the PathOffset directories
+	// too. It is set when the walk root is a single file, whose parent
+	// directories were not named explicitly.
+	offsetFloats bool
 }
 
 // Walker configures the file traversal.
