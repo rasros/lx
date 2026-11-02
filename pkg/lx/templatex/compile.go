@@ -23,7 +23,8 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		return def
 	}
 
-	funcs := templateFuncs()
+	engine := &core.TemplateEngine{}
+	funcs := templateFuncs(engine)
 
 	fileHeaderStr := pick(cfg.FileHeaderTemplate, defaults.FileHeader)
 
@@ -105,7 +106,7 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		tImage = tContent
 	}
 
-	return &core.TemplateEngine{
+	*engine = core.TemplateEngine{
 		FileContent:   tContent,
 		FileError:     tError,
 		FileBinary:    tBinary,
@@ -122,5 +123,6 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		Stats:         tStats,
 		EmbedImages:   format == "html",
 		UseSeparators: format != "html" && format != "bare",
-	}, nil
+	}
+	return engine, nil
 }

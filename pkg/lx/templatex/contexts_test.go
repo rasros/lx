@@ -120,7 +120,7 @@ func TestStatsCounterLineHasNoLeadingSeparator(t *testing.T) {
 // Content is either a string or a LineNumberFormatter; helpers must treat both
 // alike. Reaching for %v on the formatter silently skipped escaping.
 func TestEscapeHandlesLineNumberedContent(t *testing.T) {
-	escape := templateFuncs()["escape"].(func(interface{}) string)
+	escape := templateFuncs(&core.TemplateEngine{})["escape"].(func(interface{}) string)
 
 	plain := escape("<script>alert(1)</script>\n")
 	numbered := escape(internal.LineNumberFormatter{
@@ -140,7 +140,7 @@ func TestEscapeHandlesLineNumberedContent(t *testing.T) {
 }
 
 func TestEndNewlineHandlesLineNumberedContent(t *testing.T) {
-	endNewline := templateFuncs()["endNewline"].(func(interface{}) string)
+	endNewline := templateFuncs(&core.TemplateEngine{})["endNewline"].(func(interface{}) string)
 
 	got := endNewline(internal.LineNumberFormatter{Head: []byte("alpha"), TotalRows: 1})
 	if got != "1: alpha\n" {

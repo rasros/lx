@@ -5,11 +5,13 @@ import (
 	"html"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/rasros/lx/internal/ansi"
+	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
@@ -286,7 +288,8 @@ func contentString(v interface{}) string {
 	return fmt.Sprintf("%v", v)
 }
 
-func templateFuncs() template.FuncMap {
+// templateFuncs returns the functions templates of engine can call.
+func templateFuncs(engine *core.TemplateEngine) template.FuncMap {
 	return template.FuncMap{
 		"date": func(layout string, t time.Time) string {
 			return t.Format(layout)
@@ -313,7 +316,11 @@ func templateFuncs() template.FuncMap {
 			return str
 		},
 		"dataURI": func(path string) string {
-			data, err := os.ReadFile(path)
+			abs := path
+			if !filepath.IsAbs(abs) && engine.Dir != "" {
+				abs = filepath.Join(engine.Dir, abs)
+			}
+			data, err := os.ReadFile(abs)
 			if err != nil {
 				return ""
 			}
