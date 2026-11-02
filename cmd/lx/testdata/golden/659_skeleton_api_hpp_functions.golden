@@ -1,0 +1,9 @@
+--- STDOUT ---
+skeleton/api.hpp (21 rows, function signatures)
+---
+```cpp
+int afunc(void);
+```
+
+
+--- STDERR ---

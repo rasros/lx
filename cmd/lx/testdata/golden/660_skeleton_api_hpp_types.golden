@@ -1,0 +1,14 @@
+--- STDOUT ---
+skeleton/api.hpp (21 rows, type definitions)
+---
+```cpp
+/* Operations table. */
+struct ops {
+    int (*run)(int code);
+};
+...
+enum color { RED, GREEN };
+```
+
+
+--- STDERR ---

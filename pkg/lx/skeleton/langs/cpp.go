@@ -76,15 +76,24 @@ func CppSectionPrivate(c *Ctx, label *gotreesitter.Node) bool {
 	return strings.TrimSuffix(strings.TrimSpace(c.Text(label)), ":") == "private"
 }
 
-// CppEmitter emits C and C++ type declarations: typedefs with
-// cEmitTypedef, `using X = ...;` aliases whole with types, the rest with the
-// generic member walker.
+// CppEmitter emits top-level C and C++ type declarations: typedefs with
+// cEmitTypedef, `using X = ...;` aliases and forward declarations
+// (`struct fwd;`) whole with types, the type a variable declares with its
+// body (`struct s { ... } inst;`), and the rest with the generic member
+// walker.
 func CppEmitter(m *Members) Emitter {
 	return func(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
-		switch c.Type(n) {
-		case "type_definition":
+		switch t := c.Type(n); {
+		case t == "type_definition":
 			return cEmitTypedef(c, out, n)
-		case "alias_declaration":
+		case t == "declaration":
+			typ := n.ChildByFieldName("type", c.Lang)
+			if typ == nil || !isOneOf(c.Type(typ), cppTypeSpecifiers) || typ.ChildByFieldName("body", c.Lang) == nil {
+				return out
+			}
+			return m.Emit(c, out, typ)
+		case t == "alias_declaration",
+			isOneOf(t, cppTypeSpecifiers) && n.ChildByFieldName("body", c.Lang) == nil:
 			if !c.Structs {
 				return out
 			}

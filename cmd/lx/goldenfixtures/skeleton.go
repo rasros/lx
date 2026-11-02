@@ -60,6 +60,9 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"members.m",
 		"toplevel.h",
 		"toplevel.cpp",
+		"guard.h",
+		"api.hpp",
+		"widget.h",
 	}
 	for _, name := range languageFiles {
 		content := readFixtureFile(t, filepath.Join("languages", name))

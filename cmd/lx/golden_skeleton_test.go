@@ -119,11 +119,19 @@ func TestGoldenSkeletonMembers(t *testing.T) {
 }
 
 // TestGoldenSkeletonTopLevel covers C and C++ top-level declarations: header
-// guards and other preprocessor conditionals, extern "C" blocks, function
-// pointers (variables, not functions) and typedef and using aliases (types).
+// guards and other preprocessor conditionals (#elif, continued #if), extern
+// "C" blocks and the `#ifdef __cplusplus` idiom around them in C and C++,
+// function pointers (variables, not functions), typedef and using aliases
+// (types), forward declarations, a struct declared with a variable, and C++
+// in a .h file (pure virtuals, default arguments).
 func TestGoldenSkeletonTopLevel(t *testing.T) {
 	dir := setupSkeletonFixture(t)
-	runTestGolden(t, dir, skeletonModeCases(650, "toplevel", []string{"toplevel.h", "toplevel.cpp"}))
+	var cases []goldenTestCase
+	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "widget.h"} {
+		stem := strings.TrimSuffix(file, filepath.Ext(file))
+		cases = append(cases, skeletonModeCases(650+3*i, stem, []string{file})...)
+	}
+	runTestGolden(t, dir, cases)
 }
 
 // skeletonModeCases runs each skeleton fixture file with -u, -Y and both,

@@ -24,7 +24,9 @@ func CFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
 // (maybe returning a pointer or reference), not a pointer to or array of
 // them: what decides is the declarator nearest the name. In `void
 // (*callback)(int)` that is the pointer, in `int (*get(void))(int)` the
-// function.
+// function. An initializer is looked through: the C grammar reads C++
+// default arguments and pure virtuals (`virtual void f() = 0;`) as one, and
+// `int (*fp)(int) = f;` stays a pointer.
 func declaresFunction(c *Ctx, d *gotreesitter.Node) bool {
 	function := false
 	for d != nil {
@@ -33,10 +35,10 @@ func declaresFunction(c *Ctx, d *gotreesitter.Node) bool {
 			function = true
 		case "pointer_declarator", "reference_declarator", "array_declarator":
 			function = false
-		case "parenthesized_declarator":
+		case "parenthesized_declarator", "init_declarator":
 		case "operator_cast": // operator int() const
 			return true
-		default: // the name, or an initialized variable
+		default: // the name
 			return function
 		}
 		next := d.ChildByFieldName("declarator", c.Lang)
