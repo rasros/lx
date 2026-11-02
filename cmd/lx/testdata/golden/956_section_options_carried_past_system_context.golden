@@ -1,0 +1,18 @@
+--- STDOUT ---
+```
+OS: GOOS
+Arch: GOARCH
+Time: FIXED
+Host: HOST
+Tool: lx VERSION
+Command: lx -n0 -E -s A src --no-stats
+```
+
+## A
+---
+
+[1/2] src/a.go (1 rows)
+[2/2] src/a_test.go (1 rows)
+
+
+--- STDERR ---

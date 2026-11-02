@@ -42,6 +42,10 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "917_section_resets_globs", args: []string{"-s", "A", "-n0", "-i", "*.js", "build", "-s", "B", "-n0", "src"}},
 		{name: "918_section_trailing_glob_applies_to_last", args: []string{"-s", "A", "-n0", "build", "-s", "B", "-n0", "src", "-e", "*_test.go"}},
 		{name: "919_section_glob_before_next_section", args: []string{"-s", "A", "-n0", "src", "-e", "*_test.go", "-s", "B", "-n0", "src"}},
+		// Options no file has followed yet carry on into the section a -s
+		// starts, past prompts and system context.
+		{name: "955_section_options_carried_past_prompt", args: []string{"-n0", "-i", "*.go", "-p", "hi", "-s", "A", "."}},
+		{name: "956_section_options_carried_past_system_context", args: []string{"-n0", "-E", "-s", "A", "src"}},
 
 		// Globs and roots are matched as written, as rg matches them: no
 		// cleaning of "./", "//" or "..". An -i that is empty or starts with
