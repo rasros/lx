@@ -326,3 +326,54 @@ func TestStream_OriginalSizeIsPreConversionSize(t *testing.T) {
 		t.Errorf("Size = %d, want less than OriginalSize %d after the skeleton filter", rendered, original)
 	}
 }
+
+// callTokenizer counts one token per estimate, so the total shows how many
+// pieces the output was estimated in.
+type callTokenizer struct{}
+
+func (callTokenizer) Estimate(int64, interface{}) int64 { return 1 }
+
+// Each rendered piece is estimated as a whole, so templates that write in
+// several chunks get the same estimate as ones that write once.
+func TestStream_TokenEstimateIgnoresWriteChunking(t *testing.T) {
+	type templates struct{ file, sectionHeader, outputHeader, outputFooter string }
+	estimate := func(tmpl templates) (int64, string) {
+		cfg := core.NewConfig()
+		cfg.FileContentTemplate = tmpl.file
+		cfg.SectionHeaderTemplate = tmpl.sectionHeader
+		cfg.OutputHeaderTemplate = tmpl.outputHeader
+		cfg.OutputFooterTemplate = tmpl.outputFooter
+		stream, err := NewStream(cfg, core.RunnerConfig{Head: -1})
+		if err != nil {
+			t.Fatalf("NewStream failed: %v", err)
+		}
+		stream.WithTokenizer(callTokenizer{})
+		stream.AddSection("S")
+		stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("content a")))
+		stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("content b")))
+		var buf strings.Builder
+		if err := stream.Execute(context.Background(), &buf); err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+		return stream.GetGlobalContext().TokenEstimate, buf.String()
+	}
+
+	chunked, chunkedOut := estimate(templates{
+		file:          `{{ .Path }}:{{ .Content }}:{{ .Path }}`,
+		sectionHeader: `<{{ .Body }}>{{ .Index }}`,
+		outputHeader:  `files={{ .Global.TotalFiles }};`,
+		outputFooter:  `end={{ .Global.TotalFiles }};`,
+	})
+	whole, wholeOut := estimate(templates{
+		file:          `{{ printf "%s:%s:%s" .Path .Content .Path }}`,
+		sectionHeader: `{{ printf "<%s>%d" .Body .Index }}`,
+		outputHeader:  `{{ printf "files=%d;" .Global.TotalFiles }}`,
+		outputFooter:  `{{ printf "end=%d;" .Global.TotalFiles }}`,
+	})
+	if chunkedOut != wholeOut {
+		t.Fatalf("templates render differently:\n%q\n%q", chunkedOut, wholeOut)
+	}
+	if chunked != whole {
+		t.Errorf("chunked templates estimated %d tokens, single writes %d; want equal", chunked, whole)
+	}
+}

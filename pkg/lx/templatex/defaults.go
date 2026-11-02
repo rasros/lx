@@ -270,9 +270,10 @@ const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
 	`{{ if .Global.FailedFiles }}{{ $sep }}{{ commafy .Global.FailedFiles }} failed{{ end }}` +
 	"\n" + `{{ end }}`
 
-// contentString renders template content as text. FileContext.Content is either
-// a string or a LineNumberFormatter, and helpers must treat both alike —
-// reaching for %v instead silently skipped escaping for the latter.
+// contentString renders template content as text. The processor hands
+// FileContext.Content over as a string, with any line numbers already in it,
+// but a fmt.Stringer such as LineNumberFormatter is rendered as text too rather
+// than through %v, which would skip escaping.
 func contentString(v interface{}) string {
 	switch s := v.(type) {
 	case nil:

@@ -98,8 +98,8 @@ FileContext is bound to the five file templates (`file_content_template`, `file_
 | `Size`             | int64          | Bytes as rendered. Pair with `humanize`.           |
 | `OriginalSize`     | int64          | Bytes on disk, before any conversion.              |
 | `ModTime`          | time.Time      | Pair with `date "2006-01-02"`.                     |
-| `TotalRows`        | int            | Lines after slicing.                               |
-| `IsEstimate`       | bool           | True if rows are an estimate (e.g. binary skip).   |
+| `TotalRows`        | int            | Lines in the whole file, however it is sliced.     |
+| `IsEstimate`       | bool           | True if `TotalRows` is an estimate: only for a file over 64 MiB that is sliced or compact, so not read in full. |
 | `Language`         | string         | Detected language hint for fenced code blocks.     |
 | `Content`          | interface{}    | Pair with `endNewline`.                            |
 | `IsBinary`         | bool           |                                                    |
@@ -107,7 +107,7 @@ FileContext is bound to the five file templates (`file_content_template`, `file_
 | `IsCompactView`    | bool           |                                                    |
 | `IsError`          | bool           |                                                    |
 | `ReadError`        | string         | Set when `IsError`.                                |
-| `TokenEstimate`    | int64          |                                                    |
+| `TokenEstimate`    | int64          | Estimated tokens in `Content`, computed only when a template uses it. |
 | `SkeletonMode`     | string         | `function signatures`, `type definitions`, `definitions`, or empty. |
 | `ConvertedFrom`    | string         | Source format when content was converted, else empty. |
 | `FileIndex`        | int            | 1-based index across the whole run.                |

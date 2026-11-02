@@ -1,8 +1,10 @@
 package goldenfixtures
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -83,6 +85,24 @@ func SetupSlicingFixture(t *testing.T) string {
 	writeFile(t, dir, "src/script.py", "print('hello')", 0755)
 	writeFile(t, dir, "bin/data.bin", string([]byte{0x00, 0x01, 0xFF, 0xFE}), 0644)
 	buildLargeFile(t, dir, "src/large.txt")
+
+	return dir
+}
+
+// SetupLargeSlicingFixture holds a text file past the 32 KB that row counts
+// were once estimated from, with numbered lines so slices show where they come
+// from, and a file with CRLF line endings.
+func SetupLargeSlicingFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	var big strings.Builder
+	for i := 1; i <= 2500; i++ {
+		fmt.Fprintf(&big, "row %04d lorem ipsum dolor sit amet\n", i)
+	}
+	writeFile(t, dir, "big.txt", big.String(), 0644)
+	writeFile(t, dir, "crlf.txt", "one\r\ntwo\r\nthree\r\nfour\r\nfive\r\nsix\r\nseven\r\n", 0644)
 
 	return dir
 }

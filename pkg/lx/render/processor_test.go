@@ -2,11 +2,13 @@ package render
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/internal"
@@ -484,5 +486,110 @@ func TestClassifyVerifiesBeforeTreatingAsImage(t *testing.T) {
 		if got := format.IsImage() && verified; got != c.want {
 			t.Errorf("%s: image=%v, want %v", c.path, got, c.want)
 		}
+	}
+}
+
+// bigLines is a text file well past the 32 KB that row counts were once
+// estimated from, with every line distinct so its position can be checked.
+func bigLines(n int) []byte {
+	var b bytes.Buffer
+	for i := 1; i <= n; i++ {
+		fmt.Fprintf(&b, "line %05d %s\n", i, strings.Repeat("-", 20))
+	}
+	return b.Bytes()
+}
+
+func TestPrepareFileContextCountsBigFileExactly(t *testing.T) {
+	data := bigLines(3000)
+	if len(data) <= 32*1024 {
+		t.Fatalf("fixture is %d bytes, want more than 32 KB", len(data))
+	}
+	engine, _ := templatex.Compile(core.NewConfig())
+	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+
+	for _, cfg := range []core.RunnerConfig{
+		{Head: -1},         // whole file
+		{Head: 5},          // head only
+		{Head: 5, Tail: 5}, // sliced
+		{Tail: 5},          // tail only
+		{Head: 0, Tail: 0}, // compact
+	} {
+		file := sources.NewBufferInputFile("big.txt", data)
+		file.Config = cfg
+		ctx, err := proc.prepareFileContext(file, 1, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ctx.TotalRows != 3000 || ctx.IsEstimate {
+			t.Errorf("head=%d tail=%d: rows=%d estimate=%v, want exactly 3000",
+				cfg.Head, cfg.Tail, ctx.TotalRows, ctx.IsEstimate)
+		}
+	}
+}
+
+// Tail line numbers come from the exact row count, whichever kind of reader
+// the file arrives through: an *os.File, a *bytes.Reader, or any other
+// io.ReaderAt, such as a file from an fs.FS.
+func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
+	data := bigLines(3000)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "big.txt"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	osFile, err := sources.NewInputFileFromPath(os.DirFS(dir), "big.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mapFile, err := sources.NewInputFileFromPath(fstest.MapFS{"big.txt": {Data: data}}, "big.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	engine, _ := templatex.Compile(core.NewConfig())
+	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	pad := strings.Repeat("-", 20)
+	want := "   1: line 00001 " + pad + "\n" +
+		"   2: line 00002 " + pad + "\n" +
+		"... (2995 rows skipped)\n" +
+		"2998: line 02998 " + pad + "\n" +
+		"2999: line 02999 " + pad + "\n" +
+		"3000: line 03000 " + pad + "\n"
+
+	for name, file := range map[string]sources.InputFile{
+		"os.File":      osFile,
+		"bytes.Reader": sources.NewBufferInputFile("big.txt", data),
+		"fstest.MapFS": mapFile,
+	} {
+		file.Config = core.RunnerConfig{Head: 2, Tail: 3, LineNumbers: true}
+		ctx, err := proc.prepareFileContext(file, 1, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := ctx.Content.(string); got != want {
+			t.Errorf("%s: content =\n%s\nwant\n%s", name, got, want)
+		}
+		if ctx.TotalRows != 3000 || ctx.IsEstimate {
+			t.Errorf("%s: rows=%d estimate=%v, want exactly 3000", name, ctx.TotalRows, ctx.IsEstimate)
+		}
+	}
+}
+
+// A head and tail that overlap render the file once, with its line endings.
+func TestPrepareFileContextOverlapRendersWholeFile(t *testing.T) {
+	data := []byte("a\r\nb\r\nc\r\n")
+	engine, _ := templatex.Compile(core.NewConfig())
+	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+
+	file := sources.NewBufferInputFile("crlf.txt", data)
+	file.Config = core.RunnerConfig{Head: 2, Tail: 2}
+	ctx, err := proc.prepareFileContext(file, 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := ctx.Content.(string); got != string(data) {
+		t.Errorf("content = %q, want the whole file %q with CRLF kept", got, data)
+	}
+	if ctx.TotalRows != 3 || ctx.IsEstimate {
+		t.Errorf("rows=%d estimate=%v, want exactly 3", ctx.TotalRows, ctx.IsEstimate)
 	}
 }

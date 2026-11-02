@@ -189,16 +189,18 @@ func (s *Stream) GetGlobalContext() core.GlobalContext { return s.Prepare() }
 
 func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	global := s.Prepare()
-	counter := &byteCounter{w: w, tokenizer: s.tokenizer}
+	counter := &byteCounter{w: w}
 
-	if err := s.engine.OutputHeader.Execute(counter, core.HeaderContext{Global: global}); err != nil {
+	headerTokens, err := render.ExecuteCounted(counter, s.engine.OutputHeader, core.HeaderContext{Global: global}, s.tokenizer)
+	if err != nil {
 		return err
 	}
 	totals, err := s.executePipeline(ctx, counter, global)
 	if err != nil {
 		return err
 	}
-	if err := s.engine.OutputFooter.Execute(counter, core.FooterContext{Global: global}); err != nil {
+	footerTokens, err := render.ExecuteCounted(counter, s.engine.OutputFooter, core.FooterContext{Global: global}, s.tokenizer)
+	if err != nil {
 		return err
 	}
 
@@ -206,7 +208,7 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
 	global.TotalRows = totals.rows
 	global.BinaryFiles = totals.binary
 	global.FailedFiles = totals.failed
-	global.TokenEstimate = counter.tokens
+	global.TokenEstimate = headerTokens + totals.tokens + footerTokens
 	s.finalStats = &global
 	return nil
 }

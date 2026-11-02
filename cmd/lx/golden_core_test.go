@@ -81,6 +81,23 @@ func TestGoldenSlicing(t *testing.T) {
 	})
 }
 
+// Row counts and tail line numbers are exact past 32 KB, and CRLF line endings
+// survive in head and tail alike.
+func TestGoldenSlicingLarge(t *testing.T) {
+	dir := setupLargeSlicingFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "040b_lines_large_line_numbers", args: []string{"--lines", "6", "-l", "big.txt"}},
+		{name: "040c_lines_crlf", args: []string{"--lines", "4", "crlf.txt"}},
+		{name: "040d_lines_crlf_line_numbers", args: []string{"--lines", "4", "-l", "crlf.txt"}},
+		{name: "041b_line_numbers_crlf", args: []string{"-l", "crlf.txt"}},
+		{name: "044b_tail_large", args: []string{"--tail", "4", "big.txt"}},
+		{name: "044c_tail_large_line_numbers", args: []string{"--tail", "4", "-l", "big.txt"}},
+		{name: "045b_head_large", args: []string{"--head", "3", "big.txt"}},
+		{name: "046b_lines_overlap_crlf", args: []string{"--lines", "10", "crlf.txt"}},
+		{name: "047b_lines_0_compact_large", args: []string{"-n", "0", "big.txt"}},
+	})
+}
+
 func TestGoldenSymlinks(t *testing.T) {
 	dir := setupSymlinksFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{

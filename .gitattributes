@@ -1,1 +1,3 @@
 cmd/lx/testdata/golden/*.golden text eol=lf
+# These goldens hold CRLF line endings on purpose.
+cmd/lx/testdata/golden/*_crlf*.golden -text

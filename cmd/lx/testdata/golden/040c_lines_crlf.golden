@@ -1,0 +1,13 @@
+--- STDOUT ---
+crlf.txt (7 rows)
+---
+```text
+one
+two
+... (3 rows skipped)
+six
+seven
+```
+
+
+--- STDERR ---
