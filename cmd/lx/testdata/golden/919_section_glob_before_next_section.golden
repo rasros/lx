@@ -1,0 +1,15 @@
+--- STDOUT ---
+## A
+---
+
+src/a.go (1 rows)
+
+## B
+---
+
+[1/2] src/a.go (1 rows)
+[2/2] src/a_test.go (1 rows)
+
+
+--- STDERR ---
+Warning: Trailing interleaved options detected; applying to preceding files (flags=--exclude="*_test.go")

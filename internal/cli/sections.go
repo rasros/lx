@@ -18,11 +18,25 @@ type Section struct {
 	resolved    map[int][]lx.InputFile
 }
 
+// parseSections splits ops into sections, each with its own interleaved
+// options. An interleaved option after files, or a -s, starts a new section
+// with the options reset; options before the first file or -s belong to the
+// first section. Options that no file follows before the next -s or the end
+// apply to the files before them, with a warning.
 func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 	var sections []Section
 	current := Section{Render: defaultRender}
 	hasFiles := false
 	var trailingOps []Op
+
+	// closeTrailing ends the current section at a -s or the end of ops.
+	closeTrailing := func() {
+		if len(current.Ops) > 0 {
+			sections = append(sections, current)
+		} else if len(trailingOps) > 0 && len(sections) > 0 {
+			applyTrailing(trailingOps, &sections[len(sections)-1])
+		}
+	}
 
 	for _, op := range ops {
 		switch op.Type {
@@ -36,34 +50,39 @@ func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 			applyInterleaved(op, &current)
 			trailingOps = append(trailingOps, op)
 		case CmdAction:
-			if op.Action == "FILE" {
+			switch {
+			case op.Action == "section" && (len(current.Ops) > 0 || len(sections) > 0):
+				closeTrailing()
+				current = Section{Render: defaultRender}
+				hasFiles = false
+				trailingOps = nil
+			case op.Action == "FILE":
 				hasFiles = true
 				trailingOps = nil
 			}
 			current.Ops = append(current.Ops, op)
 		}
 	}
-
-	if len(current.Ops) > 0 {
-		sections = append(sections, current)
-	} else if len(trailingOps) > 0 && len(sections) > 0 {
-		names := make([]string, 0, len(trailingOps))
-		for _, op := range trailingOps {
-			desc := "--" + op.Action
-			if op.Value != "" && op.Value != "true" {
-				desc += "=" + strconv.Quote(op.Value)
-			}
-			names = append(names, desc)
-		}
-		slog.Warn("Trailing interleaved options detected; applying to preceding files",
-			"flags", strings.Join(names, ", "))
-		last := &sections[len(sections)-1]
-		for _, op := range trailingOps {
-			applyInterleaved(op, last)
-		}
-	}
-
+	closeTrailing()
 	return sections
+}
+
+// applyTrailing applies interleaved options that no file follows to the
+// section of the files before them.
+func applyTrailing(ops []Op, s *Section) {
+	names := make([]string, 0, len(ops))
+	for _, op := range ops {
+		desc := "--" + op.Action
+		if op.Value != "" && op.Value != "true" {
+			desc += "=" + strconv.Quote(op.Value)
+		}
+		names = append(names, desc)
+	}
+	slog.Warn("Trailing interleaved options detected; applying to preceding files",
+		"flags", strings.Join(names, ", "))
+	for _, op := range ops {
+		applyInterleaved(op, s)
+	}
 }
 
 func applyInterleaved(op Op, s *Section) {

@@ -28,15 +28,15 @@ working directory as you named the root (`lx -i 'src/*.go' src/`). A trailing
 slash matches directories, so `-e 'vendor/' -e 'node_modules/'` drops whole
 subtrees.
 
-Each path becomes its own output section, and interleaved flags (`-n`,
-`--head`, `--tail`, `-l`, `-i`, `-e`, `-u`, `-Y`, …) reset between sections —
-put shared flags before the first path.
+Interleaved flags (`-n`, `--head`, `--tail`, `-l`, `-i`, `-e`, `-u`, `-Y`, …)
+apply to the paths after them. A flag after a path, or a `-s`, starts a new
+section with them all reset — put shared flags before the first path.
 
 ## Other capabilities
 
 ```bash
 lx github.com/owner/repo                         # remote repo without cloning (also gitlab/bitbucket/codeberg)
-git ls-files '*.go' | lx -u -Y -                 # paths from stdin (-0 for NUL-separated)
+git ls-files '*.go' | lx -u -Y                   # paths from stdin when none are named (-0 for NUL-separated)
 lx -D docs/                                      # extract text from PDF/DOCX/XLSX/PPTX
 lx -Z -i '*.go' archive.zip                      # expand a local archive (not needed for repo URLs)
 lx --stats -u -Y src/ > /dev/null                # token estimate on stderr; redirect drops the bundle
