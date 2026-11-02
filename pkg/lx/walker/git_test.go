@@ -1,6 +1,7 @@
 package walker
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,12 +11,12 @@ import (
 // resolveGitDir returns the git directory of the repository rooted at the
 // absolute path repo on the host.
 func resolveGitDir(repo string) (string, bool) {
-	return findGitDir(hostGitFS{Host: OSHost{}}, repo)
+	return findGitDir(hostGitFS{OSHost{}, slog.Default()}, repo)
 }
 
 // commonGitDir returns the directory shared by all worktrees of gitDir.
 func commonGitDir(gitDir string) string {
-	common, _ := commonDir(hostGitFS{Host: OSHost{}}, gitDir)
+	common, _ := commonDir(hostGitFS{OSHost{}, slog.Default()}, gitDir)
 	return common
 }
 
@@ -168,17 +169,17 @@ func TestFindGitDir_Validity(t *testing.T) {
 				t.Errorf("resolveGitDir = %v, want %v", got, tt.want)
 			}
 			sub := filepath.Join(repo, "sub")
-			n := newRuleTree(hostTree{h: OSHost{}, cwd: sub}, true).node(sub)
+			n := newRuleTree(newHostTree(OSHost{}, sub, slog.Default()), true).node(sub)
 			if got := n.parent != nil && n.parent.repo; got != tt.want {
 				t.Errorf("rules of sub start at the repository root = %v, want %v", got, tt.want)
 			}
 
 			// Within an fs.FS, .git is resolved inside it. An absolute gitdir
 			// cannot be followed there but still marks the repository boundary.
-			if got := isRepoRoot(fsTree{fsys: os.DirFS(base)}, "repo"); got != tt.want {
+			if got := isRepoRoot(newFSTree(os.DirFS(base), slog.Default()), "repo"); got != tt.want {
 				t.Errorf("repository root in an fs.FS = %v, want %v", got, tt.want)
 			}
-			if got := isRepoRoot(hostTree{h: OSHost{}}, repo); got != tt.want {
+			if got := isRepoRoot(newHostTree(OSHost{}, "", slog.Default()), repo); got != tt.want {
 				t.Errorf("repository root on the host = %v, want %v", got, tt.want)
 			}
 		})
@@ -199,7 +200,7 @@ func TestRepoRules_UnreachableGitDirKeepsBoundary(t *testing.T) {
 			mustWriteFile(t, dir, "wt/.git", "gitdir: "+tt.gitdir+"\n")
 			mustWriteFile(t, dir, "wt/leak.txt", "x")
 
-			rt := newRuleTree(fsTree{fsys: os.DirFS(dir)}, true)
+			rt := newRuleTree(newFSTree(os.DirFS(dir), slog.Default()), true)
 			if !rt.node("wt").repo {
 				t.Fatal("expected a .git file with an unreachable gitdir to stay a repository boundary")
 			}
@@ -223,7 +224,7 @@ func TestRepoRules_UnreachableCommonDirSkipsInfoExclude(t *testing.T) {
 	mustWriteFile(t, dir, "wt/gd/info/exclude", "*.go\n")
 	mustWriteFile(t, dir, "wt/.git", "gitdir: gd\n")
 
-	rt := newRuleTree(fsTree{fsys: os.DirFS(dir)}, true)
+	rt := newRuleTree(newFSTree(os.DirFS(dir), slog.Default()), true)
 	ok := rt.node("wt").repo
 	if rules := rt.frame(newWalker(nil, nil), "wt").rules; !ok || len(rules) != 0 {
 		t.Fatalf("expected a boundary without info/exclude, got %v %+v", ok, rules)
@@ -256,7 +257,7 @@ func TestValidHead_Symlink(t *testing.T) {
 			if _, got := resolveGitDir(repo); got != tt.want {
 				t.Errorf("resolveGitDir = %v, want %v", got, tt.want)
 			}
-			if got := isRepoRoot(fsTree{fsys: os.DirFS(dir)}, "repo"); got != tt.want {
+			if got := isRepoRoot(newFSTree(os.DirFS(dir), slog.Default()), "repo"); got != tt.want {
 				t.Errorf("repository root in an fs.FS = %v, want %v", got, tt.want)
 			}
 		})

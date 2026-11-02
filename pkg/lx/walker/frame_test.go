@@ -2,6 +2,7 @@ package walker
 
 import (
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -192,7 +193,7 @@ func TestWalk_IgnoredDirs(t *testing.T) {
 
 func TestFrame_GitRulesNeedARepo(t *testing.T) {
 	top := t.TempDir()
-	if n := newRuleTree(hostTree{h: OSHost{}}, true).node(top); n.inRepo {
+	if n := newRuleTree(newHostTree(OSHost{}, "", slog.Default()), true).node(top); n.inRepo {
 		t.Skip("temp dir is inside a git repository")
 	}
 	mustWriteFile(t, top, ".gitignore", "*.tmp\n")

@@ -73,7 +73,11 @@ func NewCollector(cwd string, log *slog.Logger) *Collector {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Collector{cache: walker.NewCache(cwdHost{wd: cwd}, log), cwd: cwd, log: log}
+	return newCollector(cwdHost{wd: cwd}, cwd, log)
+}
+
+func newCollector(host walker.Host, cwd string, log *slog.Logger) *Collector {
+	return &Collector{cache: walker.NewCache(host, log), cwd: cwd, log: log}
 }
 
 // cwdHost is the OS seen from the working directory wd.
@@ -361,6 +365,7 @@ func (c *Collector) expandArchive(ctx context.Context, absPath, displayPath stri
 		Overrides:      opts.Globs,
 		OverridePrefix: ovPrefix,
 		SkipHidden:     !opts.ShowHidden,
+		Log:            c.log,
 	}
 	if c.debugEnabled(ctx) {
 		wopts.OnIgnore = func(p, reason string) {

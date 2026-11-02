@@ -1,6 +1,9 @@
 package walker
 
-import "strings"
+import (
+	"log/slog"
+	"strings"
+)
 
 // Rule represents a single parsed line from the ignore file.
 type Rule struct {
@@ -50,6 +53,9 @@ type Options struct {
 	Cache *Cache
 	// OnIgnore, when set, is told about every path the walk skips and why.
 	OnIgnore func(path, reason string)
+	// Log is where the walk reports files it cannot read. Nil means the
+	// Cache's logger, or slog.Default() without a Cache.
+	Log *slog.Logger
 }
 
 // Walker traverses a directory tree, skipping what the ignore rules exclude.
@@ -60,13 +66,18 @@ type Walker struct {
 	baseKey     string
 	overrides   *overrides
 	cache       *Cache
+	log         *slog.Logger
 }
 
 // New returns a Walker configured by opts.
 func New(opts Options) *Walker {
 	cache := opts.Cache
 	if cache == nil {
-		cache = NewCache(nil, nil)
+		cache = NewCache(nil, opts.Log)
+	}
+	log := opts.Log
+	if log == nil {
+		log = cache.log
 	}
 	return &Walker{
 		opts:        opts,
@@ -75,6 +86,7 @@ func New(opts Options) *Walker {
 		baseKey:     strings.Join(opts.Base, "\n") + "\x00" + strings.Join(opts.GitExcludes, "\n"),
 		overrides:   compileOverrides(opts.Overrides),
 		cache:       cache,
+		log:         log,
 	}
 }
 
