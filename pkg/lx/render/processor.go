@@ -445,15 +445,17 @@ func readSlices(lines *internal.LineSource, cfg core.RunnerConfig) (excerpt, err
 	if err != nil {
 		return excerpt{}, err
 	}
+	// Bytes lie between head and tail, so at least one line does too. An
+	// estimate from the start of the file can fall short of that.
+	shown := internal.CountLines(head) + internal.CountLines(tail)
+	rows = max(rows, shown+1)
 	sl := excerpt{head: head, tail: tail, rows: rows, exact: exact}
 	if len(head) > 0 && len(tail) > 0 {
-		if skipped := rows - internal.CountLines(head) - internal.CountLines(tail); skipped > 0 {
-			tilde := ""
-			if !exact {
-				tilde = "~"
-			}
-			sl.gap = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
+		tilde := ""
+		if !exact {
+			tilde = "~"
 		}
+		sl.gap = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, rows-shown))
 	}
 	return sl, nil
 }

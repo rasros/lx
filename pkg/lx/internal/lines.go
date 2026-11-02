@@ -37,6 +37,9 @@ func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 	if lnf.TotalRows > 9 {
 		width = int(math.Log10(float64(lnf.TotalRows))) + 1
 	}
+	if lnf.Approximate && len(lnf.Tail) > 0 {
+		width++ // room for the "~" on tail numbers, so the columns line up
+	}
 
 	numBuf := make([]byte, 0, 20)
 	spaces := []byte("          ")
@@ -57,7 +60,7 @@ func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 			}
 
 			numBuf = strconv.AppendInt(numBuf[:0], int64(currentRow), 10)
-			padLen := width - len(numBuf)
+			padLen := width - len(mark) - len(numBuf)
 			if padLen > 0 {
 				for len(spaces) < padLen {
 					spaces = append(spaces, ' ')
