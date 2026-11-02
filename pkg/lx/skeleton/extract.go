@@ -17,9 +17,9 @@ var (
 	parserInitMu   sync.Mutex
 )
 
-// extract returns the rows of src that make up its skeleton, unmerged, or
-// ok=false when src cannot be parsed.
-func extract(langName string, src []byte, functions, structs bool) (out []internal.LineRange, ok bool) {
+// extract returns the rows of src (split into lines) that make up its
+// skeleton, unmerged, or ok=false when src cannot be parsed.
+func extract(langName string, src []byte, lines [][]byte, functions, structs bool) (out []internal.LineRange, ok bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			out, ok = nil, false
@@ -39,7 +39,6 @@ func extract(langName string, src []byte, functions, structs bool) (out []intern
 	defer tree.Release()
 
 	root := tree.RootNode()
-	lines := internal.SplitLines(src)
 
 	for i := 0; i < root.ChildCount(); i++ {
 		out = def.processNode(root.Child(i), out, src, lines, lang, functions, structs)

@@ -382,7 +382,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	var skeletonMode string
 	if skel != nil {
 		skeletonMode = skel.mode
-		size = int64(len(skel.lines.Text()))
+		size = int64(skel.lines.Size())
 	}
 
 	var dataURI string
