@@ -3,4 +3,4 @@
 
 
 --- STDERR ---
-[1;33mWarning:[0m Error accessing path during walk: stat .: PERMISSION_DENIED (path=.)
+Warning: Error accessing path during walk: stat .: PERMISSION_DENIED (path=.)

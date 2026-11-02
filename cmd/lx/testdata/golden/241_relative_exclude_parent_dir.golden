@@ -170,4 +170,4 @@ print('hello')
 
 
 --- STDERR ---
-[1;31mError:[0m Failed to read file: open links/broken_link: FILE_NOT_FOUND (path=../links/broken_link)
+Error: Failed to read file: open links/broken_link: FILE_NOT_FOUND (path=../links/broken_link)

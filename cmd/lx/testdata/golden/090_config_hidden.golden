@@ -105,5 +105,5 @@ package level2
 
 
 --- STDERR ---
-[1;31mError:[0m Failed to read file: open links/broken_link: FILE_NOT_FOUND (path=links/broken_link)
-[1;31mError:[0m Failed to read file: open links/link_to_pkg: FILE_NOT_FOUND (path=links/link_to_pkg)
+Error: Failed to read file: open links/broken_link: FILE_NOT_FOUND (path=links/broken_link)
+Error: Failed to read file: open links/link_to_pkg: FILE_NOT_FOUND (path=links/link_to_pkg)
