@@ -1,11 +1,11 @@
 --- STDOUT ---
-[1mlx[22m - File discovery, slicing, and formatting tool for LLM prompting.
+lx - File discovery, slicing, and formatting tool for LLM prompting.
 
-[1m[4mUsage:[24m[22m
-  [1mlx[22m [OPTIONS] [interleaved options] <actions>...
-  [1mlx[22m [OPTIONS] -- <files...>
+Usage:
+  lx [OPTIONS] [interleaved options] <actions>...
+  lx [OPTIONS] -- <files...>
 
-[1m[4mDescription:[24m[22m
+Description:
   lx is a specialized context bundler for Large Language Models (LLMs) like
   Claude, ChatGPT, and GitHub Copilot.
 
@@ -13,16 +13,16 @@
   files, and streams content into Markdown, XML/HTML, or bare text with
   token estimations.
 
-  [1mStream Processing Model:[22m
+  Stream Processing Model:
   lx processes arguments as a stream of sections. A section is a run of file
   and directory arguments that share the same processing settings. Interleaved
   options (like --lines or --include) are scoped to the section that follows
   them.
 
   Section boundaries are created in two ways:
-    1. An interleaved option appears [4mafter[24m files: all interleaved options
+    1. An interleaved option appears after files: all interleaved options
        reset to defaults before the new option takes effect.
-    2. A [1m-s[22m (section) action is used: this also resets all interleaved
+    2. A -s (section) action is used: this also resets all interleaved
        options to defaults for the files that follow.
 
   Example: last 50 lines of app.log, then src/ with line numbers:
@@ -34,17 +34,17 @@
     lx -s "Backend" -l src/ -s "Frontend" -i "*.ts" web/
   Each -s resets interleaved options; web/ gets only the -i filter.
 
-[1m[4mArguments:[24m[22m
-  [1m[OPTIONS][22m
+Arguments:
+  [OPTIONS]
           Global options that affect the entire execution (e.g., --copy, --xml, --bare).
           These can be placed anywhere in the command.
 
-  [1m[interleaved options][22m
+  [interleaved options]
           Options that scope the processing rules for the next section.
           When placed after files, they reset all options before taking effect.
           Example: "-n 50 src/" limits src/ to 50 lines per file.
 
-  [1m[actions][22m
+  [actions]
           The inputs to process. These can be:
             1. A file path (added directly).
             2. A directory path (walked recursively).
@@ -56,14 +56,15 @@
 
           If no actions are provided, lx walks the current directory ".".
 
-  [1m--[22m
+  --
           Separator that disables flag parsing for subsequent arguments.
           Useful for filenames that start with a dash.
 
-[1m[4mGlobal option:[24m[22m
+Global option:
   Settings that apply to the whole operation, regardless of position.
+  Color is auto-detected; set NO_COLOR=1 to disable or FORCE_COLOR=1 to force.
 
-  [1m-c, --copy[22m
+  -c, --copy
           Copy the final formatted output directly to the system clipboard.
           
           This allows you to paste the context directly into an LLM interface
@@ -73,38 +74,38 @@
             - macOS: pbcopy
             - Linux: xclip (X11) or wl-copy (Wayland)
             - Windows: clip
-  [1m-o, --output[22m <value>
+  -o, --output <value>
           Write the formatted result to a specific file path.
           
           This is useful for generating large context bundles that you want to
           save locally.
-  [1m--md[22m
+  --md
           Format output as Markdown. This is the default output format.
           
           It wraps file contents in fenced code blocks (\```language) and
           separates files with horizontal rules. This format is widely
           understood by almost all coding assistants (ChatGPT, DeepSeek, GitHub
           Copilot).
-  [1m--xml[22m
+  --xml
           Format output using XML tags.
           
           This format is highly recommended when working with Anthropic's Claude
           models. It wraps file content in <document> and <source> tags.
           <section> tags are especially recommended in xml mode.
-  [1m--html[22m
+  --html
           Format output as a standalone HTML 5 file.
           
           The output includes a responsive design (Pico CSS) and syntax
           highlighting (highlight.js). This is ideal for creating shareable
           static archives of code snippets, documentation, or logs that can be
           viewed in any browser.
-  [1m--bare[22m
+  --bare
           Format output as plain text with minimal structure.
           
           This mode emits only file content and separates files with a single
           newline. No code fences, headers, section wrappers, or tree/prompt
           blocks are added.
-  [1m-C, --stdout[22m
+  -C, --stdout
           Force output to stdout.
           
           This is the default behavior unless --copy or --output is specified.
@@ -112,25 +113,25 @@
           configuration file when you specifically want to pipe the output to
           another tool.
 
-  [1m-0, --null[22m
+  -0, --null
           Expect NUL-terminated filenames when reading from stdin.
           
           This is designed for pipeline compatibility with tools like 'find ...
           -print0' or 'fd ... -0', which use the null character to safely handle
           filenames containing spaces, newlines, or other special characters.
-  [1m--prompts-dir[22m <value>
+  --prompts-dir <value>
           Set the prompts library directory used by -P/--prompt-file.
           
           Overrides $LX_PROMPTS_DIR and the prompts_dir: config key. The default
           is ~/.config/lx/prompts when none of these are set.
-  [1m--list-prompts[22m
+  --list-prompts
           Print every prompt file in the configured prompts library and exit.
           
           Output is "<relative path>\t<absolute path>" per line, useful for
           shell completion or piping to a fuzzy finder:
           
             lx -P "$(lx --list-prompts | fzf | cut -f1)" src/
-  [1m-y, --config[22m <value>
+  -y, --config <value>
           Load configuration from a specific YAML file.
           
           Overrides default config paths (~/.config/lx/config.yaml or
@@ -139,13 +140,13 @@
             2. Specific config file (-y)
             3. Environment variable ($LX_CONFIG)
             4. User config directory
-  [1m-q, --quiet[22m
+  -q, --quiet
           Suppress the final statistics summary and all non-error logging.
           
           Useful for clean piping where you don't want metadata on stderr
           interfering with scripts, though lx writes content to stdout and
           logs/stats to stderr by default anyway.
-  [1m-v, --verbose[22m [value]
+  -v, --verbose [value]
           Set the internal logging verbosity.
           
           Usage:
@@ -156,36 +157,36 @@
             --verbose=warn Sets level to Warn
             --verbose=error Sets level to Error
             --verbose=silent Disables all logging
-  [1m--stats[22m
+  --stats
           Force the display of the file count, size, and token summary to
           stderr.
           
           By default, statistics are hidden if output is being piped to another
           process (unless writing to a file or clipboard). This flag forces them
           to appear.
-  [1m--no-stats[22m
+  --no-stats
           Disable the file count, size, and token summary footer entirely.
           
           Use this if you want the process to finish silently without printing
           metadata to the terminal.
-  [1m-V, --version[22m
+  -V, --version
           Print the current version information and exit.
-  [1m-h, --help[22m
+  -h, --help
           Show the help message. Use --help for the detailed manual style help.
 
-[1m[4mInterleaved option:[24m[22m
+Interleaved option:
   Options that configure the section which follows them. When placed before any
   files, they accumulate into the first section's settings. When placed after
   files, they trigger a section boundary: all interleaved options reset to
   defaults, then the new option applies to the next section.
 
-  [1m-l, --line-numbers[22m
+  -l, --line-numbers
           Enable line numbers for the next section.
           
           This adds a numbered prefix (e.g., " 1: ") to every line of code.
           Extremely useful when asking an LLM to reference exact locations in
           follow-up prompts.
-  [1m-n, --lines[22m <n>
+  -n, --lines <n>
           Limit the content of subsequent files to N lines.
           
           If a file is larger than N lines, lx will output the first N/2 lines
@@ -193,17 +194,17 @@
           
           Use 0 to enable compact mode: file content is skipped and only the
           filename and size are shown.
-  [1m--head[22m <n>
+  --head <n>
           Read only the first N lines of subsequent files.
           
           Useful for inspecting headers, imports, or configuration files where
           the beginning is the most relevant part.
-  [1m--tail[22m <n>
+  --tail <n>
           Read only the last N lines of subsequent files.
           
           Useful for log files, append-only journals, or checking the most
           recent additions to a file.
-  [1m-i, --include[22m <value>
+  -i, --include <value>
           Add a glob whitelist pattern for subsequent file discovery.
           
           If include patterns are provided, files MUST match at least one
@@ -214,7 +215,7 @@
             -i "*.go" (Include only Go files)
             -i "src/**" (Include files inside src)
             -i "*.{js,ts}" (Include JS and TS files)
-  [1m-e, --exclude[22m <value>
+  -e, --exclude <value>
           Add a glob blacklist pattern for subsequent file discovery.
           
           Files matching ANY exclude pattern will be skipped, even if they match
@@ -223,7 +224,7 @@
           Examples:
             -e "*_test.go" (Skip Go test files)
             -e "vendor/" (Skip vendor directory)
-  [1m-m, --max-size[22m <size>
+  -m, --max-size <size>
           Skip files larger than the given size for subsequent paths.
           
           Oversized files are dropped during discovery, before any content is
@@ -244,7 +245,7 @@
           The limit applies to every input, including paths forced with -f.
           Inputs whose size is not known ahead of time, such as remote URLs, are
           never skipped.
-  [1m-D, --documents[22m
+  -D, --documents
           Convert document files to text for the next section.
           
           By default, document files are treated as binary. When set, the
@@ -269,7 +270,7 @@
           
           The other formats yield plain text, which is as much as their
           extraction libraries expose.
-  [1m-M, --media[22m
+  -M, --media
           Replace media files with a description of their metadata.
           
           By default, media files are binary and contribute nothing but a
@@ -292,7 +293,7 @@
           existence and shape reach the bundle, not its content. A file whose
           header cannot be parsed still reports its container. In HTML output,
           images are embedded whole instead.
-  [1m-Z, --expand[22m
+  -Z, --expand
           Expand archive files inline for subsequent file arguments.
           
           When set, archive files are opened and their contents processed as if
@@ -313,29 +314,29 @@
               .rar, .7z
             Single-file compression (exposed as one virtual entry):
               .gz, .bz2, .xz, .zst, .br, .lz4, .sz, .s2, .lz
-  [1m-H, --hidden[22m
+  -H, --hidden
           Include hidden files and directories (starting with '.') for
           subsequent paths.
           
           By default, dotfiles and dot-directories are excluded from directory
           walks. This flag overrides that behaviour for the next section.
-  [1m-S, --follow[22m
+  -S, --follow
           Follow symbolic links that point to directories when walking.
           
           By default, directory symlinks are skipped to avoid cycles. This flag
           enables traversal into symlinked directories for the next section.
-  [1m--no-links[22m
+  --no-links
           Skip symbolic links to files when walking directories.
           
           By default, symlinks pointing to files are followed and their target
           content included. This flag suppresses them for the next section.
-  [1m-I, --no-ignore[22m
+  -I, --no-ignore
           Disable .gitignore-based file filtering for subsequent paths.
           
           By default, lx respects .gitignore files (and the global git ignore
           file). This flag disables that filtering so ignored files are
           included.
-  [1m-u, --functions[22m
+  -u, --functions
           Filter files in the next section to show only function and method
           signatures.
           
@@ -344,7 +345,7 @@
           slicing.
           
           Pairs with --types (-Y) to show a full code skeleton.
-  [1m-Y, --types[22m
+  -Y, --types
           Filter files in the next section to show only type and class
           definitions, including their field/variable declarations.
           
@@ -354,10 +355,10 @@
           
           Pairs with --functions (-u) to show a full code skeleton.
 
-[1m[4mAction:[24m[22m
+Action:
   Explicit content generators that insert data into the stream immediately.
 
-  [1m-T, --tree[22m
+  -T, --tree
           Print a file tree for all files in the current section, then also
           include the file contents in the output. Use -t to suppress file
           content.
@@ -378,7 +379,7 @@
             lib)
             lx -T src -f extra -- file2 (one section: tree covers src, extra,
             file2)
-  [1m-t, --tree-only[22m
+  -t, --tree-only
           Print a file tree for all files in the current section without
           including the file contents. This is useful for getting a structural
           overview.
@@ -388,7 +389,7 @@
             lx -t . (show tree of current directory)
           
           See --tree (-T) for full details on section semantics.
-  [1m-f, --file[22m <value>
+  -f, --file <value>
           Force process a specific file path immediately.
           
           Unlike passing a path as a standard argument, using -f forces the file
@@ -400,7 +401,7 @@
           
           If the path is a directory, active filters (-i/-e) are preserved for
           the recursive walk, but hidden/.gitignore checks are still disabled.
-  [1m-s, --section[22m <value>
+  -s, --section <value>
           Insert a logical section separator with a custom header.
           
           This helps organize the output for the LLM by grouping related files.
@@ -414,7 +415,7 @@
             lx -s "Backend" -l src/ -s "Frontend" -i "*.ts" web/
           The second -s resets -l so web/ gets full content, with only -i
           active.
-  [1m-E, --system-context[22m
+  -E, --system-context
           Insert a block describing the machine and the command that produced
           the output.
           
@@ -433,7 +434,7 @@
           
           Every field is also available individually to a custom meta_template
           as {{ .Fields.os }}, {{ .Fields.time }}, and so on. See CONFIG.md.
-  [1m-p, --prompt[22m <value>
+  -p, --prompt <value>
           Inject a custom text block directly into the output stream.
           
           Useful for short, inline instructions. To load a prompt from a file or
@@ -441,7 +442,7 @@
           
           Example:
             lx -p "Refactor the following code for better concurrency:" main.go
-  [1m-P, --prompt-file[22m <value>
+  -P, --prompt-file <value>
           Load a prompt from a file and inject it into the output stream.
           
           Value resolution (first match wins):
@@ -468,22 +469,22 @@
             lx -P refactor -i "*.py" src/ --xml -c
             lx -P plan -P comments docs/ src/
 
-[1m[4mExamples:[24m[22m
-  1. [4mCode Review Bundle[24m
+Examples:
+  1. Code Review Bundle
      Copy all modified files in your git repo to the clipboard:
        $ git diff --name-only | lx -c
 
-  2. [4mTargeted Debugging[24m
+  2. Targeted Debugging
      Grab the last 50 lines of a log file, then the processing code with line
      numbers enabled for reference:
        $ lx --tail 50 /var/log/app.log \
             -l src/processor/
 
-  3. [4mComplex Filtering[24m
+  3. Complex Filtering
      Find JavaScript files except tests, output in XML (optimized for Claude):
        $ lx --xml -i "*.js" -e "*test*" .
 
-  4. [4mPrompt Injection[24m
+  4. Prompt Injection
      Load a prompt by name from your prompts library (set via $LX_PROMPTS_DIR
      or --prompts-dir), then attach the source code:
        $ lx -P go/test src/ -c
@@ -492,11 +493,11 @@
      Use -p only for inline literals:
        $ lx -p "Refactor for concurrency:" main.go
 
-  5. [4mSearch Integration[24m
+  5. Search Integration
      Use 'grep' to find files with TODOs and pipe them to lx:
        $ grep -Rl TODO | lx -c
 
-  6. [4mURL Input[24m
+  6. URL Input
      Fetch a remote file directly (no download step needed):
        $ lx https://example.com/config.yaml src/
 

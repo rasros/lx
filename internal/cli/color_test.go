@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestShouldColorStats(t *testing.T) {
+func TestShouldColor(t *testing.T) {
 	saved := map[string]string{}
 	for _, k := range []string{"NO_COLOR", "CLICOLOR", "CLICOLOR_FORCE", "FORCE_COLOR", "TERM"} {
 		saved[k] = os.Getenv(k)
@@ -49,9 +49,9 @@ func TestShouldColorStats(t *testing.T) {
 			for k, v := range tt.env {
 				os.Setenv(k, v)
 			}
-			got := shouldColorStats(tt.w)
+			got := shouldColor(tt.w)
 			if got != tt.want {
-				t.Errorf("shouldColorStats() = %v, want %v", got, tt.want)
+				t.Errorf("shouldColor() = %v, want %v", got, tt.want)
 			}
 		})
 	}
