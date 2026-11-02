@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -591,5 +592,74 @@ func TestPrepareFileContextOverlapRendersWholeFile(t *testing.T) {
 	}
 	if ctx.TotalRows != 3 || ctx.IsEstimate {
 		t.Errorf("rows=%d estimate=%v, want exactly 3", ctx.TotalRows, ctx.IsEstimate)
+	}
+}
+
+// hugeFile serves a file too large to count exactly without allocating it: a
+// first line longer than the chunk the row estimate is drawn from, then short
+// lines to the end. The estimate from that chunk comes out far too low.
+type hugeFile struct{ size, firstLine int64 }
+
+func (h hugeFile) Size() int64  { return h.size }
+func (h hugeFile) Close() error { return nil }
+func (h hugeFile) Read([]byte) (int, error) {
+	return 0, io.EOF // only ever read through ReadAt
+}
+func (h hugeFile) ReadAt(p []byte, off int64) (int, error) {
+	n := 0
+	for ; n < len(p) && off+int64(n) < h.size; n++ {
+		pos := off + int64(n)
+		switch {
+		case pos < h.firstLine:
+			p[n] = 'x'
+		case pos == h.firstLine, (pos-h.firstLine)%4 == 0:
+			p[n] = '\n'
+		default:
+			p[n] = 'r'
+		}
+	}
+	if n < len(p) {
+		return n, io.EOF
+	}
+	return n, nil
+}
+
+// Beyond internal.ExactCountLimit the row count is an estimate, which must
+// still leave room for the lines shown and the gap known to lie between them.
+func TestPrepareFileContextClampsEstimatedRows(t *testing.T) {
+	h := hugeFile{size: internal.ExactCountLimit + 80<<20, firstLine: 100 << 10}
+	file := sources.InputFile{
+		Path: "huge.log",
+		Size: h.size,
+		Open: func() (io.ReadCloser, error) { return h, nil },
+	}
+	file.Config = core.RunnerConfig{Head: 2, Tail: 2, LineNumbers: true}
+
+	engine, _ := templatex.Compile(core.NewConfig())
+	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	ctx, err := proc.prepareFileContext(file, 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ctx.IsEstimate {
+		t.Fatal("want an estimated row count for a file beyond ExactCountLimit")
+	}
+	if ctx.TotalRows < 5 {
+		t.Errorf("rows = %d, want at least the 4 lines shown plus 1 skipped", ctx.TotalRows)
+	}
+	content, _ := ctx.Content.(string)
+	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+	if len(lines) != 5 || !strings.HasPrefix(lines[2], "... (~") {
+		t.Fatalf("want head, gap marker and tail, got %d lines; gap line %q", len(lines), lines[min(2, len(lines)-1)])
+	}
+	width := strings.Index(lines[0], ":")
+	for _, i := range []int{3, 4} {
+		if !strings.HasPrefix(strings.TrimLeft(lines[i], " "), "~") || strings.Index(lines[i], ":") != width {
+			t.Errorf("tail line %q, want a ~ number aligned with the head's", lines[i][:min(len(lines[i]), 20)])
+		}
+	}
+	tailFirst, _ := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(lines[3][:width]), "~")))
+	if tailFirst <= 2 {
+		t.Errorf("tail starts at row %d, want after the head's rows 1-2", tailFirst)
 	}
 }

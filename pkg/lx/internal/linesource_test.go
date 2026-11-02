@@ -253,8 +253,79 @@ func TestLineNumberFormatterMarksApproximateTail(t *testing.T) {
 		TotalRows:   10,
 		Approximate: true,
 	}
-	want := " 1: one\n... (~7 rows skipped)\n~10: ten\n"
+	// The "~" takes a column of its own, so head and tail numbers line up.
+	want := "  1: one\n... (~7 rows skipped)\n~10: ten\n"
 	if got := lnf.String(); got != want {
 		t.Errorf("String() = %q, want %q", got, want)
+	}
+}
+
+// A file truncated in place between stat and read, as a log rotated with
+// copytruncate is, holds less than the size the source was given. Reading its
+// tail shrinks the source to the real end instead of failing.
+func TestLineSourceTailOfContentShorterThanSize(t *testing.T) {
+	var b bytes.Buffer
+	for i := 0; b.Len() < 3*lineChunk; i++ {
+		fmt.Fprintf(&b, "line %d\n", i)
+	}
+	data := b.Bytes()
+	wantTail := refTail(data, 2)
+
+	for _, extra := range []int64{1, 100, lineChunk + 7, 10 * lineChunk} {
+		declared := int64(len(data)) + extra
+
+		t.Run(fmt.Sprintf("+%d tail only", extra), func(t *testing.T) {
+			src := NewLineSource(bytes.NewReader(data), declared)
+			tail, err := src.Tail(2)
+			if err != nil {
+				t.Fatalf("Tail(2): %v", err)
+			}
+			if !bytes.Equal(tail, wantTail) {
+				t.Errorf("Tail(2) = %q, want %q", tail, wantTail)
+			}
+			if src.Size() != int64(len(data)) {
+				t.Errorf("Size() = %d, want %d", src.Size(), len(data))
+			}
+		})
+
+		t.Run(fmt.Sprintf("+%d head then tail", extra), func(t *testing.T) {
+			src := NewLineSource(bytes.NewReader(data), declared)
+			head, err := src.Head(2)
+			if err != nil || !bytes.Equal(head, refHead(data, 2)) {
+				t.Fatalf("Head(2) = %q, %v", head, err)
+			}
+			tail, err := src.Tail(2)
+			if err != nil {
+				t.Fatalf("Tail(2): %v", err)
+			}
+			if !bytes.Equal(tail, wantTail) {
+				t.Errorf("Tail(2) = %q, want %q", tail, wantTail)
+			}
+			rows, exact, err := src.Count()
+			if err != nil || !exact || rows != len(refLines(data)) {
+				t.Errorf("Count() = %d, %v, %v, want %d, true, nil", rows, exact, err, len(refLines(data)))
+			}
+		})
+	}
+}
+
+func TestLineNumberFormatterAlignsApproximateTailWithHead(t *testing.T) {
+	lnf := LineNumberFormatter{
+		Head:        []byte("a\nb\n"),
+		Gap:         []byte("... (~45249996 rows skipped)\n"),
+		Tail:        []byte("y\nz\n"),
+		TotalRows:   45249999,
+		Approximate: true,
+	}
+	lines := strings.Split(strings.TrimSuffix(lnf.String(), "\n"), "\n")
+	want := []string{
+		"        1: a",
+		"        2: b",
+		"... (~45249996 rows skipped)",
+		"~45249998: y",
+		"~45249999: z",
+	}
+	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
 	}
 }
