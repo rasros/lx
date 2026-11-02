@@ -1,0 +1,9 @@
+--- STDOUT ---
+sub/a.log (1 rows)
+---
+```text
+ignored by root pattern
+```
+
+
+--- STDERR ---
