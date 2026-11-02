@@ -142,8 +142,9 @@ func SetupParentIgnoreFilesFixture(t *testing.T, repo bool) string {
 }
 
 // SetupNegatedIgnoredDirFixture builds a git repository whose .gitignore
-// ignores the build directory but re-includes one file in it, and holds a
-// subdirectory x to run lx from. It returns the repository root.
+// ignores the build directory and tries to re-include one file in it, which
+// git and ripgrep do not do, and holds a subdirectory x to run lx from. It
+// returns the repository root.
 func SetupNegatedIgnoredDirFixture(t *testing.T) string {
 	t.Helper()
 	setupMockConfig(t)
@@ -151,9 +152,34 @@ func SetupNegatedIgnoredDirFixture(t *testing.T) string {
 
 	makeGitDir(t, dir, ".git")
 	writeFile(t, dir, ".gitignore", "build/\n!build/keep.js\n", 0644)
-	writeFile(t, dir, "build/keep.js", "re-included by the negation", 0644)
+	writeFile(t, dir, "build/keep.js", "ignored with its directory despite the negation", 0644)
 	writeFile(t, dir, "build/out.js", "ignored with its directory", 0644)
 	writeFile(t, dir, "x/main.go", "package x", 0644)
+
+	return dir
+}
+
+// SetupIgnoredDirNegationsFixture builds a git repository with negations
+// that can and cannot re-include a file: glob/* and deep/** ignore what is
+// inside a directory, so a negation re-includes a file there, while nested/
+// ignores the directory itself, so its own .gitignore never applies. ovr is
+// left to the -e patterns.
+func SetupIgnoredDirNegationsFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	makeGitDir(t, dir, ".git")
+	writeFile(t, dir, ".gitignore", "glob/*\n!glob/keep.js\ndeep/**\n!deep/keep.js\nnested/\n", 0644)
+	writeFile(t, dir, "glob/keep.js", "re-included: glob/* leaves glob/ itself alone", 0644)
+	writeFile(t, dir, "glob/out.js", "ignored by glob/*", 0644)
+	writeFile(t, dir, "deep/keep.js", "re-included: deep/** leaves deep/ itself alone", 0644)
+	writeFile(t, dir, "deep/out.js", "ignored by deep/**", 0644)
+	writeFile(t, dir, "nested/.gitignore", "!keep.js\n", 0644)
+	writeFile(t, dir, "nested/keep.js", "ignored with nested/, whose .gitignore is never read", 0644)
+	writeFile(t, dir, "ovr/keep.js", "ovr keep", 0644)
+	writeFile(t, dir, "ovr/out.js", "ovr out", 0644)
+	writeFile(t, dir, "src/main.go", "package src", 0644)
 
 	return dir
 }

@@ -2,7 +2,7 @@
 [1/2] ../build/keep.js (1 rows)
 ---
 ```javascript
-re-included by the negation
+ignored with its directory despite the negation
 ```
 
 [2/2] ../build/out.js (1 rows)

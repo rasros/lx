@@ -1,0 +1,27 @@
+--- STDOUT ---
+[1/4] deep/keep.js (1 rows)
+---
+```javascript
+re-included: deep/** leaves deep/ itself alone
+```
+
+[2/4] glob/keep.js (1 rows)
+---
+```javascript
+re-included: glob/* leaves glob/ itself alone
+```
+
+[3/4] ovr/keep.js (1 rows)
+---
+```javascript
+ovr keep
+```
+
+[4/4] src/main.go (1 rows)
+---
+```go
+package src
+```
+
+
+--- STDERR ---

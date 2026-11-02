@@ -54,9 +54,10 @@ func TestGoldenStrayGitDir(t *testing.T) {
 	})
 }
 
-// Every way of naming a file below an ignored directory agrees with a walk:
-// a re-included file is kept and its sibling skipped, named relative to the
-// root, by an absolute path, or by a ../ path from a subdirectory.
+// As in git and ripgrep, a walk prunes an ignored directory, so a negation
+// naming a file below it re-includes nothing. Naming the file or the
+// directory, relative to the root, by an absolute path or by a ../ path from
+// a subdirectory, still includes it, since a named path is never filtered.
 func TestGoldenNegatedIgnoredDir(t *testing.T) {
 	dir := setupNegatedIgnoredDirFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
@@ -76,6 +77,16 @@ func TestGoldenNegatedIgnoredDirFromSubdir(t *testing.T) {
 		{name: "109i_negated_ignored_dir_parent_absolute_file", args: []string{filepath.Join(dir, "build", "keep.js")}},
 		{name: "109ia_ignored_dir_parent_relative", args: []string{"../build"}},
 	}, dir)
+}
+
+// A negation re-includes a file when its directory is not itself ignored,
+// in an ignore file or by -e, and nothing below an ignored directory.
+func TestGoldenIgnoredDirNegations(t *testing.T) {
+	dir := gf.SetupIgnoredDirNegationsFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "109x_ignored_dir_negations_walk", args: []string{"-e", "ovr/*", "-e", "!ovr/keep.js", "."}},
+		{name: "109y_ignored_dir_negations_override_prunes", args: []string{"-e", "ovr", "-e", "!ovr/keep.js", "."}},
+	})
 }
 
 // The ignore files above the directory lx runs in apply as they do below it:

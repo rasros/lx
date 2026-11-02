@@ -70,7 +70,7 @@ func (w *Walker) ignore(p, reason string) {
 // walkRoot walks the directory dir of rt, which is root within fsys. The
 // directory itself is not judged, only the entries below it.
 func (w *Walker) walkRoot(rt *ruleTree, fsys fs.FS, dir, root string, info fs.FileInfo, fn fs.WalkDirFunc) error {
-	return w.walkDir(rt, fsys, rt.frame(w, dir), root, false, "", fn, []fs.FileInfo{info})
+	return w.walkDir(rt, fsys, rt.frame(w, dir), root, fn, []fs.FileInfo{info})
 }
 
 // whitelisted reports whether a negation is the rule that decides the entry
@@ -120,10 +120,8 @@ func (w *Walker) resolveEntry(fsys fs.FS, path string, d fs.DirEntry, ancestors 
 	return true, info, false, ""
 }
 
-// walkDir walks the directory at dir within fsys, whose frame is f. ignored
-// and reason are the state carried from above, set when the directory is
-// ignored but entered because a negation could re-include something below.
-func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, ignored bool, reason string, walkFn fs.WalkDirFunc, ancestors []fs.FileInfo) error {
+// walkDir walks the directory at dir within fsys, whose frame is f.
+func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, walkFn fs.WalkDirFunc, ancestors []fs.FileInfo) error {
 	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {
 		return walkFn(dir, nil, err)
@@ -168,32 +166,27 @@ func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, ignored
 		rel := joinRel(f.node.rel, d.Name())
 		if isDir {
 			childDir := rt.t.child(f.node.dir, d.Name())
-			ign, descend, r, own := judgeDir(f.rules, rel, w.override, childPath, ignored, reason)
-			if ign && !descend {
+			if ign, r := judgeDir(f.rules, rel, w.override, childPath); ign {
 				w.ignore(childPath, r)
 				continue
 			}
-			if ign {
-				r = dirReason(rt.t.display(childDir), r, own)
-			} else {
-				entry := d
-				if target != nil {
-					entry = followedDirEntry{DirEntry: d, info: target}
-				}
-				if err := walkFn(childPath, entry, nil); err != nil {
-					if err == fs.SkipDir {
-						continue
-					}
-					return err
-				}
+			entry := d
+			if target != nil {
+				entry = followedDirEntry{DirEntry: d, info: target}
 			}
-			if err := w.walkDir(rt, fsys, rt.frame(w, childDir), childPath, ign, r, walkFn, childAncestors); err != nil {
+			if err := walkFn(childPath, entry, nil); err != nil {
+				if err == fs.SkipDir {
+					continue
+				}
+				return err
+			}
+			if err := w.walkDir(rt, fsys, rt.frame(w, childDir), childPath, walkFn, childAncestors); err != nil {
 				return err
 			}
 			continue
 		}
 
-		ign, r := checkIgnore(rel, false, f.rules, ignored, reason, wantReason)
+		ign, r := checkIgnore(rel, false, f.rules, false, "", wantReason)
 		ign, r = checkIgnore(childPath, false, w.override, ign, r, wantReason)
 		if ign {
 			w.ignore(childPath, r)

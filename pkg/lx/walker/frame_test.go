@@ -182,9 +182,9 @@ func TestWalk_IgnoredDirs(t *testing.T) {
 		rel, _ := filepath.Rel(repo, p)
 		got = append(got, filepath.ToSlash(rel))
 	}
-	// A negation below an ignored directory keeps the walk going into it,
-	// re-including only what it matches.
-	want := []string{"kp/x/k.go", "lib/keep/f.go", "src/a/f.go"}
+	// As in git and ripgrep, an ignored directory is pruned: a negation below
+	// it, in the same file or in one inside it, re-includes nothing.
+	want := []string{"lib/keep/f.go", "src/a/f.go"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("walk included %v, want %v", got, want)
 	}
@@ -362,7 +362,7 @@ func TestWalkPath_NamedPathsAreNotFiltered(t *testing.T) {
 	writeTree(t, top, "build/keep.js", "build/out.js", "build/sub/keep.js", "build/sub/b.log", "x/local.txt", "x/main.go", "x/run.log", "main.go", ".hidden")
 
 	all := []string{".hidden", "build/keep.js", "build/out.js", "build/sub/b.log", "build/sub/keep.js", "main.go", "x/local.txt", "x/main.go", "x/run.log"}
-	walk := []string{"build/keep.js", "main.go", "x/main.go"}
+	walk := []string{"main.go", "x/main.go"}
 	dirs := []string{"build/keep.js", "build/out.js", "build/sub/keep.js", "x/main.go"}
 
 	rels := func(paths []string) []string {

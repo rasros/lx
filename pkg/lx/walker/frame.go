@@ -1,7 +1,6 @@
 package walker
 
 import (
-	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -341,29 +340,11 @@ func rebase(rules []Rule, rel string) []Rule {
 	return out
 }
 
-// judgeDir decides a directory: rules are those in effect in its parent,
-// matched at rel, and override those of the walk, matched at walkRel.
-// ignored and reason are the state carried from the parent. It reports
-// whether the directory is ignored, whether a walk still descends into it
-// because a negation could re-include something below, and the reason, own
-// when a rule matched the directory itself.
-func judgeDir(rules []Rule, rel string, override []Rule, walkRel string, ignored bool, reason string) (bool, bool, string, bool) {
-	carried := reason
-	ignored, reason = checkIgnore(rel, true, rules, ignored, reason, true)
-	ignored, reason = checkIgnore(walkRel, true, override, ignored, reason, true)
-	if !ignored {
-		return false, false, "", false
-	}
-	descend := hasNestedException(rel, rules) || (len(override) > 0 && hasNestedException(walkRel, override))
-	return true, descend, reason, reason != carried
-}
-
-// dirReason is the reason given for a path below the ignored directory
-// display: the rule that matched the directory, or the reason carried
-// from above it.
-func dirReason(display, reason string, own bool) string {
-	if !own {
-		return reason
-	}
-	return fmt.Sprintf("parent directory %s: %s", display, reason)
+// judgeDir reports whether a directory is ignored, and why: rules are those
+// in effect in its parent, matched at rel, and override those of the walk,
+// matched at walkRel. As in git and ripgrep, an ignored directory is not
+// entered, so no negation can re-include anything below it.
+func judgeDir(rules []Rule, rel string, override []Rule, walkRel string) (bool, string) {
+	ignored, reason := checkIgnore(rel, true, rules, false, "", true)
+	return checkIgnore(walkRel, true, override, ignored, reason, true)
 }
