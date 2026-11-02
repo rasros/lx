@@ -3,7 +3,6 @@ package sources
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 
 	"github.com/rasros/lx/pkg/lx/internal"
 )
@@ -13,15 +12,6 @@ import (
 // ExtractMediaMetadata looks at the content as well.
 func IsMediaPath(path string) bool {
 	return internal.FormatByExt(path).IsMedia()
-}
-
-// IsMediaCandidate reports whether a path is worth offering to media
-// extraction: a recognised suffix, or no suffix at all.
-//
-// Deprecated: the name alone cannot tell; ExtractMediaMetadata classifies the
-// content itself and rejects what is not media, so call it directly.
-func IsMediaCandidate(path string) bool {
-	return IsMediaPath(path) || filepath.Ext(path) == ""
 }
 
 // ExtractMediaMetadata describes a media file's container, duration and streams.
