@@ -58,9 +58,6 @@ type ImageInfo struct {
 // header at the end, as MP4 must find a trailing moov, reads the stream through
 // without holding it.
 func MediaMetadata(container string, r io.ReaderAt, size int64) ([]byte, bool) {
-	if lr, ok := r.(*LazyReader); ok {
-		defer lr.skipGaps()()
-	}
 	b := &byteReader{r: r, size: size}
 
 	info := parseMedia(container, b)
@@ -87,11 +84,21 @@ func MediaMetadata(container string, r io.ReaderAt, size int64) ([]byte, bool) {
 	return []byte(info.render()), true
 }
 
+// mediaSeeksBack names the containers whose parsers read at offsets the file
+// itself points to, which may lie before what was read last: a TIFF directory
+// can sit at the end and point back at its values. Every other parser walks
+// forward, so a stream it reads can discard what it steps over.
+var mediaSeeksBack = map[string]bool{"tiff": true}
+
 func parseMedia(container string, b *byteReader) *MediaInfo {
-	if f := FormatByName(container); f != nil && f.parse != nil {
-		return f.parse(b)
+	f := FormatByName(container)
+	if f == nil || f.parse == nil {
+		return nil
 	}
-	return nil
+	if lr, ok := b.r.(*LazyReader); ok && !mediaSeeksBack[f.Name] {
+		defer lr.skipGaps()()
+	}
+	return f.parse(b)
 }
 
 // mediaReadAhead is how much byteReader reads at once. Parsers read a few
@@ -122,8 +129,9 @@ func (b *byteReader) at(off, n int64) ([]byte, bool) {
 		return b.buf[i : i+n : i+n], true
 	}
 	if n > mediaReadAhead {
-		buf := make([]byte, n)
-		if _, err := b.r.ReadAt(buf, off); err != nil {
+		// n comes from the file, so it is allocated only as the bytes arrive.
+		buf, err := ReadAllAt(io.NewSectionReader(b.r, off, n), n)
+		if err != nil || int64(len(buf)) < n {
 			return nil, false
 		}
 		return buf, true

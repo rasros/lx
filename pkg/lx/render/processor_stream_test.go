@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -212,5 +213,36 @@ func TestProcessorRendersWholeStream(t *testing.T) {
 	}
 	if body.read != int64(len(text)) {
 		t.Errorf("read %d of %d bytes", body.read, len(text))
+	}
+}
+
+func TestProcessorSurvivesLyingContentLength(t *testing.T) {
+	// A server declares 1 TiB and sends 2 KB. Every way of rendering it shows
+	// what arrived, and none allocates for what was declared.
+	text := strings.Repeat("func f() {}\n", 170)
+	cases := []struct {
+		name string
+		cfg  core.RunnerConfig
+		want string
+	}{
+		{"whole", core.RunnerConfig{Head: -1}, text},
+		{"head and tail", core.RunnerConfig{Head: 3, Tail: 3}, "func f() {}\n"},
+		{"compact", core.RunnerConfig{}, "(170 rows)"},
+		{"skeleton", core.RunnerConfig{Head: -1, SkeletonFunctions: true}, "func f()"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var before, after runtime.MemStats
+			runtime.ReadMemStats(&before)
+			body := &countingBody{r: strings.NewReader(text), length: 1 << 40}
+			out := renderStream(t, streamInput("https://example.com/huge.go", body), tc.cfg)
+			runtime.ReadMemStats(&after)
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("missing %q in:\n%s", tc.want, out)
+			}
+			if alloc := after.TotalAlloc - before.TotalAlloc; alloc > 256<<20 {
+				t.Errorf("allocated %d bytes for %d bytes of content", alloc, len(text))
+			}
+		})
 	}
 }
