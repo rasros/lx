@@ -7,6 +7,9 @@ mixin Walker {
   }
 }
 
+// An alias is a type.
+typedef Steps = int;
+
 extension Shout on String {
   String shout() {
     return toUpperCase();

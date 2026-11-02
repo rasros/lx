@@ -7,21 +7,19 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-func CppFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	if n.Type(lang) == "declaration" {
-		return hasDescendantOfType(n, "function_declarator", lang)
-	}
-	return true
-}
-
 var cppTypeSpecifiers = []string{"class_specifier", "struct_specifier", "union_specifier", "enum_specifier"}
 
 // CppUnwrap returns the declaration inside a template_declaration, the
-// function a friend declaration declares, and the type specifier of a member
-// that only declares a type (`struct Inner { ... };`, with no declarator
-// after the body). Anything else is returned as is.
+// function a friend declaration declares, the one declaration of an
+// `extern "C"` without braces, and the type specifier of a member that only
+// declares a type (`struct Inner { ... };`, with no declarator after the
+// body). Anything else is returned as is. It serves C too.
 func CppUnwrap(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node {
 	switch c.Type(n) {
+	case "linkage_specification":
+		if body := n.ChildByFieldName("body", c.Lang); body != nil && c.Type(body) != "declaration_list" {
+			return CppUnwrap(c, body)
+		}
 	case "friend_declaration":
 		for i := 0; i < n.NamedChildCount(); i++ {
 			inner := n.NamedChild(i)
@@ -29,7 +27,7 @@ func CppUnwrap(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node {
 			case "function_definition":
 				return inner
 			case "declaration":
-				if cppDeclaresFunction(c, inner.ChildByFieldName("declarator", c.Lang)) {
+				if declaresFunction(c, inner.ChildByFieldName("declarator", c.Lang)) {
 					return inner
 				}
 			}
@@ -62,7 +60,7 @@ func CppMember(c *Ctx, n *gotreesitter.Node) MemberKind {
 	case isOneOf(t, cppTypeSpecifiers):
 		return Nested
 	case t == "field_declaration" || t == "declaration":
-		if cppDeclaresFunction(c, n.ChildByFieldName("declarator", c.Lang)) {
+		if declaresFunction(c, n.ChildByFieldName("declarator", c.Lang)) {
 			return Method
 		}
 		return Field
@@ -72,43 +70,25 @@ func CppMember(c *Ctx, n *gotreesitter.Node) MemberKind {
 	return Skip
 }
 
-// cppDeclaresFunction reports a declarator that declares a function (maybe
-// returning a pointer or reference), not a pointer to one: in `void
-// (*callback)(int)` the function declarator's own declarator is
-// parenthesized.
-func cppDeclaresFunction(c *Ctx, d *gotreesitter.Node) bool {
-	for d != nil {
-		switch c.Type(d) {
-		case "pointer_declarator", "reference_declarator":
-			next := d.ChildByFieldName("declarator", c.Lang)
-			if next == nil && d.NamedChildCount() > 0 {
-				next = d.NamedChild(d.NamedChildCount() - 1)
-			}
-			d = next
-		case "function_declarator":
-			inner := d.ChildByFieldName("declarator", c.Lang)
-			return inner == nil || c.Type(inner) != "parenthesized_declarator"
-		case "operator_cast": // operator int() const
-			return true
-		default:
-			return false
-		}
-	}
-	return false
-}
-
 // CppSectionPrivate reports a private: section label. The grammar keeps the
 // colon out of the access_specifier node.
 func CppSectionPrivate(c *Ctx, label *gotreesitter.Node) bool {
 	return strings.TrimSuffix(strings.TrimSpace(c.Text(label)), ":") == "private"
 }
 
-// CppEmitter emits C++ type declarations: typedefs as in C, the rest with
-// the generic member walker.
+// CppEmitter emits C and C++ type declarations: typedefs with
+// CEmitTypedef, `using X = ...;` aliases whole with types, the rest with the
+// generic member walker.
 func CppEmitter(m *Members) Emitter {
 	return func(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
-		if c.Type(n) == "type_definition" {
+		switch c.Type(n) {
+		case "type_definition":
 			return CEmitTypedef(c, out, n)
+		case "alias_declaration":
+			if !c.Structs {
+				return out
+			}
+			return c.KeepNode(out, n)
 		}
 		return m.Emit(c, out, n)
 	}

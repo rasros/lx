@@ -1,0 +1,23 @@
+--- STDOUT ---
+skeleton/toplevel.cpp (33 rows, function signatures)
+---
+```cpp
+// Exported with C linkage.
+extern "C" int c_entry(int argc);
+...
+extern "C" {
+...
+int handle_open(Handle *h);
+...
+}
+...
+#if defined(DEBUG)
+void trace(const char *msg) {
+...
+#endif
+...
+int run(int argc) {
+```
+
+
+--- STDERR ---

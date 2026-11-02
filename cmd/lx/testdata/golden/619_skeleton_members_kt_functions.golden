@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.kt (28 rows, function signatures)
+skeleton/members.kt (31 rows, function signatures)
 ---
 ```kotlin
 class K(val a: Int) {

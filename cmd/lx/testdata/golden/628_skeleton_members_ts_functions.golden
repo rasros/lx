@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.ts (19 rows, function signatures)
+skeleton/members.ts (22 rows, function signatures)
 ---
 ```typescript
 /** Base shape. */

@@ -1,0 +1,24 @@
+--- STDOUT ---
+skeleton/toplevel.h (45 rows, type definitions)
+---
+```c
+/* Plain struct, not a typedef. */
+struct buffer {
+    char *data;
+    int (*grow)(struct buffer *b, int n); /* function pointer field */
+};
+...
+enum mode { MODE_READ, MODE_WRITE };
+...
+typedef enum {
+    LEVEL_LOW,
+    LEVEL_HIGH
+} level;
+...
+// Callback type: a type alias, not a function.
+typedef int (*handler_fn)(int code);
+typedef unsigned long size_type;
+```
+
+
+--- STDERR ---

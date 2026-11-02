@@ -1,11 +1,14 @@
 --- STDOUT ---
-skeleton/members.swift (24 rows, type definitions)
+skeleton/members.swift (27 rows, type definitions)
 ---
 ```swift
 public struct Grid {
     public var width: Int = 0
 ...
 }
+...
+// An alias is a type.
+public typealias Width = Int
 ...
 public class Resource {
 ...

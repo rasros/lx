@@ -112,11 +112,25 @@ func TestGoldenSkeleton(t *testing.T) {
 // (method signatures in their types), -Y (types and fields) and both.
 func TestGoldenSkeletonMembers(t *testing.T) {
 	dir := setupSkeletonFixture(t)
-	var cases []goldenTestCase
-	for i, file := range []string{
+	runTestGolden(t, dir, skeletonModeCases(610, "members", []string{
 		"members.cpp", "members.cs", "Members.java", "members.kt", "members.swift",
 		"members.rs", "members.ts", "members.dart", "members.php", "members.ml", "members.m",
-	} {
+	}))
+}
+
+// TestGoldenSkeletonTopLevel covers C and C++ top-level declarations: header
+// guards and other preprocessor conditionals, extern "C" blocks, function
+// pointers (variables, not functions) and typedef and using aliases (types).
+func TestGoldenSkeletonTopLevel(t *testing.T) {
+	dir := setupSkeletonFixture(t)
+	runTestGolden(t, dir, skeletonModeCases(650, "toplevel", []string{"toplevel.h", "toplevel.cpp"}))
+}
+
+// skeletonModeCases runs each skeleton fixture file with -u, -Y and both,
+// numbered from start.
+func skeletonModeCases(start int, kind string, files []string) []goldenTestCase {
+	var cases []goldenTestCase
+	for i, file := range files {
 		lang := strings.ToLower(strings.TrimPrefix(filepath.Ext(file), "."))
 		for j, mode := range []struct {
 			name  string
@@ -127,12 +141,12 @@ func TestGoldenSkeletonMembers(t *testing.T) {
 			{"both", []string{"-u", "-Y"}},
 		} {
 			cases = append(cases, goldenTestCase{
-				name: fmt.Sprintf("%d_skeleton_members_%s_%s", 610+3*i+j, lang, mode.name),
+				name: fmt.Sprintf("%d_skeleton_%s_%s_%s", start+3*i+j, kind, lang, mode.name),
 				args: append(append([]string{}, mode.flags...), "skeleton/"+file),
 			})
 		}
 	}
-	runTestGolden(t, dir, cases)
+	return cases
 }
 
 func TestGoldenSkeletonSlicing(t *testing.T) {

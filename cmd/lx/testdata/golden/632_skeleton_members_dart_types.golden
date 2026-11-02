@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.dart (23 rows, type definitions)
+skeleton/members.dart (26 rows, type definitions)
 ---
 ```dart
 /// Mixes in walking.
@@ -7,6 +7,9 @@ mixin Walker {
   int steps = 0;
 ...
 }
+...
+// An alias is a type.
+typedef Steps = int;
 ...
 extension Shout on String {
 ...

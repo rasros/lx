@@ -34,6 +34,9 @@ type langDef struct {
 	// namespaces are node types whose "body" holds declarations walked like
 	// top-level ones, kept between the namespace's header and closing row.
 	namespaces []string
+	// frames are preprocessor conditionals whose children are walked like
+	// top-level declarations, kept between their #if and #endif rows.
+	frames []string
 	// unwrap returns the declaration a top-level node wraps (a C++
 	// template_declaration's class or function), or the node itself. Rows
 	// of the wrapper before the declaration are kept like decorators.
@@ -64,6 +67,14 @@ var (
 	// belong to the body around them; their #if, #else and #endif lines are
 	// kept around the members kept inside.
 	preprocGroups = []string{"preproc_if", "preproc_ifdef", "preproc_elif", "preproc_elifdef", "preproc_else"}
+
+	// cErrors are the nodes a C or C++ parse leaves around declarations it
+	// cannot fit in the tree, walked like top-level ones. The usual header
+	// leaves them: a guard around `#ifdef __cplusplus extern "C" { #endif`,
+	// whose brace closes in another #ifdef. C++ also wraps the declarations
+	// of an unclosed declaration list in its repeat nodes.
+	cErrors   = []string{"ERROR"}
+	cppErrors = []string{"ERROR", "declaration_list_repeat1"}
 
 	csharpMembers = &langs.Members{
 		BodyField: "body",
@@ -130,7 +141,8 @@ var (
 		Private:      langs.GroovyPrivate,
 	}
 
-	tsTypes = []string{"class_declaration", "abstract_class_declaration", "interface_declaration", "enum_declaration"}
+	tsTypes = []string{"class_declaration", "abstract_class_declaration", "interface_declaration", "enum_declaration",
+		"type_alias_declaration"}
 
 	// tsMembers covers classes, interfaces and enums of TypeScript and
 	// JavaScript.
@@ -207,24 +219,34 @@ var langDefs = map[string]langDef{
 		emitStruct:      langs.PyEmitClass,
 	},
 
+	// C's structs, unions and enums are walked by the C++ member table,
+	// whose C++-only parts never match C source.
 	"c": {
 		newLang:     grammars.CLanguage,
 		funcTypes:   []string{"function_definition", "declaration"},
-		structTypes: []string{"type_definition"},
+		structTypes: []string{"type_definition", "struct_specifier", "union_specifier", "enum_specifier"},
 		comments:    &langs.CComments,
 		funcVisible: langs.CFuncVisible,
-		emitStruct:  langs.CEmitTypedef,
+		namespaces:  []string{"linkage_specification"},
+		frames:      preprocGroups,
+		unwrap:      langs.CppUnwrap,
+		emitStruct:  langs.CppEmitter(cppMembers),
+
+		iterateChildren: cErrors,
 	},
 
 	"cpp": {
 		newLang:     grammars.CppLanguage,
 		funcTypes:   []string{"function_definition", "declaration"},
-		structTypes: []string{"type_definition", "struct_specifier", "class_specifier", "union_specifier", "enum_specifier"},
+		structTypes: []string{"type_definition", "alias_declaration", "struct_specifier", "class_specifier", "union_specifier", "enum_specifier"},
 		comments:    &langs.CComments,
-		funcVisible: langs.CppFuncVisible,
-		namespaces:  []string{"namespace_definition"},
+		funcVisible: langs.CFuncVisible,
+		namespaces:  []string{"namespace_definition", "linkage_specification"},
+		frames:      preprocGroups,
 		unwrap:      langs.CppUnwrap,
 		emitStruct:  langs.CppEmitter(cppMembers),
+
+		iterateChildren: cppErrors,
 	},
 
 	"java": {
@@ -237,7 +259,7 @@ var langDefs = map[string]langDef{
 	"rust": {
 		newLang:     grammars.RustLanguage,
 		funcTypes:   []string{"function_item"},
-		structTypes: []string{"struct_item", "enum_item", "trait_item", "impl_item"},
+		structTypes: []string{"struct_item", "enum_item", "trait_item", "impl_item", "type_item"},
 		comments:    &langs.RustComments,
 		funcVisible: langs.RustFuncVisible,
 		members:     rustMembers,
@@ -290,7 +312,7 @@ var langDefs = map[string]langDef{
 	"kotlin": {
 		newLang:       grammars.KotlinLanguage,
 		funcTypes:     []string{"function_declaration"},
-		structTypes:   []string{"class_declaration", "object_declaration", "infix_expression"},
+		structTypes:   []string{"class_declaration", "object_declaration", "infix_expression", "type_alias"},
 		comments:      &langs.CComments,
 		bodyChildType: "function_body",
 		funcVisible:   langs.KtFuncVisible,
@@ -317,7 +339,7 @@ var langDefs = map[string]langDef{
 	"swift": {
 		newLang:     grammars.SwiftLanguage,
 		funcTypes:   []string{"function_declaration", "init_declaration"},
-		structTypes: []string{"class_declaration", "protocol_declaration", "extension_declaration"},
+		structTypes: []string{"class_declaration", "protocol_declaration", "extension_declaration", "typealias_declaration"},
 		comments:    &langs.CComments,
 		funcVisible: langs.SwiftFuncVisible,
 		members:     swiftMembers,
@@ -326,7 +348,7 @@ var langDefs = map[string]langDef{
 	"scala": {
 		newLang:     grammars.ScalaLanguage,
 		funcTypes:   []string{"function_definition"},
-		structTypes: []string{"class_definition", "object_definition", "trait_definition"},
+		structTypes: []string{"class_definition", "object_definition", "trait_definition", "type_definition"},
 		comments:    &langs.CComments,
 		funcVisible: langs.ScalaFuncVisible,
 		members:     scalaMembers,
@@ -343,7 +365,7 @@ var langDefs = map[string]langDef{
 	"dart": {
 		newLang:     grammars.DartLanguage,
 		funcTypes:   []string{"function_signature"},
-		structTypes: []string{"class_definition", "mixin_declaration", "extension_declaration", "enum_declaration"},
+		structTypes: []string{"class_definition", "mixin_declaration", "extension_declaration", "enum_declaration", "type_alias"},
 		comments:    &langs.CComments,
 		members:     dartMembers,
 	},
@@ -359,7 +381,7 @@ var langDefs = map[string]langDef{
 	"haskell": {
 		newLang:         grammars.HaskellLanguage,
 		funcTypes:       []string{"signature", "function"},
-		structTypes:     []string{"data_type", "newtype"},
+		structTypes:     []string{"data_type", "newtype", "type_synomym"},
 		comments:        &langs.HaskellComments,
 		indentBody:      true,
 		bodyChildType:   "match",

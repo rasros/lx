@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.swift (24 rows, function signatures)
+skeleton/members.swift (27 rows, function signatures)
 ---
 ```swift
 public struct Grid {

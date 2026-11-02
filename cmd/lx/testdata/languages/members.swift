@@ -8,6 +8,9 @@ public struct Grid {
     private func hidden() {}
 }
 
+// An alias is a type.
+public typealias Width = Int
+
 public class Resource {
     deinit {
         print("bye")

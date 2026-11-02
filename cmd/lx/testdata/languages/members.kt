@@ -18,6 +18,9 @@ class K(val a: Int) {
     private fun hidden() {}
 }
 
+// An alias is a type.
+typealias Dirs = List<Dir>
+
 enum class Dir {
     N,
     S;

@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/main.hs (20 rows, definitions)
+skeleton/main.hs (23 rows, definitions)
 ---
 ```haskell
 -- | Animals supported by the system.
@@ -8,6 +8,9 @@ data Animal = Dog | Cat
 {- A newtype wrapper for names.
    Avoids mixing up plain strings. -}
 newtype Name = Name String
+...
+-- | An alias is a type.
+type Greeting = String
 ...
 -- | Greet by name, with a fallback.
 greet :: String -> String

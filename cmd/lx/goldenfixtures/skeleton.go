@@ -58,6 +58,8 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"members.php",
 		"members.ml",
 		"members.m",
+		"toplevel.h",
+		"toplevel.cpp",
 	}
 	for _, name := range languageFiles {
 		content := readFixtureFile(t, filepath.Join("languages", name))

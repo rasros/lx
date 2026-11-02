@@ -1,8 +1,11 @@
 --- STDOUT ---
-skeleton/members.rs (18 rows, definitions)
+skeleton/members.rs (21 rows, definitions)
 ---
 ```rust
 pub struct Meters(f64);
+...
+/// Distances in meters: an alias is a type.
+pub type Distance = Meters;
 ...
 impl Meters {
     pub fn new(v: f64) -> Self {

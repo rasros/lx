@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.dart (23 rows, function signatures)
+skeleton/members.dart (26 rows, function signatures)
 ---
 ```dart
 /// Mixes in walking.

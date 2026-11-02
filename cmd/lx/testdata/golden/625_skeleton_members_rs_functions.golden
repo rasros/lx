@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.rs (18 rows, function signatures)
+skeleton/members.rs (21 rows, function signatures)
 ---
 ```rust
 impl Meters {
