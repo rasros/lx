@@ -1,6 +1,7 @@
 package walker
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -31,22 +32,36 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(w.AncestorRules)+len(w.OverrideRules))
 		effectiveRules = append(effectiveRules, w.BaseRules...)
 		effectiveRules = append(effectiveRules, w.AncestorRules...)
-		if w.IgnoreEnabled {
-			// Load each directory's rules from the filesystem root down to
-			// the file, starting over at every repository boundary.
-			dirs := []string{"."}
-			if dir := path.Dir(root); dir != "." {
-				parts := strings.Split(dir, "/")
-				for i := range parts {
-					dirs = append(dirs, strings.Join(parts[:i+1], "/"))
+
+		// Visit each directory from the filesystem root down to the file,
+		// checking it against the rules in effect at its parent as a walk
+		// would. As in git, nothing below an ignored directory is included,
+		// whatever a later negation says. With ignore files enabled, each
+		// directory's rules are loaded, starting over at every repository
+		// boundary.
+		dirs := []string{"."}
+		if dir := path.Dir(root); dir != "." {
+			parts := strings.Split(dir, "/")
+			for i := range parts {
+				dirs = append(dirs, strings.Join(parts[:i+1], "/"))
+			}
+		}
+		for _, d := range dirs {
+			if d != "." {
+				if ignored, reason := w.dirIgnoredBy(d, effectiveRules); ignored {
+					if w.OnIgnore != nil {
+						w.OnIgnore(root, reason)
+					}
+					return nil
 				}
 			}
-			for _, d := range dirs {
-				if rules, ok := w.repoRules(fsys, d); ok {
-					effectiveRules = rules
-				}
-				effectiveRules = append(effectiveRules, w.loadIgnoreFiles(fsys, d)...)
+			if !w.IgnoreEnabled {
+				continue
 			}
+			if rules, ok := w.repoRules(fsys, d); ok {
+				effectiveRules = rules
+			}
+			effectiveRules = append(effectiveRules, w.loadIgnoreFiles(fsys, d)...)
 		}
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 
@@ -64,6 +79,26 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	initialRules = append(initialRules, w.BaseRules...)
 	initialRules = append(initialRules, w.AncestorRules...)
 	return w.recursiveWalk(fsys, root, initialRules, walkFn, false, []fs.FileInfo{info})
+}
+
+// dirIgnoredBy reports whether the walk-relative directory dir is ignored by
+// rules, the ignore rules in effect at its parent, followed by the override
+// rules as the walk applies them. The reason names the directory.
+func (w *Walker) dirIgnoredBy(dir string, rules []Rule) (bool, string) {
+	if len(w.OverrideRules) > 0 {
+		rules = append(rules[:len(rules):len(rules)], w.OverrideRules...)
+	}
+	ignored, reason := checkIgnore(dir, true, rules, false, w.OnIgnore != nil)
+	// Descend into an ignored directory when a negation could re-include
+	// something below it, as recursiveWalk does, so a named file and a walk
+	// agree.
+	if ignored && hasNestedException(dir, rules) {
+		return false, ""
+	}
+	if ignored && w.OnIgnore != nil {
+		reason = fmt.Sprintf("parent directory %s: %s", dir, reason)
+	}
+	return ignored, reason
 }
 
 // resolveEntry reports how an entry should be treated, applying symlink policy.

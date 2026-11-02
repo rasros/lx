@@ -39,6 +39,24 @@ func SetupAncestorIgnoreFixture(t *testing.T) string {
 	return dir
 }
 
+// SetupIgnoredParentDirFixture builds a git repository whose .gitignore
+// ignores the build directory with a directory-only rule, which matches no
+// file by itself. It returns the repository root.
+func SetupIgnoredParentDirFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, ".gitignore", "build/\n", 0644)
+	writeFile(t, dir, "build/out.js", "console.log(1)", 0644)
+	writeFile(t, dir, "main.go", "package main", 0644)
+
+	return dir
+}
+
 // SetupWorktreeExcludeFixture builds a main repository and a linked worktree
 // whose .git file points into it. The worktree shares the main repository's
 // info/exclude. It returns the worktree root.

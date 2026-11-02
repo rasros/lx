@@ -26,5 +26,8 @@ func setupRelativePathsFixture(t *testing.T) (string, string) {
 }
 func setupAncestorIgnoreFixture(t *testing.T) string  { return gf.SetupAncestorIgnoreFixture(t) }
 func setupWorktreeExcludeFixture(t *testing.T) string { return gf.SetupWorktreeExcludeFixture(t) }
-func setupTreeFixture(t *testing.T) string            { return gf.SetupTreeFixture(t) }
-func setupPromptLibFixture(t *testing.T) string       { return gf.SetupPromptLibFixture(t) }
+func setupIgnoredParentDirFixture(t *testing.T) string {
+	return gf.SetupIgnoredParentDirFixture(t)
+}
+func setupTreeFixture(t *testing.T) string      { return gf.SetupTreeFixture(t) }
+func setupPromptLibFixture(t *testing.T) string { return gf.SetupPromptLibFixture(t) }
