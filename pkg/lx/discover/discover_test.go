@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -84,7 +85,7 @@ func TestCollect_IgnoreFileReads(t *testing.T) {
 
 	collect := func(targets []string) (*countingHost, int) {
 		host := &countingHost{cwd: dir, reads: map[string]int{}}
-		c := &Collector{cache: walker.NewCache(host)}
+		c := &Collector{cache: walker.NewCache(host, nil), cwd: dir, log: slog.Default()}
 		included := 0
 		for _, target := range targets {
 			files, err := c.Collect(context.Background(), target, Options{})
@@ -130,8 +131,7 @@ func paths(files []sources.InputFile) []string {
 
 // A target that does not exist is an error, which names the path stat'ed.
 func TestCollect_MissingTarget(t *testing.T) {
-	t.Chdir(t.TempDir())
-	files, err := NewCollector().Collect(context.Background(), "nope.go", Options{})
+	files, err := NewCollector(t.TempDir(), nil).Collect(context.Background(), "nope.go", Options{})
 	var pe *fs.PathError
 	if !errors.As(err, &pe) || pe.Op != "stat" || len(files) != 0 {
 		t.Fatalf("got %v, %v; want a stat error and no inputs", paths(files), err)
@@ -141,7 +141,7 @@ func TestCollect_MissingTarget(t *testing.T) {
 // A URL is one input, fetched only when rendered.
 func TestCollect_URL(t *testing.T) {
 	url := "https://example.com/repo.zip"
-	files, err := NewCollector().Collect(context.Background(), url, Options{})
+	files, err := NewCollector("", nil).Collect(context.Background(), url, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestCollect_CancelledWalk(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	files, err := NewCollector().Collect(ctx, dir, Options{})
+	files, err := NewCollector("", nil).Collect(ctx, dir, Options{})
 	if !errors.Is(err, context.Canceled) || len(files) != 0 {
 		t.Fatalf("got %v, %v; want context.Canceled and no inputs", paths(files), err)
 	}

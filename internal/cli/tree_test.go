@@ -15,7 +15,7 @@ func TestResolveSections_StdinAndMissingPaths(t *testing.T) {
 		{Action: "FILE", Value: "-", Type: CmdAction},
 		{Action: "FILE", Value: "nope.go", Type: CmdAction},
 	}}}
-	if got, err := resolveSections(context.Background(), sections, lx.NewCollector()); got != 1 || err != nil {
+	if got, err := resolveSections(context.Background(), sections, lx.NewCollector("", nil)); got != 1 || err != nil {
 		t.Errorf("unresolved = %d, %v; want 1, nil", got, err)
 	}
 	if len(sections[0].resolved) != 0 {

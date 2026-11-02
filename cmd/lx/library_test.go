@@ -28,8 +28,8 @@ func TestLibraryMatchesCLI(t *testing.T) {
 	}
 
 	var opts lx.DiscoverOptions
-	opts.IgnoreRules, opts.GitExcludes = lx.UserIgnoreRules()
-	files, err := lx.NewCollector().Collect(ctx, ".", opts)
+	opts.IgnoreRules, opts.GitExcludes = lx.UserIgnoreRules(os.LookupEnv, nil)
+	files, err := lx.NewCollector("", nil).Collect(ctx, ".", opts)
 	if err != nil {
 		t.Fatal(err)
 	}

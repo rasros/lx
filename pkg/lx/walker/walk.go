@@ -23,7 +23,7 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	if !info.IsDir() {
 		return walkFn(root, dirEntryAdapter{info}, nil)
 	}
-	rt := newRuleTree(fsTree{fsys}, w.opts.IgnoreEnabled)
+	rt := newRuleTree(fsTree{fsys, w.cache.log}, w.opts.IgnoreEnabled)
 	return w.walkDir(rt, fsys, rt.frame(w, root), root, Anchor{prefix: w.opts.OverridePrefix}, walkFn, []fs.FileInfo{info})
 }
 
@@ -60,7 +60,7 @@ func (w *Walker) WalkPath(root string, fn fs.WalkDirFunc) error {
 	}
 	a := w.cache.Anchor(root)
 	if !w.opts.IgnoreEnabled {
-		rt := newRuleTree(fsTree{fsys}, false)
+		rt := newRuleTree(fsTree{fsys, w.cache.log}, false)
 		return w.walkDir(rt, fsys, rt.frame(w, "."), ".", a, fn, []fs.FileInfo{info})
 	}
 	// Like ripgrep, the rules of the directories above a symlinked root are

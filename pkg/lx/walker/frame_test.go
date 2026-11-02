@@ -57,7 +57,7 @@ func (h *testHost) total() int {
 // hostWalker returns a walker reading ignore files on the OS, seen from cwd,
 // that skips hidden paths.
 func hostWalker(cwd string, base ...string) *Walker {
-	return New(Options{Base: base, IgnoreEnabled: true, SkipHidden: true, Cache: NewCache(newTestHost(cwd))})
+	return New(Options{Base: base, IgnoreEnabled: true, SkipHidden: true, Cache: NewCache(newTestHost(cwd), nil)})
 }
 
 // hostFrame returns the frame of dir, seen from cwd.
@@ -199,7 +199,7 @@ func TestFrame_GitRulesNeedARepo(t *testing.T) {
 	mustWriteFile(t, top, ".lxignore", "*.lx\n")
 	mustMkdir(t, top, "src")
 
-	w := New(Options{Base: []string{"*.base"}, GitExcludes: []string{"*.git"}, IgnoreEnabled: true, Cache: NewCache(newTestHost(filepath.Join(top, "src")))})
+	w := New(Options{Base: []string{"*.base"}, GitExcludes: []string{"*.git"}, IgnoreEnabled: true, Cache: NewCache(newTestHost(filepath.Join(top, "src")), nil)})
 	if got := rulePatterns(hostFrame(w, filepath.Join(top, "src")).rules, top); !reflect.DeepEqual(got, []string{"*.lx@."}) {
 		t.Fatalf("expected only .lxignore outside a repository, got %v", got)
 	}
@@ -281,7 +281,7 @@ func TestFrame_RepoBoundaryResets(t *testing.T) {
 	mustWriteFile(t, top, "vendor/dep/d.go", "x")
 
 	for _, cwd := range []string{top, filepath.Join(top, "vendor", "dep")} {
-		w := New(Options{Base: []string{"*.base"}, GitExcludes: []string{"*.git"}, IgnoreEnabled: true, Cache: NewCache(newTestHost(cwd))})
+		w := New(Options{Base: []string{"*.base"}, GitExcludes: []string{"*.git"}, IgnoreEnabled: true, Cache: NewCache(newTestHost(cwd), nil)})
 		inner := hostFrame(w, filepath.Join(top, "lib", "inner"))
 		want := []string{"*.base@lib/inner", "*.git@lib/inner", "*.ign@.", "*.c@lib/inner", "*.o@lib/inner"}
 		if got := rulePatterns(inner.rules, top); !reflect.DeepEqual(got, want) {
@@ -427,7 +427,7 @@ func TestCache_Anchor(t *testing.T) {
 		{real, "src/../x", "y", "src/../x/y"},
 		{real, "sub", ".", "sub"},
 	} {
-		if got := NewCache(newTestHost(tt.cwd)).Anchor(tt.root).Path(tt.rel); got != tt.want {
+		if got := NewCache(newTestHost(tt.cwd), nil).Anchor(tt.root).Path(tt.rel); got != tt.want {
 			t.Errorf("cwd %s, root %s, path %s: got %q, want %q", tt.cwd, tt.root, tt.rel, got, tt.want)
 		}
 	}
@@ -439,7 +439,7 @@ func TestCache_ConcurrentWalks(t *testing.T) {
 	mustWriteFile(t, top, ".gitignore", "*.log\n")
 	writeTree(t, top, "a/b/c.go", "a/b/d.log", "e/f.go")
 
-	cache := NewCache(newTestHost(top))
+	cache := NewCache(newTestHost(top), nil)
 	var wg sync.WaitGroup
 	results := make([][]string, 8)
 	for i := range results {
@@ -480,7 +480,7 @@ func TestCache_ReadsEachIgnoreFileOnce(t *testing.T) {
 	}
 
 	named := newTestHost(top)
-	cache := NewCache(named)
+	cache := NewCache(named, nil)
 	for _, f := range files {
 		w := New(Options{IgnoreEnabled: true, Cache: cache})
 		if got := walkPath(t, w, f); len(got) != 1 {
@@ -492,7 +492,7 @@ func TestCache_ReadsEachIgnoreFileOnce(t *testing.T) {
 	}
 
 	shared := newTestHost(top)
-	cache = NewCache(shared)
+	cache = NewCache(shared, nil)
 	for d := range dirs {
 		walkPath(t, New(Options{IgnoreEnabled: true, SkipHidden: true, Cache: cache}), d)
 	}
@@ -509,7 +509,7 @@ func TestCache_ReadsEachIgnoreFileOnce(t *testing.T) {
 
 	unshared := newTestHost(top)
 	for d := range dirs {
-		walkPath(t, New(Options{IgnoreEnabled: true, SkipHidden: true, Cache: NewCache(unshared)}), d)
+		walkPath(t, New(Options{IgnoreEnabled: true, SkipHidden: true, Cache: NewCache(unshared, nil)}), d)
 	}
 	t.Logf("walking each of %d directories: %d reads with a shared cache, %d with one cache per walk",
 		len(dirs), shared.total(), unshared.total())

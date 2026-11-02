@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rasros/lx/internal/userdir"
 	"github.com/rasros/lx/pkg/lx/sources"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
@@ -58,11 +59,37 @@ type Options struct {
 // ignore files once. It is not safe for concurrent use.
 type Collector struct {
 	cache *walker.Cache
+	cwd   string
+	log   *slog.Logger
 }
 
-// NewCollector returns a Collector over the OS filesystem.
-func NewCollector() *Collector {
-	return &Collector{cache: walker.NewCache(nil)}
+// NewCollector returns a Collector over the OS filesystem that resolves
+// relative targets against cwd, or the process's working directory when cwd
+// is empty, and logs to log, or slog.Default() when log is nil.
+func NewCollector(cwd string, log *slog.Logger) *Collector {
+	if cwd == "" {
+		cwd, _ = os.Getwd()
+	}
+	if log == nil {
+		log = slog.Default()
+	}
+	return &Collector{cache: walker.NewCache(cwdHost{wd: cwd}, log), cwd: cwd, log: log}
+}
+
+// cwdHost is the OS seen from the working directory wd.
+type cwdHost struct {
+	walker.OSHost
+	wd string
+}
+
+func (h cwdHost) Getwd() (string, error) { return h.wd, nil }
+
+// abs returns p as an absolute path, resolved against the working directory.
+func (c *Collector) abs(p string) string {
+	if filepath.IsAbs(p) {
+		return filepath.Clean(p)
+	}
+	return filepath.Join(c.cwd, p)
 }
 
 // Collect returns the inputs target refers to: a file, every file below a
@@ -78,12 +105,12 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 	}
 	forceExpand := false
 	if rewritten, ok := sources.RewriteRepoURL(target); ok {
-		slog.Debug("Rewrote repo URL to archive", "from", target, "to", rewritten)
+		c.log.Debug("Rewrote repo URL to archive", "from", target, "to", rewritten)
 		target = rewritten
 		forceExpand = true
 	}
 	if sources.IsHTTPURL(target) {
-		return collectURL(ctx, target, opts, forceExpand)
+		return c.collectURL(ctx, target, opts, forceExpand)
 	}
 
 	if opts.Piped {
@@ -92,20 +119,17 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 		// "./" or "..".
 		target = filepath.Clean(target)
 	}
-	absPath, err := filepath.Abs(target)
-	if err != nil {
-		return nil, err
-	}
+	absPath := c.abs(target)
 	stat, err := os.Stat(absPath)
 	w := c.walker(ctx, opts)
 	if opts.Piped && !w.Accepts(target, err == nil && (stat.IsDir() || expands(opts, target))) {
-		slog.Debug("Skipping piped path due to filters", "path", target)
+		c.log.Debug("Skipping piped path due to filters", "path", target)
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return c.walk(ctx, w, newRoot(target, absPath, stat.IsDir()), opts)
+	return c.walk(ctx, w, newRoot(c.cwd, target, absPath, stat.IsDir()), opts)
 }
 
 // expands reports whether the file at path is an archive opts expand, which
@@ -115,29 +139,35 @@ func expands(opts Options, path string) bool {
 }
 
 // UserIgnoreRules reads the ignore files lx applies everywhere: lx's own,
-// in the user config directory, and git's global excludes.
-func UserIgnoreRules() (ignoreRules, gitExcludes []string) {
-	home, _ := os.UserHomeDir()
-	configDir, _ := os.UserConfigDir()
-	ignoreRules = readIgnorePatterns(filepath.Join(configDir, "lx", "ignore"))
+// in the user config directory, and git's global excludes. It finds them
+// through env, which looks variables up as os.LookupEnv does, and logs to
+// log, or slog.Default() when log is nil.
+func UserIgnoreRules(env func(key string) (string, bool), log *slog.Logger) (ignoreRules, gitExcludes []string) {
+	if log == nil {
+		log = slog.Default()
+	}
+	home, _ := userdir.Home(env)
+	if configDir, err := userdir.Config(env); err == nil {
+		ignoreRules = readIgnorePatterns(log, filepath.Join(configDir, "lx", "ignore"))
+	}
 
-	xdgConfig := os.Getenv("XDG_CONFIG_HOME")
+	xdgConfig, _ := env("XDG_CONFIG_HOME")
 	if xdgConfig == "" && home != "" {
 		xdgConfig = filepath.Join(home, ".config")
 	}
 	if xdgConfig != "" {
-		gitExcludes = readIgnorePatterns(filepath.Join(xdgConfig, "git", "ignore"))
+		gitExcludes = readIgnorePatterns(log, filepath.Join(xdgConfig, "git", "ignore"))
 	}
 	return ignoreRules, gitExcludes
 }
 
 // readIgnorePatterns returns the patterns in the ignore file at p, if any.
-func readIgnorePatterns(p string) []string {
+func readIgnorePatterns(log *slog.Logger, p string) []string {
 	data, err := os.ReadFile(p)
 	if err != nil {
 		return nil
 	}
-	slog.Debug("Loaded global ignore file", "path", p)
+	log.Debug("Loaded global ignore file", "path", p)
 	var lines []string
 	for _, line := range strings.Split(string(data), "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -150,7 +180,7 @@ func readIgnorePatterns(p string) []string {
 
 // collectURL fetches a named URL. Like a named path it is never filtered
 // itself; an archive's entries are.
-func collectURL(ctx context.Context, rawURL string, opts Options, forceExpand bool) ([]sources.InputFile, error) {
+func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options, forceExpand bool) ([]sources.InputFile, error) {
 	if (opts.ExpandArchives || forceExpand) && sources.IsHTTPArchiveURL(rawURL) {
 		tempPath, cleanup, err := sources.DownloadURLToTempFile(ctx, rawURL)
 		if err != nil {
@@ -161,14 +191,14 @@ func collectURL(ctx context.Context, rawURL string, opts Options, forceExpand bo
 		}
 		// Expansion reads the entries into memory.
 		defer cleanup()
-		return expandArchive(ctx, tempPath, rawURL, opts, strings.TrimSuffix(rawURL, "/")+"/", "Ignored in URL archive")
+		return c.expandArchive(ctx, tempPath, rawURL, opts, strings.TrimSuffix(rawURL, "/")+"/", "Ignored in URL archive")
 	}
 
 	urlFile, err := sources.NewURLInputFile(rawURL)
 	if err != nil {
 		return nil, &URLError{URL: rawURL, Err: err}
 	}
-	slog.Debug("URL accepted", "url", urlFile.Path)
+	c.log.Debug("URL accepted", "url", urlFile.Path)
 	return []sources.InputFile{urlFile}, nil
 }
 
@@ -185,13 +215,13 @@ type root struct {
 
 // newRoot decides which filesystem a target's files are opened in and how
 // their paths are displayed. A file is opened as walkRoot within fsys.
-func newRoot(rawPath, absPath string, isDir bool) root {
+func newRoot(cwd, rawPath, absPath string, isDir bool) root {
 	r := root{rawPath: rawPath, absPath: absPath, isDir: isDir}
 	switch rawPathClean := filepath.Clean(rawPath); {
 	case isDir:
 		r.fsys, r.walkRoot, r.displayPrefix = os.DirFS(absPath), ".", rawPathClean
 	case !filepath.IsAbs(rawPathClean) && !strings.HasPrefix(rawPathClean, ".."):
-		r.fsys, r.walkRoot = os.DirFS("."), filepath.ToSlash(rawPathClean)
+		r.fsys, r.walkRoot = os.DirFS(cwd), filepath.ToSlash(rawPathClean)
 	default:
 		r.fsys, r.walkRoot, r.displayPrefix = os.DirFS(filepath.Dir(absPath)), filepath.Base(absPath), filepath.Dir(rawPathClean)
 	}
@@ -221,8 +251,8 @@ func (r root) abs(path string) string {
 	}
 }
 
-func debugEnabled(ctx context.Context) bool {
-	return slog.Default().Enabled(ctx, slog.LevelDebug)
+func (c *Collector) debugEnabled(ctx context.Context) bool {
+	return c.log.Enabled(ctx, slog.LevelDebug)
 }
 
 // walker returns the walker of a target's files.
@@ -245,16 +275,16 @@ func (c *Collector) walker(ctx context.Context, opts Options) *walker.Walker {
 	if opts.ExpandArchives {
 		wopts.MatchAsDir = sources.IsArchivePath
 	}
-	if debugEnabled(ctx) {
+	if c.debugEnabled(ctx) {
 		wopts.OnIgnore = func(p, reason string) {
-			slog.Debug("Ignored", "path", p, "reason", reason)
+			c.log.Debug("Ignored", "path", p, "reason", reason)
 		}
 	}
 	return walker.New(wopts)
 }
 
 func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Options) ([]sources.InputFile, error) {
-	slog.Debug("Walking target", "root", r.rawPath, "globs", len(opts.Globs))
+	c.log.Debug("Walking target", "root", r.rawPath, "globs", len(opts.Globs))
 	anchor := c.cache.Anchor(r.rawPath)
 
 	var files []sources.InputFile
@@ -268,7 +298,7 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 			return ctxErr
 		}
 		if err != nil {
-			slog.Warn("Error accessing path during walk", "path", path, "error", err)
+			c.log.Warn("Error accessing path during walk", "path", path, "error", err)
 			return nil
 		}
 		if d.IsDir() {
@@ -283,17 +313,17 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 			if r.isDir {
 				rel = path
 			}
-			entries, err := expandArchive(ctx, r.abs(path), display, opts, anchor.Path(rel)+"/", "Ignored in archive")
+			entries, err := c.expandArchive(ctx, r.abs(path), display, opts, anchor.Path(rel)+"/", "Ignored in archive")
 			files = append(files, entries...)
 			return err
 		}
-		if isOutput(display, opts.OutPath) {
+		if c.isOutput(display, opts.OutPath) {
 			return nil
 		}
 
 		info, err := d.Info()
 		if err != nil {
-			slog.Error("Failed to stat file in walk", "path", path, "error", err)
+			c.log.Error("Failed to stat file in walk", "path", path, "error", err)
 			return nil
 		}
 		// A walked symlink reports the link's own size (its target path
@@ -309,7 +339,7 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 		f.Path = display
 		f.AbsPath = r.abs(path)
 
-		slog.Debug("File accepted by walker", "path", f.Path, "size", f.Size)
+		c.log.Debug("File accepted by walker", "path", f.Path, "size", f.Size)
 		files = append(files, f)
 		return nil
 	})
@@ -317,44 +347,45 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 		return nil, ctxErr
 	}
 	if err != nil {
-		slog.Error("Walker traversal failed", "error", err)
+		c.log.Error("Walker traversal failed", "error", err)
 	}
-	slog.Debug("Walker finished", "root", r.walkRoot, "files_matched", len(files))
+	c.log.Debug("Walker finished", "root", r.walkRoot, "files_matched", len(files))
 	return files, nil
 }
 
 // expandArchive returns the entries of the archive at absPath, displayed
 // below displayPath, that opts keep. The globs match ovPrefix before each
 // entry's path in the archive. Its only error is ctx's.
-func expandArchive(ctx context.Context, absPath, displayPath string, opts Options, ovPrefix, ignoreMsg string) ([]sources.InputFile, error) {
+func (c *Collector) expandArchive(ctx context.Context, absPath, displayPath string, opts Options, ovPrefix, ignoreMsg string) ([]sources.InputFile, error) {
 	wopts := walker.Options{
 		Overrides:      opts.Globs,
 		OverridePrefix: ovPrefix,
 		SkipHidden:     !opts.ShowHidden,
 	}
-	if debugEnabled(ctx) {
+	if c.debugEnabled(ctx) {
 		wopts.OnIgnore = func(p, reason string) {
-			slog.Debug(ignoreMsg, "path", displayPath+"/"+p, "reason", reason)
+			c.log.Debug(ignoreMsg, "path", displayPath+"/"+p, "reason", reason)
 		}
 	}
-	files, err := sources.ExpandArchive(ctx, absPath, displayPath, walker.New(wopts))
+	files, err := sources.ExpandArchive(ctx, absPath, displayPath, walker.New(wopts), c.log)
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return nil, ctxErr
 	}
 	if err != nil {
-		slog.Error("Failed to expand archive", "path", displayPath, "error", err)
+		c.log.Error("Failed to expand archive", "path", displayPath, "error", err)
 	}
 	return files, nil
 }
 
-// isOutput reports whether path is the file output is written to, outPath,
-// which is never collected, even when named.
-func isOutput(path, outPath string) bool {
+// isOutput reports whether path, relative to the working directory, is the
+// file output is written to, outPath, which is never collected, even when
+// named.
+func (c *Collector) isOutput(path, outPath string) bool {
 	if outPath == "" {
 		return false
 	}
-	if abs, _ := filepath.Abs(path); abs == outPath {
-		slog.Warn("Skipping output file to avoid infinite recursion", "path", path)
+	if c.abs(path) == outPath {
+		c.log.Warn("Skipping output file to avoid infinite recursion", "path", path)
 		return true
 	}
 	return false

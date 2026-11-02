@@ -3,7 +3,8 @@
 //
 // Core API:
 //
-//   - NewCollector finds the inputs a path or URL refers to, as lx does.
+//   - NewCollector finds the inputs a path or URL refers to, as lx does,
+//     resolving relative paths against the working directory it is given.
 //   - NewConfig creates a Config with sensible defaults.
 //   - NewStream creates a Stream that renders files, sections, and prompts.
 //   - NewInputFile / NewBufferInputFile create inputs of your own.
@@ -45,8 +46,12 @@
 //   - AddTree enqueues a directory tree of the files Admit keeps.
 //   - Execute renders output to an io.Writer.
 //   - GetGlobalContext exposes aggregate statistics.
-//   - WithConcurrency / WithOnFileError customize processing. Skeleton
-//     rendering caps the workers at two.
+//   - WithConcurrency / WithOnFileError / WithLogger customize processing.
+//     Skeleton rendering caps the workers at two.
+//
+// The library logs to the *slog.Logger it is given: NewCollector,
+// UserIgnoreRules and Stream.WithLogger take one, and nil means
+// slog.Default().
 //
 // Example, rendering a directory as lx <dir> does when no project or user
 // lx config changes the output and stats are off:
@@ -64,8 +69,8 @@
 //		ctx := context.Background()
 //
 //		var opts lx.DiscoverOptions
-//		opts.IgnoreRules, opts.GitExcludes = lx.UserIgnoreRules()
-//		files, err := lx.NewCollector().Collect(ctx, ".", opts)
+//		opts.IgnoreRules, opts.GitExcludes = lx.UserIgnoreRules(os.LookupEnv, nil)
+//		files, err := lx.NewCollector("", nil).Collect(ctx, ".", opts)
 //		if err != nil {
 //			panic(err)
 //		}

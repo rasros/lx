@@ -66,7 +66,7 @@ type Walker struct {
 func New(opts Options) *Walker {
 	cache := opts.Cache
 	if cache == nil {
-		cache = NewCache(nil)
+		cache = NewCache(nil, nil)
 	}
 	return &Walker{
 		opts:        opts,

@@ -16,9 +16,6 @@ import (
 	"github.com/rasros/lx/pkg/lx/sources"
 )
 
-// FileErrorHandler handles per-file read errors.
-type FileErrorHandler func(f sources.InputFile, err error)
-
 // FileItem is a file queued for rendering with the options it renders with.
 type FileItem struct {
 	File sources.InputFile
@@ -39,7 +36,7 @@ type Processor struct {
 	engine       *core.TemplateEngine
 	global       core.GlobalContext
 	tokenCounter core.TokenCounter
-	onFileError  FileErrorHandler
+	log          *slog.Logger
 }
 
 // RenderStats reports what one rendered item turned out to be. A non-file item
@@ -49,6 +46,9 @@ type RenderStats struct {
 	IsCompact bool
 	IsBinary  bool
 	IsError   bool
+	// ReadErr is why a file that rendered as an error row could not be
+	// opened, for the caller to report in the order items are written.
+	ReadErr error
 }
 
 type readerAtWithSize interface {
@@ -60,11 +60,16 @@ type byteReaderProvider interface {
 	ByteReader() *bytes.Reader
 }
 
-func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext, onError FileErrorHandler) *Processor {
+// NewProcessor returns a Processor that logs to log, or slog.Default() when
+// log is nil.
+func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext, log *slog.Logger) *Processor {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &Processor{
 		engine:       engine,
 		global:       global,
-		onFileError:  onError,
+		log:          log,
 		tokenCounter: core.DefaultTokenCounter,
 	}
 }
@@ -83,10 +88,7 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 
 	switch v := item.Raw.(type) {
 	case FileItem:
-		fCtx, err := p.prepareFileContext(v.File, v.Opts, item.FileIndexGlobal, scratchBuf)
-		if err != nil {
-			return stats, err
-		}
+		fCtx, readErr := p.prepareFileContext(v.File, v.Opts, item.FileIndexGlobal, scratchBuf)
 		fCtx.Section = *item.Section
 		fCtx.SectionFileIndex = item.FileIndexSection
 
@@ -95,6 +97,7 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 			IsCompact: fCtx.IsCompactView,
 			IsBinary:  fCtx.IsBinary,
 			IsError:   fCtx.IsError,
+			ReadErr:   readErr,
 		}
 		ctx = &fCtx
 
@@ -235,7 +238,7 @@ var converters = []converter{
 //
 // An image that is about to be embedded is left alone: the picture itself says
 // more than a description of it would.
-func applyConverters(file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool) {
+func applyConverters(log *slog.Logger, file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool) {
 	if embedImages && format.IsImage() {
 		return reader, size, "", "", false
 	}
@@ -245,7 +248,7 @@ func applyConverters(file sources.InputFile, opts core.RenderOptions, format *in
 		}
 		text, err := c.convert(file, reader, size)
 		if err != nil {
-			slog.Debug("Converter failed, keeping raw content",
+			log.Debug("Converter failed, keeping raw content",
 				"converter", c.name, "path", file.Path, "error", err)
 			return reader, size, "", "", false
 		}
@@ -360,13 +363,13 @@ func skeletonModeLabel(functions, types bool) string {
 	}
 }
 
+// prepareFileContext describes file for its template. A file that cannot be
+// opened becomes an error row, and the error is returned for the caller to
+// report; every other problem is only shown in the row.
 func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOptions, index int, scratch []byte) (core.FileContext, error) {
 	rc, err := file.Open()
 	if err != nil {
-		if p.onFileError != nil {
-			p.onFileError(file, err)
-		}
-		return p.errorContext(file, index, err.Error()), nil
+		return p.errorContext(file, index, err.Error()), err
 	}
 	defer rc.Close()
 
@@ -384,7 +387,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 
 	format, verified := classify(file.Path, reader, scratch)
 	reader, size, convertedFrom, convertedLang, converted := applyConverters(
-		file, cfg, format, reader, size, p.engine.EmbedImages && verified)
+		p.log, file, cfg, format, reader, size, p.engine.EmbedImages && verified)
 
 	isBinary, lang := detectContent(file.Path, reader, scratch)
 	if convertedLang != "" {
