@@ -21,7 +21,7 @@ import (
 // through its directory, is collected once.
 //
 // It stops at the first target that finds ctx done and returns ctx's error.
-func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) (int, error) {
+func resolveSections(ctx context.Context, log *slog.Logger, sections []Section, c *lx.Collector) (int, error) {
 	unresolved := 0
 	piped := map[string]bool{}
 	for si := range sections {
@@ -37,7 +37,7 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) (
 				return unresolved, ctxErr
 			}
 			if err != nil {
-				logUnresolved(op.Value, err)
+				logUnresolved(log, op.Value, err)
 				unresolved++
 				continue
 			}
@@ -60,17 +60,17 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) (
 	return unresolved, nil
 }
 
-func logUnresolved(target string, err error) {
+func logUnresolved(log *slog.Logger, target string, err error) {
 	var pe *fs.PathError
 	var ue *lx.URLError
 	switch {
 	case errors.As(err, &pe) && pe.Op == "stat":
-		slog.Error("Failed to stat path", "path", pe.Path, "error", err)
+		log.Error("Failed to stat path", "path", pe.Path, "error", err)
 	case errors.As(err, &ue) && ue.Download:
-		slog.Error("Failed to download URL archive", "url", ue.URL, "error", ue.Err)
+		log.Error("Failed to download URL archive", "url", ue.URL, "error", ue.Err)
 	case errors.As(err, &ue):
-		slog.Error("Failed to create URL input", "url", ue.URL, "error", ue.Err)
+		log.Error("Failed to create URL input", "url", ue.URL, "error", ue.Err)
 	default:
-		slog.Error("Failed to resolve path", "path", target, "error", err)
+		log.Error("Failed to resolve path", "path", target, "error", err)
 	}
 }

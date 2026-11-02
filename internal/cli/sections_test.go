@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"log/slog"
 	"reflect"
 	"testing"
 
@@ -15,7 +16,7 @@ func TestParseSections_NoSplitBeforeFiles(t *testing.T) {
 		{Action: "FILE", Value: "main.go", Type: CmdAction},
 	}
 
-	sections := parseSections(ops, defaultRender)
+	sections := parseSections(slog.Default(), ops, defaultRender)
 	if len(sections) != 1 {
 		t.Fatalf("len(sections) = %d, want 1", len(sections))
 	}
@@ -37,7 +38,7 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 		{Action: "FILE", Value: "next.txt", Type: CmdAction},
 	}
 
-	sections := parseSections(ops, defaultRender)
+	sections := parseSections(slog.Default(), ops, defaultRender)
 	if len(sections) != 2 {
 		t.Fatalf("len(sections) = %d, want 2", len(sections))
 	}
@@ -66,32 +67,32 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 func TestApplyInterleaved_RunConfigFlags(t *testing.T) {
 	s := Section{Render: lx.RenderOptions{Head: -1, Tail: 0}}
 
-	applyInterleaved(Op{Action: "head", Value: "9"}, &s)
+	applyInterleaved(slog.Default(), Op{Action: "head", Value: "9"}, &s)
 	if s.Render.Head != 9 || s.Render.Tail != 0 {
 		t.Fatalf("after head: Render = %+v, want Head=9 Tail=0", s.Render)
 	}
 
-	applyInterleaved(Op{Action: "tail", Value: "4"}, &s)
+	applyInterleaved(slog.Default(), Op{Action: "tail", Value: "4"}, &s)
 	if s.Render.Head != 0 || s.Render.Tail != 4 {
 		t.Fatalf("after tail: Render = %+v, want Head=0 Tail=4", s.Render)
 	}
 
-	applyInterleaved(Op{Action: "lines", Value: "5"}, &s)
+	applyInterleaved(slog.Default(), Op{Action: "lines", Value: "5"}, &s)
 	if s.Render.Head != 3 || s.Render.Tail != 2 {
 		t.Fatalf("after lines: Render = %+v, want Head=3 Tail=2", s.Render)
 	}
 
-	applyInterleaved(Op{Action: "line-numbers"}, &s)
+	applyInterleaved(slog.Default(), Op{Action: "line-numbers"}, &s)
 	if !s.Render.LineNumbers {
 		t.Fatalf("line numbers should be enabled")
 	}
 
-	applyInterleaved(Op{Action: "functions"}, &s)
+	applyInterleaved(slog.Default(), Op{Action: "functions"}, &s)
 	if !s.Render.SkeletonFunctions {
 		t.Fatalf("skeleton functions should be enabled")
 	}
 
-	applyInterleaved(Op{Action: "types"}, &s)
+	applyInterleaved(slog.Default(), Op{Action: "types"}, &s)
 	if !s.Render.SkeletonTypes {
 		t.Fatalf("skeleton types should be enabled")
 	}
@@ -102,9 +103,9 @@ func TestApplyInterleaved_RunConfigFlags(t *testing.T) {
 func TestApplyInterleaved_FilterFlagsKeepOrder(t *testing.T) {
 	s := Section{}
 
-	applyInterleaved(Op{Action: "exclude", Value: "build/*"}, &s)
-	applyInterleaved(Op{Action: "include", Value: "build/keep.js"}, &s)
-	applyInterleaved(Op{Action: "exclude", Value: "*.min.js"}, &s)
+	applyInterleaved(slog.Default(), Op{Action: "exclude", Value: "build/*"}, &s)
+	applyInterleaved(slog.Default(), Op{Action: "include", Value: "build/keep.js"}, &s)
+	applyInterleaved(slog.Default(), Op{Action: "exclude", Value: "*.min.js"}, &s)
 
 	want := []lx.Glob{lx.ExcludeGlob("build/*"), lx.IncludeGlob("build/keep.js"), lx.ExcludeGlob("*.min.js")}
 	if !reflect.DeepEqual(s.Discover.Globs, want) {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"flag"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,49 +24,35 @@ type goldenTestCase struct {
 	autoStat bool
 }
 
-func runTestGolden(t *testing.T, workDir string, cases []goldenTestCase, extraScrub ...string) {
-	t.Helper()
-	pkgDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(pkgDir) })
-	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
-	if err := os.Chdir(workDir); err != nil {
-		t.Fatal(err)
-	}
-	scrub := append([]string{workDir, canonicalWorkDir}, extraScrub...)
-	runGoldenTests(t, cases, pkgDir, scrub...)
+// goldenRun is what the cases of one batch share: the working directory they
+// run in and the paths their output names as /ROOT.
+type goldenRun struct {
+	cwd   string
+	scrub []string
 }
 
-func runGoldenTests(t *testing.T, cases []goldenTestCase, pkgDir string, scrubPaths ...string) {
+// runTestGolden runs cases in workDir, naming it /ROOT.
+func runTestGolden(t *testing.T, workDir string, cases []goldenTestCase, extraScrub ...string) {
+	t.Helper()
+	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
+	runGoldenTests(t, cases, goldenRun{
+		cwd:   workDir,
+		scrub: append([]string{workDir, canonicalWorkDir}, extraScrub...),
+	})
+}
+
+// runGoldenTests runs every case with an Env of its own.
+func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
+	lookupEnv := func(key string) (string, bool) {
+		// Goldens are plain text whatever color settings the shell has.
+		if key == "NO_COLOR" {
+			return "1", true
+		}
+		return os.LookupEnv(key)
+	}
+
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Goldens are plain text whatever color settings the shell has.
-			t.Setenv("NO_COLOR", "1")
-
-			outR, outW, _ := os.Pipe()
-			errR, errW, _ := os.Pipe()
-			inR, inW, _ := os.Pipe()
-
-			origOut := os.Stdout
-			origErr := os.Stderr
-			origIn := os.Stdin
-
-			defer func() {
-				os.Stdout = origOut
-				os.Stderr = origErr
-				os.Stdin = origIn
-			}()
-
-			os.Stdout = outW
-			os.Stderr = errW
-			os.Stdin = inR
-
-			go func() {
-				defer inW.Close()
-				if tc.stdin != "" {
-					io.WriteString(inW, tc.stdin)
-				}
-			}()
-
 			// Force deterministic output unless explicitly requested otherwise.
 			runArgs := append([]string{}, tc.args...)
 			hasStatsControl := false
@@ -80,24 +65,25 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, pkgDir string, scrubPa
 				runArgs = append(runArgs, "--no-stats")
 			}
 
-			errChan := make(chan error, 1)
-			go func() {
-				defer outW.Close()
-				defer errW.Close()
-				errChan <- cli.Run(context.Background(), runArgs)
-			}()
-
 			var stdoutBuf, stderrBuf bytes.Buffer
-			_, _ = io.Copy(&stdoutBuf, outR)
-			_, _ = io.Copy(&stderrBuf, errR)
-
-			if err := <-errChan; err != nil {
+			err := cli.Run(context.Background(), runArgs, cli.Env{
+				Stdin:     strings.NewReader(tc.stdin),
+				Stdout:    &stdoutBuf,
+				Stderr:    &stderrBuf,
+				LookupEnv: lookupEnv,
+				Cwd:       run.cwd,
+				Clipboard: func(string) error {
+					t.Error("a golden run wrote to the clipboard")
+					return nil
+				},
+			})
+			if err != nil {
 				stderrBuf.WriteString("\nCLI Error: " + err.Error() + "\n")
 			}
 
-			fullOutput := normalizeOutput(stdoutBuf.String(), stderrBuf.String(), scrubPaths...)
+			fullOutput := normalizeOutput(stdoutBuf.String(), stderrBuf.String(), run.scrub...)
 
-			goldenPath := filepath.Join(pkgDir, "testdata", "golden", tc.name+".golden")
+			goldenPath := filepath.Join("testdata", "golden", tc.name+".golden")
 			if *update {
 				if err := os.MkdirAll(filepath.Dir(goldenPath), 0755); err != nil {
 					t.Fatalf("create golden dir: %v", err)
@@ -112,15 +98,15 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, pkgDir string, scrubPa
 				if *update {
 					return
 				}
-				t.Fatalf("Golden file missing: %v. Run with -update", err)
+				t.Fatalf("Golden file missing: %v. Run make test-update", err)
 			}
 
 			want := string(wantBytes)
 			if want != fullOutput {
 				diffAt := firstDiffIndex(want, fullOutput)
 				t.Errorf(
-					"Mismatch for %s.\nExpected len: %d\nGot len: %d\nFirst difference at byte: %d\nGolden: testdata/golden/%s.golden\nTo accept current output: go test ./cmd/lx -run %s -update",
-					tc.name, len(want), len(fullOutput), diffAt, tc.name, tc.name,
+					"Mismatch for %s.\nExpected len: %d\nGot len: %d\nFirst difference at byte: %d\nGolden: testdata/golden/%s.golden\nTo accept current output: make test-update",
+					tc.name, len(want), len(fullOutput), diffAt, tc.name,
 				)
 			}
 		})
@@ -143,6 +129,26 @@ func firstDiffIndex(a, b string) int {
 	return -1
 }
 
+var (
+	tempDirPattern       = regexp.MustCompile(`(/?\w+)+/TestGolden\w+/\d+`)
+	permissionPattern    = regexp.MustCompile(`(?i)(permission denied|access is denied)`)
+	isDirectoryPattern   = regexp.MustCompile(`(?i)(read .*: is a directory|The handle is invalid)`)
+	notFoundPattern      = regexp.MustCompile(`(?i)(The system cannot find the file specified|no such file or directory)`)
+	timePattern          = regexp.MustCompile(`time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(?:[+-]\d{2}:\d{2}|Z)`)
+	globalIgnorePattern  = regexp.MustCompile(`msg="Loaded global ignore file" path=.*`)
+	systemContextPattern = []struct {
+		re   *regexp.Regexp
+		repl string
+	}{
+		// --system-context reports the host machine and the current time.
+		{regexp.MustCompile(`(?m)^OS: .*$`), "OS: GOOS"},
+		{regexp.MustCompile(`(?m)^Arch: .*$`), "Arch: GOARCH"},
+		{regexp.MustCompile(`(?m)^Time: .*$`), "Time: FIXED"},
+		{regexp.MustCompile(`(?m)^Host: .*$`), "Host: HOST"},
+		{regexp.MustCompile(`(?m)^Tool: lx .*$`), "Tool: lx VERSION"},
+	}
+)
+
 func normalizeOutput(stdout, stderr string, roots ...string) string {
 	var sb strings.Builder
 
@@ -153,25 +159,20 @@ func normalizeOutput(stdout, stderr string, roots ...string) string {
 			}
 		}
 
-		s = regexp.MustCompile(`(/?\w+)+/TestGolden\w+/\d+`).ReplaceAllString(s, "/ROOT")
+		s = tempDirPattern.ReplaceAllString(s, "/ROOT")
 
 		if runtime.GOOS == "windows" {
 			s = strings.ReplaceAll(s, "\\", "/")
 		}
 
-		s = regexp.MustCompile(`(?i)(permission denied|access is denied)`).ReplaceAllString(s, "PERMISSION_DENIED")
-		s = regexp.MustCompile(`(?i)(read .*: is a directory|The handle is invalid)`).ReplaceAllString(s, "IS_DIRECTORY_ERROR")
-		s = regexp.MustCompile(`(?i)(The system cannot find the file specified|no such file or directory)`).ReplaceAllString(s, "FILE_NOT_FOUND")
-		s = regexp.MustCompile(`time=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(?:[+-]\d{2}:\d{2}|Z)`).ReplaceAllString(s, "time=FIXED")
-		s = regexp.MustCompile(`msg="Loaded global ignore file" path=.*`).ReplaceAllString(s, `msg="Loaded global ignore file" path=GLOBAL_IGNORE`)
-
-		// --system-context reports the host machine and the current time.
-		s = regexp.MustCompile(`(?m)^OS: .*$`).ReplaceAllString(s, "OS: GOOS")
-		s = regexp.MustCompile(`(?m)^Arch: .*$`).ReplaceAllString(s, "Arch: GOARCH")
-		s = regexp.MustCompile(`(?m)^Time: .*$`).ReplaceAllString(s, "Time: FIXED")
-		s = regexp.MustCompile(`(?m)^Host: .*$`).ReplaceAllString(s, "Host: HOST")
-		s = regexp.MustCompile(`(?m)^Tool: lx .*$`).ReplaceAllString(s, "Tool: lx VERSION")
-
+		s = permissionPattern.ReplaceAllString(s, "PERMISSION_DENIED")
+		s = isDirectoryPattern.ReplaceAllString(s, "IS_DIRECTORY_ERROR")
+		s = notFoundPattern.ReplaceAllString(s, "FILE_NOT_FOUND")
+		s = timePattern.ReplaceAllString(s, "time=FIXED")
+		s = globalIgnorePattern.ReplaceAllString(s, `msg="Loaded global ignore file" path=GLOBAL_IGNORE`)
+		for _, p := range systemContextPattern {
+			s = p.re.ReplaceAllString(s, p.repl)
+		}
 		return s
 	}
 

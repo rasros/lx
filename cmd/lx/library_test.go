@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rasros/lx/internal/cli"
@@ -15,21 +16,25 @@ import (
 // as lx <dir> does, ancestor ignore rules included.
 func TestLibraryMatchesCLI(t *testing.T) {
 	dir := setupAncestorIgnoreFixture(t)
-	t.Chdir(filepath.Join(dir, "sub"))
+	cwd := filepath.Join(dir, "sub")
+	lookupEnv := os.LookupEnv
 	ctx := context.Background()
 
-	out := filepath.Join(t.TempDir(), "cli.md")
-	if err := cli.Run(ctx, []string{".", "--no-stats", "-o", out}); err != nil {
-		t.Fatal(err)
-	}
-	want, err := os.ReadFile(out)
+	var want, stderr bytes.Buffer
+	err := cli.Run(ctx, []string{".", "--no-stats"}, cli.Env{
+		Stdin:     strings.NewReader(""),
+		Stdout:    &want,
+		Stderr:    &stderr,
+		LookupEnv: lookupEnv,
+		Cwd:       cwd,
+	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(err, stderr.String())
 	}
 
 	var opts lx.DiscoverOptions
-	opts.IgnoreRules, opts.GitExcludes = lx.UserIgnoreRules(os.LookupEnv, nil)
-	files, err := lx.NewCollector("", nil).Collect(ctx, ".", opts)
+	opts.IgnoreRules, opts.GitExcludes = lx.UserIgnoreRules(lookupEnv, nil)
+	files, err := lx.NewCollector(cwd, nil).Collect(ctx, ".", opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,8 +50,8 @@ func TestLibraryMatchesCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got.String() != string(want) {
-		t.Errorf("library output differs from lx .\nlibrary:\n%s\nlx:\n%s", got.String(), want)
+	if got.String() != want.String() {
+		t.Errorf("library output differs from lx .\nlibrary:\n%s\nlx:\n%s", got.String(), want.String())
 	}
 	if len(files) < 3 {
 		t.Errorf("collected %d files, want the fixture's", len(files))

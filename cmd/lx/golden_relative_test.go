@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -9,16 +8,8 @@ import (
 func TestGoldenRelativePaths(t *testing.T) {
 	workDir, srcDir := setupRelativePathsFixture(t)
 
-	pkgDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(pkgDir) })
-
 	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
-
-	if err := os.Chdir(srcDir); err != nil {
-		t.Fatal(err)
-	}
-
-	perceivedRoot, _ := filepath.Abs("..")
+	perceivedRoot := filepath.Dir(srcDir)
 
 	cases := []goldenTestCase{
 		// --- 200-219: Basic Navigation ---
@@ -63,5 +54,5 @@ func TestGoldenRelativePaths(t *testing.T) {
 		{name: "262_symlink_follow_relative", args: []string{"--follow", "../links/loop"}},
 	}
 
-	runGoldenTests(t, cases, pkgDir, workDir, canonicalWorkDir, perceivedRoot)
+	runGoldenTests(t, cases, goldenRun{cwd: srcDir, scrub: []string{workDir, canonicalWorkDir, perceivedRoot}})
 }

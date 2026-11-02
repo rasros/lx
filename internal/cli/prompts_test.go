@@ -31,7 +31,7 @@ func newTestLib(t *testing.T) string {
 
 func TestPromptResolver_FlatExactExtension(t *testing.T) {
 	dir := newTestLib(t)
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	got, err := r.resolve("refactor")
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func TestPromptResolver_FlatExactExtension(t *testing.T) {
 
 func TestPromptResolver_NestedRelativePath(t *testing.T) {
 	dir := newTestLib(t)
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	got, err := r.resolve("go/test")
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestPromptResolver_NestedRelativePath(t *testing.T) {
 
 func TestPromptResolver_DeeplyNested(t *testing.T) {
 	dir := newTestLib(t)
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	got, err := r.resolve("claude/code/review")
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +67,7 @@ func TestPromptResolver_DeeplyNested(t *testing.T) {
 
 func TestPromptResolver_ExactWithExtension(t *testing.T) {
 	dir := newTestLib(t)
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	got, err := r.resolve("go/test.md")
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestPromptResolver_ExactWithExtension(t *testing.T) {
 
 func TestPromptResolver_TxtExtension(t *testing.T) {
 	dir := newTestLib(t)
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	got, err := r.resolve("notes")
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +91,7 @@ func TestPromptResolver_TxtExtension(t *testing.T) {
 
 func TestPromptResolver_PromptExtension(t *testing.T) {
 	dir := newTestLib(t)
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	got, err := r.resolve("raw")
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestPromptResolver_PromptExtension(t *testing.T) {
 
 func TestPromptResolver_AmbiguousBasename(t *testing.T) {
 	dir := newTestLib(t)
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	_, err := r.resolve("test")
 	if err == nil {
 		t.Fatal("expected ambiguity error")
@@ -119,7 +119,7 @@ func TestPromptResolver_AmbiguousBasename(t *testing.T) {
 
 func TestPromptResolver_NotFound(t *testing.T) {
 	dir := newTestLib(t)
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	_, err := r.resolve("nope/missing")
 	if err == nil {
 		t.Fatal("expected not-found error")
@@ -134,7 +134,7 @@ func TestPromptResolver_AbsolutePathBypassesLib(t *testing.T) {
 	external := filepath.Join(tmp, "external.md")
 	writeFile(t, external, "EXTERNAL")
 
-	r := newPromptResolver(t.TempDir(), defaultPromptExtensions)
+	r := newPromptResolver(Env{}, t.TempDir(), defaultPromptExtensions)
 	got, err := r.resolve(external)
 	if err != nil {
 		t.Fatal(err)
@@ -145,19 +145,10 @@ func TestPromptResolver_AbsolutePathBypassesLib(t *testing.T) {
 }
 
 func TestPromptResolver_RelativeDotPathBypassesLib(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	env := Env{Cwd: t.TempDir()}
+	writeFile(t, filepath.Join(env.Cwd, "local.md"), "LOCAL")
 
-	work := t.TempDir()
-	writeFile(t, filepath.Join(work, "local.md"), "LOCAL")
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
-
-	r := newPromptResolver(t.TempDir(), defaultPromptExtensions)
+	r := newPromptResolver(env, t.TempDir(), defaultPromptExtensions)
 	got, err := r.resolve("./local.md")
 	if err != nil {
 		t.Fatal(err)
@@ -172,7 +163,7 @@ func TestPromptResolver_ExactRelativeBeatsBasename(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "a", "shared.md"), "A")
 	writeFile(t, filepath.Join(dir, "b", "shared.md"), "B")
 
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	got, err := r.resolve("a/shared")
 	if err != nil {
 		t.Fatal(err)
@@ -183,7 +174,7 @@ func TestPromptResolver_ExactRelativeBeatsBasename(t *testing.T) {
 }
 
 func TestPromptResolver_NoLibConfigured(t *testing.T) {
-	r := newPromptResolver("", defaultPromptExtensions)
+	r := newPromptResolver(Env{}, "", defaultPromptExtensions)
 	_, err := r.resolve("anything")
 	if err == nil {
 		t.Fatal("expected error when libDir is empty")
@@ -192,7 +183,7 @@ func TestPromptResolver_NoLibConfigured(t *testing.T) {
 
 func TestPromptResolver_ListLib(t *testing.T) {
 	dir := newTestLib(t)
-	r := newPromptResolver(dir, defaultPromptExtensions)
+	r := newPromptResolver(Env{}, dir, defaultPromptExtensions)
 	entries, err := r.listLib(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -216,28 +207,35 @@ func TestPromptResolver_ListLib(t *testing.T) {
 }
 
 func TestResolvePromptsDir_PrecedenceCLI(t *testing.T) {
-	t.Setenv("LX_PROMPTS_DIR", "/from/env")
 	parsed := &ParsedArgs{Globals: map[string]string{"prompts-dir": "/from/cli"}}
 	cfg := &CliConfig{PromptsDir: "/from/cfg"}
-	if got := resolvePromptsDir(parsed, cfg); got != "/from/cli" {
+	if got := resolvePromptsDir(parsed, cfg, envWith("LX_PROMPTS_DIR", "/from/env")); got != "/from/cli" {
 		t.Errorf("got %s", got)
 	}
 }
 
 func TestResolvePromptsDir_PrecedenceEnvOverConfig(t *testing.T) {
-	t.Setenv("LX_PROMPTS_DIR", "/from/env")
 	parsed := &ParsedArgs{Globals: map[string]string{}}
 	cfg := &CliConfig{PromptsDir: "/from/cfg"}
-	if got := resolvePromptsDir(parsed, cfg); got != "/from/env" {
+	if got := resolvePromptsDir(parsed, cfg, envWith("LX_PROMPTS_DIR", "/from/env")); got != "/from/env" {
 		t.Errorf("got %s", got)
 	}
 }
 
 func TestResolvePromptsDir_ConfigOverDefault(t *testing.T) {
-	t.Setenv("LX_PROMPTS_DIR", "")
 	parsed := &ParsedArgs{Globals: map[string]string{}}
 	cfg := &CliConfig{PromptsDir: "/from/cfg"}
-	if got := resolvePromptsDir(parsed, cfg); got != "/from/cfg" {
+	if got := resolvePromptsDir(parsed, cfg, envWith("LX_PROMPTS_DIR", "")); got != "/from/cfg" {
 		t.Errorf("got %s", got)
 	}
+}
+
+// envWith returns an Env whose only environment variable is key, set to value.
+func envWith(key, value string) Env {
+	return Env{LookupEnv: func(k string) (string, bool) {
+		if k == key {
+			return value, true
+		}
+		return "", false
+	}}
 }

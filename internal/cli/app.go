@@ -6,72 +6,76 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/atotto/clipboard"
 	"github.com/rasros/lx/internal/ansi"
 	"github.com/rasros/lx/pkg/lx"
 )
 
-func Run(ctx context.Context, args []string) error {
+// Run runs lx with args against env, which stands for the process: Run reads
+// and writes nothing else of it, and logs to env.Stderr through a logger of
+// its own.
+func Run(ctx context.Context, args []string, env Env) error {
 	parsed, err := Parse(args, definitions)
 	if err != nil {
 		return fmt.Errorf("argument parsing failed: %w", err)
 	}
 
-	stopProfiling, err := setupProfiling(parsed)
+	stopProfiling, err := setupProfiling(parsed, env)
 	if err != nil {
 		return fmt.Errorf("profiling setup failed: %w", err)
 	}
 	defer stopProfiling()
 
-	if done := handleGlobals(parsed); done {
-		return nil
+	if done, err := handleGlobals(parsed, env); done || err != nil {
+		return err
 	}
 
-	if err := gatherInputs(parsed); err != nil {
+	if err := gatherInputs(parsed, env); err != nil {
 		if len(args) == 0 {
-			printShortHelp()
+			printShortHelp(env)
 			return nil
 		}
 		return fmt.Errorf("input gathering failed: %w", err)
 	}
 
-	return processStream(ctx, parsed, args)
+	return processStream(ctx, parsed, args, env)
 }
 
-func handleGlobals(parsed *ParsedArgs) bool {
+// handleGlobals runs the options that replace a run, reporting whether one
+// did.
+func handleGlobals(parsed *ParsedArgs, env Env) (bool, error) {
 	for _, op := range parsed.Ops {
 		if op.Action == "help" {
 			if op.IsShort {
-				printShortHelp()
+				printShortHelp(env)
 			} else {
-				printLongHelp()
+				printLongHelp(env)
 			}
-			return true
+			return true, nil
 		}
 	}
 
 	if _, ok := parsed.Globals["version"]; ok {
-		fmt.Printf("lx version %s\n", Version)
-		return true
+		fmt.Fprintf(env.Stdout, "lx version %s\n", Version)
+		return true, nil
 	}
 
 	if _, ok := parsed.Globals["list-prompts"]; ok {
-		if err := runListPrompts(parsed); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+		if err := runListPrompts(parsed, env); err != nil {
+			fmt.Fprintln(env.Stderr, err)
+			return true, ExitError{Code: 1}
 		}
-		return true
+		return true, nil
 	}
-	return false
+	return false, nil
 }
 
-func gatherInputs(parsed *ParsedArgs) error {
+// gatherInputs adds the paths piped to stdin when no file is named, and "."
+// when there is still nothing to render.
+func gatherInputs(parsed *ParsedArgs, env Env) error {
 	// Stdin depends only on explicit file arguments; the "." fallback also
 	// depends on generators, which already give the run something to emit.
 	hasFiles := false
@@ -84,43 +88,36 @@ func gatherInputs(parsed *ParsedArgs) error {
 			hasGenerators = true
 		}
 	}
-	if hasFiles {
-		slog.Debug("Detected input from file actions")
-	}
 
 	if !hasFiles {
 		_, useNull := parsed.Globals["null"]
-		stdinFiles, isPipe, err := readFilenamesFromStdin(useNull)
+		stdinFiles, isPipe, err := readFilenamesFromStdin(env.Stdin, useNull)
 		if err != nil {
 			return fmt.Errorf("read stdin: %w", err)
 		}
 		if isPipe {
-			slog.Debug("Detected input from stdin pipe", "count", len(stdinFiles))
 			for _, f := range stdinFiles {
 				parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: f, Type: CmdAction, Piped: true})
 			}
 			hasFiles = true
-		} else {
-			slog.Debug("No stdin pipe detected")
 		}
 	}
 
 	if !hasFiles && !hasGenerators {
-		slog.Debug("No inputs detected, defaulting to current directory '.'")
 		parsed.Ops = append(parsed.Ops, Op{Action: "FILE", Value: ".", Type: CmdAction})
 	}
 	return nil
 }
 
-func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) error {
+func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, env Env) error {
 	initialLevel, err := determineLogLevel(parsed, "warn")
 	if err != nil {
 		return err
 	}
-	setupLogger(initialLevel)
-	slog.Debug("Logger initialized (early)", "level", initialLevel.String())
+	log := newLogger(env, initialLevel)
+	log.Debug("Logger initialized (early)", "level", initialLevel.String())
 
-	cfg, cliOpts, err := LoadConfigChain(parsed.Globals["config"])
+	cfg, cliOpts, err := LoadConfigChain(env, log, parsed.Globals["config"])
 	if err != nil {
 		return err
 	}
@@ -131,25 +128,22 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 	}
 
 	if finalLevel != initialLevel {
-		setupLogger(finalLevel)
-		slog.Debug("Logger level updated from config", "new_level", finalLevel.String())
+		log = newLogger(env, finalLevel)
+		log.Debug("Logger level updated from config", "new_level", finalLevel.String())
 	}
 
-	slog.Debug("Configuration loaded", "format", cfg.OutputFormat)
+	log.Debug("Configuration loaded", "format", cfg.OutputFormat)
 
 	applyOutputFormatOverrides(cfg, parsed)
 
-	out, clipBuf, debugOut, err := determineOutput(parsed.Globals, cliOpts.OutputMode)
-	if err != nil {
-		return err
-	}
-
-	var outPath string
-	if outputPath, ok := parsed.Globals["output"]; ok {
-		if abs, err := filepath.Abs(outputPath); err == nil {
-			outPath = abs
-			slog.Debug("Output file path resolved", "path", outPath)
+	out := determineOutput(parsed.Globals, cliOpts.OutputMode, env, log)
+	if out.path != "" {
+		f, err := env.create(out.name)
+		if err != nil {
+			return err
 		}
+		defer f.Close()
+		out.w = f
 	}
 
 	stream, err := lx.NewStream(cfg)
@@ -157,24 +151,24 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 		return err
 	}
 
-	stream.WithOnFileError(func(f lx.InputFile, err error) {
-		slog.Error("Failed to read file", "path", f.Path, "error", err)
+	stream.WithLogger(log).WithOnFileError(func(f lx.InputFile, err error) {
+		log.Error("Failed to read file", "path", f.Path, "error", err)
 	})
-	slog.Debug("Processing operations", "total_ops", len(parsed.Ops))
+	log.Debug("Processing operations", "total_ops", len(parsed.Ops))
 
-	ignoreRules, gitExcludes := lx.UserIgnoreRules(os.LookupEnv, nil)
-	promptResolver := newPromptResolver(resolvePromptsDir(parsed, cliOpts), cliOpts.PromptExtensions)
-	sections := parseSections(parsed.Ops, lx.RenderOptions{Head: -1})
+	ignoreRules, gitExcludes := lx.UserIgnoreRules(env.LookupEnv, log)
+	promptResolver := newPromptResolver(env, resolvePromptsDir(parsed, cliOpts, env), cliOpts.PromptExtensions)
+	sections := parseSections(log, parsed.Ops, lx.RenderOptions{Head: -1})
 	for i := range sections {
 		d := &sections[i].Discover
-		d.IgnoreRules, d.GitExcludes, d.OutPath = ignoreRules, gitExcludes, outPath
+		d.IgnoreRules, d.GitExcludes, d.OutPath = ignoreRules, gitExcludes, out.path
 	}
 
-	unresolved, err := resolveSections(ctx, sections, lx.NewCollector("", nil))
+	unresolved, err := resolveSections(ctx, log, sections, lx.NewCollector(env.Cwd, log))
 	if err != nil {
 		return err
 	}
-	assignTrees(sections)
+	assignTrees(log, sections)
 	var metaFields map[string]string
 	var metaBody string
 	resolveSystemContext := func() (map[string]string, string) {
@@ -185,23 +179,23 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 	}
 
 	for si, section := range sections {
-		slog.Debug("Processing section", "index", si, "ops", len(section.Ops))
+		log.Debug("Processing section", "index", si, "ops", len(section.Ops))
 
 		for oi, op := range section.Ops {
-			slog.Debug("Processing op", "action", op.Action, "value", op.Value)
+			log.Debug("Processing op", "action", op.Action, "value", op.Value)
 
 			switch op.Action {
 			case "FILE":
 				if section.skipFileOps[oi] {
-					slog.Debug("Skipping file content (tree-only mode)", "path", op.Value)
+					log.Debug("Skipping file content (tree-only mode)", "path", op.Value)
 					continue
 				}
 
 				if op.Value == "-" {
-					slog.Info("Reading content from stdin")
-					data, err := io.ReadAll(os.Stdin)
+					log.Info("Reading content from stdin")
+					data, err := io.ReadAll(env.Stdin)
 					if err != nil {
-						slog.Error("Failed to read from stdin", "error", err)
+						log.Error("Failed to read from stdin", "error", err)
 						continue
 					}
 					stream.AddFile(lx.NewBufferInputFile("stdin", data), section.Render)
@@ -215,73 +209,68 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 			case "tree", "tree-only":
 				stream.AddTree(section.treeFiles[oi], section.Render)
 			case "section":
-				slog.Debug("Adding section", "title", op.Value)
+				log.Debug("Adding section", "title", op.Value)
 				stream.AddSection(op.Value)
 			case "system-context":
 				fields, body := resolveSystemContext()
-				slog.Debug("Adding system context", "fields", len(fields))
+				log.Debug("Adding system context", "fields", len(fields))
 				stream.AddMeta(body, fields)
 			case "prompt":
-				slog.Debug("Adding prompt", "length", len(op.Value))
+				log.Debug("Adding prompt", "length", len(op.Value))
 				stream.AddPrompt(op.Value)
 			case "prompt-file":
 				path, err := promptResolver.resolve(op.Value)
 				if err != nil {
 					return err
 				}
-				data, err := os.ReadFile(path)
+				data, err := env.readFile(path)
 				if err != nil {
 					return fmt.Errorf("read prompt file %s: %w", path, err)
 				}
-				slog.Debug("Adding prompt from file", "path", path, "length", len(data))
+				log.Debug("Adding prompt from file", "path", path, "length", len(data))
 				stream.AddPrompt(string(data))
 			}
 		}
 	}
 
-	if f, ok := out.(*os.File); ok && f != os.Stdout {
-		slog.Info("Writing output to file", "path", f.Name())
-		defer f.Close()
+	if out.path != "" {
+		log.Info("Writing output to file", "path", out.name)
 	}
 
-	slog.Info("Executing stream pipeline...")
-	err = stream.Execute(ctx, out)
+	log.Info("Executing stream pipeline...")
+	err = stream.Execute(ctx, out.w)
 	if err != nil {
-		slog.Error("Pipeline execution failed", "error", err)
+		log.Error("Pipeline execution failed", "error", err)
 		return err
 	}
 
-	if clipBuf != nil {
-		slog.Info("Copying output to clipboard", "bytes", clipBuf.Len())
-		if err := clipboard.WriteAll(clipBuf.String()); err != nil {
+	if out.clip != nil {
+		log.Info("Copying output to clipboard", "bytes", out.clip.Len())
+		if err := env.Clipboard(out.clip.String()); err != nil {
 			return fmt.Errorf("clipboard write failed: %w", err)
 		}
-		slog.Info("Clipboard copy successful")
+		log.Info("Clipboard copy successful")
 	}
 
 	global := stream.GetGlobalContext()
 	if global.TotalFiles == 0 && global.SkippedBySize > 0 {
-		slog.Warn("Every input was skipped by the size limit (-m)",
+		log.Warn("Every input was skipped by the size limit (-m)",
 			"skipped", global.SkippedBySize)
 	}
 
-	handleStatsDisplay(parsed, cliOpts, stream, debugOut, unresolved)
+	handleStatsDisplay(log, env, parsed, cliOpts, stream, out.debug, unresolved)
 	return nil
 }
 
-func setupLogger(level slog.Level) {
-	var handler slog.Handler
+// newLogger returns the logger of a run at level, writing to env.Stderr.
+func newLogger(env Env, level slog.Level) *slog.Logger {
 	if level > slog.LevelDebug {
-		handler = NewCliHandler(os.Stderr, level)
-	} else {
-		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: level,
-		})
+		return slog.New(NewCliHandler(env.Stderr, level, env.paint(env.Stderr)))
 	}
-	slog.SetDefault(slog.New(handler))
+	return slog.New(slog.NewTextHandler(env.Stderr, &slog.HandlerOptions{Level: level}))
 }
 
-func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer, unresolved int) {
+func handleStatsDisplay(log *slog.Logger, env Env, parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer, unresolved int) {
 	showStatsFlag := cliOpts.ShowStats
 	if _, ok := parsed.Globals["stats"]; ok {
 		showStatsFlag = "always"
@@ -312,10 +301,10 @@ func handleStatsDisplay(parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Strea
 
 		err := stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
 			Global:       global,
-			ColorEnabled: ansi.Enabled(debugOut),
+			ColorEnabled: ansi.Enabled(debugOut, env.LookupEnv),
 		})
 		if err != nil {
-			slog.Error("Failed to render stats", "error", err)
+			log.Error("Failed to render stats", "error", err)
 		}
 	}
 }
@@ -404,33 +393,42 @@ func applyOutputFormatOverrides(cfg *lx.Config, parsed *ParsedArgs) {
 	}
 }
 
-func determineOutput(globals map[string]string, defaultMode string) (io.Writer, *bytes.Buffer, io.Writer, error) {
+// output is where a run writes its bundle and its stats.
+type output struct {
+	// w receives the bundle.
+	w io.Writer
+	// path is the absolute path of the output file, if any, and name that
+	// path as given.
+	path, name string
+	// clip, when set, buffers the bundle for the clipboard.
+	clip *bytes.Buffer
+	// debug receives the stats.
+	debug io.Writer
+}
+
+func determineOutput(globals map[string]string, defaultMode string, env Env, log *slog.Logger) output {
 	outputPath, hasOutput := globals["output"]
 	_, hasCopy := globals["copy"]
 	_, hasStdout := globals["stdout"]
 
-	var out io.Writer = os.Stdout
-	var clipBuf *bytes.Buffer
-	var debugOut io.Writer = os.Stderr
+	out := output{w: env.Stdout, debug: env.Stderr}
 
 	if hasOutput {
-		f, err := os.Create(outputPath)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		out = f
-		debugOut = os.Stdout
-		slog.Debug("Output set to file", "path", outputPath)
+		out.path, out.name = env.abs(outputPath), outputPath
+		out.w = nil
+		out.debug = env.Stdout
+		log.Debug("Output set to file", "path", outputPath)
+		log.Debug("Output file path resolved", "path", out.path)
 	} else if hasStdout {
-		slog.Debug("Output explicitly forced to stdout")
+		log.Debug("Output explicitly forced to stdout")
 	} else if hasCopy || defaultMode == "copy" {
-		clipBuf = new(bytes.Buffer)
-		out = clipBuf
-		debugOut = os.Stdout
-		slog.Debug("Output set to clipboard buffer")
+		out.clip = new(bytes.Buffer)
+		out.w = out.clip
+		out.debug = env.Stdout
+		log.Debug("Output set to clipboard buffer")
 	} else {
-		slog.Debug("Output set to stdout")
+		log.Debug("Output set to stdout")
 	}
 
-	return out, clipBuf, debugOut, nil
+	return out
 }

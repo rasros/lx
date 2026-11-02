@@ -29,7 +29,9 @@ func overrideIfSet[T comparable](dst *T, src T) {
 	}
 }
 
-func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
+// LoadConfigChain merges the user's config file, the one $LX_CONFIG names and
+// the one cliPath names, each over the ones before it.
+func LoadConfigChain(env Env, log *slog.Logger, cliPath string) (*lx.Config, *CliConfig, error) {
 	lxCfg := lx.NewConfig()
 
 	mergedCli := &CliConfig{
@@ -39,21 +41,21 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 	}
 
 	apply := func(path string, strict bool) error {
-		f, err := os.Open(path)
+		f, err := env.open(path)
 		if err != nil {
 			if os.IsNotExist(err) && !strict {
 				return nil
 			}
-			slog.Error("Failed to open config file", "path", path, "error", err)
+			log.Error("Failed to open config file", "path", path, "error", err)
 			return err
 		}
 		defer f.Close()
 
-		slog.Debug("Loading configuration file", "path", path)
+		log.Debug("Loading configuration file", "path", path)
 
 		var loaded CliConfig
 		if err := yaml.NewDecoder(f).Decode(&loaded); err != nil {
-			slog.Error("Failed to parse config file", "path", path, "error", err)
+			log.Error("Failed to parse config file", "path", path, "error", err)
 			return err
 		}
 
@@ -70,12 +72,12 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 		return nil
 	}
 
-	if configDir, err := os.UserConfigDir(); err == nil {
+	if configDir, err := env.configDir(); err == nil {
 		path := filepath.Join(configDir, "lx", "config.yaml")
 		_ = apply(path, false)
 	}
 
-	if envPath := os.Getenv("LX_CONFIG"); envPath != "" {
+	if envPath := env.getenv("LX_CONFIG"); envPath != "" {
 		_ = apply(envPath, false)
 	}
 

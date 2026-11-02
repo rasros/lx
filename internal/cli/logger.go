@@ -19,13 +19,13 @@ type CliHandler struct {
 	paint ansi.Painter
 }
 
-// NewCliHandler writes log records to w, coloring the level prefix only when
-// color is enabled for w.
-func NewCliHandler(w io.Writer, level slog.Level) *CliHandler {
+// NewCliHandler writes log records to w, coloring the level prefix with
+// paint.
+func NewCliHandler(w io.Writer, level slog.Level, paint ansi.Painter) *CliHandler {
 	return &CliHandler{
 		w:     w,
 		level: level,
-		paint: ansi.For(w),
+		paint: paint,
 	}
 }
 

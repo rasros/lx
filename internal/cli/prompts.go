@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 	"io/fs"
-	"os"
+	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -11,17 +11,20 @@ import (
 
 var defaultPromptExtensions = []string{".md", ".txt", ".prompt"}
 
+// promptResolver finds -P prompts. Paths are shown as given and resolved
+// against env's working directory.
 type promptResolver struct {
+	env        Env
 	libDir     string
 	extensions []string
 }
 
-func newPromptResolver(libDir string, extensions []string) *promptResolver {
+func newPromptResolver(env Env, libDir string, extensions []string) *promptResolver {
 	exts := extensions
 	if len(exts) == 0 {
 		exts = defaultPromptExtensions
 	}
-	return &promptResolver{libDir: libDir, extensions: exts}
+	return &promptResolver{env: env, libDir: libDir, extensions: exts}
 }
 
 func looksLikePath(v string) bool {
@@ -43,11 +46,11 @@ func looksLikePath(v string) bool {
 	return false
 }
 
-func expandHome(p string) string {
+func expandHome(env Env, p string) string {
 	if !strings.HasPrefix(p, "~") {
 		return p
 	}
-	home, err := os.UserHomeDir()
+	home, err := env.homeDir()
 	if err != nil {
 		return p
 	}
@@ -62,8 +65,8 @@ func expandHome(p string) string {
 
 func (r *promptResolver) resolve(value string) (string, error) {
 	if looksLikePath(value) {
-		path := expandHome(value)
-		if _, err := os.Stat(path); err != nil {
+		path := expandHome(r.env, value)
+		if _, err := r.env.stat(path); err != nil {
 			return "", fmt.Errorf("prompt file %q not found: %w", value, err)
 		}
 		return path, nil
@@ -73,19 +76,19 @@ func (r *promptResolver) resolve(value string) (string, error) {
 		return "", fmt.Errorf("prompt %q not found: no prompts library configured (set --prompts-dir, $LX_PROMPTS_DIR, or prompts_dir in config)", value)
 	}
 
-	libDir := expandHome(r.libDir)
-	if info, err := os.Stat(libDir); err != nil || !info.IsDir() {
+	libDir := expandHome(r.env, r.libDir)
+	if info, err := r.env.stat(libDir); err != nil || !info.IsDir() {
 		return "", fmt.Errorf("prompts library %q is not a readable directory", libDir)
 	}
 
 	direct := filepath.Join(libDir, value)
-	if info, err := os.Stat(direct); err == nil && !info.IsDir() {
+	if info, err := r.env.stat(direct); err == nil && !info.IsDir() {
 		return direct, nil
 	}
 
 	for _, ext := range r.extensions {
 		probe := filepath.Join(libDir, value+ext)
-		if info, err := os.Stat(probe); err == nil && !info.IsDir() {
+		if info, err := r.env.stat(probe); err == nil && !info.IsDir() {
 			return probe, nil
 		}
 	}
@@ -114,16 +117,18 @@ func (r *promptResolver) resolve(value string) (string, error) {
 	return "", fmt.Errorf("prompt %q is ambiguous in %s; candidates:\n  %s", value, libDir, strings.Join(rels, "\n  "))
 }
 
+// searchLib returns the prompts in libDir named value, below libDir as given.
 func (r *promptResolver) searchLib(libDir, value string) ([]string, error) {
 	var matches []string
 	target := filepath.ToSlash(value)
-	err := filepath.WalkDir(libDir, func(path string, d fs.DirEntry, err error) error {
+	absLib := r.env.abs(libDir)
+	err := filepath.WalkDir(absLib, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if path != libDir && (strings.HasPrefix(name, ".") || name == "node_modules") {
+			if path != absLib && (strings.HasPrefix(name, ".") || name == "node_modules") {
 				return fs.SkipDir
 			}
 			return nil
@@ -131,18 +136,13 @@ func (r *promptResolver) searchLib(libDir, value string) ([]string, error) {
 		if !r.hasAllowedExt(d.Name()) {
 			return nil
 		}
-		rel, err := filepath.Rel(libDir, path)
+		rel, err := filepath.Rel(absLib, path)
 		if err != nil {
 			return nil
 		}
 		relSlash := filepath.ToSlash(rel)
-		if stripExt(relSlash) == target {
-			matches = append(matches, path)
-			return nil
-		}
-		base := filepath.Base(relSlash)
-		if stripExt(base) == target {
-			matches = append(matches, path)
+		if stripExt(relSlash) == target || stripExt(filepath.Base(relSlash)) == target {
+			matches = append(matches, filepath.Join(libDir, rel))
 		}
 		return nil
 	})
@@ -177,13 +177,14 @@ func pickShallowest(libDir string, matches []string) []string {
 
 func (r *promptResolver) listLib(libDir string) ([]string, error) {
 	var entries []string
-	err := filepath.WalkDir(libDir, func(path string, d fs.DirEntry, err error) error {
+	absLib := r.env.abs(libDir)
+	err := filepath.WalkDir(absLib, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if path != libDir && (strings.HasPrefix(name, ".") || name == "node_modules") {
+			if path != absLib && (strings.HasPrefix(name, ".") || name == "node_modules") {
 				return fs.SkipDir
 			}
 			return nil
@@ -191,7 +192,7 @@ func (r *promptResolver) listLib(libDir string) ([]string, error) {
 		if !r.hasAllowedExt(d.Name()) {
 			return nil
 		}
-		if rel, err := filepath.Rel(libDir, path); err == nil {
+		if rel, err := filepath.Rel(absLib, path); err == nil {
 			entries = append(entries, filepath.ToSlash(rel))
 		}
 		return nil
@@ -244,47 +245,47 @@ func suggestList(entries []string) string {
 	return sb.String()
 }
 
-func resolvePromptsDir(parsed *ParsedArgs, cliCfg *CliConfig) string {
+func resolvePromptsDir(parsed *ParsedArgs, cliCfg *CliConfig, env Env) string {
 	if v, ok := parsed.Globals["prompts-dir"]; ok && v != "" {
 		return v
 	}
-	if v := os.Getenv("LX_PROMPTS_DIR"); v != "" {
+	if v := env.getenv("LX_PROMPTS_DIR"); v != "" {
 		return v
 	}
 	if cliCfg != nil && cliCfg.PromptsDir != "" {
 		return cliCfg.PromptsDir
 	}
-	if home, err := os.UserHomeDir(); err == nil {
+	if home, err := env.homeDir(); err == nil {
 		return filepath.Join(home, ".config", "lx", "prompts")
 	}
 	return ""
 }
 
-func runListPrompts(parsed *ParsedArgs) error {
-	_, cliCfg, err := LoadConfigChain(parsed.Globals["config"])
+func runListPrompts(parsed *ParsedArgs, env Env) error {
+	_, cliCfg, err := LoadConfigChain(env, newLogger(env, slog.LevelWarn), parsed.Globals["config"])
 	if err != nil {
 		return err
 	}
-	dir := resolvePromptsDir(parsed, cliCfg)
+	dir := resolvePromptsDir(parsed, cliCfg, env)
 	if dir == "" {
 		return fmt.Errorf("no prompts library configured")
 	}
-	dir = expandHome(dir)
-	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+	dir = expandHome(env, dir)
+	if info, err := env.stat(dir); err != nil || !info.IsDir() {
 		return fmt.Errorf("prompts library %q is not a readable directory", dir)
 	}
 	exts := defaultPromptExtensions
 	if cliCfg != nil && len(cliCfg.PromptExtensions) > 0 {
 		exts = cliCfg.PromptExtensions
 	}
-	r := newPromptResolver(dir, exts)
+	r := newPromptResolver(env, dir, exts)
 	entries, err := r.listLib(dir)
 	if err != nil {
 		return err
 	}
 	for _, rel := range entries {
 		abs := filepath.Join(dir, filepath.FromSlash(rel))
-		fmt.Printf("%s\t%s\n", rel, abs)
+		fmt.Fprintf(env.Stdout, "%s\t%s\n", rel, abs)
 	}
 	return nil
 }

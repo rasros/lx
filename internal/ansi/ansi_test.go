@@ -13,60 +13,39 @@ import (
 	"github.com/rasros/lx/pkg/lx/walker"
 )
 
-var colorEnv = []string{"NO_COLOR", "CLICOLOR", "CLICOLOR_FORCE", "FORCE_COLOR", "TERM"}
-
-// withPipedStdio points stdout and stderr at pipes for the test, so results
-// do not depend on whether go test runs in a terminal.
-func withPipedStdio(t *testing.T) {
-	t.Helper()
-	origOut, origErr := os.Stdout, os.Stderr
-	_, outW, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, errW, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	os.Stdout, os.Stderr = outW, errW
-	t.Cleanup(func() {
-		os.Stdout, os.Stderr = origOut, origErr
-		outW.Close()
-		errW.Close()
-	})
-}
-
 func TestEnabled(t *testing.T) {
-	withPipedStdio(t)
+	_, pipe, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pipe.Close() })
 	tests := []struct {
 		name string
 		env  map[string]string
-		w    func() io.Writer
+		w    io.Writer
 		want bool
 	}{
-		{"unknown writer", map[string]string{"TERM": "xterm"}, func() io.Writer { return &bytes.Buffer{} }, false},
-		{"piped stdout", map[string]string{"TERM": "xterm"}, func() io.Writer { return os.Stdout }, false},
-		{"NO_COLOR beats FORCE_COLOR", map[string]string{"NO_COLOR": "1", "FORCE_COLOR": "1", "TERM": "xterm"}, func() io.Writer { return os.Stdout }, false},
-		{"CLICOLOR=0 beats FORCE_COLOR", map[string]string{"CLICOLOR": "0", "FORCE_COLOR": "1", "TERM": "xterm"}, func() io.Writer { return os.Stdout }, false},
-		{"TERM=dumb beats FORCE_COLOR", map[string]string{"TERM": "dumb", "FORCE_COLOR": "1"}, func() io.Writer { return os.Stdout }, false},
-		{"FORCE_COLOR without TERM", map[string]string{"FORCE_COLOR": "1"}, func() io.Writer { return os.Stdout }, true},
-		{"FORCE_COLOR on stderr", map[string]string{"FORCE_COLOR": "1", "TERM": "xterm"}, func() io.Writer { return os.Stderr }, true},
-		{"FORCE_COLOR=0 disables", map[string]string{"FORCE_COLOR": "0", "CLICOLOR_FORCE": "1", "TERM": "xterm"}, func() io.Writer { return os.Stdout }, false},
-		{"FORCE_COLOR=false disables", map[string]string{"FORCE_COLOR": "false", "TERM": "xterm"}, func() io.Writer { return os.Stdout }, false},
-		{"CLICOLOR_FORCE forces", map[string]string{"CLICOLOR_FORCE": "1", "TERM": "xterm"}, func() io.Writer { return os.Stdout }, true},
-		{"CLICOLOR_FORCE=0 does not force", map[string]string{"CLICOLOR_FORCE": "0", "TERM": "xterm"}, func() io.Writer { return os.Stdout }, false},
+		{"unknown writer", map[string]string{"TERM": "xterm"}, &bytes.Buffer{}, false},
+		{"pipe", map[string]string{"TERM": "xterm"}, pipe, false},
+		{"NO_COLOR beats FORCE_COLOR", map[string]string{"NO_COLOR": "1", "FORCE_COLOR": "1", "TERM": "xterm"}, pipe, false},
+		{"CLICOLOR=0 beats FORCE_COLOR", map[string]string{"CLICOLOR": "0", "FORCE_COLOR": "1", "TERM": "xterm"}, pipe, false},
+		{"TERM=dumb beats FORCE_COLOR", map[string]string{"TERM": "dumb", "FORCE_COLOR": "1"}, pipe, false},
+		{"FORCE_COLOR without TERM", map[string]string{"FORCE_COLOR": "1"}, pipe, true},
+		{"FORCE_COLOR on a buffer", map[string]string{"FORCE_COLOR": "1", "TERM": "xterm"}, &bytes.Buffer{}, true},
+		{"empty FORCE_COLOR forces", map[string]string{"FORCE_COLOR": "", "TERM": "xterm"}, pipe, true},
+		{"FORCE_COLOR=0 disables", map[string]string{"FORCE_COLOR": "0", "CLICOLOR_FORCE": "1", "TERM": "xterm"}, pipe, false},
+		{"FORCE_COLOR=false disables", map[string]string{"FORCE_COLOR": "false", "TERM": "xterm"}, pipe, false},
+		{"CLICOLOR_FORCE forces", map[string]string{"CLICOLOR_FORCE": "1", "TERM": "xterm"}, pipe, true},
+		{"CLICOLOR_FORCE=0 does not force", map[string]string{"CLICOLOR_FORCE": "0", "TERM": "xterm"}, pipe, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, k := range colorEnv {
-				t.Setenv(k, "")
-				os.Unsetenv(k)
+			env := func(k string) (string, bool) {
+				v, ok := tt.env[k]
+				return v, ok
 			}
-			for k, v := range tt.env {
-				t.Setenv(k, v)
-			}
-			if got := Enabled(tt.w()); got != tt.want {
+			if got := Enabled(tt.w, env); got != tt.want {
 				t.Errorf("Enabled() = %v, want %v", got, tt.want)
 			}
 		})

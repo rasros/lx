@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"os"
 	"testing"
 )
@@ -10,7 +11,7 @@ func TestSetupProfiling_NoOp(t *testing.T) {
 		Globals: make(map[string]string),
 	}
 
-	cleanup, err := setupProfiling(parsed)
+	cleanup, err := setupProfiling(parsed, Env{Cwd: t.TempDir(), Stderr: io.Discard})
 	if err != nil {
 		t.Fatalf("setupProfiling unexpected error: %v", err)
 	}
@@ -34,7 +35,7 @@ func TestSetupProfiling_CPU(t *testing.T) {
 		},
 	}
 
-	cleanup, err := setupProfiling(parsed)
+	cleanup, err := setupProfiling(parsed, Env{Cwd: t.TempDir(), Stderr: io.Discard})
 	if err != nil {
 		return
 	}

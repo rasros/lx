@@ -4,7 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -51,9 +51,7 @@ func TestRun_Basic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out, err := captureStdout(func() error {
-				return Run(context.Background(), tt.args)
-			})
+			out, err := runCapture(t, tt.args)
 
 			if err != nil && !strings.Contains(tt.name, "error") {
 				t.Fatalf("Run() unexpected error: %v", err)
@@ -73,9 +71,7 @@ func TestRun_StickyFlags(t *testing.T) {
 	f1 := filepath.Join(tmpDir, "long.txt")
 	os.WriteFile(f1, []byte("line1\nline2\nline3\nline4\nline5\n"), 0644)
 
-	out, err := captureStdout(func() error {
-		return Run(context.Background(), []string{"-n", "2", f1})
-	})
+	out, err := runCapture(t, []string{"-n", "2", f1})
 
 	if err != nil {
 		t.Fatal(err)
@@ -115,9 +111,7 @@ func TestRun_HTTPURLInput(t *testing.T) {
 	defer server.Close()
 
 	url := server.URL + "/sample.txt"
-	out, err := captureStdout(func() error {
-		return Run(context.Background(), []string{url})
-	})
+	out, err := runCapture(t, []string{url})
 	if err != nil {
 		t.Fatalf("Run() error: %v", err)
 	}
@@ -153,9 +147,7 @@ func TestRun_HTTPURLArchiveInput_Expand(t *testing.T) {
 	defer server.Close()
 
 	url := server.URL + "/main.zip"
-	out, err := captureStdout(func() error {
-		return Run(context.Background(), []string{"-Z", url})
-	})
+	out, err := runCapture(t, []string{"-Z", url})
 	if err != nil {
 		t.Fatalf("Run() error: %v", err)
 	}
@@ -202,9 +194,7 @@ func TestRun_ShortRepoURL_AutoExpand(t *testing.T) {
 	defer restore()
 
 	short := serverURL.Host + "/owner/repo"
-	out, err := captureStdout(func() error {
-		return Run(context.Background(), []string{short})
-	})
+	out, err := runCapture(t, []string{short})
 	if err != nil {
 		t.Fatalf("Run() error: %v", err)
 	}
@@ -219,68 +209,61 @@ func TestRun_ShortRepoURL_AutoExpand(t *testing.T) {
 	}
 }
 
-func captureStdout(f func() error) (string, error) {
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+// testEnv returns an Env that writes to buffers and runs in a temporary
+// working directory with an empty user config.
+func testEnv(t *testing.T) (Env, *bytes.Buffer, *bytes.Buffer) {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	home := t.TempDir()
+	vars := map[string]string{"HOME": home, "XDG_CONFIG_HOME": filepath.Join(home, ".config"), "NO_COLOR": "1"}
+	return Env{
+		Stdin:  strings.NewReader(""),
+		Stdout: &stdout,
+		Stderr: &stderr,
+		LookupEnv: func(k string) (string, bool) {
+			v, ok := vars[k]
+			return v, ok
+		},
+		Cwd: t.TempDir(),
+		Clipboard: func(string) error {
+			t.Error("unexpected clipboard write")
+			return nil
+		},
+	}, &stdout, &stderr
+}
 
-	errC := make(chan error, 1)
-	go func() {
-		errC <- f()
-		w.Close()
-	}()
-
-	var buf strings.Builder
-	ioCopyC := make(chan struct{})
-	go func() {
-		data, _ := io.ReadAll(r)
-		buf.Write(data)
-		close(ioCopyC)
-	}()
-
-	err := <-errC
-	<-ioCopyC
-	os.Stdout = oldStdout
-	return buf.String(), err
+// runCapture runs lx with args and returns what it wrote to stdout.
+func runCapture(t *testing.T, args []string) (string, error) {
+	t.Helper()
+	env, stdout, _ := testEnv(t)
+	err := Run(context.Background(), args, env)
+	return stdout.String(), err
 }
 
 func TestDetermineOutput_StdoutOverridesCopyDefault(t *testing.T) {
-	out, clipBuf, debugOut, err := determineOutput(map[string]string{"stdout": "true"}, "copy")
-	if err != nil {
-		t.Fatalf("determineOutput error: %v", err)
+	env, _, _ := testEnv(t)
+	out := determineOutput(map[string]string{"stdout": "true"}, "copy", env, slog.Default())
+	if out.w != env.Stdout {
+		t.Fatalf("out = %T, want env.Stdout", out.w)
 	}
-	if out != os.Stdout {
-		t.Fatalf("out = %T, want os.Stdout", out)
+	if out.clip != nil {
+		t.Fatalf("clip should be nil when stdout is forced")
 	}
-	if clipBuf != nil {
-		t.Fatalf("clipBuf should be nil when stdout is forced")
-	}
-	if debugOut != os.Stderr {
-		t.Fatalf("debugOut should stay on stderr when stdout is forced")
+	if out.debug != env.Stderr {
+		t.Fatalf("debug should stay on stderr when stdout is forced")
 	}
 }
 
 func TestDetermineOutput_OutputWinsOverStdoutAndCopy(t *testing.T) {
-	target := filepath.Join(t.TempDir(), "out.txt")
-	out, clipBuf, debugOut, err := determineOutput(
-		map[string]string{"output": target, "stdout": "true", "copy": "true"},
-		"copy",
-	)
-	if err != nil {
-		t.Fatalf("determineOutput error: %v", err)
+	env, _, _ := testEnv(t)
+	out := determineOutput(map[string]string{"output": "out.txt", "stdout": "true", "copy": "true"}, "copy", env, slog.Default())
+	if want := filepath.Join(env.Cwd, "out.txt"); out.path != want || out.name != "out.txt" {
+		t.Fatalf("output file = %q (%q), want %q", out.path, out.name, want)
 	}
-	fileOut, ok := out.(*os.File)
-	if !ok {
-		t.Fatalf("out type = %T, want *os.File", out)
+	if out.clip != nil {
+		t.Fatalf("clip should be nil when output file is used")
 	}
-	defer fileOut.Close()
-	if fileOut.Name() != target {
-		t.Fatalf("output file = %q, want %q", fileOut.Name(), target)
-	}
-	if clipBuf != nil {
-		t.Fatalf("clipBuf should be nil when output file is used")
-	}
-	if debugOut != os.Stdout {
-		t.Fatalf("debugOut should be stdout when output file is used")
+	if out.debug != env.Stdout {
+		t.Fatalf("debug should be stdout when output file is used")
 	}
 }

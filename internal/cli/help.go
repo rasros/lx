@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"text/template"
 
@@ -301,7 +300,7 @@ func makeFuncs(p ansi.Painter) template.FuncMap {
 	}
 }
 
-func printShortHelp() {
+func printShortHelp(env Env) {
 	groupOrder := []struct {
 		cmdType  CmdType
 		typeName string
@@ -323,13 +322,13 @@ func printShortHelp() {
 		}
 	}
 
-	t := template.Must(template.New("short-help").Funcs(makeFuncs(ansi.For(os.Stdout))).Parse(shortHelpTmpl))
-	if err := t.Execute(os.Stdout, groups); err != nil {
-		fmt.Fprintf(os.Stderr, "template error: %v\n", err)
+	t := template.Must(template.New("short-help").Funcs(makeFuncs(env.paint(env.Stdout))).Parse(shortHelpTmpl))
+	if err := t.Execute(env.Stdout, groups); err != nil {
+		fmt.Fprintf(env.Stderr, "template error: %v\n", err)
 	}
 }
 
-func printLongHelp() {
+func printLongHelp(env Env) {
 	var formatting, interleaved, actions, config []CommandDef
 
 	for _, d := range definitions {
@@ -355,9 +354,9 @@ func printLongHelp() {
 		Config      []CommandDef
 	}{formatting, interleaved, actions, config}
 
-	t := template.Must(template.New("long-help").Funcs(makeFuncs(ansi.For(os.Stdout))).Parse(longHelpTmpl))
-	if err := t.Execute(os.Stdout, data); err != nil {
-		fmt.Fprintf(os.Stderr, "template error: %v\n", err)
+	t := template.Must(template.New("long-help").Funcs(makeFuncs(env.paint(env.Stdout))).Parse(longHelpTmpl))
+	if err := t.Execute(env.Stdout, data); err != nil {
+		fmt.Fprintf(env.Stderr, "template error: %v\n", err)
 	}
 }
 

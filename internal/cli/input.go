@@ -4,21 +4,26 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
 
-func readFilenamesFromStdin(useNull bool) ([]string, bool, error) {
-	info, err := os.Stdin.Stat()
-	if err != nil {
-		return nil, false, err
+// readFilenamesFromStdin reads the paths piped to stdin, one per line or, with
+// useNull, NUL-terminated. It reports false when stdin is a terminal; any
+// reader that is not a file counts as a pipe.
+func readFilenamesFromStdin(stdin io.Reader, useNull bool) ([]string, bool, error) {
+	if f, ok := stdin.(*os.File); ok {
+		info, err := f.Stat()
+		if err != nil {
+			return nil, false, err
+		}
+		if info.Mode()&os.ModeCharDevice != 0 {
+			return nil, false, nil
+		}
 	}
 
-	if info.Mode()&os.ModeCharDevice != 0 {
-		return nil, false, nil
-	}
-
-	sc := bufio.NewScanner(os.Stdin)
+	sc := bufio.NewScanner(stdin)
 	if useNull {
 		sc.Split(scanNullTerminated)
 	}
