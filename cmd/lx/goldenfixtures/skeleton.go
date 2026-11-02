@@ -62,7 +62,7 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"toplevel.cpp",
 		"guard.h",
 		"api.hpp",
-		"widget.h",
+		"defaults.h",
 		"idiom.h",
 		"rawstring.cpp",
 	}
