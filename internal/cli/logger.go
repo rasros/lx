@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+
+	"github.com/rasros/lx/internal/ansi"
 )
 
 type CliHandler struct {
@@ -14,12 +16,16 @@ type CliHandler struct {
 	mu    sync.Mutex
 	level slog.Level
 	attrs []slog.Attr
+	paint ansi.Painter
 }
 
+// NewCliHandler writes log records to w, coloring the level prefix only when
+// color is enabled for w.
 func NewCliHandler(w io.Writer, level slog.Level) *CliHandler {
 	return &CliHandler{
 		w:     w,
 		level: level,
+		paint: ansi.For(w),
 	}
 }
 
@@ -35,9 +41,9 @@ func (h *CliHandler) Handle(_ context.Context, r slog.Record) error {
 
 	switch r.Level {
 	case slog.LevelError:
-		sb.WriteString("\033[1;31mError:\033[0m ")
+		sb.WriteString(h.paint.Paint("Error:", ansi.Bold, ansi.Red) + " ")
 	case slog.LevelWarn:
-		sb.WriteString("\033[1;33mWarning:\033[0m ")
+		sb.WriteString(h.paint.Paint("Warning:", ansi.Bold, ansi.Yellow) + " ")
 	case slog.LevelInfo:
 		sb.WriteString("Info: ")
 	}
@@ -93,6 +99,7 @@ func (h *CliHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		w:     h.w,
 		level: h.level,
 		attrs: newAttrs,
+		paint: h.paint,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rasros/lx/internal/ansi"
 	"github.com/rasros/lx/pkg/lx/core"
 )
 
@@ -102,16 +103,16 @@ func TestTemplateFuncs_TokenLabel(t *testing.T) {
 		n     int64
 		color string
 	}{
-		{90_000, ansiGreen},
-		{150_000, ansiYellow},
-		{300_000, ansiRed},
+		{90_000, string(ansi.Green)},
+		{150_000, string(ansi.Yellow)},
+		{300_000, string(ansi.Red)},
 	}
 	for _, c := range cases {
 		out := tokenLabel(c.n, true)
-		if !strings.HasPrefix(out, c.color+ansiBold) {
-			t.Errorf("tokenLabel(%d,true) = %q, want prefix %q", c.n, out, c.color+ansiBold)
+		if !strings.HasPrefix(out, c.color+string(ansi.Bold)) {
+			t.Errorf("tokenLabel(%d,true) = %q, want prefix %q", c.n, out, c.color+string(ansi.Bold))
 		}
-		if !strings.HasSuffix(out, ansiReset) {
+		if !strings.HasSuffix(out, string(ansi.Reset)) {
 			t.Errorf("tokenLabel(%d,true) missing reset", c.n)
 		}
 	}
@@ -229,10 +230,10 @@ func TestDefaultStatsTemplate_Render(t *testing.T) {
 				TotalFiles: 2, TotalRows: 4, TotalSections: 1, TotalSize: 100, TokenEstimate: 250_000,
 			},
 		})
-		if !strings.Contains(out, ansiRed+ansiBold+"~250,000 tokens"+ansiReset) {
+		if !strings.Contains(out, string(ansi.Red)+string(ansi.Bold)+"~250,000 tokens"+string(ansi.Reset)) {
 			t.Errorf("expected red+bold token label in colored render: %q", out)
 		}
-		if !strings.Contains(out, ansiCyan+"▎"+ansiReset) {
+		if !strings.Contains(out, string(ansi.Cyan)+"▎"+string(ansi.Reset)) {
 			t.Errorf("expected accent on leader: %q", out)
 		}
 	})

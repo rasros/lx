@@ -3,4 +3,4 @@
 
 
 --- STDERR ---
-[1;31mError:[0m Failed to read file: open locked.txt: PERMISSION_DENIED (path=../secret/locked.txt)
+Error: Failed to read file: open locked.txt: PERMISSION_DENIED (path=../secret/locked.txt)

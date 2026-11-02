@@ -5,14 +5,8 @@ import (
 	"os"
 	"strings"
 	"text/template"
-)
 
-const (
-	ansiResetIntensity = "\033[22m"
-	ansiResetUnderline = "\033[24m"
-	ansiBold           = "\033[1m"
-	ansiDim            = "\033[2m"
-	ansiUnderline      = "\033[4m"
+	"github.com/rasros/lx/internal/ansi"
 )
 
 const shortHelpTmpl = `A program to discover and format files for LLM prompting
@@ -167,14 +161,11 @@ type flagGroup struct {
 	Flags    []CommandDef
 }
 
-// makeFuncs returns the help template functions. When color is false the
-// styling helpers emit plain text so no ANSI escape sequences are written.
-func makeFuncs(color bool) template.FuncMap {
-	var cBold, cDim, cUnderline, cResetIntensity, cResetUnderline string
-	if color {
-		cBold, cDim, cUnderline = ansiBold, ansiDim, ansiUnderline
-		cResetIntensity, cResetUnderline = ansiResetIntensity, ansiResetUnderline
-	}
+// makeFuncs returns the help template functions, styled through p so they
+// emit plain text when color is off.
+func makeFuncs(p ansi.Painter) template.FuncMap {
+	cBold, cDim, cUnderline := p.Code(ansi.Bold), p.Code(ansi.Dim), p.Code(ansi.Underline)
+	cResetIntensity, cResetUnderline := p.Code(ansi.NoIntensity), p.Code(ansi.NoUnderline)
 	return template.FuncMap{
 		"bold":      func(s string) string { return cBold + s + cResetIntensity },
 		"underline": func(s string) string { return cUnderline + s + cResetUnderline },
@@ -320,7 +311,7 @@ func printShortHelp() {
 		}
 	}
 
-	t := template.Must(template.New("short-help").Funcs(makeFuncs(shouldColor(os.Stdout))).Parse(shortHelpTmpl))
+	t := template.Must(template.New("short-help").Funcs(makeFuncs(ansi.For(os.Stdout))).Parse(shortHelpTmpl))
 	if err := t.Execute(os.Stdout, groups); err != nil {
 		fmt.Fprintf(os.Stderr, "template error: %v\n", err)
 	}
@@ -352,7 +343,7 @@ func printLongHelp() {
 		Config      []CommandDef
 	}{formatting, interleaved, actions, config}
 
-	t := template.Must(template.New("long-help").Funcs(makeFuncs(shouldColor(os.Stdout))).Parse(longHelpTmpl))
+	t := template.Must(template.New("long-help").Funcs(makeFuncs(ansi.For(os.Stdout))).Parse(longHelpTmpl))
 	if err := t.Execute(os.Stdout, data); err != nil {
 		fmt.Fprintf(os.Stderr, "template error: %v\n", err)
 	}

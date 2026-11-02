@@ -9,6 +9,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/rasros/lx/internal/ansi"
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
@@ -250,16 +251,6 @@ const defaultBarePrompt = ``
 const defaultBareTree = ``
 const defaultBareMeta = ``
 
-const (
-	ansiReset  = "\x1b[0m"
-	ansiBold   = "\x1b[1m"
-	ansiDim    = "\x1b[2m"
-	ansiCyan   = "\x1b[36m"
-	ansiGreen  = "\x1b[32m"
-	ansiYellow = "\x1b[33m"
-	ansiRed    = "\x1b[31m"
-)
-
 // 128k matches GPT-4o context, 200k matches Claude Opus.
 const (
 	tokenWarnThreshold   int64 = 128_000
@@ -344,30 +335,21 @@ func templateFuncs() template.FuncMap {
 			return plural
 		},
 		"accent": func(enabled bool, s string) string {
-			if !enabled {
-				return s
-			}
-			return ansiCyan + s + ansiReset
+			return ansi.New(enabled).Paint(s, ansi.Cyan)
 		},
 		"dim": func(enabled bool, s string) string {
-			if !enabled {
-				return s
-			}
-			return ansiDim + s + ansiReset
+			return ansi.New(enabled).Paint(s, ansi.Dim)
 		},
 		"tokenLabel": func(n int64, enabled bool) string {
 			label := fmt.Sprintf("~%s tokens", commafy(n))
-			if !enabled {
-				return label
-			}
-			color := ansiGreen
+			color := ansi.Green
 			switch {
 			case n >= tokenDangerThreshold:
-				color = ansiRed
+				color = ansi.Red
 			case n >= tokenWarnThreshold:
-				color = ansiYellow
+				color = ansi.Yellow
 			}
-			return color + ansiBold + label + ansiReset
+			return ansi.New(enabled).Paint(label, color, ansi.Bold)
 		},
 	}
 }
