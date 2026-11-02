@@ -1,0 +1,15 @@
+--- STDOUT ---
+skeleton/asm.c (26 rows, function signatures)
+---
+```c
+static void kernel(long n, double *x)
+{
+...
+#ifdef HAVE_DOT
+/* Dot product. */
+double dot(long n, double *x, double *y);
+#endif
+```
+
+
+--- STDERR ---

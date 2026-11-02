@@ -2,8 +2,6 @@
 skeleton/guard.h (38 rows, definitions)
 ---
 ```c
-#ifndef GUARD_H
-...
 /* Declared before its definition. */
 struct fwd;
 ...
@@ -29,8 +27,6 @@ static inline int open_port(int port, int flags)
 #else
 static inline int open_port(int port)
 #endif
-...
-#endif /* GUARD_H */
 ```
 
 

@@ -2,8 +2,6 @@
 skeleton/guard.h (38 rows, function signatures)
 ---
 ```c
-#ifndef GUARD_H
-...
 #if defined(USE_THREADS) && \
     defined(HAVE_PTHREAD)
 int lock_init(void);
@@ -20,8 +18,6 @@ static inline int open_port(int port, int flags)
 #else
 static inline int open_port(int port)
 #endif
-...
-#endif /* GUARD_H */
 ```
 
 

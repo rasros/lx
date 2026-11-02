@@ -128,7 +128,7 @@ func TestGoldenSkeletonMembers(t *testing.T) {
 func TestGoldenSkeletonTopLevel(t *testing.T) {
 	dir := setupSkeletonFixture(t)
 	var cases []goldenTestCase
-	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "defaults.h", "idiom.h", "rawstring.cpp"} {
+	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "defaults.h", "idiom.h", "rawstring.cpp", "asm.c"} {
 		stem := strings.TrimSuffix(file, filepath.Ext(file))
 		cases = append(cases, skeletonModeCases(650+3*i, stem, []string{file})...)
 	}

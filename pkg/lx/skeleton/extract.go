@@ -51,16 +51,17 @@ func extract(langName string, src []byte, lines [][]byte, functions, structs boo
 	for i := 0; i < root.ChildCount(); i++ {
 		out = def.processNode(c, out, root.Child(i))
 	}
-	if len(def.frames) > 0 {
-		out = langs.BalanceConditionals(lines, out, literalRows(c, root))
+	if def.conditionals {
+		out = langs.BalanceConditionals(lines, out, hiddenRows(c, root))
 	}
 	return out, true
 }
 
-// literalRows reports the rows inside comments and string literals that
-// span several rows (all but their first), where a line that reads like a
-// preprocessor directive is none.
-func literalRows(c *langs.Ctx, root *gotreesitter.Node) []bool {
+// hiddenRows reports the rows inside comments and raw strings that span
+// several rows (all but their first), where a line that reads like a
+// preprocessor directive is none. Ordinary string literals are left alone:
+// a directive between two of them (in inline asm) is a real one.
+func hiddenRows(c *langs.Ctx, root *gotreesitter.Node) []bool {
 	rows := make([]bool, len(c.Lines))
 	var walk func(n *gotreesitter.Node)
 	walk = func(n *gotreesitter.Node) {
@@ -69,7 +70,7 @@ func literalRows(c *langs.Ctx, root *gotreesitter.Node) []bool {
 			return
 		}
 		switch c.Type(n) {
-		case "comment", "string_literal", "raw_string_literal", "concatenated_string":
+		case "comment", "raw_string_literal":
 			for row := first + 1; row <= last && row < len(rows); row++ {
 				rows[row] = true
 			}
@@ -118,10 +119,6 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 			out = def.processNode(c, out, node.Child(i))
 		}
 		return out
-	}
-
-	if slices.Contains(def.frames, nodeType) {
-		return def.processFrame(c, out, node)
 	}
 
 	// A namespace without a declaration list (extern "C" int f(void);)
@@ -192,23 +189,6 @@ func (def *langDef) processNamespace(c *langs.Ctx, out []internal.LineRange, n, 
 		out = internal.KeepLine(out, c.Lines, closingRow)
 	}
 	return out
-}
-
-// processFrame walks the children of a preprocessor conditional like
-// top-level declarations. Its first row (#if, #ifdef, #elif, #else) is kept
-// when any of them keeps something; langs.BalanceConditionals then adds the
-// rest of the conditional's directive rows. An #elif or #else is a child
-// frame of its #if.
-func (def *langDef) processFrame(c *langs.Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
-	var inner []internal.LineRange
-	for i := 0; i < n.ChildCount(); i++ {
-		inner = def.processNode(c, inner, n.Child(i))
-	}
-	if len(inner) == 0 {
-		return out
-	}
-	out = internal.KeepLine(out, c.Lines, int(n.StartPoint().Row))
-	return append(out, inner...)
 }
 
 // processError walks the children of an error node like top-level
