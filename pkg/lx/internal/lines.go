@@ -1,28 +1,30 @@
 package internal
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"strconv"
 )
 
+// LineNumberFormatter prefixes each line of a head, gap and tail with its row
+// number. Tail rows are counted back from TotalRows; when that count is an
+// estimate, Approximate marks each tail number with "~" so it is not mistaken
+// for an exact position.
 type LineNumberFormatter struct {
-	Head      []byte
-	Gap       []byte
-	Tail      []byte
-	TotalRows int
+	Head        []byte
+	Gap         []byte
+	Tail        []byte
+	TotalRows   int
+	Approximate bool
 }
 
 func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
 	lnf.writeTo(f)
 }
 
-// String lets consumers that only understand text — template helpers, the token
-// counter — see the numbered content instead of falling back to %v.
+// String returns the numbered content as text.
 func (lnf LineNumberFormatter) String() string {
 	var buf bytes.Buffer
 	buf.Grow(len(lnf.Head) + len(lnf.Gap) + len(lnf.Tail))
@@ -40,7 +42,7 @@ func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 	spaces := []byte("          ")
 	colon := []byte(": ")
 
-	printChunk := func(data []byte, startRow int) {
+	printChunk := func(data []byte, startRow int, mark []byte) {
 		currentRow := startRow
 		offset := 0
 		write := func(b []byte) { out.Write(b) }
@@ -63,6 +65,7 @@ func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 				write(spaces[:padLen])
 			}
 
+			write(mark)
 			write(numBuf)
 			write(colon)
 			write(data[offset:end])
@@ -73,7 +76,7 @@ func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 	}
 
 	if len(lnf.Head) > 0 {
-		printChunk(lnf.Head, 1)
+		printChunk(lnf.Head, 1, nil)
 	}
 
 	if len(lnf.Gap) > 0 {
@@ -86,121 +89,12 @@ func (lnf LineNumberFormatter) writeTo(out io.Writer) {
 		if startRow < 1 {
 			startRow = 1
 		}
-		printChunk(lnf.Tail, startRow)
-	}
-}
-
-func EstimateLineCount(r io.ReaderAt, fileSize int64, buf []byte) (int, bool, error) {
-	if fileSize == 0 {
-		return 0, true, nil
-	}
-
-	n, err := r.ReadAt(buf, 0)
-	if err != nil && err != io.EOF {
-		return 0, false, err
-	}
-
-	if int64(n) >= fileSize {
-		return CountLines(buf[:n]), true, nil
-	}
-
-	newlineCount := bytes.Count(buf[:n], []byte("\n"))
-	if newlineCount == 0 {
-		return 1, false, nil
-	}
-
-	avgLineLen := float64(n) / float64(newlineCount)
-	if avgLineLen == 0 {
-		return 0, false, nil
-	}
-
-	estimated := int(float64(fileSize) / avgLineLen)
-	return estimated, false, nil
-}
-
-func ReadHead(r io.Reader, n int) ([]byte, int, error) {
-	if n == 0 {
-		return nil, 0, nil
-	}
-
-	var buf bytes.Buffer
-	sc := bufio.NewScanner(r)
-
-	scanBuf := make([]byte, 0, 64*1024)
-	sc.Buffer(scanBuf, 10*1024*1024)
-
-	linesRead := 0
-	readAll := n < 0
-
-	for sc.Scan() {
-		buf.Write(sc.Bytes())
-		buf.WriteByte('\n')
-		linesRead++
-		if !readAll && linesRead >= n {
-			break
+		var mark []byte
+		if lnf.Approximate {
+			mark = []byte("~")
 		}
+		printChunk(lnf.Tail, startRow, mark)
 	}
-	return buf.Bytes(), linesRead, sc.Err()
-}
-
-func ReadTailSeek(f *os.File, linesWanted int) ([]byte, error) {
-	if linesWanted <= 0 {
-		return nil, nil
-	}
-
-	const chunkSize = 4096
-	stat, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	fileSize := stat.Size()
-
-	if fileSize == 0 {
-		return nil, nil
-	}
-
-	var chunks [][]byte
-	linesFound := 0
-	offset := fileSize
-
-	for offset > 0 && linesFound < linesWanted {
-		readSize := int64(chunkSize)
-		if offset < readSize {
-			readSize = offset
-		}
-		offset -= readSize
-
-		buf := make([]byte, readSize)
-		if _, err := f.ReadAt(buf, offset); err != nil {
-			return nil, err
-		}
-
-		count := bytes.Count(buf, []byte("\n"))
-		linesFound += count
-
-		chunks = append(chunks, buf)
-	}
-
-	totalLen := 0
-	for _, chunk := range chunks {
-		totalLen += len(chunk)
-	}
-
-	result := make([]byte, totalLen)
-	currentPos := 0
-
-	for i := len(chunks) - 1; i >= 0; i-- {
-		copy(result[currentPos:], chunks[i])
-		currentPos += len(chunks[i])
-	}
-
-	extraLines := linesFound - linesWanted
-	if extraLines > 0 {
-		idx := findNthNewline(result, extraLines)
-		result = result[idx:]
-	}
-
-	return result, nil
 }
 
 // SplitLines splits src into lines on \n boundaries.
@@ -235,17 +129,4 @@ func CountLines(data []byte) int {
 		n++
 	}
 	return n
-}
-
-func findNthNewline(data []byte, n int) int {
-	count := 0
-	for i, b := range data {
-		if b == '\n' {
-			count++
-			if count == n {
-				return i + 1
-			}
-		}
-	}
-	return len(data)
 }

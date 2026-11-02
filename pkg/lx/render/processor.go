@@ -165,7 +165,9 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 	case readerAtWithSize:
 		return v, v.Size()
 	case io.ReaderAt:
-		return v, sizeHint
+		if sizeHint >= 0 {
+			return v, sizeHint
+		}
 	}
 	data, _ := io.ReadAll(rc)
 	return bytes.NewReader(data), int64(len(data))
@@ -353,31 +355,38 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	}
 
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
-	totalRows, exact, _ := internal.EstimateLineCount(reader, size, scratch)
+
+	var (
+		content      interface{}
+		totalRows    int
+		rowsAreExact = true
+	)
+	if !isBinary && !isImage {
+		lines := internal.NewLineSource(reader, size)
+		var sl excerpt
+		if isCompact {
+			sl.rows, sl.exact, err = lines.Count()
+		} else {
+			sl, err = readSlices(lines, cfg)
+		}
+		if err != nil {
+			return p.errorContext(file, index, err.Error()), nil
+		}
+		size = lines.Size()
+		totalRows, rowsAreExact = sl.rows, sl.exact
+		if !isCompact {
+			content = formatContent(sl, cfg.LineNumbers)
+		}
+	}
 
 	// In skeleton mode the header should report the original file's row
 	// count, not the filtered output's; slicing still uses totalRows.
-	displayRows, displayExact := totalRows, exact
+	displayRows, displayExact := totalRows, rowsAreExact
 	if originalRows >= 0 {
 		displayRows, displayExact = originalRows, true
 	}
 
-	var contentData interface{}
-	if !isBinary && !isCompact && size > 0 && !isImage {
-		effectiveCfg := cfg
-		if exact && cfg.Head > 0 && cfg.Tail > 0 && totalRows <= (cfg.Head+cfg.Tail) {
-			effectiveCfg.Head = -1
-			effectiveCfg.Tail = 0
-		}
-
-		head, tail, gap, err := p.readSlices(reader, size, totalRows, !exact, effectiveCfg)
-		if err != nil {
-			return p.errorContext(file, index, err.Error()), nil
-		}
-		contentData = p.formatContent(head, tail, gap, totalRows, effectiveCfg)
-	}
-
-	return core.FileContext{
+	fCtx := core.FileContext{
 		Path:          file.Path,
 		AbsPath:       file.AbsPath,
 		Size:          size,
@@ -385,8 +394,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		TotalRows:     displayRows,
 		IsEstimate:    !displayExact,
 		Language:      lang,
-		Content:       contentData,
-		TokenEstimate: p.tokenCounter(size, contentData),
+		Content:       content,
 		IsBinary:      isBinary,
 		IsImage:       isImage,
 		DataURI:       dataURI,
@@ -395,62 +403,90 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 		Global:        p.global,
 		SkeletonMode:  skeletonMode,
 		ConvertedFrom: convertedFrom,
-	}, nil
+	}
+	fCtx.SetTokenCounter(p.tokenCounter)
+	return fCtx, nil
 }
 
-func (p *Processor) readSlices(reader io.ReaderAt, size int64, totalRows int, isEstimate bool, cfg core.RunnerConfig) (head, tail, gap []byte, err error) {
+// excerpt is the part of a file that gets rendered: a head, and a tail with a
+// gap marker between them when lines in the middle are left out.
+type excerpt struct {
+	head, gap, tail []byte
+	rows            int  // lines in the whole file
+	exact           bool // whether rows is a count rather than an estimate
+}
+
+// readSlices reads what cfg asks for from lines. A head and tail that meet or
+// overlap cover the whole file, which then renders whole, and any read that
+// covers the whole file yields an exact row count.
+func readSlices(lines *internal.LineSource, cfg core.RunnerConfig) (excerpt, error) {
 	if cfg.Head < 0 {
-		sr := io.NewSectionReader(reader, 0, size)
-		head, _, err = internal.ReadHead(sr, -1)
-		return head, nil, nil, err
+		all, err := lines.All()
+		return excerpt{head: terminate(all), rows: internal.CountLines(all), exact: true}, err
 	}
-	if cfg.Head > 0 {
-		sr := io.NewSectionReader(reader, 0, size)
-		head, _, err = internal.ReadHead(sr, cfg.Head)
+
+	head, err := lines.Head(cfg.Head)
+	if err != nil {
+		return excerpt{}, err
 	}
-	if cfg.Tail > 0 {
-		skipped := totalRows - cfg.Head - cfg.Tail
-		if skipped > 0 && cfg.Head > 0 {
+	tail, err := lines.Tail(cfg.Tail)
+	if err != nil {
+		return excerpt{}, err
+	}
+
+	// Head and tail are prefix and suffix of the content, so their byte
+	// lengths alone tell whether anything lies between them.
+	if overlap := int64(len(head)+len(tail)) - lines.Size(); overlap >= 0 {
+		all := append(head[:len(head):len(head)], tail[overlap:]...)
+		return excerpt{head: terminate(all), rows: internal.CountLines(all), exact: true}, nil
+	}
+
+	rows, exact, err := lines.Count()
+	if err != nil {
+		return excerpt{}, err
+	}
+	sl := excerpt{head: head, tail: tail, rows: rows, exact: exact}
+	if len(head) > 0 && len(tail) > 0 {
+		if skipped := rows - internal.CountLines(head) - internal.CountLines(tail); skipped > 0 {
 			tilde := ""
-			if isEstimate {
+			if !exact {
 				tilde = "~"
 			}
-			gap = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
-		}
-		if f, ok := reader.(*os.File); ok {
-			tail, _ = internal.ReadTailSeek(f, cfg.Tail)
-		} else if br, ok := reader.(*bytes.Reader); ok {
-			tail, _ = tailFromBuffer(br, cfg.Tail)
+			sl.gap = []byte(fmt.Sprintf("... (%s%d rows skipped)\n", tilde, skipped))
 		}
 	}
-	return
+	return sl, nil
 }
 
-func (p *Processor) formatContent(head, tail, gap []byte, totalRows int, cfg core.RunnerConfig) interface{} {
-	if cfg.LineNumbers {
-		return internal.LineNumberFormatter{Head: head, Gap: gap, Tail: tail, TotalRows: totalRows}
+// terminate ends a head with a newline when its last line has none, as the
+// head always has been, so templates that print Content as-is keep their
+// output.
+func terminate(head []byte) []byte {
+	if len(head) == 0 || head[len(head)-1] == '\n' {
+		return head
 	}
-	var res bytes.Buffer
-	res.Grow(len(head) + len(gap) + len(tail))
-	res.Write(head)
-	res.Write(gap)
-	res.Write(tail)
+	return append(head[:len(head):len(head)], '\n')
+}
+
+// formatContent joins the slices into the text the templates render, numbering
+// the lines when asked. The text is built once here, so templates and the token
+// estimate all read the same string.
+func formatContent(sl excerpt, lineNumbers bool) string {
+	if lineNumbers {
+		return internal.LineNumberFormatter{
+			Head:        sl.head,
+			Gap:         sl.gap,
+			Tail:        sl.tail,
+			TotalRows:   sl.rows,
+			Approximate: !sl.exact,
+		}.String()
+	}
+	var res strings.Builder
+	res.Grow(len(sl.head) + len(sl.gap) + len(sl.tail))
+	res.Write(sl.head)
+	res.Write(sl.gap)
+	res.Write(sl.tail)
 	return res.String()
-}
-
-func tailFromBuffer(r *bytes.Reader, lines int) ([]byte, error) {
-	data := make([]byte, r.Size())
-	_, _ = r.ReadAt(data, 0)
-	count := 0
-	for i := len(data) - 1; i >= 0; i-- {
-		if data[i] == '\n' {
-			count++
-			if count > lines {
-				return data[i+1:], nil
-			}
-		}
-	}
-	return data, nil
 }
 
 const (

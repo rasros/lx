@@ -25,6 +25,7 @@ var readPool = sync.Pool{New: func() interface{} {
 }}
 
 type pipelineTotals struct {
+	tokens int64
 	rows   int64
 	binary int
 	failed int
@@ -76,16 +77,22 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				if capHint := render.EstimatePreparedBufferSize(j.item); capHint > 0 {
 					buf.Grow(capHint)
 				}
-				localCounter := &byteCounter{w: buf}
-
-				itemStats, err := proc.RenderPrepared(localCounter, j.item, readBuf)
+				itemStats, err := proc.RenderPrepared(buf, j.item, readBuf)
 				readPool.Put(readBufPtr)
+
+				// One estimate over the whole rendered item, so how the template
+				// happened to split its writes cannot change the count.
+				var tokens int64
+				if buf.Len() > 0 {
+					tokens = s.tokenizer.Estimate(int64(buf.Len()), buf.Bytes())
+				}
 
 				// j.out has one slot reserved for this job, so this never blocks.
 				j.out <- render.Result{
 					Index:        j.seqID,
 					Buffer:       buf,
-					Stats:        localCounter.count,
+					Stats:        int64(buf.Len()),
+					Tokens:       tokens,
 					Rows:         itemStats.Rows,
 					IsCompact:    itemStats.IsCompact,
 					IsBinary:     itemStats.IsBinary,
@@ -118,6 +125,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 	}()
 
 	layout := render.NewLayoutWriter(dest, s.engine, s.sections, s.engine.UseSeparators)
+	layout.SetTokenizer(s.tokenizer)
 
 	written := 0
 Loop:
@@ -154,23 +162,18 @@ Loop:
 	if err := layout.Close(); err != nil {
 		return totals, err
 	}
+	totals.tokens = layout.Tokens()
 	return totals, nil
 }
 
-// byteCounter counts bytes written, plus token estimates when a tokenizer is
-// set. Estimating per Write covers separators and wrappers too, not just items.
+// byteCounter counts the bytes written through it.
 type byteCounter struct {
-	w         io.Writer
-	count     int64
-	tokens    int64
-	tokenizer core.Tokenizer
+	w     io.Writer
+	count int64
 }
 
 func (b *byteCounter) Write(p []byte) (n int, err error) {
 	n, err = b.w.Write(p)
 	b.count += int64(n)
-	if b.tokenizer != nil && n > 0 {
-		b.tokens += b.tokenizer.Estimate(int64(n), p[:n])
-	}
 	return
 }

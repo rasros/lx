@@ -1,0 +1,15 @@
+--- STDOUT ---
+big.txt (2500 rows)
+---
+```text
+   1: row 0001 lorem ipsum dolor sit amet
+   2: row 0002 lorem ipsum dolor sit amet
+   3: row 0003 lorem ipsum dolor sit amet
+... (2494 rows skipped)
+2498: row 2498 lorem ipsum dolor sit amet
+2499: row 2499 lorem ipsum dolor sit amet
+2500: row 2500 lorem ipsum dolor sit amet
+```
+
+
+--- STDERR ---

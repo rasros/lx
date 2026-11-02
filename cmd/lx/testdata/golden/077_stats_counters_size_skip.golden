@@ -12,4 +12,4 @@ func main() {}
 --- STDERR ---
   1 skipped (size) · 1 binary
   ~46 tokens
-▎ 2 files · 3 rows · 1 section · 31 B
+▎ 2 files · 2 rows · 1 section · 31 B

@@ -1,0 +1,12 @@
+--- STDOUT ---
+big.txt (2500 rows)
+---
+```text
+2497: row 2497 lorem ipsum dolor sit amet
+2498: row 2498 lorem ipsum dolor sit amet
+2499: row 2499 lorem ipsum dolor sit amet
+2500: row 2500 lorem ipsum dolor sit amet
+```
+
+
+--- STDERR ---

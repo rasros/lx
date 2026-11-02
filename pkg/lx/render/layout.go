@@ -13,6 +13,7 @@ type Result struct {
 	Index        int
 	Buffer       *bytes.Buffer
 	Stats        int64
+	Tokens       int64
 	Rows         int
 	IsCompact    bool
 	IsBinary     bool
@@ -30,6 +31,8 @@ type LayoutWriter struct {
 	currentSecIdx    int
 	hasWritten       bool
 	lastIsCompact    bool
+	tokenizer        core.Tokenizer
+	tokens           int64
 }
 
 func NewLayoutWriter(w io.Writer, engine *core.TemplateEngine, sections []*core.SectionContext, enableSeparators bool) *LayoutWriter {
@@ -40,6 +43,17 @@ func NewLayoutWriter(w io.Writer, engine *core.TemplateEngine, sections []*core.
 		enableSeparators: enableSeparators,
 		currentSecIdx:    -1,
 	}
+}
+
+// SetTokenizer makes the writer estimate tokens for what it writes besides the
+// items, whose estimates arrive with them in Result.Tokens.
+func (lw *LayoutWriter) SetTokenizer(t core.Tokenizer) {
+	lw.tokenizer = t
+}
+
+// Tokens is the estimate for everything written so far.
+func (lw *LayoutWriter) Tokens() int64 {
+	return lw.tokens
 }
 
 // WriteItem handles a single rendered item from the pipeline.
@@ -55,7 +69,7 @@ func (lw *LayoutWriter) WriteItem(res Result) error {
 		if lw.lastIsCompact && res.IsCompact {
 			sep = "\n"
 		}
-		if _, err := lw.w.Write([]byte(sep)); err != nil {
+		if err := lw.writeCounted([]byte(sep)); err != nil {
 			return err
 		}
 	}
@@ -63,6 +77,7 @@ func (lw *LayoutWriter) WriteItem(res Result) error {
 	if _, err := lw.w.Write(res.Buffer.Bytes()); err != nil {
 		return err
 	}
+	lw.tokens += res.Tokens
 
 	lw.hasWritten = true
 	lw.lastIsCompact = res.IsCompact
@@ -77,7 +92,7 @@ func (lw *LayoutWriter) handleSectionChange(newIdx int) error {
 	}
 
 	if lw.hasWritten && lw.enableSeparators {
-		if _, err := lw.w.Write([]byte("\n\n")); err != nil {
+		if err := lw.writeCounted([]byte("\n\n")); err != nil {
 			return err
 		}
 	}
@@ -113,5 +128,32 @@ func (lw *LayoutWriter) renderTemplate(tmpl *template.Template, secIdx int) erro
 	if !found {
 		return nil
 	}
-	return tmpl.Execute(lw.w, ctx)
+	tokens, err := ExecuteCounted(lw.w, tmpl, ctx, lw.tokenizer)
+	lw.tokens += tokens
+	return err
+}
+
+// writeCounted writes p and adds its token estimate.
+func (lw *LayoutWriter) writeCounted(p []byte) error {
+	if lw.tokenizer != nil {
+		lw.tokens += lw.tokenizer.Estimate(int64(len(p)), p)
+	}
+	_, err := lw.w.Write(p)
+	return err
+}
+
+// ExecuteCounted renders tmpl to w in one write and estimates its tokens over
+// the whole output, so the estimate does not depend on how the template splits
+// its writes. A nil tokenizer estimates nothing.
+func ExecuteCounted(w io.Writer, tmpl *template.Template, data interface{}, tokenizer core.Tokenizer) (int64, error) {
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return 0, err
+	}
+	var tokens int64
+	if tokenizer != nil && buf.Len() > 0 {
+		tokens = tokenizer.Estimate(int64(buf.Len()), buf.Bytes())
+	}
+	_, err := w.Write(buf.Bytes())
+	return tokens, err
 }

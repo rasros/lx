@@ -100,7 +100,6 @@ type FileContext struct {
 	TotalRows        int
 	ReadError        string
 	IsError          bool
-	TokenEstimate    int64
 	IsEstimate       bool
 	Language         string
 	Content          interface{}
@@ -114,6 +113,23 @@ type FileContext struct {
 	Section          SectionContext
 	SkeletonMode     string
 	ConvertedFrom    string
+
+	tokenCounter TokenCounter
+}
+
+// TokenEstimate estimates the tokens in the rendered content. It is computed
+// when a template asks for it, so templates that never do skip the scan.
+func (f FileContext) TokenEstimate() int64 {
+	tc := f.tokenCounter
+	if tc == nil {
+		tc = DefaultTokenCounter
+	}
+	return tc(f.Size, f.Content)
+}
+
+// SetTokenCounter sets the estimator behind TokenEstimate.
+func (f *FileContext) SetTokenCounter(tc TokenCounter) {
+	f.tokenCounter = tc
 }
 
 // SectionContext represents the data provided to section templates.
