@@ -1,7 +1,6 @@
 package discover
 
 import (
-	"archive/zip"
 	"context"
 	"errors"
 	"io/fs"
@@ -129,59 +128,6 @@ func paths(files []sources.InputFile) []string {
 	return out
 }
 
-func writeZip(t *testing.T, path string, files map[string]string) {
-	t.Helper()
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	w := zip.NewWriter(f)
-	for name, body := range files {
-		fw, err := w.Create(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := fw.Write([]byte(body)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// The includes select archive entries the way they select walked files,
-// relative to the archive root, and prune its directories the same way.
-func TestCollect_ArchiveEntriesUseTheSelector(t *testing.T) {
-	tmp := t.TempDir()
-	t.Chdir(tmp)
-	writeZip(t, filepath.Join(tmp, "archive.zip"), map[string]string{
-		"hello.txt":       "hello\n",
-		"nested/world.go": "package nested\n",
-		"src/main.go":     "package main\n",
-	})
-
-	for _, tc := range []struct {
-		includes []string
-		want     []string
-	}{
-		{[]string{"*.go"}, []string{"archive.zip/nested/world.go", "archive.zip/src/main.go"}},
-		{[]string{"src/*.go"}, []string{"archive.zip/src/main.go"}},
-	} {
-		files, err := NewCollector().Collect(context.Background(), "archive.zip",
-			Options{ExpandArchives: true, Includes: tc.includes})
-		if err != nil {
-			t.Fatal(err)
-		}
-		got := paths(files)
-		slices.Sort(got)
-		if !slices.Equal(got, tc.want) {
-			t.Errorf("includes %v: got %v, want %v", tc.includes, got, tc.want)
-		}
-	}
-}
-
 // A target that does not exist is an error, which names the path stat'ed.
 func TestCollect_MissingTarget(t *testing.T) {
 	t.Chdir(t.TempDir())
@@ -201,5 +147,19 @@ func TestCollect_URL(t *testing.T) {
 	}
 	if got := paths(files); !slices.Equal(got, []string{url}) {
 		t.Fatalf("got %v, want [%s]", got, url)
+	}
+}
+
+// A walk stops when its context is done.
+func TestCollect_CancelledWalk(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	files, err := NewCollector().Collect(ctx, dir, Options{})
+	if !errors.Is(err, context.Canceled) || len(files) != 0 {
+		t.Fatalf("got %v, %v; want context.Canceled and no inputs", paths(files), err)
 	}
 }

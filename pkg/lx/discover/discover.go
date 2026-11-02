@@ -4,9 +4,9 @@ package discover
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,9 +17,11 @@ import (
 
 // Options decide what Collect finds for a target.
 type Options struct {
-	// Includes keeps only the files below a walked directory, or in an
-	// archive, that match one of these globs, relative to it. A named file
-	// is never filtered.
+	// Includes keeps only the files below a walked directory that match one
+	// of these globs, relative to it. The entries of an archive found in the
+	// walk are matched the same way, as files below the archive's path; those
+	// of a named archive relative to the archive, as for a named directory.
+	// A named file is never filtered by them, nor by anything but OutPath.
 	Includes []string
 	// Excludes drops what matches these patterns, applied as ignore rules
 	// after every ignore file, relative to the walked directory or archive.
@@ -66,7 +68,9 @@ func NewCollector() *Collector {
 // target is never filtered itself, while the files below it are filtered by
 // the ignore rules of the directories above and below it, and by opts.
 // Problems with single entries are logged and the entries skipped; an error
-// means target itself could not be resolved.
+// means target itself could not be resolved, or ctx was done. A URL that
+// cannot be fetched or parsed fails with a *url.Error whose Op is "download"
+// or "parse".
 func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([]sources.InputFile, error) {
 	sel := newSelector(opts)
 	forceExpand := false
@@ -91,7 +95,7 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 	if err != nil {
 		return nil, err
 	}
-	return c.walk(ctx, newRoot(target, absPath, stat.IsDir()), opts, sel), nil
+	return c.walk(ctx, newRoot(target, absPath, stat.IsDir()), opts, sel)
 }
 
 // UserIgnoreRules reads the ignore files lx applies everywhere: lx's own,
@@ -145,7 +149,7 @@ func collectURL(ctx context.Context, rawURL string, opts Options, sel selector, 
 	if (opts.ExpandArchives || forceExpand) && sources.IsHTTPArchiveURL(rawURL) {
 		tempPath, cleanup, err := sources.DownloadURLToTempFile(ctx, rawURL)
 		if err != nil {
-			return nil, fmt.Errorf("download URL archive: %w", err)
+			return nil, &url.Error{Op: "download", URL: rawURL, Err: err}
 		}
 		// Expansion reads the entries into memory.
 		defer cleanup()
@@ -154,7 +158,7 @@ func collectURL(ctx context.Context, rawURL string, opts Options, sel selector, 
 
 	urlFile, err := sources.NewURLInputFile(rawURL)
 	if err != nil {
-		return nil, err
+		return nil, &url.Error{Op: "parse", URL: rawURL, Err: err}
 	}
 	slog.Debug("URL accepted", "url", urlFile.Path)
 	return []sources.InputFile{urlFile}, nil
@@ -212,7 +216,7 @@ func debugEnabled(ctx context.Context) bool {
 	return slog.Default().Enabled(ctx, slog.LevelDebug)
 }
 
-func (c *Collector) walk(ctx context.Context, r root, opts Options, sel selector) []sources.InputFile {
+func (c *Collector) walk(ctx context.Context, r root, opts Options, sel selector) ([]sources.InputFile, error) {
 	var baseRules, gitExcludes []string
 	if !opts.NoIgnore {
 		baseRules = opts.IgnoreRules
@@ -248,6 +252,9 @@ func (c *Collector) walk(ctx context.Context, r root, opts Options, sel selector
 			// as walkRoot.
 			path = r.walkRoot
 		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if err != nil {
 			slog.Warn("Error accessing path during walk", "path", path, "error", err)
 			return nil
@@ -261,7 +268,13 @@ func (c *Collector) walk(ctx context.Context, r root, opts Options, sel selector
 
 		display := r.display(path)
 		if opts.ExpandArchives && sources.IsArchivePath(path) {
-			files = append(files, expandArchive(ctx, r.abs(path), display, opts, sel, "Ignored in archive")...)
+			// The entries of an archive found in the walk are matched as
+			// files below its path; those of a named one as files below it.
+			archiveSel := sel
+			if r.isDir {
+				archiveSel = sel.within(path)
+			}
+			files = append(files, expandArchive(ctx, r.abs(path), display, opts, archiveSel, "Ignored in archive")...)
 			return nil
 		}
 		if r.isDir {
@@ -295,11 +308,14 @@ func (c *Collector) walk(ctx context.Context, r root, opts Options, sel selector
 		files = append(files, f)
 		return nil
 	})
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
+	}
 	if err != nil {
 		slog.Error("Walker traversal failed", "error", err)
 	}
 	slog.Debug("Walker finished", "root", r.walkRoot, "files_matched", len(files))
-	return files
+	return files, nil
 }
 
 // expandArchive returns the entries of the archive at absPath, displayed
