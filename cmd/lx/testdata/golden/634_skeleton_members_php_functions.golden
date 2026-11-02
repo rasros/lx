@@ -1,0 +1,20 @@
+--- STDOUT ---
+skeleton/members.php (20 rows, function signatures)
+---
+```php
+/** Greets things. */
+trait Greets {
+...
+    public function greet(): string {
+...
+}
+...
+enum Suit: string {
+...
+    public function label(): string {
+...
+}
+```
+
+
+--- STDERR ---

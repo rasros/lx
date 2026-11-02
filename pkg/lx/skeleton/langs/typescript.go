@@ -7,8 +7,12 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-// TSPrivate reports a class member with the private accessibility modifier.
+// TSPrivate reports a class member with the private accessibility modifier
+// or an ECMAScript private name (#field, #method()).
 func TSPrivate(c *Ctx, _, n *gotreesitter.Node) bool {
+	if name := n.ChildByFieldName("name", c.Lang); name != nil && strings.HasPrefix(c.Text(name), "#") {
+		return true
+	}
 	acc := findChildByType(n, "accessibility_modifier", c.Lang)
 	return acc != nil && strings.TrimSpace(c.Text(acc)) == "private"
 }

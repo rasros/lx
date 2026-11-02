@@ -37,11 +37,14 @@ var dartSignatures = []string{
 
 // DartMember classifies a Dart class-body member. A method with a body is a
 // method_signature (its function_body is the next sibling); one without is a
-// declaration holding a signature. Any other declaration is a field.
+// declaration holding a signature. Any other declaration, and an enum
+// constant, is a field.
 func DartMember(c *Ctx, n *gotreesitter.Node) MemberKind {
 	switch c.Type(n) {
 	case "method_signature":
 		return Method
+	case "enum_constant":
+		return Field
 	case "declaration":
 		for i := 0; i < n.ChildCount(); i++ {
 			if slices.Contains(dartSignatures, c.Type(n.Child(i))) {

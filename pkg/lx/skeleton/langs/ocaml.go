@@ -5,11 +5,15 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-// OCamlEmitDefinition emits an OCaml top-level or module-level definition.
-// It stays custom because OCaml has no class bodies to walk: functions are
-// let bindings whose signature runs up to the row before the body
-// expression, and a module's members are definitions again, nested inside a
-// module_binding's structure.
+// OCamlEmitDefinition emits an OCaml top-level definition. It stays custom
+// because OCaml has no class bodies to walk: functions are let bindings
+// whose signature runs up to the row before the body expression, and a
+// module's members are definitions again, nested inside a module_binding's
+// structure.
+//
+// A let binding with parameters or a fun/function body is a function, kept
+// with functions. Any other value binding is a field of its module (a file
+// is a module too), kept with types.
 func OCamlEmitDefinition(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	switch c.Type(n) {
 	case "type_definition", "module_type_definition":
@@ -17,26 +21,41 @@ func OCamlEmitDefinition(c *Ctx, out []internal.LineRange, n *gotreesitter.Node)
 			return c.KeepNode(out, n)
 		}
 	case "value_definition":
-		if !c.Functions {
+		binding := findChildByType(n, "let_binding", c.Lang)
+		if ocamlIsFunction(c, binding) {
+			if !c.Functions {
+				return out
+			}
+		} else if !c.Structs {
 			return out
 		}
 		sigRow := startRow(n)
-		binding := findChildByType(n, "let_binding", c.Lang)
-		if binding == nil {
-			return internal.KeepLine(out, c.Lines, sigRow)
+		var body *gotreesitter.Node
+		if binding != nil {
+			body = binding.ChildByFieldName("body", c.Lang)
 		}
-		body := binding.ChildByFieldName("body", c.Lang)
-		if body == nil {
-			return internal.KeepLine(out, c.Lines, sigRow)
-		}
-		if bodyRow := startRow(body); bodyRow > sigRow {
-			return internal.KeepLines(out, c.Lines, sigRow, bodyRow-1)
+		if body != nil {
+			if bodyRow := startRow(body); bodyRow > sigRow {
+				return internal.KeepLines(out, c.Lines, sigRow, bodyRow-1)
+			}
 		}
 		return internal.KeepLine(out, c.Lines, sigRow)
 	case "module_definition":
 		return ocamlEmitModule(c, out, n)
 	}
 	return out
+}
+
+// ocamlIsFunction reports a let binding that defines a function.
+func ocamlIsFunction(c *Ctx, binding *gotreesitter.Node) bool {
+	if binding == nil {
+		return false
+	}
+	if findChildByType(binding, "parameter", c.Lang) != nil {
+		return true
+	}
+	body := binding.ChildByFieldName("body", c.Lang)
+	return body != nil && isOneOf(c.Type(body), []string{"fun_expression", "function_expression"})
 }
 
 func ocamlEmitModule(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {

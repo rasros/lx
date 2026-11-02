@@ -1,0 +1,18 @@
+--- STDOUT ---
+skeleton/members.rs (18 rows, type definitions)
+---
+```rust
+pub struct Meters(f64);
+...
+impl Meters {
+...
+}
+...
+// Trait impl items are public through the trait.
+impl fmt::Display for Meters {
+...
+}
+```
+
+
+--- STDERR ---

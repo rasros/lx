@@ -1,0 +1,31 @@
+--- STDOUT ---
+skeleton/members.cs (52 rows, type definitions)
+---
+```csharp
+namespace Shapes
+{
+    /// <summary>A shape.</summary>
+    public class Shape
+    {
+...
+        public int Sides { get; set; }
+        public event EventHandler Changed;
+        public delegate void Handler(int x);
+...
+    }
+...
+    public interface IArea
+    {
+...
+    }
+...
+    public enum Kind
+    {
+        Square,
+        Circle,
+    }
+}
+```
+
+
+--- STDERR ---

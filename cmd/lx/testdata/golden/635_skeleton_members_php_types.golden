@@ -1,0 +1,19 @@
+--- STDOUT ---
+skeleton/members.php (20 rows, type definitions)
+---
+```php
+/** Greets things. */
+trait Greets {
+    public $greeting = 'hi';
+...
+}
+...
+enum Suit: string {
+    case Hearts = 'H';
+    case Spades = 'S';
+...
+}
+```
+
+
+--- STDERR ---

@@ -1,0 +1,18 @@
+--- STDOUT ---
+skeleton/members.rs (18 rows, function signatures)
+---
+```rust
+impl Meters {
+    pub fn new(v: f64) -> Self {
+...
+}
+...
+// Trait impl items are public through the trait.
+impl fmt::Display for Meters {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+...
+}
+```
+
+
+--- STDERR ---

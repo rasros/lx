@@ -1,0 +1,16 @@
+--- STDOUT ---
+skeleton/members.ml (20 rows, type definitions)
+---
+```ocaml
+(* A constant, not a function. *)
+let pi = 3.14159
+...
+module Config = struct
+  (* A module value: a field. *)
+  let default_size = 10
+...
+end
+```
+
+
+--- STDERR ---

@@ -1,0 +1,218 @@
+package langs
+
+import (
+	"testing"
+
+	"github.com/odvcencio/gotreesitter"
+	"github.com/odvcencio/gotreesitter/grammars"
+	"github.com/rasros/lx/pkg/lx/internal"
+)
+
+// parse returns a Ctx for src and its syntax tree's root.
+func parse(t *testing.T, lang *gotreesitter.Language, src string) (*Ctx, *gotreesitter.Node) {
+	t.Helper()
+	tree, err := gotreesitter.NewParserPool(lang).Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(tree.Release)
+	c := &Ctx{Src: []byte(src), Lines: internal.SplitLines([]byte(src)), Lang: lang, Comments: &CComments}
+	return c, tree.RootNode()
+}
+
+// members returns the named children of the body of the first node of type
+// typ under n, the node itself, in source order.
+func members(t *testing.T, c *Ctx, n *gotreesitter.Node, typ string, bodyTypes ...string) (*gotreesitter.Node, []*gotreesitter.Node) {
+	t.Helper()
+	decl := find(c, n, typ)
+	if decl == nil {
+		t.Fatalf("no %s", typ)
+	}
+	body := (&Members{BodyField: "body", Bodies: bodyTypes}).body(c, decl)
+	if body == nil {
+		t.Fatalf("%s has no body", typ)
+	}
+	var out []*gotreesitter.Node
+	for i := 0; i < body.ChildCount(); i++ {
+		if ch := body.Child(i); ch.IsNamed() && c.Type(ch) != "comment" {
+			out = append(out, ch)
+		}
+	}
+	return decl, out
+}
+
+func find(c *Ctx, n *gotreesitter.Node, typ string) *gotreesitter.Node {
+	if c.Type(n) == typ {
+		return n
+	}
+	for i := 0; i < n.ChildCount(); i++ {
+		if f := find(c, n.Child(i), typ); f != nil {
+			return f
+		}
+	}
+	return nil
+}
+
+func TestCppMember(t *testing.T) {
+	c, root := parse(t, grammars.CppLanguage(), `class C {
+public:
+    struct Inner { int a; };
+    struct { int b; } anon;
+    void (*callback)(int);
+    int *make();
+    int &ref();
+    int plain;
+    void decl();
+    void def() {}
+    C();
+    template <typename T> T get(T x) { return x; }
+    enum class E { A };
+};
+`)
+	_, ms := members(t, c, root, "class_specifier")
+	want := []struct {
+		text string
+		kind MemberKind
+	}{
+		{"public", Skip}, // the access_specifier label
+		{"struct Inner { int a; };", Nested},
+		{"struct { int b; } anon;", Field},
+		{"void (*callback)(int);", Field},
+		{"int *make();", Method},
+		{"int &ref();", Method},
+		{"int plain;", Field},
+		{"void decl();", Method},
+		{"void def() {}", Method},
+		{"C();", Method},
+		{"template <typename T> T get(T x) { return x; }", Method},
+		{"enum class E { A };", Nested},
+	}
+	if len(ms) != len(want) {
+		for _, m := range ms {
+			t.Logf("%s %q", c.Type(m), c.Text(m))
+		}
+		t.Fatalf("got %d members, want %d", len(ms), len(want))
+	}
+	for i, w := range want {
+		m := ms[i]
+		if got := c.Text(m); got != w.text {
+			t.Fatalf("member %d is %q, want %q", i, got, w.text)
+		}
+		if got := CppMember(c, CppUnwrap(c, m)); got != w.kind {
+			t.Errorf("%q: kind %d, want %d", w.text, got, w.kind)
+		}
+	}
+}
+
+func TestCSharpPrivate(t *testing.T) {
+	c, root := parse(t, grammars.CSharpLanguage(), `class C {
+    int implicitField;
+    void ImplicitMethod() {}
+    public int Pub;
+    protected void Prot() {}
+    internal void Int() {}
+    protected internal void ProtInt() {}
+    private void Priv() {}
+    private protected void PrivProt() {}
+    ~C() {}
+    void IDisposable.Dispose() {}
+    class Nested {}
+}
+interface I {
+    void M();
+}
+`)
+	want := map[string]bool{
+		"int implicitField;":                   true,
+		"void ImplicitMethod() {}":             true,
+		"public int Pub;":                      false,
+		"protected void Prot() {}":             false,
+		"internal void Int() {}":               false,
+		"protected internal void ProtInt() {}": false,
+		"private void Priv() {}":               true,
+		"private protected void PrivProt() {}": true,
+		"~C() {}":                              false,
+		"void IDisposable.Dispose() {}":        false,
+		"class Nested {}":                      true,
+	}
+	parent, ms := members(t, c, root, "class_declaration")
+	for _, m := range ms {
+		w, ok := want[c.Text(m)]
+		if !ok {
+			t.Fatalf("unexpected member %q", c.Text(m))
+		}
+		if got := CSharpPrivate(c, parent, m); got != w {
+			t.Errorf("%q: private %v, want %v", c.Text(m), got, w)
+		}
+	}
+	iface, ims := members(t, c, root, "interface_declaration")
+	if CSharpPrivate(c, iface, ims[0]) {
+		t.Errorf("interface member %q reported private", c.Text(ims[0]))
+	}
+}
+
+func TestTSPrivate(t *testing.T) {
+	c, root := parse(t, grammars.TypescriptLanguage(), `class A {
+    #secret = 1;
+    private p = 2;
+    protected q = 3;
+    r = 4;
+    #hidden(): void {}
+    private ph(): void {}
+    shown(): void {}
+}
+`)
+	want := []bool{true, true, false, false, true, true, false}
+	parent, ms := members(t, c, root, "class_declaration")
+	if len(ms) != len(want) {
+		t.Fatalf("got %d members, want %d", len(ms), len(want))
+	}
+	for i, m := range ms {
+		if got := TSPrivate(c, parent, m); got != want[i] {
+			t.Errorf("%q: private %v, want %v", c.Text(m), got, want[i])
+		}
+	}
+}
+
+func TestRustPrivate(t *testing.T) {
+	c, root := parse(t, grammars.RustLanguage(), `impl S {
+    pub fn public() {}
+    pub(crate) fn crate_visible() {}
+    fn private() {}
+}
+impl Display for S {
+    fn fmt(&self) {}
+}
+trait T {
+    fn t(&self);
+}
+`)
+	for _, tc := range []struct {
+		find string
+		want []bool
+	}{
+		{"impl_item", []bool{false, false, true}},
+		{"trait_item", []bool{false}},
+	} {
+		parent, ms := members(t, c, root, tc.find, "declaration_list")
+		for i, m := range ms {
+			if got := RustPrivate(c, parent, m); got != tc.want[i] {
+				t.Errorf("%q: private %v, want %v", c.Text(m), got, tc.want[i])
+			}
+		}
+	}
+	// The second impl is a trait impl: its items are public through the trait.
+	var traitImpl *gotreesitter.Node
+	for i := 0; i < root.ChildCount(); i++ {
+		if n := root.Child(i); c.Type(n) == "impl_item" && n.ChildByFieldName("trait", c.Lang) != nil {
+			traitImpl = n
+		}
+	}
+	if traitImpl == nil {
+		t.Fatal("no trait impl")
+	}
+	fn := find(c, traitImpl, "function_item")
+	if RustPrivate(c, traitImpl, fn) {
+		t.Errorf("trait impl item %q reported private", c.Text(fn))
+	}
+}

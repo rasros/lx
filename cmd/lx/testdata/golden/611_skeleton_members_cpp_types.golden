@@ -1,0 +1,43 @@
+--- STDOUT ---
+skeleton/members.cpp (57 rows, type definitions)
+---
+```cpp
+// Widget holds a value.
+class Widget {
+...
+    // Nested type: walked with its own (struct, public) access.
+    struct Inner {
+        int a;
+...
+    };
+    class Deep {
+...
+    };
+    void (*callback)(int);
+    int plain;
+...
+};
+...
+enum class Color {
+    Red,
+    Green,
+};
+...
+namespace geo {
+// Point in the plane.
+struct Point {
+    double x;
+    double y;
+...
+};
+...
+}
+...
+template <typename T>
+class Box {
+...
+};
+```
+
+
+--- STDERR ---

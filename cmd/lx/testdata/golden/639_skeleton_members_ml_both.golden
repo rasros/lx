@@ -1,0 +1,25 @@
+--- STDOUT ---
+skeleton/members.ml (20 rows, definitions)
+---
+```ocaml
+(* A constant, not a function. *)
+let pi = 3.14159
+...
+(* A function with parameters. *)
+let area r =
+...
+let double = fun x -> 2 * x
+...
+let classify = function
+...
+module Config = struct
+  (* A module value: a field. *)
+  let default_size = 10
+...
+  let scale x =
+...
+end
+```
+
+
+--- STDERR ---

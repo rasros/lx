@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestGoldenSkeleton(t *testing.T) {
 	dir := setupSkeletonFixture(t)
@@ -100,6 +105,34 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "608_skeleton_swift_attributes", args: []string{"-u", "-Y", "skeleton/deco.swift"}},
 		{name: "609_skeleton_dart_annotations", args: []string{"-u", "-Y", "skeleton/deco.dart"}},
 	})
+}
+
+// TestGoldenSkeletonMembers covers each language's member table: enums,
+// namespaces, traits, companion objects, nested types and privacy, with -u
+// (method signatures in their types), -Y (types and fields) and both.
+func TestGoldenSkeletonMembers(t *testing.T) {
+	dir := setupSkeletonFixture(t)
+	var cases []goldenTestCase
+	for i, file := range []string{
+		"members.cpp", "members.cs", "Members.java", "members.kt", "members.swift",
+		"members.rs", "members.ts", "members.dart", "members.php", "members.ml", "members.m",
+	} {
+		lang := strings.ToLower(strings.TrimPrefix(filepath.Ext(file), "."))
+		for j, mode := range []struct {
+			name  string
+			flags []string
+		}{
+			{"functions", []string{"-u"}},
+			{"types", []string{"-Y"}},
+			{"both", []string{"-u", "-Y"}},
+		} {
+			cases = append(cases, goldenTestCase{
+				name: fmt.Sprintf("%d_skeleton_members_%s_%s", 610+3*i+j, lang, mode.name),
+				args: append(append([]string{}, mode.flags...), "skeleton/"+file),
+			})
+		}
+	}
+	runTestGolden(t, dir, cases)
 }
 
 func TestGoldenSkeletonSlicing(t *testing.T) {

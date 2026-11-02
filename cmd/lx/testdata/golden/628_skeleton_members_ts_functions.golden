@@ -1,0 +1,16 @@
+--- STDOUT ---
+skeleton/members.ts (19 rows, function signatures)
+---
+```typescript
+/** Base shape. */
+export abstract class Shape {
+...
+    abstract area(): number;
+...
+    describe(): string {
+...
+}
+```
+
+
+--- STDERR ---

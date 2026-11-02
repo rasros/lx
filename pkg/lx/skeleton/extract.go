@@ -88,6 +88,10 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 		return out
 	}
 
+	if slices.Contains(def.namespaces, nodeType) {
+		return def.processNamespace(c, out, node)
+	}
+
 	outerStart := int(node.StartPoint().Row)
 
 	if def.decoratedType != "" && nodeType == def.decoratedType {
@@ -95,6 +99,10 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 			node = defNode
 			nodeType = c.Type(node)
 		}
+	}
+	if def.unwrap != nil {
+		node = def.unwrap(c, node)
+		nodeType = c.Type(node)
 	}
 	sigStart := int(node.StartPoint().Row)
 
@@ -121,6 +129,31 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 			out = langs.EmitDecorators(out, c.Lines, outerStart, sigStart)
 			out = append(out, typ...)
 		}
+	}
+	return out
+}
+
+// processNamespace walks the declarations in the body of a namespace like
+// top-level ones. The namespace's doc, header and closing row are kept
+// around them for context when any of them keeps something.
+func (def *langDef) processNamespace(c *langs.Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+	body := n.ChildByFieldName("body", c.Lang)
+	if body == nil {
+		return out
+	}
+	var inner []internal.LineRange
+	for i := 0; i < body.ChildCount(); i++ {
+		inner = def.processNode(c, inner, body.Child(i))
+	}
+	if len(inner) == 0 {
+		return out
+	}
+	start, headerEnd := int(n.StartPoint().Row), int(body.StartPoint().Row)
+	out = c.EmitLeadingDoc(out, start)
+	out = internal.KeepLines(out, c.Lines, start, headerEnd)
+	out = append(out, inner...)
+	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
+		out = internal.KeepLine(out, c.Lines, closingRow)
 	}
 	return out
 }
