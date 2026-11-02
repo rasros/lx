@@ -25,7 +25,6 @@ type WalkerOptions = walkerpkg.Options
 type RuleCache = walkerpkg.Cache
 type Host = walkerpkg.Host
 type OSHost = walkerpkg.OSHost
-type Rule = walkerpkg.Rule
 type CompiledSpec = walkerpkg.CompiledSpec
 
 type FileErrorHandler = streamingpkg.FileErrorHandler

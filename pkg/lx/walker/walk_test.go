@@ -83,6 +83,7 @@ func TestWalker_StartOnFile(t *testing.T) {
 
 func TestWalker_StartOnFile_Ignored(t *testing.T) {
 	tmp := t.TempDir()
+	mustGitDir(t, tmp, ".git")
 	mustWriteFile(t, tmp, "ignore.me", "content")
 	mustWriteFile(t, tmp, ".gitignore", "*.me")
 
@@ -199,6 +200,7 @@ func TestWalker_DirectoryTrailingSlash(t *testing.T) {
 
 func TestWalker_LoadLocalGitignore(t *testing.T) {
 	tmp := t.TempDir()
+	mustGitDir(t, tmp, ".git")
 	mustMkdir(t, tmp, "nested")
 
 	mustWriteFile(t, tmp, "root.txt", "root")
@@ -216,6 +218,7 @@ func TestWalker_LoadLocalGitignore(t *testing.T) {
 
 func TestWalker_NestedGitignoreOverride(t *testing.T) {
 	tmp := t.TempDir()
+	mustGitDir(t, tmp, ".git")
 	mustMkdir(t, tmp, "deep")
 
 	mustWriteFile(t, tmp, ".gitignore", "*\n!deep/")
@@ -693,6 +696,7 @@ func TestWalker_NamedFileInIgnoredDir(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
+			mustGitDir(t, dir, ".git")
 			for p, content := range tt.files {
 				mustMkdir(t, dir, filepath.Dir(p))
 				mustWriteFile(t, dir, p, content)

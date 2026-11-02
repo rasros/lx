@@ -174,7 +174,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 
 	slog.Debug("Processing operations", "total_ops", len(parsed.Ops))
 
-	globalIgnoreRules := LoadGlobalIgnorePatterns()
+	globalIgnoreRules, gitExcludes := LoadGlobalIgnorePatterns()
 	promptResolver := newPromptResolver(resolvePromptsDir(parsed, cliOpts), cliOpts.PromptExtensions)
 	sections := parseSections(parsed.Ops, defaultRunCfg)
 	applyWorkloadConcurrency(stream, sections, runtime.NumCPU())
@@ -182,6 +182,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 
 	unresolved := resolveSections(ctx, sections, resolveContext{
 		ignoreRules: globalIgnoreRules,
+		gitExcludes: gitExcludes,
 		outPath:     outPath,
 		debug:       debugLoggingEnabled,
 		cleanups:    &tempCleanups,

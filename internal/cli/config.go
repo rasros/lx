@@ -89,33 +89,37 @@ func LoadConfigChain(cliPath string) (*lx.Config, *CliConfig, error) {
 	return lxCfg, mergedCli, nil
 }
 
-// LoadGlobalIgnorePatterns returns a slice of strings representing global ignore rules.
-func LoadGlobalIgnorePatterns() []string {
-	var lines []string
+// LoadGlobalIgnorePatterns returns the global ignore patterns: lx's own,
+// which apply everywhere, and git's global excludes, which apply only inside
+// a git repository.
+func LoadGlobalIgnorePatterns() (lxPatterns, gitPatterns []string) {
 	home, _ := os.UserHomeDir()
 	configDir, _ := os.UserConfigDir()
-	candidates := []string{filepath.Join(configDir, "lx", "ignore")}
+	lxPatterns = readIgnorePatterns(filepath.Join(configDir, "lx", "ignore"))
 
 	xdgConfig := os.Getenv("XDG_CONFIG_HOME")
 	if xdgConfig == "" && home != "" {
 		xdgConfig = filepath.Join(home, ".config")
 	}
 	if xdgConfig != "" {
-		candidates = append(candidates, filepath.Join(xdgConfig, "git", "ignore"))
+		gitPatterns = readIgnorePatterns(filepath.Join(xdgConfig, "git", "ignore"))
 	}
+	return lxPatterns, gitPatterns
+}
 
-	for _, c := range candidates {
-		if data, err := os.ReadFile(c); err == nil {
-			slog.Debug("Loaded global ignore file", "path", c)
-			raw := strings.Split(string(data), "\n")
-			for _, line := range raw {
-				trimmed := strings.TrimSpace(line)
-				if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
-					lines = append(lines, trimmed)
-				}
-			}
+// readIgnorePatterns returns the patterns in the ignore file at p, if any.
+func readIgnorePatterns(p string) []string {
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return nil
+	}
+	slog.Debug("Loaded global ignore file", "path", p)
+	var lines []string
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			lines = append(lines, trimmed)
 		}
 	}
-
 	return lines
 }

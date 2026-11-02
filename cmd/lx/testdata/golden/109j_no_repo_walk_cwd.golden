@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] b.tmp (1 rows)
+---
+```
+ignored by .gitignore in a repository
+```
+
+[2/2] ok.txt (1 rows)
+---
+```text
+always included
+```
+
+
+--- STDERR ---

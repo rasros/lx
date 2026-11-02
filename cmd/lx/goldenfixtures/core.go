@@ -11,7 +11,7 @@ import (
 func SetupWalkFixture(t *testing.T) string {
 	t.Helper()
 	setupMockConfig(t)
-	dir := t.TempDir()
+	dir := repoTempDir(t)
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
@@ -57,7 +57,7 @@ func SetupSectionsFixture(t *testing.T) string {
 func SetupFilteringFixture(t *testing.T) string {
 	t.Helper()
 	setupMockConfig(t)
-	dir := t.TempDir()
+	dir := repoTempDir(t)
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
@@ -177,7 +177,7 @@ func SetupDetectionFixture(t *testing.T) string {
 func SetupConfigFixture(t *testing.T) string {
 	t.Helper()
 	setupMockConfig(t)
-	dir := t.TempDir()
+	dir := repoTempDir(t)
 
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
 	writeFile(t, dir, "main_test.go", "package main\nimport \"testing\"", 0644)
@@ -200,7 +200,7 @@ func SetupConfigFixture(t *testing.T) string {
 func SetupComplexFixture(t *testing.T) string {
 	t.Helper()
 	setupMockConfig(t)
-	dir := t.TempDir()
+	dir := repoTempDir(t)
 
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)

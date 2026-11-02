@@ -116,21 +116,40 @@ func writeTree(t *testing.T, dir string, files ...string) {
 	}
 }
 
-func rulePatterns(rules []Rule) []string {
+// treeRel is dir's path from the root of the host tree, as rules match it.
+func treeRel(dir string) string {
+	return strings.TrimPrefix(filepath.ToSlash(filepath.Clean(dir)), "/")
+}
+
+// rulePatterns lists the rules loaded at or below root, each with its base
+// path relative to root. Rules from above root, such as an .ignore in a
+// shared temp directory, are left out.
+func rulePatterns(rules []Rule, root string) []string {
+	top := treeRel(root)
 	var out []string
 	for _, r := range rules {
+		var base string
+		switch {
+		case r.BasePath == top:
+			base = "."
+		case strings.HasPrefix(r.BasePath, top+"/"):
+			base = strings.TrimPrefix(r.BasePath, top+"/")
+		default:
+			continue
+		}
 		p := r.Pattern
 		if r.Negate {
 			p = "!" + p
 		}
-		out = append(out, p+"@"+r.BasePath)
+		out = append(out, p+"@"+base)
 	}
 	return out
 }
 
-func TestFrame_StopsAtRepoRoot(t *testing.T) {
+func TestFrame_RulesFromEveryAncestor(t *testing.T) {
 	outer := t.TempDir()
 	mustWriteFile(t, outer, ".gitignore", "outer.txt\n")
+	mustWriteFile(t, outer, ".ignore", "*.ign\n")
 	mustMkdir(t, outer, "repo/a/b")
 	repo := filepath.Join(outer, "repo")
 	mustGitDir(t, outer, "gitdirs/repo")
@@ -138,10 +157,13 @@ func TestFrame_StopsAtRepoRoot(t *testing.T) {
 	mustWriteFile(t, repo, ".gitignore", "*.log\n")
 	mustWriteFile(t, repo, "a/.ignore", "tmp/\n")
 
-	want := []string{"*.log@.", "tmp/@a"}
-	for _, cwd := range []string{outer, filepath.Join(repo, "a", "b")} {
+	// The .gitignore above the repository is not git's, so it does not
+	// apply, while the .ignore above it does. The working directory plays
+	// no part.
+	want := []string{"*.ign@.", "*.log@repo", "tmp/@repo/a"}
+	for _, cwd := range []string{outer, filepath.Join(repo, "a", "b"), t.TempDir()} {
 		w := hostWalker(cwd)
-		if got := rulePatterns(hostFrame(w, filepath.Join(repo, "a", "b")).rules); !reflect.DeepEqual(got, want) {
+		if got := rulePatterns(hostFrame(w, filepath.Join(repo, "a", "b")).rules, outer); !reflect.DeepEqual(got, want) {
 			t.Errorf("from %s: got rules %v, want %v", cwd, got, want)
 		}
 	}
@@ -184,30 +206,26 @@ func TestFrame_Ignored(t *testing.T) {
 	}
 }
 
-func TestFrame_OutsideRepoStartsAtWorkingDir(t *testing.T) {
+func TestFrame_GitRulesNeedARepo(t *testing.T) {
 	top := t.TempDir()
-	if n := newRuleTree(hostTree{h: OSHost{}, cwd: top}, true).node(top); n.inRepo {
+	if n := newRuleTree(hostTree{h: OSHost{}}, true).node(top); n.inRepo {
 		t.Skip("temp dir is inside a git repository")
 	}
-	mustWriteFile(t, top, ".lxignore", "*.tmp\n")
-	mustMkdir(t, top, "sub")
-	mustMkdir(t, top, "other")
-	sub, other := filepath.Join(top, "sub"), filepath.Join(top, "other")
+	mustWriteFile(t, top, ".gitignore", "*.tmp\n")
+	mustWriteFile(t, top, ".lxignore", "*.lx\n")
+	mustMkdir(t, top, "src")
 
-	// Below the working directory its rules apply.
-	if got := rulePatterns(hostFrame(hostWalker(top), sub).rules); !reflect.DeepEqual(got, []string{"*.tmp@."}) {
-		t.Fatalf("expected the working directory's rule in sub, got %v", got)
+	w := New(Options{Base: []string{"*.base"}, GitExcludes: []string{"*.git"}, IgnoreEnabled: true, Cache: NewCache(newTestHost(filepath.Join(top, "src")))})
+	if got := rulePatterns(hostFrame(w, filepath.Join(top, "src")).rules, top); !reflect.DeepEqual(got, []string{"*.lx@."}) {
+		t.Fatalf("expected only .lxignore outside a repository, got %v", got)
 	}
-
-	// The working directory itself starts over, but a directory beside it
-	// keeps the rules of the directory they share, so naming it by a ../
-	// path agrees with walking that directory.
-	w := hostWalker(sub)
-	if got := rulePatterns(hostFrame(w, sub).rules); len(got) != 0 {
-		t.Fatalf("expected no rules from above the working directory, got %v", got)
+	if f := hostFrame(w, filepath.Join(top, "src")); f.rules[0].Pattern != "*.base" {
+		t.Fatalf("expected the base rules to apply outside a repository, got %v", f.rules)
 	}
-	if got := rulePatterns(hostFrame(w, other).rules); !reflect.DeepEqual(got, []string{"*.tmp@."}) {
-		t.Fatalf("expected the shared directory's rule beside the working directory, got %v", got)
+	for _, r := range hostFrame(w, filepath.Join(top, "src")).rules {
+		if r.Pattern == "*.git" {
+			t.Fatal("expected git's global excludes not to apply outside a repository")
+		}
 	}
 }
 
@@ -220,13 +238,13 @@ func TestFrame_InfoExcludeComesFirst(t *testing.T) {
 	mustWriteFile(t, repo, ".gitignore", "!README.md\n")
 
 	f := hostFrame(hostWalker(repo), filepath.Join(repo, "sub"))
-	if got := rulePatterns(f.rules); !reflect.DeepEqual(got, []string{"*.md@.", "!README.md@."}) {
+	if got := rulePatterns(f.rules, repo); !reflect.DeepEqual(got, []string{"*.md@.", "!README.md@."}) {
 		t.Fatalf("expected info/exclude before .gitignore, got %v", got)
 	}
-	if ignored, _ := checkIgnore("sub/README.md", false, f.rules, false, "", false); ignored {
+	if ignored, _ := checkIgnore(treeRel(repo)+"/sub/README.md", false, f.rules, false, "", false); ignored {
 		t.Fatal("expected .gitignore negation to override info/exclude")
 	}
-	if ignored, _ := checkIgnore("sub/notes.md", false, f.rules, false, "", false); !ignored {
+	if ignored, _ := checkIgnore(treeRel(repo)+"/sub/notes.md", false, f.rules, false, "", false); !ignored {
 		t.Fatal("expected info/exclude to ignore notes.md")
 	}
 }
@@ -255,42 +273,39 @@ func TestFrame_StrayGitDirIsNotARepo(t *testing.T) {
 	mustMkdir(t, cwd, "proj/sub")
 
 	f := hostFrame(hostWalker(cwd), filepath.Join(cwd, "proj", "sub"))
-	if got := rulePatterns(f.rules); !reflect.DeepEqual(got, []string{"*.tmp@."}) {
-		t.Fatalf("expected only the working directory's rule, not the stray info/exclude, got %v", got)
+	if got := rulePatterns(f.rules, cwd); !reflect.DeepEqual(got, []string{"*.tmp@."}) {
+		t.Fatalf("expected only the .lxignore rule, not the stray info/exclude, got %v", got)
 	}
 }
 
-// The rules start over at a nested repository: base rules, its info/exclude
-// and its own ignore files, while the enclosing repository still decides
-// whether the nested one is ignored.
+// Git's rules start over at a nested repository: base rules and git's
+// global excludes move to its root, followed by .ignore rules from above, its
+// info/exclude and its own ignore files. The enclosing repository still
+// decides whether the nested one is ignored.
 func TestFrame_RepoBoundaryResets(t *testing.T) {
 	top := t.TempDir()
 	mustGitDir(t, top, ".git")
 	mustWriteFile(t, top, ".gitignore", "*.tmp\nvendor/\n")
+	mustWriteFile(t, top, ".ignore", "*.ign\n")
 	mustGitDir(t, top, "lib/inner/.git")
 	mustMkdir(t, top, "lib/inner/.git/info")
 	mustWriteFile(t, top, "lib/inner/.git/info/exclude", "*.c\n")
 	mustWriteFile(t, top, "lib/inner/.gitignore", "*.o\n")
 	mustGitDir(t, top, "vendor/dep/.git")
 
-	w := hostWalker(top, "*.base")
-	inner := hostFrame(w, filepath.Join(top, "lib", "inner"))
-	if got := rulePatterns(inner.rules); !reflect.DeepEqual(got, []string{"*.base@", "*.c@.", "*.o@."}) {
-		t.Fatalf("expected the rules to start over at the nested repository, got %v", got)
-	}
-	if inner.ignored || inner.node.rel != "." || inner.node.relInParent != "lib/inner" {
-		t.Fatalf("unexpected nested repository frame %+v %+v", inner, inner.node)
-	}
-
-	dep := hostFrame(w, filepath.Join(top, "vendor", "dep"))
-	if !dep.excluded {
-		t.Fatal("expected a nested repository in an ignored directory to be excluded")
-	}
-
-	// From inside the nested repository, nothing above it applies.
-	w = hostWalker(filepath.Join(top, "vendor", "dep"), "*.base")
-	if f := hostFrame(w, filepath.Join(top, "vendor", "dep")); f.ignored || f.excluded {
-		t.Fatalf("expected the repository holding the working directory not to be ignored, got %+v", f)
+	for _, cwd := range []string{top, filepath.Join(top, "vendor", "dep")} {
+		w := New(Options{Base: []string{"*.base"}, GitExcludes: []string{"*.git"}, IgnoreEnabled: true, Cache: NewCache(newTestHost(cwd))})
+		inner := hostFrame(w, filepath.Join(top, "lib", "inner"))
+		want := []string{"*.base@lib/inner", "*.git@lib/inner", "*.ign@.", "*.c@lib/inner", "*.o@lib/inner"}
+		if got := rulePatterns(inner.rules, top); !reflect.DeepEqual(got, want) {
+			t.Fatalf("got rules %v, want %v", got, want)
+		}
+		if inner.ignored {
+			t.Fatalf("unexpected ignored nested repository %+v", inner)
+		}
+		if dep := hostFrame(w, filepath.Join(top, "vendor", "dep")); !dep.excluded {
+			t.Fatalf("from %s: expected a nested repository in an ignored directory to be excluded", cwd)
+		}
 	}
 }
 
@@ -472,8 +487,8 @@ func TestCache_ReadsEachIgnoreFileOnce(t *testing.T) {
 		}
 	}
 	// Three ignore files and a .git per directory, plus the .git of each
-	// directory above the repository.
-	if max := 4*len(dirs) + strings.Count(top, string(filepath.Separator)); shared.total() > max {
+	// directory above the repository with its .ignore and .lxignore.
+	if max := 4*len(dirs) + 3*strings.Count(top, string(filepath.Separator)); shared.total() > max {
 		t.Errorf("shared cache: %d reads, want at most %d", shared.total(), max)
 	}
 

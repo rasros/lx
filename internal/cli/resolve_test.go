@@ -96,8 +96,9 @@ func TestResolveSections_PipedFilesReadIgnoreFilesOnce(t *testing.T) {
 		total += n
 	}
 	// The root and a, a/b, a/b/c, a/b/d, e, e/f, e/f/g: three ignore files
-	// and a .git each.
-	if want := 8 * 4; total != want {
+	// and a .git each, and above the repository an .ignore, an .lxignore and a
+	// .git per directory.
+	if want := 8*4 + 3*strings.Count(dir, string(filepath.Separator)); total != want {
 		t.Errorf("%d reads for %d piped files, want %d", total, len(ops), want)
 	}
 }

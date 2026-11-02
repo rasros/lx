@@ -3,6 +3,8 @@ package main
 import (
 	"path/filepath"
 	"testing"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
 )
 
 func TestGoldenAncestorIgnore(t *testing.T) {
@@ -67,6 +69,24 @@ func TestGoldenNegatedIgnoredDirFromSubdir(t *testing.T) {
 		{name: "109g_negated_ignored_dir_parent_walk", args: []string{".."}},
 		{name: "109h_negated_ignored_dir_parent_relative_file", args: []string{"../build/keep.js", "../build/out.js"}},
 		{name: "109i_negated_ignored_dir_parent_absolute_file", args: []string{filepath.Join(dir, "build", "keep.js")}},
+	}, dir)
+}
+
+// The ignore files above the directory lx runs in apply as they do below it:
+// .ignore everywhere, .gitignore only inside a git repository.
+func TestGoldenParentIgnoreFilesNoRepo(t *testing.T) {
+	dir := gf.SetupParentIgnoreFilesFixture(t, false)
+	runTestGolden(t, filepath.Join(dir, "src"), []goldenTestCase{
+		{name: "109j_no_repo_walk_cwd", args: []string{"."}},
+		{name: "109k_no_repo_walk_parent", args: []string{".."}},
+	}, dir)
+}
+
+func TestGoldenParentIgnoreFilesRepo(t *testing.T) {
+	dir := gf.SetupParentIgnoreFilesFixture(t, true)
+	runTestGolden(t, filepath.Join(dir, "src"), []goldenTestCase{
+		{name: "109l_repo_walk_cwd", args: []string{"."}},
+		{name: "109m_repo_walk_parent", args: []string{".."}},
 	}, dir)
 }
 

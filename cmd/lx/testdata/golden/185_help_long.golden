@@ -331,11 +331,13 @@ Interleaved option:
           By default, symlinks pointing to files are followed and their target
           content included. This flag suppresses them for the next section.
   -I, --no-ignore
-          Disable .gitignore-based file filtering for subsequent paths.
+          Disable ignore-file filtering for subsequent paths.
           
-          By default, lx respects .gitignore files, .git/info/exclude, and the
-          global git ignore file. This flag disables that filtering so ignored
-          files are included.
+          By default, lx respects .ignore and .lxignore files and the global lx
+          ignore file everywhere, and inside a git repository also .gitignore
+          files, .git/info/exclude, and the global git ignore file. The ignore
+          files of the directories above a path apply to it too. This flag
+          disables that filtering so ignored files are included.
   -u, --functions
           Filter files in the next section to show only function and method
           signatures. A method keeps the header and closing line of the type

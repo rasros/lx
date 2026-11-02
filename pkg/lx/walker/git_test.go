@@ -194,6 +194,7 @@ func TestRepoRules_UnreachableGitDirKeepsBoundary(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
 			mustMkdir(t, dir, "wt")
+			mustGitDir(t, dir, ".git")
 			mustWriteFile(t, dir, ".gitignore", "leak*\n")
 			mustWriteFile(t, dir, "wt/.git", "gitdir: "+tt.gitdir+"\n")
 			mustWriteFile(t, dir, "wt/leak.txt", "x")

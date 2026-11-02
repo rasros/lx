@@ -44,6 +44,9 @@ func resolveSections(ctx context.Context, sections []Section, rc resolveContext)
 type resolveContext struct {
 	section     Section
 	ignoreRules []string
+	// gitExcludes are git's global excludes, which apply only inside a git
+	// repository.
+	gitExcludes []string
 	outPath     string
 	debug       bool
 	cleanups    *[]func()
@@ -187,9 +190,10 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 	// A forced path (-f) bypasses ignore rules entirely, as in git's add -f.
 	ignoreEnabled := !section.RunCfg.NoIgnore && !t.isForced
 
-	var baseRules, overrideRules []string
+	var baseRules, gitExcludes, overrideRules []string
 	if ignoreEnabled {
 		baseRules = append(baseRules, rc.ignoreRules...)
+		gitExcludes = append(gitExcludes, rc.gitExcludes...)
 	}
 	if !t.isForced {
 		overrideRules = append(overrideRules, section.Excludes...)
@@ -204,6 +208,7 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 
 	opts := lx.WalkerOptions{
 		Base:              baseRules,
+		GitExcludes:       gitExcludes,
 		Override:          overrideRules,
 		IgnoreEnabled:     ignoreEnabled,
 		SkipHidden:        !section.RunCfg.ShowHidden && !t.isForced,

@@ -42,7 +42,7 @@ Options:
   -H, --hidden              Include hidden files (dotfiles) for subsequent paths
   -S, --follow              Follow directory symlinks for subsequent paths
       --no-links            Skip symbolic links to files for subsequent paths
-  -I, --no-ignore           Disable .gitignore filtering for subsequent paths
+  -I, --no-ignore           Disable ignore-file filtering for subsequent paths
   -u, --functions           Show only function/method signatures for subsequent files
   -Y, --types               Show only type/class definitions for subsequent files
 

@@ -33,7 +33,8 @@ func (OSHost) DirFS(dir string) fs.FS                 { return os.DirFS(dir) }
 
 // Cache holds the ignore rules found on the host, keyed by absolute
 // directory, so the walkers of one run read each ignore file and look each
-// repository up once. It is safe for concurrent use.
+// repository up once. It is safe for concurrent use. The working directory
+// only shapes how paths are named in reasons, never which rules apply.
 type Cache struct {
 	host Host
 	once sync.Once
@@ -70,8 +71,6 @@ func (c *Cache) hostTree() *ruleTree {
 type tree interface {
 	parent(dir string) (string, bool)
 	child(dir, name string) string
-	// onCwdPath reports whether dir is the working directory or above it.
-	onCwdPath(dir string) bool
 	gitDir(dir string) (g gitFS, gitDir string, ok bool)
 	readFile(dir, name string) (data []byte, source string, err error)
 	// display names a path in an ignore reason.
@@ -90,13 +89,6 @@ func (t hostTree) parent(dir string) (string, bool) {
 }
 
 func (hostTree) child(dir, name string) string { return filepath.Join(dir, name) }
-
-func (t hostTree) onCwdPath(dir string) bool {
-	if t.cwd == "" || !strings.HasPrefix(t.cwd, dir) {
-		return false
-	}
-	return len(t.cwd) == len(dir) || strings.HasSuffix(dir, string(filepath.Separator)) || t.cwd[len(dir)] == filepath.Separator
-}
 
 func (t hostTree) gitDir(dir string) (gitFS, string, bool) {
 	g := hostGitFS{t.h}
@@ -145,7 +137,6 @@ func (fsTree) parent(dir string) (string, bool) {
 }
 
 func (fsTree) child(dir, name string) string { return joinRel(dir, name) }
-func (fsTree) onCwdPath(dir string) bool     { return dir == "." }
 func (fsTree) display(p string) string       { return p }
 
 func (t fsTree) gitDir(dir string) (gitFS, string, bool) {
@@ -187,21 +178,16 @@ func newRuleTree(t tree, ignoreFiles bool) *ruleTree {
 // where it stands relative to repositories and its own ignore files.
 type node struct {
 	dir string
-	// parent is nil for a top directory, which nothing above affects: the
-	// root of the tree, and, on the path to the working directory, a
-	// repository root or a directory outside any repository. Below the
-	// working directory, or beside it, the rules of the directories above
-	// keep applying, so every way of naming a path agrees.
+	// parent is nil only at the root of the tree. Like ripgrep, the rules of
+	// every directory above a path apply to it, wherever the walk starts.
 	parent *node
-	top    bool
 	repo   bool // a repository root: its rules start over
-	inRepo bool
+	inRepo bool // in a repository, where git's own ignore rules apply
 	g      gitFS
 	gitDir string
-	// rel is the directory's path relative to its anchor, the top or
-	// repository root its rules start from, and relInParent the same
-	// relative to its parent's anchor, which differ at a repository root.
-	rel, relInParent string
+	// rel is the directory's path from the root of the tree, which every
+	// rule is matched against.
+	rel string
 
 	loaded bool
 	own    []Rule // info/exclude, when a repository root, then its ignore files
@@ -215,23 +201,10 @@ func (rt *ruleTree) node(dir string) *node {
 	if rt.ignoreFiles {
 		n.g, n.gitDir, n.repo = rt.t.gitDir(dir)
 	}
-	parentDir, ok := rt.t.parent(dir)
-	switch {
-	case !ok:
-		n.top = true
-	case rt.t.onCwdPath(dir) && n.repo:
-		n.top = true
-	default:
+	if parentDir, ok := rt.t.parent(dir); ok {
 		p := rt.node(parentDir)
-		if rt.t.onCwdPath(dir) && !p.inRepo {
-			n.top = true
-			break
-		}
 		n.parent = p
-		n.relInParent = joinRel(p.rel, path.Base(filepath.ToSlash(dir)))
-		if !n.repo {
-			n.rel = n.relInParent
-		}
+		n.rel = joinRel(p.rel, path.Base(filepath.ToSlash(dir)))
 	}
 	n.inRepo = n.repo || (n.parent != nil && n.parent.inRepo)
 	rt.nodes[dir] = n
@@ -239,32 +212,44 @@ func (rt *ruleTree) node(dir string) *node {
 }
 
 // ownRules returns the rules dir itself adds. Git ranks info/exclude below
-// every ignore file, so it comes first.
+// every ignore file, so it comes first. As in ripgrep, git's own rules,
+// info/exclude and .gitignore, apply only inside a repository, while .ignore
+// and .lxignore apply everywhere.
 func (rt *ruleTree) ownRules(n *node) []Rule {
 	if n.loaded || !rt.ignoreFiles {
 		return n.own
 	}
 	n.loaded = true
-	if n.repo {
-		n.own = infoExclude(n.g, n.gitDir, ".")
+	names := []string{".ignore", ".lxignore"}
+	if n.inRepo {
+		names = append([]string{".gitignore"}, names...)
 	}
-	for _, name := range []string{".gitignore", ".ignore", ".lxignore"} {
+	if n.repo {
+		n.own = withScope(infoExclude(n.g, n.gitDir, n.rel), scopeGit)
+	}
+	for _, name := range names {
 		data, source, err := rt.t.readFile(n.dir, name)
 		if err == nil {
-			n.own = append(n.own, parseRuleFile(data, n.rel, source)...)
+			scope := scopeIgnore
+			if name == ".gitignore" {
+				scope = scopeGit
+			}
+			n.own = append(n.own, withScope(parseRuleFile(data, n.rel, source), scope)...)
 		}
 	}
 	return n.own
 }
 
-// frameSet holds the frames built for one set of base rules.
+// frameSet holds the frames built for one set of base rules: base, which
+// apply everywhere, and git, git's global excludes, which apply only inside a
+// repository.
 type frameSet struct {
-	base   []Rule
-	frames map[string]*frame
+	base, git []Rule
+	frames    map[string]*frame
 }
 
-// frame is the ignore state of a directory: the rules in effect in it,
-// relative to its node's anchor, and whether it is ignored itself.
+// frame is the ignore state of a directory: the rules in effect in it and
+// whether it is ignored itself.
 type frame struct {
 	node  *node
 	rules []Rule
@@ -282,22 +267,10 @@ func (rt *ruleTree) frame(w *Walker, dir string) *frame {
 	defer rt.mu.Unlock()
 	set, ok := rt.sets[w.baseKey]
 	if !ok {
-		set = &frameSet{base: w.base, frames: map[string]*frame{}}
+		set = &frameSet{base: w.base, git: w.gitExcludes, frames: map[string]*frame{}}
 		rt.sets[w.baseKey] = set
 	}
 	return rt.frameOf(set, dir)
-}
-
-// isTop reports whether dir is a top directory, which starts over.
-func (rt *ruleTree) isTop(dir string) bool {
-	if !rt.t.onCwdPath(dir) {
-		if _, ok := rt.t.parent(dir); ok {
-			return false
-		}
-	}
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	return rt.node(dir).top
 }
 
 func (rt *ruleTree) frameOf(set *frameSet, dir string) *frame {
@@ -313,45 +286,83 @@ func (rt *ruleTree) frameOf(set *frameSet, dir string) *frame {
 		if pf.excluded {
 			f.ignored, f.excluded, f.reason = true, true, pf.reason
 		} else {
-			ignored, descend, reason, own := judgeDir(pf.rules, n.relInParent, false, nil, "", pf.ignored, pf.reason)
+			ignored, descend, reason, own := judgeDir(pf.rules, n.rel, nil, "", pf.ignored, pf.reason)
 			if ignored {
 				f.ignored, f.excluded, f.reason = true, !descend, dirReason(rt.t.display(dir), reason, own)
 			}
 		}
 	}
-	// The one place the rules start over: at a top directory, or at a
-	// repository root, as git never applies one repository's ignore rules
-	// inside another, submodules included.
 	own := rt.ownRules(n)
-	if n.parent == nil || n.repo {
-		f.rules = make([]Rule, 0, len(set.base)+len(own))
-		f.rules = append(append(f.rules, set.base...), own...)
-	} else {
+	switch {
+	case n.parent == nil:
+		f.rules = rebase(set.base, n.rel)
+		if n.repo {
+			f.rules = append(f.rules, rebase(set.git, n.rel)...)
+		}
+		f.rules = append(f.rules, own...)
+	case n.repo:
+		// The one place the rules start over: at a repository root, git
+		// never applies one repository's rules inside another, submodules
+		// included. The base rules move to the new root, while .ignore and
+		// .lxignore rules from above keep applying, as in ripgrep.
+		f.rules = append(rebase(set.base, n.rel), rebase(set.git, n.rel)...)
+		for _, r := range parentRules {
+			if r.scope == scopeIgnore {
+				f.rules = append(f.rules, r)
+			}
+		}
+		f.rules = append(f.rules, own...)
+	default:
 		f.rules = append(parentRules[:len(parentRules):len(parentRules)], own...)
 	}
 	set.frames[dir] = f
 	return f
 }
 
+// ruleScope says where a rule comes from, which decides where it applies.
+type ruleScope uint8
+
+const (
+	scopeBase   ruleScope = iota // base and override patterns
+	scopeGit                     // git's: .gitignore, info/exclude, global excludes
+	scopeIgnore                  // .ignore and .lxignore, which apply everywhere
+)
+
+func withScope(rules []Rule, scope ruleScope) []Rule {
+	for i := range rules {
+		rules[i].scope = scope
+	}
+	return rules
+}
+
+// rebase returns a copy of rules, which were parsed relative to the root of
+// a tree, matched relative to its directory at rel instead.
+func rebase(rules []Rule, rel string) []Rule {
+	out := make([]Rule, len(rules))
+	for i, r := range rules {
+		r.BasePath, r.BasePathPrefix = rel, ""
+		if rel != "." {
+			r.BasePathPrefix = rel + "/"
+		}
+		out[i] = r
+	}
+	return out
+}
+
 // judgeDir decides a directory: rules are those in effect in its parent,
 // matched at rel, and override those of the walk, matched at walkRel.
-// ignored and reason are the state carried from the parent, which a top
-// directory drops. It reports whether the directory is ignored, whether a
-// walk still descends into it because a negation could re-include something
-// below, and the reason, own when a rule matched the directory itself.
-func judgeDir(rules []Rule, rel string, top bool, override []Rule, walkRel string, ignored bool, reason string) (bool, bool, string, bool) {
-	if top {
-		ignored, reason = false, ""
-	}
+// ignored and reason are the state carried from the parent. It reports
+// whether the directory is ignored, whether a walk still descends into it
+// because a negation could re-include something below, and the reason, own
+// when a rule matched the directory itself.
+func judgeDir(rules []Rule, rel string, override []Rule, walkRel string, ignored bool, reason string) (bool, bool, string, bool) {
 	carried := reason
-	if !top {
-		ignored, reason = checkIgnore(rel, true, rules, ignored, reason, true)
-	}
+	ignored, reason = checkIgnore(rel, true, rules, ignored, reason, true)
 	ignored, reason = checkIgnore(walkRel, true, override, ignored, reason, true)
 	if !ignored {
 		return false, false, "", false
 	}
-	descend := (!top && hasNestedException(rel, rules)) || (len(override) > 0 && hasNestedException(walkRel, override))
+	descend := hasNestedException(rel, rules) || (len(override) > 0 && hasNestedException(walkRel, override))
 	return true, descend, reason, reason != carried
 }
 

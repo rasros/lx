@@ -27,8 +27,9 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 }
 
 // WalkPath walks absRoot, an absolute path on the cache's host, with the
-// ignore rules of the directories above it and of its repository, as git
-// would see them. Paths passed to fn are relative to absRoot when it is a
+// ignore rules of every directory above it, as ripgrep does: .ignore and
+// .lxignore everywhere, and git's rules inside a repository, which start over
+// at its root. Paths passed to fn are relative to absRoot when it is a
 // directory; a file root is passed as its base name.
 //
 // Override rules match relative to absRoot, or for a file root relative to
@@ -111,7 +112,7 @@ func (w *Walker) walkFile(rt *ruleTree, base, rel, name string, info fs.FileInfo
 			if len(w.override) == 0 {
 				continue
 			}
-			ign, descend, r, own := judgeDir(f.rules, joinRel(f.node.rel, part), rt.isTop(child), w.override, walkRel, ignored, reason)
+			ign, descend, r, own := judgeDir(f.rules, joinRel(f.node.rel, part), w.override, walkRel, ignored, reason)
 			if ign {
 				r = dirReason(rt.t.display(child), r, own)
 				if !descend {
@@ -218,7 +219,7 @@ func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, ignored
 		rel := joinRel(f.node.rel, d.Name())
 		if isDir {
 			childDir := rt.t.child(f.node.dir, d.Name())
-			ign, descend, r, own := judgeDir(f.rules, rel, rt.isTop(childDir), w.override, childPath, ignored, reason)
+			ign, descend, r, own := judgeDir(f.rules, rel, w.override, childPath, ignored, reason)
 			if ign && !descend {
 				w.ignore(childPath, r)
 				continue

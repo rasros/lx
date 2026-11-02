@@ -366,11 +366,13 @@ included. This flag suppresses them for the next section.`,
 		Short:     "I",
 		Type:      CmdInterleaved,
 		ValueType: ValueNone,
-		Usage:     "Disable .gitignore filtering for subsequent paths",
-		Long: `Disable .gitignore-based file filtering for subsequent paths.
+		Usage:     "Disable ignore-file filtering for subsequent paths",
+		Long: `Disable ignore-file filtering for subsequent paths.
 
-By default, lx respects .gitignore files, .git/info/exclude, and the global
-git ignore file.
+By default, lx respects .ignore and .lxignore files and the global lx ignore
+file everywhere, and inside a git repository also .gitignore files,
+.git/info/exclude, and the global git ignore file. The ignore files of the
+directories above a path apply to it too.
 This flag disables that filtering so ignored files are included.`,
 	},
 
