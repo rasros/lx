@@ -51,10 +51,15 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
   Section boundaries are created in two ways:
     1. An interleaved option appears {{ "after" | underline }} files: all interleaved options
        reset to defaults before the new option takes effect.
-    2. A {{ "-s" | bold }} (section) action is used: this also resets all interleaved
-       options to defaults for the files that follow. Options that no file
-       has followed yet, such as those before the first file, carry on into
-       the new section.
+    2. A {{ "-s" | bold }} (section) action is used after files: this also resets all
+       interleaved options to defaults for the files that follow.
+
+  Options that no file follows before a -s or the end of the arguments:
+    - If files come right before them, they apply back to those files, with a
+      warning, even when prompts or trees come between them and the -s.
+    - Otherwise, as for options before the first file, they carry on into the
+      section the -s starts. Options no file follows at all are reported, and
+      so is a tree with no files to show.
 
   Example: last 50 lines of app.log, then src/ with line numbers:
     lx --tail 50 app.log -l src/
@@ -113,7 +118,8 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
   Options that configure the section which follows them. When placed before any
   files, they accumulate into the first section's settings. When placed after
   files, they trigger a section boundary: all interleaved options reset to
-  defaults, then the new option applies to the next section.
+  defaults, then the new option applies to the next section. Options after
+  files that no file follows apply back to those files.
 {{ range .Interleaved }}
 {{ . | flagLine }}
 {{ .Long | wrapIndent "          " 80 }}
