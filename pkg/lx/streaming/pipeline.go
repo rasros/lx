@@ -63,7 +63,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 			defer wg.Done()
 
 			// One processor per worker: it no longer carries per-item state.
-			proc := render.NewProcessor(s.engine, global, s.log)
+			proc := render.NewProcessor(s.engine, global)
 			proc.SetTokenCounter(s.tokenizer.Estimate)
 
 			for j := range jobsCh {
@@ -98,7 +98,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					IsCompact:    itemStats.IsCompact,
 					IsBinary:     itemStats.IsBinary,
 					IsError:      itemStats.IsError,
-					ReadErr:      itemStats.ReadErr,
+					Issues:       itemStats.Issues,
 					File:         fileOf(j.item),
 					Err:          err,
 					SectionIndex: j.item.Section.Index,
@@ -146,9 +146,7 @@ Loop:
 		if res.IsBinary {
 			totals.binary++
 		}
-		if res.ReadErr != nil && s.onFileError != nil {
-			s.onFileError(res.File, res.ReadErr)
-		}
+		s.report(res.File, res.Issues)
 		if res.IsError {
 			totals.failed++
 		}
@@ -188,4 +186,16 @@ func (b *byteCounter) Write(p []byte) (n int, err error) {
 func fileOf(item render.PreparedItem) sources.InputFile {
 	fi, _ := item.Raw.(render.FileItem)
 	return fi.File
+}
+
+// report tells about the problems f met while rendering, from the goroutine
+// writing the output, so they come in output order.
+func (s *Stream) report(f sources.InputFile, issues render.FileIssues) {
+	if issues.ReadErr != nil && s.onFileError != nil {
+		s.onFileError(f, issues.ReadErr)
+	}
+	if ce := issues.ConvertErr; ce != nil {
+		s.log.Debug("Converter failed, keeping raw content",
+			"converter", ce.Converter, "path", f.Path, "error", ce.Err)
+	}
 }

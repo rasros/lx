@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,7 +23,7 @@ func TestProcessor_RenderFile_Slicing(t *testing.T) {
 	engine, _ := templatex.Compile(cfg)
 	global := core.GlobalContext{TotalFiles: 1}
 
-	proc := NewProcessor(engine, global, nil)
+	proc := NewProcessor(engine, global)
 
 	file := sources.NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
 	opts := core.RenderOptions{Head: 1, Tail: 1}
@@ -66,7 +65,7 @@ func renderSkeleton(t *testing.T, rc core.RenderOptions) string {
 	t.Helper()
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1})
 
 	file := sources.NewBufferInputFile("skeleton.go", []byte(skeletonThreeFuncs))
 	item := PreparedItem{Raw: FileItem{File: file, Opts: rc}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
@@ -122,7 +121,7 @@ func TestRender_DataURI(t *testing.T) {
 	cfg.OutputFormat = "html"
 	engine, _ := templatex.Compile(cfg)
 
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 
 	file, err := sources.NewInputFileFromPath(os.DirFS(tmp), imgName)
 	if err != nil {
@@ -147,7 +146,7 @@ func TestRender_ErrorHandling(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
 
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 
 	file := sources.InputFile{Path: "ghost.txt", Open: func() (io.ReadCloser, error) { return nil, os.ErrPermission }}
 	item := PreparedItem{Raw: FileItem{File: file}, Section: &core.SectionContext{}}
@@ -166,7 +165,7 @@ func TestRender_ErrorHandling(t *testing.T) {
 func TestRender_BinaryFile(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 
 	binaryContent := append([]byte("ELF"), 0x00, 0x01, 0x02, 0x03)
 	file := sources.NewBufferInputFile("program", binaryContent)
@@ -188,7 +187,7 @@ func TestRender_BinaryFile(t *testing.T) {
 func TestRender_CompactView(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 
 	file := sources.NewBufferInputFile("data.txt", []byte("lots of content\n"))
 	opts := core.RenderOptions{Head: 0, Tail: 0}
@@ -212,7 +211,7 @@ func TestRender_CompactView(t *testing.T) {
 func TestRender_LineNumbers(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1})
 
 	file := sources.NewBufferInputFile("code.go", []byte("package main\nfunc main() {}\n"))
 	opts := core.RenderOptions{Head: -1, Tail: -1, LineNumbers: true}
@@ -281,7 +280,7 @@ func TestApplyConvertersLeavesContentWhenNoneApply(t *testing.T) {
 	src := []byte("package main\n")
 	file := sources.NewBufferInputFile("main.go", src)
 
-	reader, size, from, _, _ := applyConverters(slog.Default(), file, core.RenderOptions{}, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
+	reader, size, from, _, _, _ := applyConverters(file, core.RenderOptions{}, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
 	if from != "" {
 		t.Errorf("convertedFrom = %q, want empty", from)
 	}
@@ -308,7 +307,7 @@ func TestApplyConvertersRunsMatchingConverter(t *testing.T) {
 	t.Cleanup(func() { converters = converters[:len(converters)-1] })
 
 	file := sources.NewBufferInputFile("doc.zzz", []byte("raw"))
-	reader, size, from, _, _ := applyConverters(slog.Default(), file, core.RenderOptions{}, nil, bytes.NewReader([]byte("raw")), 3, false)
+	reader, size, from, _, _, _ := applyConverters(file, core.RenderOptions{}, nil, bytes.NewReader([]byte("raw")), 3, false)
 
 	if from != "zzz" {
 		t.Errorf("convertedFrom = %q, want %q", from, "zzz")
@@ -334,9 +333,11 @@ func TestApplyConvertersKeepsContentOnFailure(t *testing.T) {
 	t.Cleanup(func() { converters = converters[:len(converters)-1] })
 
 	src := []byte("raw content")
-	reader, size, from, _, _ := applyConverters(slog.Default(),
-		sources.NewBufferInputFile("doc.zzz", src), core.RenderOptions{}, nil, bytes.NewReader(src), int64(len(src)), false)
+	reader, size, from, _, _, convErr := applyConverters(sources.NewBufferInputFile("doc.zzz", src), core.RenderOptions{}, nil, bytes.NewReader(src), int64(len(src)), false)
 
+	if convErr == nil || convErr.Converter != "failing" || convErr.Err != io.ErrUnexpectedEOF {
+		t.Errorf("convErr = %v, want the failing converter's error", convErr)
+	}
 	if from != "" {
 		t.Errorf("convertedFrom = %q, want empty after a failure", from)
 	}
@@ -389,7 +390,7 @@ func TestApplySkeletonSkipsBinaryAndImages(t *testing.T) {
 func TestRenderPreparedReportsStats(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 
 	file := sources.NewBufferInputFile("a.txt", []byte("one\ntwo\nthree\n"))
 	opts := core.RenderOptions{Head: -1}
@@ -413,7 +414,7 @@ func TestRenderPreparedReportsStats(t *testing.T) {
 func TestRenderPreparedNonFileItemHasZeroStats(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 
 	file := sources.NewBufferInputFile("a.txt", []byte("one\ntwo\n"))
 	opts := core.RenderOptions{Head: -1}
@@ -440,7 +441,7 @@ func TestApplyConvertersReportsProducedLanguage(t *testing.T) {
 	file := sources.NewBufferInputFile("page.html", src)
 	opts := core.RenderOptions{Head: -1, ExtractDocuments: true}
 
-	_, _, from, lang, _ := applyConverters(slog.Default(), file, opts, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
+	_, _, from, lang, _, _ := applyConverters(file, opts, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
 	if from != "html" {
 		t.Errorf("convertedFrom = %q, want html", from)
 	}
@@ -456,10 +457,10 @@ func TestApplyConvertersLeavesImagesBeingEmbedded(t *testing.T) {
 	file := sources.NewBufferInputFile("logo.png", src)
 	opts := core.RenderOptions{Head: -1, ExtractMedia: true}
 
-	if _, _, from, _, _ := applyConverters(slog.Default(), file, opts, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), true); from != "" {
+	if _, _, from, _, _, _ := applyConverters(file, opts, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), true); from != "" {
 		t.Errorf("convertedFrom = %q, want empty while embedding", from)
 	}
-	if _, _, from, _, _ := applyConverters(slog.Default(), file, opts, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false); from != "png" {
+	if _, _, from, _, _, _ := applyConverters(file, opts, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false); from != "png" {
 		t.Errorf("convertedFrom = %q, want png when not embedding", from)
 	}
 }
@@ -468,7 +469,7 @@ func TestApplyConvertersReportsNoLanguageWhenNoneApply(t *testing.T) {
 	src := []byte("package main\n")
 	file := sources.NewBufferInputFile("main.go", src)
 
-	_, _, from, lang, _ := applyConverters(slog.Default(), file, core.RenderOptions{}, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
+	_, _, from, lang, _, _ := applyConverters(file, core.RenderOptions{}, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
 	if from != "" || lang != "" {
 		t.Errorf("got from=%q lang=%q, want both empty", from, lang)
 	}
@@ -482,13 +483,13 @@ func TestPrepareFileContextConvertsExtensionlessImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 
 	file := sources.NewBufferInputFile("avatar", src)
 	opts := core.RenderOptions{Head: -1, ExtractMedia: true}
-	ctx, err := proc.prepareFileContext(file, opts, 1, nil)
-	if err != nil {
-		t.Fatal(err)
+	ctx, issues := proc.prepareFileContext(file, opts, 1, nil)
+	if issues.ReadErr != nil {
+		t.Fatal(issues.ReadErr)
 	}
 	if ctx.IsImage || ctx.IsBinary || ctx.ConvertedFrom != "png" {
 		t.Errorf("IsImage=%v IsBinary=%v ConvertedFrom=%q, want a png converted to text",
@@ -535,7 +536,7 @@ func TestPrepareFileContextCountsBigFileExactly(t *testing.T) {
 		t.Fatalf("fixture is %d bytes, want more than 32 KB", len(data))
 	}
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 
 	for _, cfg := range []core.RenderOptions{
 		{Head: -1},         // whole file
@@ -545,9 +546,9 @@ func TestPrepareFileContextCountsBigFileExactly(t *testing.T) {
 		{Head: 0, Tail: 0}, // compact
 	} {
 		file := sources.NewBufferInputFile("big.txt", data)
-		ctx, err := proc.prepareFileContext(file, cfg, 1, nil)
-		if err != nil {
-			t.Fatal(err)
+		ctx, issues := proc.prepareFileContext(file, cfg, 1, nil)
+		if issues.ReadErr != nil {
+			t.Fatal(issues.ReadErr)
 		}
 		if ctx.TotalRows != 3000 || ctx.IsEstimate {
 			t.Errorf("head=%d tail=%d: rows=%d estimate=%v, want exactly 3000",
@@ -575,7 +576,7 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 	}
 
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 	pad := strings.Repeat("-", 20)
 	want := "   1: line 00001 " + pad + "\n" +
 		"   2: line 00002 " + pad + "\n" +
@@ -590,9 +591,9 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 		"fstest.MapFS": mapFile,
 	} {
 		opts := core.RenderOptions{Head: 2, Tail: 3, LineNumbers: true}
-		ctx, err := proc.prepareFileContext(file, opts, 1, nil)
-		if err != nil {
-			t.Fatal(err)
+		ctx, issues := proc.prepareFileContext(file, opts, 1, nil)
+		if issues.ReadErr != nil {
+			t.Fatal(issues.ReadErr)
 		}
 		if got, _ := ctx.Content.(string); got != want {
 			t.Errorf("%s: content =\n%s\nwant\n%s", name, got, want)
@@ -607,13 +608,13 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 func TestPrepareFileContextOverlapRendersWholeFile(t *testing.T) {
 	data := []byte("a\r\nb\r\nc\r\n")
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+	proc := NewProcessor(engine, core.GlobalContext{})
 
 	file := sources.NewBufferInputFile("crlf.txt", data)
 	opts := core.RenderOptions{Head: 2, Tail: 2}
-	ctx, err := proc.prepareFileContext(file, opts, 1, nil)
-	if err != nil {
-		t.Fatal(err)
+	ctx, issues := proc.prepareFileContext(file, opts, 1, nil)
+	if issues.ReadErr != nil {
+		t.Fatal(issues.ReadErr)
 	}
 	if got, _ := ctx.Content.(string); got != string(data) {
 		t.Errorf("content = %q, want the whole file %q with CRLF kept", got, data)
@@ -664,10 +665,10 @@ func TestPrepareFileContextClampsEstimatedRows(t *testing.T) {
 	opts := core.RenderOptions{Head: 2, Tail: 2, LineNumbers: true}
 
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{}, nil)
-	ctx, err := proc.prepareFileContext(file, opts, 1, nil)
-	if err != nil {
-		t.Fatal(err)
+	proc := NewProcessor(engine, core.GlobalContext{})
+	ctx, issues := proc.prepareFileContext(file, opts, 1, nil)
+	if issues.ReadErr != nil {
+		t.Fatal(issues.ReadErr)
 	}
 	if !ctx.IsEstimate {
 		t.Fatal("want an estimated row count for a file beyond ExactCountLimit")

@@ -21,7 +21,7 @@ type Result struct {
 	IsError      bool
 	Err          error
 	SectionIndex int
-	ReadErr      error // why File, a file item, could not be opened
+	Issues       FileIssues // of File, a file item
 	File         sources.InputFile
 }
 

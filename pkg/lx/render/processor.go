@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +35,26 @@ type Processor struct {
 	engine       *core.TemplateEngine
 	global       core.GlobalContext
 	tokenCounter core.TokenCounter
-	log          *slog.Logger
+}
+
+// ConvertError is a converter that failed on a file, which then rendered as
+// its raw content.
+type ConvertError struct {
+	Converter string
+	Err       error
+}
+
+func (e *ConvertError) Error() string { return e.Converter + ": " + e.Err.Error() }
+func (e *ConvertError) Unwrap() error { return e.Err }
+
+// FileIssues are the problems a file met while rendering, which workers hand
+// back for the caller to report in output order.
+type FileIssues struct {
+	// ReadErr is why a file that rendered as an error row could not be
+	// opened.
+	ReadErr error
+	// ConvertErr is a converter that failed, leaving the raw content.
+	ConvertErr *ConvertError
 }
 
 // RenderStats reports what one rendered item turned out to be. A non-file item
@@ -46,9 +64,7 @@ type RenderStats struct {
 	IsCompact bool
 	IsBinary  bool
 	IsError   bool
-	// ReadErr is why a file that rendered as an error row could not be
-	// opened, for the caller to report in the order items are written.
-	ReadErr error
+	Issues    FileIssues
 }
 
 type readerAtWithSize interface {
@@ -60,16 +76,12 @@ type byteReaderProvider interface {
 	ByteReader() *bytes.Reader
 }
 
-// NewProcessor returns a Processor that logs to log, or slog.Default() when
-// log is nil.
-func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext, log *slog.Logger) *Processor {
-	if log == nil {
-		log = slog.Default()
-	}
+// NewProcessor returns a Processor. It logs nothing: what goes wrong with a
+// file comes back in RenderStats.Issues.
+func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext) *Processor {
 	return &Processor{
 		engine:       engine,
 		global:       global,
-		log:          log,
 		tokenCounter: core.DefaultTokenCounter,
 	}
 }
@@ -88,7 +100,7 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 
 	switch v := item.Raw.(type) {
 	case FileItem:
-		fCtx, readErr := p.prepareFileContext(v.File, v.Opts, item.FileIndexGlobal, scratchBuf)
+		fCtx, issues := p.prepareFileContext(v.File, v.Opts, item.FileIndexGlobal, scratchBuf)
 		fCtx.Section = *item.Section
 		fCtx.SectionFileIndex = item.FileIndexSection
 
@@ -97,7 +109,7 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 			IsCompact: fCtx.IsCompactView,
 			IsBinary:  fCtx.IsBinary,
 			IsError:   fCtx.IsError,
-			ReadErr:   readErr,
+			Issues:    issues,
 		}
 		ctx = &fCtx
 
@@ -234,13 +246,14 @@ var converters = []converter{
 }
 
 // applyConverters reports whether a converter replaced the content, and the
-// format it converted from. A converter that fails leaves the content untouched.
+// format it converted from. A converter that fails leaves the content untouched
+// and is returned.
 //
 // An image that is about to be embedded is left alone: the picture itself says
 // more than a description of it would.
-func applyConverters(log *slog.Logger, file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool) {
+func applyConverters(file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool, *ConvertError) {
 	if embedImages && format.IsImage() {
-		return reader, size, "", "", false
+		return reader, size, "", "", false, nil
 	}
 	for _, c := range converters {
 		if !c.applies(file, opts, format) {
@@ -248,9 +261,7 @@ func applyConverters(log *slog.Logger, file sources.InputFile, opts core.RenderO
 		}
 		text, err := c.convert(file, reader, size)
 		if err != nil {
-			log.Debug("Converter failed, keeping raw content",
-				"converter", c.name, "path", file.Path, "error", err)
-			return reader, size, "", "", false
+			return reader, size, "", "", false, &ConvertError{Converter: c.name, Err: err}
 		}
 		lang := ""
 		if c.language != nil {
@@ -260,9 +271,9 @@ func applyConverters(log *slog.Logger, file sources.InputFile, opts core.RenderO
 		if from == "" && format != nil {
 			from = format.Name // an extensionless input, named by its content
 		}
-		return bytes.NewReader(text), int64(len(text)), from, lang, true
+		return bytes.NewReader(text), int64(len(text)), from, lang, true, nil
 	}
-	return reader, size, "", "", false
+	return reader, size, "", "", false, nil
 }
 
 // classify reads the start of the file and decides its format before any
@@ -364,18 +375,20 @@ func skeletonModeLabel(functions, types bool) string {
 }
 
 // prepareFileContext describes file for its template. A file that cannot be
-// opened becomes an error row, and the error is returned for the caller to
-// report; every other problem is only shown in the row.
-func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOptions, index int, scratch []byte) (core.FileContext, error) {
+// opened becomes an error row; that and a failed converter are returned for
+// the caller to report. Every other problem is only shown in the row.
+func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOptions, index int, scratch []byte) (core.FileContext, FileIssues) {
+	var issues FileIssues
 	rc, err := file.Open()
 	if err != nil {
-		return p.errorContext(file, index, err.Error()), err
+		issues.ReadErr = err
+		return p.errorContext(file, index, err.Error()), issues
 	}
 	defer rc.Close()
 
 	if f, ok := rc.(*os.File); ok {
 		if stat, err := f.Stat(); err == nil && stat.IsDir() {
-			return p.errorContext(file, index, "is a directory"), nil
+			return p.errorContext(file, index, "is a directory"), issues
 		}
 	}
 
@@ -386,8 +399,9 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 	}
 
 	format, verified := classify(file.Path, reader, scratch)
-	reader, size, convertedFrom, convertedLang, converted := applyConverters(
-		p.log, file, cfg, format, reader, size, p.engine.EmbedImages && verified)
+	reader, size, convertedFrom, convertedLang, converted, convertErr := applyConverters(
+		file, cfg, format, reader, size, p.engine.EmbedImages && verified)
+	issues.ConvertErr = convertErr
 
 	isBinary, lang := detectContent(file.Path, reader, scratch)
 	if convertedLang != "" {
@@ -433,7 +447,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 			sl, err = readSlices(lines, cfg)
 		}
 		if err != nil {
-			return p.errorContext(file, index, err.Error()), nil
+			return p.errorContext(file, index, err.Error()), issues
 		}
 		size = lines.Size()
 		totalRows, rowsAreExact = sl.rows, sl.exact
@@ -461,7 +475,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 		ConvertedFrom: convertedFrom,
 	}
 	fCtx.SetTokenCounter(p.tokenCounter)
-	return fCtx, nil
+	return fCtx, issues
 }
 
 // excerpt is the part of a file that gets rendered: a head, and a tail with a
