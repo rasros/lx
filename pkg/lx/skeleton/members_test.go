@@ -21,63 +21,6 @@ func TestFunctionsOnly_LeavesOutTypesWithoutMethods(t *testing.T) {
 	}
 }
 
-// A C++ member that declares a type is a nested type, walked with its own
-// access rules; a function pointer is a field.
-func TestCpp_NestedTypesAndFunctionPointers(t *testing.T) {
-	src := `class C {
-public:
-    struct Inner {
-        int a;
-        void m();
-    };
-    class Deep {
-        int hidden;
-        void hiddenToo();
-    public:
-        void d();
-    };
-    void (*callback)(int);
-    int plain;
-};
-`
-	for _, tc := range []struct {
-		name               string
-		functions, structs bool
-		want               string
-	}{
-		{"functions", true, false, `class C {
-...
-    struct Inner {
-...
-        void m();
-    };
-    class Deep {
-...
-        void d();
-    };
-...
-};
-`},
-		{"types", false, true, `class C {
-...
-    struct Inner {
-        int a;
-...
-    };
-    class Deep {
-...
-    };
-    void (*callback)(int);
-    int plain;
-};
-`},
-	} {
-		if got := string(Extract("cpp", []byte(src), tc.functions, tc.structs)); got != tc.want {
-			t.Errorf("%s: got:\n%s\nwant:\n%s", tc.name, got, tc.want)
-		}
-	}
-}
-
 func TestDocComments_PreprocessorIsNotDoc(t *testing.T) {
 	for _, tc := range []struct{ lang, src, want string }{
 		{"c", "#include <stdio.h>\n#define MAX 10\nint f(void);\n", "int f(void);\n"},

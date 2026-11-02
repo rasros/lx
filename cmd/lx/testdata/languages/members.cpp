@@ -23,6 +23,12 @@ public:
         return x;
     }
     static int count();
+    operator bool() const;
+    friend bool operator==(const Widget& a, const Widget& b);
+    friend class WidgetFactory;
+#ifdef WIDGET_DEBUG
+    void dump() const;
+#endif
 private:
     int secret;
     void hide();

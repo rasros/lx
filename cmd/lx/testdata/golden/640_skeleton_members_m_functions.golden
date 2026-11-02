@@ -1,12 +1,28 @@
 --- STDOUT ---
-skeleton/members.m (14 rows, function signatures)
+skeleton/members.m (31 rows, function signatures)
 ---
 ```objectivec
 /** A counter with instance variables. */
 @interface Counter : NSObject {
 ...
+}
+...
 - (void)increment;
+#if TARGET_OS_IPHONE
+- (void)vibrate;
+#else
+- (void)beep;
+#endif
 + (instancetype)counterWithStep:(NSUInteger)step;
+@end
+...
+/* Something that can be counted. */
+@protocol Countable <NSObject>
+@required
+- (NSUInteger)count;
+@optional
+- (void)reset;
+...
 @end
 ```
 

@@ -30,6 +30,11 @@ namespace Shapes
         protected internal void Shared()
         {
         }
+#if DEBUG
+        public void Dump()
+        {
+        }
+#endif
         private void Hidden()
         {
         }

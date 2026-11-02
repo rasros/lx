@@ -16,11 +16,24 @@ func CppFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Languag
 
 var cppTypeSpecifiers = []string{"class_specifier", "struct_specifier", "union_specifier", "enum_specifier"}
 
-// CppUnwrap returns the declaration inside a template_declaration, and the
-// type specifier of a member that only declares a type (`struct Inner { ...
-// };`, with no declarator after the body). Anything else is returned as is.
+// CppUnwrap returns the declaration inside a template_declaration, the
+// function a friend declaration declares, and the type specifier of a member
+// that only declares a type (`struct Inner { ... };`, with no declarator
+// after the body). Anything else is returned as is.
 func CppUnwrap(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node {
 	switch c.Type(n) {
+	case "friend_declaration":
+		for i := 0; i < n.NamedChildCount(); i++ {
+			inner := n.NamedChild(i)
+			switch c.Type(inner) {
+			case "function_definition":
+				return inner
+			case "declaration":
+				if cppDeclaresFunction(c, inner.ChildByFieldName("declarator", c.Lang)) {
+					return inner
+				}
+			}
+		}
 	case "template_declaration":
 		for i := n.ChildCount() - 1; i >= 0; i-- {
 			if child := n.Child(i); child.IsNamed() && c.Type(child) != "template_parameter_list" {
@@ -39,9 +52,9 @@ func CppUnwrap(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node {
 
 // CppMember classifies a C++ class member (after CppUnwrap): a
 // function_definition, or a declaration whose declarator declares a
-// function, is a method; a class, struct, union or enum is a nested type;
-// other declarations, including function pointers, and enumerators are
-// fields.
+// function (a friend function too), is a method; a class, struct, union or
+// enum is a nested type; other declarations, including function pointers,
+// friend classes and enumerators, are fields.
 func CppMember(c *Ctx, n *gotreesitter.Node) MemberKind {
 	switch t := c.Type(n); {
 	case t == "function_definition":
@@ -53,7 +66,7 @@ func CppMember(c *Ctx, n *gotreesitter.Node) MemberKind {
 			return Method
 		}
 		return Field
-	case t == "enumerator":
+	case t == "enumerator" || t == "friend_declaration":
 		return Field
 	}
 	return Skip
@@ -75,6 +88,8 @@ func cppDeclaresFunction(c *Ctx, d *gotreesitter.Node) bool {
 		case "function_declarator":
 			inner := d.ChildByFieldName("declarator", c.Lang)
 			return inner == nil || c.Type(inner) != "parenthesized_declarator"
+		case "operator_cast": // operator int() const
+			return true
 		default:
 			return false
 		}

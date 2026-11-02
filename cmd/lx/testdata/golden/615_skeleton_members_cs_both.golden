@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.cs (52 rows, definitions)
+skeleton/members.cs (57 rows, definitions)
 ---
 ```csharp
 namespace Shapes
@@ -28,6 +28,12 @@ namespace Shapes
 ...
         protected internal void Shared()
         {
+...
+#if DEBUG
+        public void Dump()
+        {
+...
+#endif
 ...
     }
 ...
