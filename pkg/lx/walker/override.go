@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 // OverrideKind says what an override glob does to the paths it matches.
@@ -102,17 +104,62 @@ func (o Override) rule() (Rule, bool) {
 	if p == "" {
 		p = "**"
 	}
+	if strings.HasPrefix(p, `\!`) || strings.HasPrefix(p, `\#`) {
+		// An escaped leading "!" or "#" is part of the glob, before a
+		// backslash can be read as a separator.
+		p = p[1:]
+	}
 	if filepath.Separator == '\\' {
 		// As in ripgrep, a backslash is a separator on Windows.
 		p = strings.ReplaceAll(p, `\`, "/")
 	}
-	return newRule(p, o.Kind != Exclude, "", "-i/-e globs"), true
+	return newRule(escapeClassBrackets(p), o.Kind != Exclude, "", "-i/-e globs"), true
+}
+
+// escapeClassBrackets escapes a "]" that opens a character class, "[]a]" or
+// "[!]a]", which ripgrep reads as a literal "]" and the matcher would read as
+// closing the class.
+func escapeClassBrackets(p string) string {
+	if !strings.Contains(p, "[]") && !strings.Contains(p, "[!]") && !strings.Contains(p, "[^]") {
+		return p
+	}
+	var b strings.Builder
+	for i := 0; i < len(p); i++ {
+		b.WriteByte(p[i])
+		switch p[i] {
+		case '\\':
+			if i+1 < len(p) {
+				i++
+				b.WriteByte(p[i])
+			}
+		case '[':
+			if i+1 < len(p) && (p[i+1] == '!' || p[i+1] == '^') {
+				i++
+				b.WriteByte(p[i])
+			}
+			if i+1 < len(p) && p[i+1] == ']' {
+				i++
+				b.WriteString(`\]`)
+			}
+			// The rest of the class, up to its closing "]", is copied as is.
+			for i+1 < len(p) && p[i+1] != ']' {
+				i++
+				b.WriteByte(p[i])
+				if p[i] == '\\' && i+1 < len(p) {
+					i++
+					b.WriteByte(p[i])
+				}
+			}
+		}
+	}
+	return b.String()
 }
 
 // Validate reports an error when o's glob cannot be parsed, as ripgrep does
-// for its -g globs, such as an unclosed "[" or "{" or a dangling "\".
+// for its -g globs, such as an unclosed "[" or "{", an unopened "}" or a
+// dangling "\".
 func (o Override) Validate() error {
-	if r, ok := o.rule(); ok && !r.Spec.Pattern.PatternValid {
+	if r, ok := o.rule(); ok && !doublestar.ValidatePattern(r.Spec.Pattern.Pattern) {
 		return fmt.Errorf("invalid glob %q", o.Glob)
 	}
 	return nil
