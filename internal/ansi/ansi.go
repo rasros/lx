@@ -6,6 +6,8 @@ package ansi
 import (
 	"io"
 	"os"
+	"runtime"
+	"strings"
 )
 
 // Code is an SGR escape sequence.
@@ -35,24 +37,35 @@ func New(enabled bool) Painter { return Painter{enabled: enabled} }
 // For returns a Painter for output written to w, see Enabled.
 func For(w io.Writer) Painter { return New(Enabled(w)) }
 
-// Enabled reports whether output written to w should be colored. NO_COLOR,
-// CLICOLOR=0 and an empty or dumb TERM disable color; otherwise
-// CLICOLOR_FORCE or FORCE_COLOR enable it, and without them only a terminal
-// on stdout or stderr gets color.
+// Enabled reports whether output written to w should be colored:
+//
+//   - NO_COLOR, CLICOLOR=0 or TERM=dumb turn color off;
+//   - FORCE_COLOR turns it on, unless it is 0 or false, which turn it off;
+//   - CLICOLOR_FORCE, unless it is 0, turns it on;
+//   - otherwise only a terminal on stdout or stderr gets color, and outside
+//     Windows, whose consoles never set TERM, only when TERM is set.
 func Enabled(w io.Writer) bool {
-	if os.Getenv("NO_COLOR") != "" {
-		return false
-	}
-	if os.Getenv("CLICOLOR") == "0" {
+	if os.Getenv("NO_COLOR") != "" || os.Getenv("CLICOLOR") == "0" {
 		return false
 	}
 	term := os.Getenv("TERM")
-	if term == "" || term == "dumb" {
+	if term == "dumb" {
 		return false
 	}
-	if os.Getenv("CLICOLOR_FORCE") != "" || os.Getenv("FORCE_COLOR") != "" {
+	if force, ok := os.LookupEnv("FORCE_COLOR"); ok {
+		return force != "0" && !strings.EqualFold(force, "false")
+	}
+	if force := os.Getenv("CLICOLOR_FORCE"); force != "" && force != "0" {
 		return true
 	}
+	if term == "" && runtime.GOOS != "windows" {
+		return false
+	}
+	return isTerminal(w)
+}
+
+// isTerminal reports whether w is stdout or stderr attached to a terminal.
+func isTerminal(w io.Writer) bool {
 	var f *os.File
 	switch w {
 	case os.Stderr:
@@ -66,7 +79,7 @@ func Enabled(w io.Writer) bool {
 	if err != nil {
 		return false
 	}
-	return (stat.Mode() & os.ModeCharDevice) != 0
+	return stat.Mode()&os.ModeCharDevice != 0
 }
 
 // Enabled reports whether p styles text.
@@ -77,17 +90,13 @@ func (p Painter) Paint(s string, codes ...Code) string {
 	if !p.enabled || len(codes) == 0 {
 		return s
 	}
-	n := len(s) + len(Reset)
+	var b strings.Builder
 	for _, c := range codes {
-		n += len(c)
+		b.WriteString(string(c))
 	}
-	b := make([]byte, 0, n)
-	for _, c := range codes {
-		b = append(b, c...)
-	}
-	b = append(b, s...)
-	b = append(b, Reset...)
-	return string(b)
+	b.WriteString(s)
+	b.WriteString(string(Reset))
+	return b.String()
 }
 
 // Wrap surrounds s with open and close, for styles that must end without
@@ -97,13 +106,4 @@ func (p Painter) Wrap(s string, open, close Code) string {
 		return s
 	}
 	return string(open) + s + string(close)
-}
-
-// Code returns c when enabled and an empty string otherwise, for building
-// output piece by piece.
-func (p Painter) Code(c Code) string {
-	if !p.enabled {
-		return ""
-	}
-	return string(c)
 }

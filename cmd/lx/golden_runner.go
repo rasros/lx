@@ -40,6 +40,9 @@ func runTestGolden(t *testing.T, workDir string, cases []goldenTestCase, extraSc
 func runGoldenTests(t *testing.T, cases []goldenTestCase, pkgDir string, scrubPaths ...string) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Goldens are plain text whatever color settings the shell has.
+			t.Setenv("NO_COLOR", "1")
+
 			outR, outW, _ := os.Pipe()
 			errR, errW, _ := os.Pipe()
 			inR, inW, _ := os.Pipe()
