@@ -21,9 +21,12 @@ Find the declaration you care about, then Read its body. A `...` line marks
 left-out code; with `-l` skeleton lines keep their source line numbers, so the
 number is where to Read from.
 
-`-i`/`-e` are repeatable and additive; excludes win on conflict. Patterns
-match basenames and full paths; a trailing slash matches directories, so
-`-e 'vendor/' -e 'node_modules/'` drops whole subtrees.
+`-i`/`-e` work as rg's `-g GLOB`/`-g '!GLOB'`: the last one to match a path
+wins, and once there is an `-i` a file has to match one. A pattern without a
+slash matches a name anywhere; one with a slash matches the path from the
+working directory as you named the root (`lx -i 'src/*.go' src/`). A trailing
+slash matches directories, so `-e 'vendor/' -e 'node_modules/'` drops whole
+subtrees.
 
 Each path becomes its own output section, and interleaved flags (`-n`,
 `--head`, `--tail`, `-l`, `-i`, `-e`, `-u`, `-Y`, …) reset between sections —
