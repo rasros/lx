@@ -53,11 +53,11 @@ func NewCollector() *Collector { return discover.NewCollector() }
 // IncludeGlob returns lx's -i pattern p, ripgrep's -g p: a GlobInclude, or a
 // GlobExclude of what follows a leading "!". Glob.Validate reports a glob
 // that cannot be parsed.
-var IncludeGlob = walker.IncludeOverride
+func IncludeGlob(p string) Glob { return walker.IncludeOverride(p) }
 
 // ExcludeGlob returns lx's -e pattern p, ripgrep's -g '!p': a GlobExclude,
 // or a GlobKeep of what follows a leading "!".
-var ExcludeGlob = walker.ExcludeOverride
+func ExcludeGlob(p string) Glob { return walker.ExcludeOverride(p) }
 
 // UserIgnoreRules reads the ignore files lx applies everywhere, for
 // DiscoverOptions.IgnoreRules and GitExcludes.
