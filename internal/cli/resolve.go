@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
+	"slices"
 
 	"github.com/rasros/lx/pkg/lx"
 )
@@ -16,9 +17,13 @@ import (
 // Stdin ("-") resolves to nothing: it is a buffer, not a discoverable path, and
 // it can only be read once. The content pass handles it directly.
 //
+// A piped list names a set of paths, so a file it reaches twice, named and
+// through its directory, is collected once.
+//
 // It stops at the first target that finds ctx done and returns ctx's error.
 func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) (int, error) {
 	unresolved := 0
+	piped := map[string]bool{}
 	for si := range sections {
 		s := &sections[si]
 		for oi, op := range s.Ops {
@@ -35,6 +40,13 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) (
 				logUnresolved(op.Value, err)
 				unresolved++
 				continue
+			}
+			if op.Piped {
+				files = slices.DeleteFunc(files, func(f lx.InputFile) bool {
+					seen := piped[f.AbsPath]
+					piped[f.AbsPath] = true
+					return seen
+				})
 			}
 			if len(files) == 0 {
 				continue
