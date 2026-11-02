@@ -18,6 +18,11 @@ public:
     };
     void (*callback)(int);
     int plain;
+    // Member aliases are types.
+    typedef std::vector<int> values;
+    using size_type = unsigned long;
+    template <typename T>
+    using ptr = T*;
     template <typename T>
     T get(T x) {
         return x;
@@ -31,6 +36,7 @@ public:
 #endif
 private:
     int secret;
+    typedef int hidden_alias;
     void hide();
 protected:
     void prot();
