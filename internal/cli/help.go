@@ -86,7 +86,8 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
           As in rg, a path you name is never filtered itself: ignore files,
           hidden-file skipping and -i/-e do not apply to it. They filter what
           a named directory contains. Paths piped on stdin are filtered by
-          -i/-e only.
+          -i/-e only, as a walk of the working directory would filter them,
+          and a file piped twice, or with its directory, is listed once.
 
           If no actions are provided, lx walks the current directory ".".
 

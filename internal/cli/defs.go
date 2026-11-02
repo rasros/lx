@@ -185,16 +185,29 @@ additions to a file.`,
 		Short:     "i",
 		Type:      CmdInterleaved,
 		ValueType: ValueAny,
-		Usage:     "Add a glob whitelist pattern to subsequent files",
-		Long: `Add a glob whitelist pattern for subsequent file discovery.
+		Usage:     "Keep files matching a glob for subsequent paths (rg -g)",
+		Long: `Keep what matches a glob for subsequent paths, as rg -g GLOB does.
 
-If include patterns are provided, files MUST match at least one pattern to be
-included in the output. This applies to directory traversal.
+-i and -e globs apply in command-line order, and the last one to match a path
+decides it: -e "build/*" -i build/keep.js keeps build/keep.js, while
+-i build/keep.js -e "build/*" drops it. Once there is an -i, a file must be
+kept by some glob. A path an -i keeps is kept even when an ignore file
+ignores it or it is hidden. A leading "!" makes -i exclude, as -e does.
+
+Globs follow .gitignore syntax: one without a slash matches a file or
+directory name anywhere, and one with a slash the whole path, which is the
+path from the working directory as you named the root: -i "src/*.go" src
+matches, -i "*.go" ../lib matches below "..", and -i "lib/*.go" ../lib does
+not. Below an absolute root the working directory is stripped, and outside it
+the absolute path is matched. A glob matches a directory only as itself, so
+-i src keeps nothing; use -i "src/**". An excluded directory is not entered,
+so no later glob keeps anything below it: -e build -i build/keep.js keeps
+nothing, -e "build/**" -i build/keep.js keeps it.
 
 Examples:
-  -i "*.go"       (Include only Go files)
-  -i "src/**"     (Include files inside src)
-  -i "*.{js,ts}"  (Include JS and TS files)`,
+  -i "*.go"       (Keep only Go files)
+  -i "src/**"     (Keep the files inside src)
+  -i "*.{js,ts}"  (Keep JS and TS files)`,
 	},
 	{
 		Category:  CatInterleaved,
@@ -202,15 +215,18 @@ Examples:
 		Short:     "e",
 		Type:      CmdInterleaved,
 		ValueType: ValueAny,
-		Usage:     "Add a glob blacklist pattern to subsequent files",
-		Long: `Add a glob blacklist pattern for subsequent file discovery.
+		Usage:     "Drop files matching a glob for subsequent paths (rg -g '!glob')",
+		Long: `Drop what matches a glob for subsequent paths, as rg -g '!GLOB' does.
 
-Files matching ANY exclude pattern will be skipped, even if they match an
-include pattern.
+-e globs match as -i globs do, and the last -i or -e to match a path decides
+it, ahead of ignore files. A leading "!" keeps what matches, even when an
+ignore file ignores it or it is hidden, without requiring every file to match
+some glob as -i does: -e "vendor/**" -e "!vendor/keep.go" keeps one file of
+vendor/ and everything outside it.
 
 Examples:
   -e "*_test.go"  (Skip Go test files)
-  -e "vendor/"    (Skip vendor directory)`,
+  -e "vendor/"    (Skip vendor directories)`,
 	},
 	{
 		Category:  CatInterleaved,
@@ -310,11 +326,10 @@ When set, archive files are opened and their contents processed as if they
 were regular files in the directory tree. The archive path is used as a
 prefix for entries inside it (e.g. archive.zip/hello.txt).
 
-Active include (-i) and exclude (-e) filters apply to entries inside the archive.
-An archive found while walking a directory is matched like a directory there:
-its entries by their paths through it (e.g. -i "pkg/a.zip/src/**"). The
-entries of a named archive are matched from its root, like those of a named
-directory.
+Include (-i) and exclude (-e) globs match an archive being expanded as a
+directory and its entries as the paths below it, whether it is found in a
+walk or named: -i "pkg/a.zip/src/**" keeps the entries of pkg/a.zip below
+src/. The entries of an archive URL are below the URL.
 Hidden entry filtering (leading dot) is also respected.
 
 Supported formats:

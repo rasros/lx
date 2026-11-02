@@ -30,9 +30,13 @@ lx -c                          # this project, on the clipboard
 lx src/ docs/
 lx -t src/                     # just the tree (-T for tree plus files)
 lx -u -Y src/                  # signatures and type definitions, no bodies
-lx -i "*.py" -e "*test*" src/  # include/exclude globs
+lx -i "*.py" -e "*test*" src/  # include/exclude globs, as rg -g
 lx -n 20 src/                  # first 20 lines of each file
 ```
+
+-i and -e work as rg's `-g GLOB` and `-g '!GLOB'`: the last one to match a path wins, ahead of your ignore files, and once
+there is an -i a file has to match one. A glob with a slash matches the path from the working directory as you named
+the root, so `lx -i "src/*.go" src/` works while `lx -i "*.go" -e "src/gen/**" src/` drops a subtree.
 
 Paths can also come from stdin, so lx composes with whatever you use to pick files:
 

@@ -33,8 +33,8 @@ Options:
   -n, --lines <n>           Limit subsequent files to N lines (0 for compact)
       --head <n>            Read only the first N lines of subsequent files
       --tail <n>            Read only the last N lines of subsequent files
-  -i, --include <value>     Add a glob whitelist pattern to subsequent files
-  -e, --exclude <value>     Add a glob blacklist pattern to subsequent files
+  -i, --include <value>     Keep files matching a glob for subsequent paths (rg -g)
+  -e, --exclude <value>     Drop files matching a glob for subsequent paths (rg -g '!glob')
   -m, --max-size <size>     Skip files larger than the given size for subsequent paths
   -D, --documents           Extract text from document files for subsequent paths
   -M, --media               Describe media files by their metadata for subsequent paths
