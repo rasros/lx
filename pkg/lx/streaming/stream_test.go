@@ -392,3 +392,32 @@ func TestStream_TokenEstimateIgnoresWriteChunking(t *testing.T) {
 		t.Errorf("chunked templates estimated %d tokens, single writes %d; want equal", chunked, whole)
 	}
 }
+
+func TestStream_SkeletonFilesCapWorkers(t *testing.T) {
+	stream, _ := NewStream(core.NewConfig())
+	stream.WithConcurrency(8)
+	stream.AddFile(sources.NewBufferInputFile("a.go", []byte("package a")), core.RenderOptions{Head: -1})
+	if got := stream.workers(); got != 8 {
+		t.Fatalf("workers = %d without skeletons, want 8", got)
+	}
+	stream.AddFile(sources.NewBufferInputFile("b.go", []byte("package b")), core.RenderOptions{Head: -1, SkeletonTypes: true})
+	if got := stream.workers(); got != maxSkeletonWorkers {
+		t.Fatalf("workers = %d with skeletons, want %d", got, maxSkeletonWorkers)
+	}
+}
+
+func TestStream_TreeListsOnlyAdmittedFiles(t *testing.T) {
+	stream, _ := NewStream(core.NewConfig())
+	opts := core.RenderOptions{Head: -1, MaxSize: 4}
+	small := sources.NewBufferInputFile("dir/small.txt", []byte("ok"))
+	big := sources.NewBufferInputFile("dir/big.txt", []byte("too large"))
+	stream.AddTree([]sources.InputFile{small, big}, opts)
+	stream.AddTree([]sources.InputFile{big}, opts)
+
+	if len(stream.items) != 1 {
+		t.Fatalf("items = %d, want one tree; a tree with no admitted files is left out", len(stream.items))
+	}
+	if got, want := stream.items[0].(core.TreeContext).Body, "dir/\n└── small.txt"; got != want {
+		t.Fatalf("tree = %q, want %q", got, want)
+	}
+}

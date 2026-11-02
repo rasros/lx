@@ -68,7 +68,11 @@ func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
 	return s
 }
 
-// AddFile enqueues f to render with opts, unless it exceeds opts.MaxSize.
+// Admit reports whether the stream keeps f when added with opts: a file over
+// opts.MaxSize is dropped. AddFile and AddTree both decide by it.
+func (s *Stream) Admit(f InputFile, opts RenderOptions) bool { return s.inner.Admit(f, opts) }
+
+// AddFile enqueues f to render with opts, unless Admit drops it.
 func (s *Stream) AddFile(f InputFile, opts RenderOptions) *Stream {
 	s.inner.AddFile(f, opts)
 	return s
@@ -84,8 +88,10 @@ func (s *Stream) AddPrompt(text string) *Stream {
 	return s
 }
 
-func (s *Stream) AddTree(body string) *Stream {
-	s.inner.AddTree(body)
+// AddTree enqueues a directory tree of the files among files that Admit keeps
+// under opts. A tree with no admitted files is left out.
+func (s *Stream) AddTree(files []InputFile, opts RenderOptions) *Stream {
+	s.inner.AddTree(files, opts)
 	return s
 }
 

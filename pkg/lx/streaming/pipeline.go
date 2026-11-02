@@ -38,13 +38,13 @@ func reorderWindow(workers int) int {
 	return 2 * workers
 }
 
-// executePipeline renders the prepared items on s.concurrency workers and
+// executePipeline renders the prepared items on s.workers() workers and
 // writes them to dest in order. The feeder hands each job a one-slot result
 // channel and enqueues that channel in a bounded FIFO, so the consumer reads
 // results in order and the feeder stalls once the window is full.
 func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global core.GlobalContext) (pipelineTotals, error) {
 	var totals pipelineTotals
-	numWorkers := s.concurrency
+	numWorkers := s.workers()
 	jobsCh := make(chan seqJob, numWorkers)
 	pending := make(chan chan render.Result, reorderWindow(numWorkers))
 

@@ -244,66 +244,6 @@ func captureStdout(f func() error) (string, error) {
 	return buf.String(), err
 }
 
-func TestWorkloadConcurrency(t *testing.T) {
-	tests := []struct {
-		name        string
-		sections    []Section
-		cpuCount    int
-		wantWorkers int
-		wantLimited bool
-	}{
-		{
-			name:        "no skeleton flags",
-			sections:    []Section{{Render: lx.RenderOptions{}}},
-			cpuCount:    8,
-			wantWorkers: 0,
-			wantLimited: false,
-		},
-		{
-			name: "skeleton functions limited to max",
-			sections: []Section{{
-				Render: lx.RenderOptions{
-					SkeletonFunctions: true,
-				},
-			}},
-			cpuCount:    8,
-			wantWorkers: maxSkeletonWorkers,
-			wantLimited: true,
-		},
-		{
-			name: "skeleton types keeps low cpu count",
-			sections: []Section{{
-				Render: lx.RenderOptions{
-					SkeletonTypes: true,
-				},
-			}},
-			cpuCount:    1,
-			wantWorkers: 1,
-			wantLimited: true,
-		},
-		{
-			name: "multiple sections one skeleton section limits",
-			sections: []Section{
-				{Render: lx.RenderOptions{}},
-				{Render: lx.RenderOptions{SkeletonTypes: true}},
-			},
-			cpuCount:    6,
-			wantWorkers: maxSkeletonWorkers,
-			wantLimited: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotWorkers, gotLimited := workloadConcurrency(tt.sections, tt.cpuCount)
-			if gotWorkers != tt.wantWorkers || gotLimited != tt.wantLimited {
-				t.Fatalf("workloadConcurrency() = (%d, %v), want (%d, %v)",
-					gotWorkers, gotLimited, tt.wantWorkers, tt.wantLimited)
-			}
-		})
-	}
-}
-
 func TestDetermineOutput_StdoutOverridesCopyDefault(t *testing.T) {
 	out, clipBuf, debugOut, err := determineOutput(map[string]string{"stdout": "true"}, "copy")
 	if err != nil {
