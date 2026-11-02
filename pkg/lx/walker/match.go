@@ -13,26 +13,6 @@ type pathMatchInfo struct {
 	parts    []string
 }
 
-// offsetInfoCache keeps the last offset rewrite of one walk path, so
-// consecutive rules loaded from the same ancestor directory share it.
-type offsetInfoCache struct {
-	set    bool
-	offset string
-	info   pathMatchInfo
-}
-
-// get rewrites a walk-relative path for a rule loaded above the walk root.
-func (c *offsetInfoCache) get(offset string, ctx pathMatchInfo) pathMatchInfo {
-	if c == nil {
-		return buildPathMatchInfo(offset + ctx.relPath)
-	}
-	if !c.set || c.offset != offset {
-		c.set, c.offset = true, offset
-		c.info = buildPathMatchInfo(offset + ctx.relPath)
-	}
-	return c.info
-}
-
 var dotPathMatchInfo = pathMatchInfo{
 	relPath:  ".",
 	baseName: ".",
@@ -112,18 +92,16 @@ func matchCompiledSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 }
 
 func match(rule Rule, relPath string, isDir bool) bool {
-	return matchWithPathInfo(rule, buildPathMatchInfo(relPath), isDir, nil)
+	return matchWithPathInfo(rule, buildPathMatchInfo(relPath), isDir)
 }
 
-func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool, offsets *offsetInfoCache) bool {
+func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool) bool {
 	if rule.Spec.DirOnly && !isDir {
 		return false
 	}
 
 	target := ctx
-	if rule.PathOffset != "" {
-		target = offsets.get(rule.PathOffset, ctx)
-	} else if rule.BasePathPrefix != "" {
+	if rule.BasePathPrefix != "" {
 		if !strings.HasPrefix(ctx.relPath, rule.BasePathPrefix) && ctx.relPath != rule.BasePath {
 			return false
 		}
@@ -137,18 +115,17 @@ func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool, offsets *offset
 	return matchCompiledSpec(rule.Spec, target)
 }
 
-// checkIgnore determines if a path should be ignored and returns the reason.
-func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool, wantReason bool) (bool, string) {
-	ignored := parentIgnored
-	reason := ""
-	if parentIgnored && wantReason {
-		reason = "parent directory"
+// checkIgnore applies rules to a path, continuing from the state ignored
+// and its reason, as carried from the parent directory or from earlier rules.
+// The last matching rule decides.
+func checkIgnore(relPath string, isDir bool, rules []Rule, ignored bool, reason string, wantReason bool) (bool, string) {
+	if len(rules) == 0 {
+		return ignored, reason
 	}
 	ctx := buildPathMatchInfo(relPath)
-	var offsets offsetInfoCache
 
 	for _, rule := range rules {
-		if matchWithPathInfo(rule, ctx, isDir, &offsets) {
+		if matchWithPathInfo(rule, ctx, isDir) {
 			if rule.Negate {
 				ignored = false
 				if wantReason {
@@ -166,18 +143,11 @@ func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool, w
 }
 
 func hasNestedException(walkDirPath string, rules []Rule) bool {
-	walkDirParts := strings.Split(walkDirPath, "/")
-	var offsets offsetInfoCache
+	dirPath, dirParts := walkDirPath, strings.Split(walkDirPath, "/")
 
 	for _, rule := range rules {
 		if !rule.Negate {
 			continue
-		}
-
-		dirPath, dirParts := walkDirPath, walkDirParts
-		if rule.PathOffset != "" {
-			info := offsets.get(rule.PathOffset, pathMatchInfo{relPath: walkDirPath})
-			dirPath, dirParts = info.relPath, info.parts
 		}
 
 		if rule.BasePath != "" && rule.BasePath != "." {

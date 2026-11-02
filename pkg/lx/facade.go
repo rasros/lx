@@ -21,6 +21,10 @@ type StatsContext = core.StatsContext
 
 type InputFile = sources.InputFile
 type Walker = walkerpkg.Walker
+type WalkerOptions = walkerpkg.Options
+type RuleCache = walkerpkg.Cache
+type Host = walkerpkg.Host
+type OSHost = walkerpkg.OSHost
 type Rule = walkerpkg.Rule
 type CompiledSpec = walkerpkg.CompiledSpec
 
@@ -31,9 +35,12 @@ func NewConfig() *Config { return core.NewConfig() }
 
 func Merge(dst *Config, src *Config) { core.Merge(dst, src) }
 
-func NewWalker(basePatterns, overridePatterns []string) *Walker {
-	return walkerpkg.NewWalker(basePatterns, overridePatterns)
-}
+// NewWalker returns a Walker configured by opts.
+func NewWalker(opts WalkerOptions) *Walker { return walkerpkg.New(opts) }
+
+// NewRuleCache returns a cache of the ignore rules found on host, or on the
+// OS when host is nil, to share between the walkers of one run.
+func NewRuleCache(host Host) *RuleCache { return walkerpkg.NewCache(host) }
 
 func CompileSpecs(patterns []string) []CompiledSpec { return walkerpkg.CompileSpecs(patterns) }
 

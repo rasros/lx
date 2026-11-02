@@ -116,3 +116,20 @@ func SetupStrayGitDirAboveFixture(t *testing.T) string {
 
 	return filepath.Join(dir, "proj")
 }
+
+// SetupNegatedIgnoredDirFixture builds a git repository whose .gitignore
+// ignores the build directory but re-includes one file in it, and holds a
+// subdirectory x to run lx from. It returns the repository root.
+func SetupNegatedIgnoredDirFixture(t *testing.T) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	makeGitDir(t, dir, ".git")
+	writeFile(t, dir, ".gitignore", "build/\n!build/keep.js\n", 0644)
+	writeFile(t, dir, "build/keep.js", "re-included by the negation", 0644)
+	writeFile(t, dir, "build/out.js", "ignored with its directory", 0644)
+	writeFile(t, dir, "x/main.go", "package x", 0644)
+
+	return dir
+}
