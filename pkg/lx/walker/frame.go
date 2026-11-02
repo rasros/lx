@@ -57,6 +57,15 @@ func NewCache(host Host, log *slog.Logger) *Cache {
 	return &Cache{host: host, log: orDefault(log)}
 }
 
+// orDefault returns log, or slog.Default() when log is nil. The exported
+// constructors default the logger once; everything below them is given one.
+func orDefault(log *slog.Logger) *slog.Logger {
+	if log == nil {
+		return slog.Default()
+	}
+	return log
+}
+
 func (c *Cache) hostTree() *ruleTree {
 	c.once.Do(func() {
 		cwd, err := c.host.Getwd()
@@ -67,7 +76,7 @@ func (c *Cache) hostTree() *ruleTree {
 			cwd = filepath.Clean(cwd)
 		}
 		c.wd = cwd
-		c.ht = hostTree{h: c.host, log: c.log}
+		c.ht = newHostTree(c.host, "", c.log)
 		if cwd != "" {
 			c.ht.cwd = c.ht.real(cwd)
 		}
@@ -186,6 +195,10 @@ type hostTree struct {
 	log *slog.Logger
 }
 
+func newHostTree(h Host, cwd string, log *slog.Logger) hostTree {
+	return hostTree{h: h, cwd: cwd, log: log}
+}
+
 // real returns p with symlinks resolved, or p itself when it cannot be.
 func (t hostTree) real(p string) string {
 	if r, err := t.h.EvalSymlinks(p); err == nil {
@@ -233,6 +246,8 @@ type fsTree struct {
 	fsys fs.FS
 	log  *slog.Logger
 }
+
+func newFSTree(fsys fs.FS, log *slog.Logger) fsTree { return fsTree{fsys: fsys, log: log} }
 
 func (fsTree) parent(dir string) (string, bool) {
 	if dir == "." {

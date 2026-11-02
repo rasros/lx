@@ -39,7 +39,7 @@ func parseRuleFile(data []byte, basePath, source string) []Rule {
 // silently missing set of rules shows up in --debug output.
 func logReadError(log *slog.Logger, path string, err error) {
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		orDefault(log).Debug("Failed to read ignore rules", "path", path, "error", err)
+		log.Debug("Failed to read ignore rules", "path", path, "error", err)
 	}
 }
 
@@ -64,7 +64,7 @@ type hostGitFS struct {
 	log *slog.Logger
 }
 
-func (g hostGitFS) logger() *slog.Logger { return orDefault(g.log) }
+func (g hostGitFS) logger() *slog.Logger { return g.log }
 
 func (hostGitFS) Join(elem ...string) string { return filepath.Join(elem...) }
 func (hostGitFS) Resolve(base, target string) (string, bool) {
@@ -78,7 +78,7 @@ type subGitFS struct {
 	log  *slog.Logger
 }
 
-func (g subGitFS) logger() *slog.Logger { return orDefault(g.log) }
+func (g subGitFS) logger() *slog.Logger { return g.log }
 
 func (g subGitFS) Stat(name string) (fs.FileInfo, error)  { return fs.Stat(g.fsys, name) }
 func (g subGitFS) Lstat(name string) (fs.FileInfo, error) { return fs.Lstat(g.fsys, name) }
@@ -223,12 +223,4 @@ func resolveRelative(base, target string) string {
 		base = real
 	}
 	return filepath.Join(base, target)
-}
-
-// orDefault returns log, or slog.Default() when log is nil.
-func orDefault(log *slog.Logger) *slog.Logger {
-	if log == nil {
-		return slog.Default()
-	}
-	return log
 }

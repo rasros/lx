@@ -85,7 +85,7 @@ func TestCollect_IgnoreFileReads(t *testing.T) {
 
 	collect := func(targets []string) (*countingHost, int) {
 		host := &countingHost{cwd: dir, reads: map[string]int{}}
-		c := &Collector{cache: walker.NewCache(host, nil), cwd: dir, log: slog.Default()}
+		c := newCollector(host, dir, slog.Default())
 		included := 0
 		for _, target := range targets {
 			files, err := c.Collect(context.Background(), target, Options{})
