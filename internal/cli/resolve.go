@@ -23,7 +23,7 @@ func resolveSections(ctx context.Context, sections []Section, rc resolveContext)
 	for si := range sections {
 		rc.section = sections[si]
 		for oi, op := range sections[si].Ops {
-			if op.Action != "FILE" && op.Action != "file" {
+			if op.Action != "FILE" {
 				continue
 			}
 			files, missing := resolveOp(ctx, op, rc)
@@ -63,13 +63,10 @@ type resolveContext struct {
 // Stdin ("-") resolves to nothing: it is a buffer, not a discoverable path, and
 // it can only be read once. The content pass handles it directly.
 func resolveOp(ctx context.Context, op Op, rc resolveContext) (files []lx.InputFile, unresolved int) {
-	section := rc.section
 	rawPath := op.Value
 	if rawPath == "-" {
 		return nil, 0
 	}
-	isForced := op.Action == "file"
-
 	forceExpand := false
 	if rewritten, ok := lx.RewriteRepoURL(rawPath); ok {
 		slog.Debug("Rewrote repo URL to archive", "from", rawPath, "to", rewritten)
@@ -78,7 +75,7 @@ func resolveOp(ctx context.Context, op Op, rc resolveContext) (files []lx.InputF
 	}
 
 	if lx.IsHTTPURL(rawPath) {
-		return resolveURL(ctx, rawPath, isForced, forceExpand, rc)
+		return resolveURL(ctx, rawPath, forceExpand, rc)
 	}
 
 	absPath, err := filepath.Abs(rawPath)
@@ -89,39 +86,26 @@ func resolveOp(ctx context.Context, op Op, rc resolveContext) (files []lx.InputF
 
 	stat, err := os.Stat(absPath)
 	if err != nil {
-		if !isForced && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
-			slog.Debug("Skipping missing path due to filters", "path", rawPath)
-			return nil, 0
-		}
 		slog.Error("Failed to stat path", "path", absPath, "error", err)
 		return nil, 1
 	}
 
-	fsys, walkRoot, displayPrefix, ok := walkTarget(rawPath, absPath, stat.IsDir(), isForced, section)
-	if !ok {
-		return nil, 0
-	}
-
+	fsys, walkRoot, displayPrefix := walkTarget(rawPath, absPath, stat.IsDir())
 	return walkInputs(ctx, walkTargetArgs{
 		fsys:          fsys,
 		walkRoot:      walkRoot,
 		displayPrefix: displayPrefix,
 		absPath:       absPath,
 		rootIsDir:     stat.IsDir(),
-		isForced:      isForced,
-		warnSkipped:   !op.FromStdin,
 	}, rc), 0
 }
 
-func resolveURL(ctx context.Context, rawPath string, isForced, forceExpand bool, rc resolveContext) ([]lx.InputFile, int) {
+// resolveURL fetches a named URL. Like a named path it is never filtered
+// itself; an archive's entries are.
+func resolveURL(ctx context.Context, rawPath string, forceExpand bool, rc resolveContext) ([]lx.InputFile, int) {
 	section := rc.section
 
 	if (section.RunCfg.ExpandArchives || forceExpand) && lx.IsHTTPArchiveURL(rawPath) {
-		if !isForced && !lx.IsKept(rawPath, nil, section.Excludes) {
-			slog.Debug("Skipping URL archive due to exclude filter", "url", rawPath)
-			return nil, 0
-		}
-
 		tempPath, cleanup, err := lx.DownloadURLToTempFile(ctx, rawPath)
 		if err != nil {
 			slog.Error("Failed to download URL archive", "url", rawPath, "error", err)
@@ -129,12 +113,7 @@ func resolveURL(ctx context.Context, rawPath string, isForced, forceExpand bool,
 		}
 		*rc.cleanups = append(*rc.cleanups, cleanup)
 
-		return expandArchive(ctx, tempPath, rawPath, isForced, rc, "Ignored in URL archive"), 0
-	}
-
-	if !isForced && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
-		slog.Debug("Skipping URL due to filters", "url", rawPath)
-		return nil, 0
+		return expandArchive(ctx, tempPath, rawPath, rc, "Ignored in URL archive"), 0
 	}
 
 	urlFile, err := lx.NewURLInputFile(rawPath)
@@ -147,28 +126,18 @@ func resolveURL(ctx context.Context, rawPath string, isForced, forceExpand bool,
 }
 
 // walkTarget decides which filesystem to walk and how discovered paths should be
-// displayed, applying the filters that reject a path outright. A file is
-// opened as walkRoot within fsys.
-func walkTarget(rawPath, absPath string, isDir, isForced bool, section Section) (fsys fs.FS, walkRoot, displayPrefix string, ok bool) {
+// displayed. A file is opened as walkRoot within fsys. As in ripgrep, a named
+// path is never filtered itself: a file is always included and a directory
+// always walked, whatever the ignore rules and the -i and -e filters say.
+func walkTarget(rawPath, absPath string, isDir bool) (fsys fs.FS, walkRoot, displayPrefix string) {
 	if isDir {
-		return os.DirFS(absPath), ".", filepath.Clean(rawPath), true
+		return os.DirFS(absPath), ".", filepath.Clean(rawPath)
 	}
-
-	isExpandableArchive := section.RunCfg.ExpandArchives && lx.IsArchivePath(rawPath)
-	if !isForced && !isExpandableArchive && !lx.IsKept(rawPath, section.Includes, section.Excludes) {
-		slog.Debug("Skipping file due to filters", "path", rawPath)
-		return nil, "", "", false
-	}
-	if !isForced && isExpandableArchive && !lx.IsKept(rawPath, nil, section.Excludes) {
-		slog.Debug("Skipping archive due to exclude filter", "path", rawPath)
-		return nil, "", "", false
-	}
-
 	rawPathClean := filepath.Clean(rawPath)
 	if !filepath.IsAbs(rawPathClean) && !strings.HasPrefix(rawPathClean, "..") {
-		return os.DirFS("."), filepath.ToSlash(rawPathClean), "", true
+		return os.DirFS("."), filepath.ToSlash(rawPathClean), ""
 	}
-	return os.DirFS(filepath.Dir(absPath)), filepath.Base(absPath), filepath.Dir(rawPathClean), true
+	return os.DirFS(filepath.Dir(absPath)), filepath.Base(absPath), filepath.Dir(rawPathClean)
 }
 
 type walkTargetArgs struct {
@@ -177,33 +146,25 @@ type walkTargetArgs struct {
 	displayPrefix string
 	absPath       string
 	rootIsDir     bool
-	isForced      bool
-	// warnSkipped reports a file root that is skipped as ignored. Paths
-	// piped in as a file list stay quiet, since they are often unfiltered.
-	warnSkipped bool
 }
 
 func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.InputFile {
 	section := rc.section
 	includeSpecs := lx.CompileSpecs(section.Includes)
 
-	// A forced path (-f) bypasses ignore rules entirely, as in git's add -f.
-	ignoreEnabled := !section.RunCfg.NoIgnore && !t.isForced
+	ignoreEnabled := !section.RunCfg.NoIgnore
 
 	var baseRules, gitExcludes, overrideRules []string
 	if ignoreEnabled {
 		baseRules = append(baseRules, rc.ignoreRules...)
 		gitExcludes = append(gitExcludes, rc.gitExcludes...)
 	}
-	if !t.isForced {
-		overrideRules = append(overrideRules, section.Excludes...)
-	}
+	overrideRules = append(overrideRules, section.Excludes...)
 
 	slog.Debug("Initializing Walker",
 		"walk_root", t.walkRoot,
 		"base_rules_count", len(baseRules),
 		"override_rules_count", len(overrideRules),
-		"is_forced", t.isForced,
 	)
 
 	opts := lx.WalkerOptions{
@@ -211,7 +172,7 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 		GitExcludes:       gitExcludes,
 		Override:          overrideRules,
 		IgnoreEnabled:     ignoreEnabled,
-		SkipHidden:        !section.RunCfg.ShowHidden && !t.isForced,
+		SkipHidden:        !section.RunCfg.ShowHidden,
 		FollowDirSymlinks: section.RunCfg.FollowDirSymlinks,
 		SkipFileSymlinks:  section.RunCfg.SkipFileSymlinks,
 		Cache:             rc.rules,
@@ -225,7 +186,7 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 
 	var files []lx.InputFile
 
-	rootSkipReason, err := walker.WalkPath(t.absPath, func(path string, d fs.DirEntry, err error) error {
+	err := walker.WalkPath(t.absPath, func(path string, d fs.DirEntry, err error) error {
 		if !t.rootIsDir {
 			// The walker names a file root by its base name; t.fsys
 			// opens it as walkRoot.
@@ -236,7 +197,7 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 			return nil
 		}
 		if d.IsDir() {
-			if !t.isForced && len(includeSpecs) > 0 && path != "." && !lx.CouldMatchAnyDescendant(includeSpecs, path) {
+			if len(includeSpecs) > 0 && path != "." && !lx.CouldMatchAnyDescendant(includeSpecs, path) {
 				return fs.SkipDir
 			}
 			return nil
@@ -249,11 +210,11 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 			if t.rootIsDir {
 				archiveAbsPath = filepath.Join(t.absPath, filepath.FromSlash(path))
 			}
-			files = append(files, expandArchive(ctx, archiveAbsPath, effectivePath, t.isForced, rc, "Ignored in archive")...)
+			files = append(files, expandArchive(ctx, archiveAbsPath, effectivePath, rc, "Ignored in archive")...)
 			return nil
 		}
 
-		if !t.isForced && len(includeSpecs) > 0 && !lx.IsMatchAnyCompiled(includeSpecs, path) {
+		if t.rootIsDir && len(includeSpecs) > 0 && !lx.IsMatchAnyCompiled(includeSpecs, path) {
 			slog.Debug("Ignored by include filter (-i)", "path", effectivePath)
 			return nil
 		}
@@ -290,12 +251,6 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 	if err != nil {
 		slog.Error("Walker traversal failed", "error", err)
 	}
-	// A file named directly that is skipped would otherwise vanish without a
-	// trace. Walked directories stay quiet, as skipping is their normal job.
-	if rootSkipReason != "" && t.warnSkipped && !t.isForced && !t.rootIsDir {
-		slog.Warn("Skipping path, use -f to include it",
-			"path", displayPath(t.walkRoot, t), "reason", rootSkipReason)
-	}
 	slog.Debug("Walker finished", "root", t.walkRoot, "files_matched", len(files))
 
 	return files
@@ -324,22 +279,17 @@ func inputAbsPath(path string, t walkTargetArgs) string {
 	return t.absPath
 }
 
-func expandArchive(ctx context.Context, absPath, displayPath string, isForced bool, rc resolveContext, ignoreMsg string) []lx.InputFile {
+func expandArchive(ctx context.Context, absPath, displayPath string, rc resolveContext, ignoreMsg string) []lx.InputFile {
 	var onIgnore func(p, reason string)
 	if rc.debug {
 		onIgnore = func(p, reason string) {
 			slog.Debug(ignoreMsg, "path", displayPath+"/"+p, "reason", reason)
 		}
 	}
-	archiveWalker := newArchiveWalker(rc.section.Excludes, rc.section.RunCfg.ShowHidden, isForced, onIgnore)
-
-	includes := rc.section.Includes
-	if isForced {
-		includes = nil
-	}
+	archiveWalker := newArchiveWalker(rc.section.Excludes, rc.section.RunCfg.ShowHidden, onIgnore)
 
 	collector := &fileCollector{}
-	if err := lx.ExpandArchive(ctx, absPath, displayPath, archiveWalker, includes, rc.outPath, collector); err != nil {
+	if err := lx.ExpandArchive(ctx, absPath, displayPath, archiveWalker, rc.section.Includes, rc.outPath, collector); err != nil {
 		slog.Error("Failed to expand archive", "path", displayPath, "error", err)
 	}
 	return collector.files

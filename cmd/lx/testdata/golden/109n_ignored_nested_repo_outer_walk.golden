@@ -1,8 +1,8 @@
 --- STDOUT ---
-sub/main.go (1 rows)
+main.go (1 rows)
 ---
 ```go
-package sub
+package main
 ```
 
 

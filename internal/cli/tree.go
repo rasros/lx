@@ -64,7 +64,7 @@ func computeSectionTrees(g *Section) {
 			flush()
 			subTreeIdxs = append(subTreeIdxs, oi)
 			subTreeOnly = true
-		case "FILE", "file":
+		case "FILE":
 			subFileIdxs = append(subFileIdxs, oi)
 		}
 	}

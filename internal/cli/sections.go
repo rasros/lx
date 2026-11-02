@@ -37,7 +37,7 @@ func parseSections(ops []Op, defaultRunCfg lx.RunnerConfig) []Section {
 			applyInterleaved(op, &current)
 			trailingOps = append(trailingOps, op)
 		case CmdAction:
-			if op.Action == "FILE" || op.Action == "file" {
+			if op.Action == "FILE" {
 				hasFiles = true
 				trailingOps = nil
 			}

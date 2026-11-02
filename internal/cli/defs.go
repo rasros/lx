@@ -236,7 +236,7 @@ and case-insensitive, matching how lx reports sizes elsewhere:
 The value must be greater than zero; there is no "unlimited" spelling, simply
 omit the flag.
 
-The limit applies to every input, including paths forced with -f. Inputs whose
+The limit applies to every input, including paths named directly. Inputs whose
 size is not known ahead of time, such as remote URLs, are never skipped.`,
 	},
 	{
@@ -432,7 +432,7 @@ A "section" is a set of consecutive file arguments with no interleaved
 options or section markers between them. Each section renders its own tree:
   lx -T src -s "Tests" test    (tree only for src, not test)
   lx -T src -i "*.go" lib      (two sections: tree for src, no tree for lib)
-  lx -T src -f extra -- file2  (one section: tree covers src, extra, file2)`,
+  lx -T src extra -- file2     (one section: tree covers src, extra, file2)`,
 	},
 	{
 		Category:  CatActions,
@@ -449,25 +449,6 @@ Behaves identically to -T except file contents are suppressed:
   lx -t .         (show tree of current directory)
 
 See --tree (-T) for full details on section semantics.`,
-	},
-	{
-		Category:  CatActions,
-		Name:      "file",
-		Short:     "f",
-		Type:      CmdAction,
-		ValueType: ValueAny,
-		Usage:     "Force process a specific path (bypasses ignores/filters)",
-		Long: `Force process a specific file path immediately.
-
-Unlike passing a path as a standard argument, using -f forces the file to be
-included even if it is:
-  - Listed in .gitignore
-  - Hidden (starts with .)
-  - Excluded by active -e filters
-  - Not included by active -i filters
-
-If the path is a directory, active filters (-i/-e) are preserved for the
-recursive walk, but hidden/.gitignore checks are still disabled.`,
 	},
 	{
 		Category:  CatActions,

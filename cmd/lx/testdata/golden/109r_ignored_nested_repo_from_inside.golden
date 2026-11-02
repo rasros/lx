@@ -1,0 +1,9 @@
+--- STDOUT ---
+i.go (1 rows)
+---
+```go
+package inner
+```
+
+
+--- STDERR ---

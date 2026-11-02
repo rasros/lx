@@ -1,0 +1,9 @@
+--- STDOUT ---
+.worktrees/wt/main.go (1 rows)
+---
+```go
+package main // worktree
+```
+
+
+--- STDERR ---

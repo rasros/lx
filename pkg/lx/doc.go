@@ -80,7 +80,7 @@
 //		w := lx.NewWalker(lx.WalkerOptions{IgnoreEnabled: true})
 //		root, _ := filepath.Abs(".")
 //		fsys := os.DirFS(root)
-//		_, _ = w.WalkPath(root, func(path string, d fs.DirEntry, err error) error {
+//		_ = w.WalkPath(root, func(path string, d fs.DirEntry, err error) error {
 //			if err != nil || d.IsDir() {
 //				return err
 //			}

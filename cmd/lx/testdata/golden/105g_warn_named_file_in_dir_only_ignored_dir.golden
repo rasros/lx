@@ -1,6 +1,0 @@
---- STDOUT ---
-
-
-
---- STDERR ---
-Warning: Skipping path, use -f to include it (path=build/out.js reason=parent directory build: rule "build/" in .gitignore)

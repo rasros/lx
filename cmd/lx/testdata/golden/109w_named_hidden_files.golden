@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] .kunitconfig (1 rows)
+---
+```
+re-included by a negation
+```
+
+[2/2] .hidden (1 rows)
+---
+```
+hidden
+```
+
+
+--- STDERR ---

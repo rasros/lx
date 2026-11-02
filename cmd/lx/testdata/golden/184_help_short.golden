@@ -49,7 +49,6 @@ Options:
   Action:
   -T, --tree                Print file tree for the section (with content)
   -t, --tree-only           Print a file tree for the section (no content)
-  -f, --file <value>        Force process a specific path (bypasses ignores/filters)
   -s, --section <value>     Insert a logical separator with a header
   -E, --system-context      Insert a block describing the machine and invocation
   -p, --prompt <value>      Inject a custom text prompt into the output

@@ -50,7 +50,6 @@ func TestGoldenRelativePaths(t *testing.T) {
 		{name: "241_relative_exclude_parent_dir", args: []string{"-e", "main*", ".."}},
 		{name: "242_relative_exclude_nested", args: []string{"-e", "*.txt", "../doc"}},
 		{name: "243_relative_hidden_override", args: []string{"-H", "../.hidden"}},
-		{name: "244_relative_force_include", args: []string{"-f", "../.gitignore"}},
 
 		// --- 250-259: Slicing with Relative Paths ---
 		{name: "250_relative_lines_limit", args: []string{"-n", "2", "../main.go"}},
