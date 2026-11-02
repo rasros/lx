@@ -216,6 +216,7 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 
 	walker := lx.NewWalker(baseRules, overrideRules)
 	walker.IgnoreEnabled = ignoreEnabled
+	walker.FSRoot = t.fsysRoot
 	if walker.IgnoreEnabled && t.fsysRoot != "" {
 		if st, ok := rc.ancestorRules[t.fsysRoot]; ok {
 			walker.AncestorRules, walker.RootIgnored = st.rules, st.rootIgnored

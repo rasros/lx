@@ -1,9 +1,11 @@
 package walker
 
 import (
-	"bufio"
-	"bytes"
+	"errors"
+	"io/fs"
+	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -17,7 +19,8 @@ import (
 //     root, or outside a repository up to the working directory when dir is
 //     below it.
 //
-// dir's own ignore files are left to the walk.
+// When dir is itself a repository root there is nothing above it to load:
+// the walk reads that repository's info/exclude at its boundary.
 //
 // It also sets RootIgnored when dir or a directory above it is ignored,
 // checking each directory from the top down with the rules that apply at its
@@ -27,21 +30,23 @@ func (w *Walker) LoadAncestorRules(dir string) {
 	w.RootIgnored = false
 	dir = filepath.Clean(dir)
 
-	levels := make([]int, len(w.BaseRules))
-	if repo, ok := findRepoRoot(dir); ok {
-		for _, r := range loadInfoExclude(repo, dir) {
-			w.AncestorRules = append(w.AncestorRules, r)
-			levels = append(levels, 0)
-		}
-	}
-
-	root, ok := ancestorRoot(dir)
+	root, isRepo, ok := ancestorRoot(dir)
 	if !ok || root == dir {
 		return
 	}
 	parts, ok := relParts(root, dir)
 	if !ok {
 		return
+	}
+
+	levels := make([]int, len(w.BaseRules))
+	if isRepo {
+		offset := strings.Join(parts, "/") + "/"
+		for _, r := range infoExcludeRules(root, ".") {
+			r.PathOffset = offset
+			w.AncestorRules = append(w.AncestorRules, r)
+			levels = append(levels, 0)
+		}
 	}
 
 	cur := root
@@ -80,37 +85,58 @@ func (w *Walker) dirIgnored(parts []string, i int, levels []int) bool {
 	return ignored
 }
 
-// loadInfoExclude reads the info/exclude rules of the repository rooted at
-// repo, offset so they match paths relative to dir.
-func loadInfoExclude(repo, dir string) []Rule {
+// repoRules reports whether the walk-relative directory dir is the root of a
+// git repository, and if so returns the rules that replace everything
+// inherited from outside it: BaseRules, which apply to every repository, and
+// the repository's own info/exclude. Git never applies one repository's
+// ignore rules inside another, including submodules.
+func (w *Walker) repoRules(fsys fs.FS, dir string) ([]Rule, bool) {
+	if _, err := fs.Stat(fsys, path.Join(dir, ".git")); err != nil {
+		return nil, false
+	}
+	rules := make([]Rule, 0, len(w.BaseRules))
+	rules = append(rules, w.BaseRules...)
+	if w.FSRoot != "" {
+		rules = append(rules, infoExcludeRules(filepath.Join(w.FSRoot, filepath.FromSlash(dir)), dir)...)
+	} else {
+		p := path.Join(dir, ".git", "info", "exclude")
+		data, err := fs.ReadFile(fsys, p)
+		logReadError(p, err)
+		if err == nil {
+			rules = append(rules, parseRuleFile(data, dir, p)...)
+		}
+	}
+	return rules, true
+}
+
+// infoExcludeRules reads the info/exclude rules of the repository rooted at
+// the absolute path repo, scoped to basePath within the walk.
+func infoExcludeRules(repo, basePath string) []Rule {
 	gitDir, ok := resolveGitDir(repo)
 	if !ok {
 		return nil
 	}
-	path := filepath.Join(commonGitDir(gitDir), "info", "exclude")
-	data, err := os.ReadFile(path)
+	p := filepath.Join(commonGitDir(gitDir), "info", "exclude")
+	data, err := os.ReadFile(p)
+	logReadError(p, err)
 	if err != nil {
 		return nil
 	}
+	return parseRuleFile(data, basePath, p)
+}
 
-	var lines []string
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	for sc.Scan() {
-		lines = append(lines, sc.Text())
-	}
-	rules := parseRules(lines, ".", path)
+// parseRuleFile parses an ignore file. It splits on newlines rather than
+// scanning, so no line length limit can drop the rules after a long line.
+func parseRuleFile(data []byte, basePath, source string) []Rule {
+	return parseRules(strings.Split(string(data), "\n"), basePath, source)
+}
 
-	if repo != dir {
-		parts, ok := relParts(repo, dir)
-		if !ok {
-			return nil
-		}
-		offset := strings.Join(parts, "/") + "/"
-		for i := range rules {
-			rules[i].PathOffset = offset
-		}
+// logReadError records why a rule file that exists could not be read, so a
+// silently missing set of rules shows up in --debug output.
+func logReadError(path string, err error) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		slog.Debug("Failed to read ignore rules", "path", path, "error", err)
 	}
-	return rules
 }
 
 // resolveGitDir returns the git directory for the repository rooted at repo.
@@ -119,6 +145,7 @@ func resolveGitDir(repo string) (string, bool) {
 	dotGit := filepath.Join(repo, ".git")
 	info, err := os.Stat(dotGit)
 	if err != nil {
+		logReadError(dotGit, err)
 		return "", false
 	}
 	if info.IsDir() {
@@ -127,35 +154,45 @@ func resolveGitDir(repo string) (string, bool) {
 
 	data, err := os.ReadFile(dotGit)
 	if err != nil {
+		logReadError(dotGit, err)
 		return "", false
 	}
 	line := strings.TrimSpace(strings.SplitN(string(data), "\n", 2)[0])
 	target, ok := strings.CutPrefix(line, "gitdir:")
 	if !ok {
+		slog.Debug("Ignoring .git file without a gitdir line", "path", dotGit)
 		return "", false
 	}
-	target = strings.TrimSpace(target)
-	if !filepath.IsAbs(target) {
-		target = filepath.Join(repo, target)
-	}
-	return filepath.Clean(target), true
+	return resolveRelative(repo, strings.TrimSpace(target)), true
 }
 
 // commonGitDir returns the directory shared by all worktrees of gitDir,
 // which holds info/exclude. Without a commondir file it is gitDir itself.
 func commonGitDir(gitDir string) string {
-	data, err := os.ReadFile(filepath.Join(gitDir, "commondir"))
+	p := filepath.Join(gitDir, "commondir")
+	data, err := os.ReadFile(p)
 	if err != nil {
+		logReadError(p, err)
 		return gitDir
 	}
 	common := strings.TrimSpace(string(data))
 	if common == "" {
 		return gitDir
 	}
-	if !filepath.IsAbs(common) {
-		common = filepath.Join(gitDir, common)
+	return resolveRelative(gitDir, common)
+}
+
+// resolveRelative resolves target against base the way the filesystem does.
+// filepath.Join would collapse ".." textually, which goes wrong when base is
+// reached through a symlink, so base is made real first.
+func resolveRelative(base, target string) string {
+	if filepath.IsAbs(target) {
+		return filepath.Clean(target)
 	}
-	return filepath.Clean(common)
+	if real, err := filepath.EvalSymlinks(base); err == nil {
+		base = real
+	}
+	return filepath.Join(base, target)
 }
 
 // relParts splits dir's path relative to root into slash-free components.
@@ -167,20 +204,22 @@ func relParts(root, dir string) ([]string, bool) {
 	return strings.Split(filepath.ToSlash(rel), "/"), true
 }
 
-// ancestorRoot picks the highest directory whose ignore files apply to dir.
-func ancestorRoot(dir string) (string, bool) {
+// ancestorRoot picks the highest directory whose ignore files apply to dir:
+// the enclosing repository's root, or outside a repository the working
+// directory when dir is below it. isRepo reports which.
+func ancestorRoot(dir string) (root string, isRepo, ok bool) {
 	if root, ok := findRepoRoot(dir); ok {
-		return root, true
+		return root, true, true
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", false
+		return "", false, false
 	}
 	rel, err := filepath.Rel(cwd, dir)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", false
+		return "", false, false
 	}
-	return cwd, true
+	return cwd, false, true
 }
 
 // findRepoRoot returns the nearest directory at or above dir that holds a

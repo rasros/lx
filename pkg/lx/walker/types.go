@@ -25,7 +25,11 @@ type Walker struct {
 	AncestorRules []Rule
 	// RootIgnored reports that the walk root or a directory above it is
 	// ignored. As in git, nothing below an ignored directory is included.
-	RootIgnored   bool
+	RootIgnored bool
+	// FSRoot is the absolute directory the walked filesystem is rooted at.
+	// It lets a nested repository's .git file, which may point outside that
+	// filesystem, be followed to its info/exclude.
+	FSRoot        string
 	OverrideRules []Rule
 	IgnoreEnabled bool
 	SkipHidden    bool
