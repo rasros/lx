@@ -243,6 +243,14 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 			slog.Error("Failed to stat file in walk", "path", path, "error", err)
 			return nil
 		}
+		// A walked symlink reports the link's own size (its target path
+		// length); the content reader is bounded by Size, so use the target's.
+		// Broken links keep the link info and fail later when opened.
+		if info.Mode()&fs.ModeSymlink != 0 {
+			if target, statErr := fs.Stat(t.fsys, path); statErr == nil {
+				info = target
+			}
+		}
 
 		f := lx.NewInputFile(t.fsys, path, info)
 		f.Path = effectivePath

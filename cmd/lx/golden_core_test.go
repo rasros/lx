@@ -84,6 +84,7 @@ func TestGoldenSlicing(t *testing.T) {
 func TestGoldenSymlinks(t *testing.T) {
 	dir := setupSymlinksFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
+		{name: "049_symlinks_relative_target", args: []string{"rellinks"}},
 		{name: "050_symlinks_default", args: []string{"links"}},
 		{name: "051_symlinks_follow", args: []string{"--follow", "links"}},
 		{name: "052_symlinks_dag", args: []string{"--follow", "links/loop"}},

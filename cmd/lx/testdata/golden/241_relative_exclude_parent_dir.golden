@@ -38,7 +38,7 @@ a
 b
 ```
 
-[8/12] ../links/link_to_main.go (~1 rows)
+[8/12] ../links/link_to_main.go (2 rows)
 ---
 ```go
 package main

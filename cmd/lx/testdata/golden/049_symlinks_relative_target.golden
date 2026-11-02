@@ -1,0 +1,10 @@
+--- STDOUT ---
+rellinks/main.go (2 rows)
+---
+```go
+package main
+func main() {}
+```
+
+
+--- STDERR ---
