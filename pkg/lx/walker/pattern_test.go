@@ -259,6 +259,18 @@ func TestCouldMatchAnyDescendant(t *testing.T) {
 			want:     false,
 		},
 		{
+			name:     "wildcard inside a directory name keeps that directory",
+			patterns: []string{"src*/x.go"},
+			dir:      "srcfoo",
+			want:     true,
+		},
+		{
+			name:     "escape inside a directory name keeps that directory",
+			patterns: []string{`lit\*/a.go`},
+			dir:      "lit*",
+			want:     true,
+		},
+		{
 			name:     "star with fixed prefix keeps matching subtree",
 			patterns: []string{"scripts/*bpf_doc.py"},
 			dir:      "scripts/tools",
