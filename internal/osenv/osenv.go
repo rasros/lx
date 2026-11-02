@@ -39,7 +39,9 @@ func Home(env Lookup) (string, error) {
 	return "", errors.New("$" + key + " is not defined")
 }
 
-// Config returns the user's config directory, as os.UserConfigDir does.
+// Config returns the user's config directory, as os.UserConfigDir does, but
+// for a relative $XDG_CONFIG_HOME, which it ignores as the XDG spec says
+// instead of failing.
 func Config(env Lookup) (string, error) {
 	switch runtime.GOOS {
 	case "windows":
@@ -60,15 +62,20 @@ func Config(env Lookup) (string, error) {
 		}
 		return filepath.Join(home, "lib"), nil
 	}
-	if dir := env.Get("XDG_CONFIG_HOME"); dir != "" {
-		if !filepath.IsAbs(dir) {
-			return "", errors.New("path in $XDG_CONFIG_HOME is relative")
-		}
+	if dir := XDGConfigHome(env); dir != "" {
 		return dir, nil
 	}
-	home := env.Get("HOME")
-	if home == "" {
-		return "", errors.New("neither $XDG_CONFIG_HOME nor $HOME are defined")
+	return "", errors.New("neither $XDG_CONFIG_HOME nor $HOME are defined")
+}
+
+// XDGConfigHome returns $XDG_CONFIG_HOME, or ~/.config when it is unset or
+// relative, which the XDG spec says to ignore; "" without a home either.
+func XDGConfigHome(env Lookup) string {
+	if dir := env.Get("XDG_CONFIG_HOME"); filepath.IsAbs(dir) {
+		return dir
 	}
-	return filepath.Join(home, ".config"), nil
+	if home, err := Home(env); err == nil {
+		return filepath.Join(home, ".config")
+	}
+	return ""
 }
