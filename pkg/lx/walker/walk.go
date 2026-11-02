@@ -45,7 +45,10 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 
 		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(w.AncestorRules)+len(localRules)+len(w.OverrideRules))
 		effectiveRules = append(effectiveRules, w.BaseRules...)
-		effectiveRules = append(effectiveRules, w.AncestorRules...)
+		for _, r := range w.AncestorRules {
+			r.offsetFloats = true
+			effectiveRules = append(effectiveRules, r)
+		}
 		effectiveRules = append(effectiveRules, localRules...)
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 

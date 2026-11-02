@@ -21,6 +21,7 @@ type StatsContext = core.StatsContext
 
 type InputFile = sources.InputFile
 type Walker = walkerpkg.Walker
+type Rule = walkerpkg.Rule
 type CompiledSpec = walkerpkg.CompiledSpec
 
 type FileErrorHandler = streamingpkg.FileErrorHandler

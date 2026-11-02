@@ -18,15 +18,38 @@ type pathMatchInfo struct {
 }
 
 // offsetPathInfo rewrites a walk-relative path for a rule loaded above the
-// walk root.
-func offsetPathInfo(offset string, ctx pathMatchInfo) pathMatchInfo {
+// walk root. With offsetFloats, floating patterns may also match the offset's
+// directories, as they lead to a named file rather than a named directory.
+func offsetPathInfo(offset string, offsetFloats bool, ctx pathMatchInfo) pathMatchInfo {
 	full := offset + ctx.relPath
 	if ctx.relPath == "." {
 		full = strings.TrimSuffix(offset, "/")
 	}
 	info := buildPathMatchInfo(full)
-	info.floatFrom = strings.Count(offset, "/")
+	if !offsetFloats {
+		info.floatFrom = strings.Count(offset, "/")
+	}
 	return info
+}
+
+// offsetInfoCache keeps the last offset rewrite of one path, so consecutive
+// rules loaded from the same ancestor directory share it.
+type offsetInfoCache struct {
+	set    bool
+	offset string
+	floats bool
+	info   pathMatchInfo
+}
+
+func (c *offsetInfoCache) get(offset string, floats bool, ctx pathMatchInfo) pathMatchInfo {
+	if c == nil {
+		return offsetPathInfo(offset, floats, ctx)
+	}
+	if !c.set || c.offset != offset || c.floats != floats {
+		c.set, c.offset, c.floats = true, offset, floats
+		c.info = offsetPathInfo(offset, floats, ctx)
+	}
+	return c.info
 }
 
 var dotPathMatchInfo = pathMatchInfo{
@@ -108,17 +131,17 @@ func matchCompiledSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 }
 
 func match(rule Rule, relPath string, isDir bool) bool {
-	return matchWithPathInfo(rule, buildPathMatchInfo(relPath), isDir)
+	return matchWithPathInfo(rule, buildPathMatchInfo(relPath), isDir, nil)
 }
 
-func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool) bool {
+func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool, offsets *offsetInfoCache) bool {
 	if rule.Spec.DirOnly && !isDir {
 		return false
 	}
 
 	target := ctx
 	if rule.PathOffset != "" {
-		target = offsetPathInfo(rule.PathOffset, ctx)
+		target = offsets.get(rule.PathOffset, rule.offsetFloats, ctx)
 	} else if rule.BasePathPrefix != "" {
 		if !strings.HasPrefix(ctx.relPath, rule.BasePathPrefix) && ctx.relPath != rule.BasePath {
 			return false
@@ -141,9 +164,10 @@ func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool, w
 		reason = "parent directory"
 	}
 	ctx := buildPathMatchInfo(relPath)
+	var offsets offsetInfoCache
 
 	for _, rule := range rules {
-		if matchWithPathInfo(rule, ctx, isDir) {
+		if matchWithPathInfo(rule, ctx, isDir, &offsets) {
 			if rule.Negate {
 				ignored = false
 				if wantReason {

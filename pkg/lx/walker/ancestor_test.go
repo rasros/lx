@@ -1,6 +1,7 @@
 package walker
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,6 +34,25 @@ func TestMatch_PathOffsetNeverExcludesWalkRoot(t *testing.T) {
 	}
 	if !match(rule, "nested/dist", true) {
 		t.Fatal("expected the rule to still match a matching directory below the root")
+	}
+}
+
+func TestWalk_SingleFileAncestorRuleMatchesParentDir(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, filepath.Join(dir, "out.js"), "x")
+
+	w := NewWalker(nil, nil)
+	w.AncestorRules = []Rule{offsetRule(t, "dist", "dist/")}
+	var walked []string
+	err := w.Walk(os.DirFS(dir), "out.js", func(p string, _ fs.DirEntry, err error) error {
+		walked = append(walked, p)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(walked) != 0 {
+		t.Fatalf("expected a file below an ignored parent to be ignored, got %v", walked)
 	}
 }
 
@@ -88,6 +108,9 @@ func TestLoadAncestorRules_StopsAtRepoRoot(t *testing.T) {
 
 func TestLoadAncestorRules_OutsideRepoUsesWorkingDir(t *testing.T) {
 	cwd := t.TempDir()
+	if repo, ok := findRepoRoot(cwd); ok {
+		t.Skipf("temp dir is inside git repository %s", repo)
+	}
 	writeTestFile(t, filepath.Join(cwd, ".lxignore"), "*.tmp\n")
 	sub := filepath.Join(cwd, "sub")
 	if err := os.MkdirAll(sub, 0755); err != nil {
