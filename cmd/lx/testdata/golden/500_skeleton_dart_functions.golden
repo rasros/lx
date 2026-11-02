@@ -2,6 +2,16 @@
 skeleton/main.dart (30 rows, function signatures)
 ---
 ```dart
+/// An animal with a name and species.
+class Animal {
+...
+  Animal(this.name, this.species);
+...
+  // Make the animal speak.
+  String speak() {
+...
+}
+...
 /* Greet a person by name. */
 String greet(String name) {
 ...

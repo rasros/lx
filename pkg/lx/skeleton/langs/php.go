@@ -4,45 +4,14 @@ import (
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-func PHPEmitClass(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	isInterface := n.Type(lang) == "interface_declaration"
-	body := findChildByType(n, "declaration_list", lang)
-	if body == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerStart := int(n.StartPoint().Row)
-	headerEnd := int(body.StartPoint().Row)
-	out = internal.KeepLines(out, lines, headerStart, headerEnd)
-	for i := 0; i < body.ChildCount(); i++ {
-		child := body.Child(i)
-		if !isInterface && phpIsPrivate(child, src, lang) {
-			continue
-		}
-		switch child.Type(lang) {
-		case "property_declaration":
-			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-		case "method_declaration":
-			if functions {
-				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
-				out = emitFuncSig(out, lines, child, lang, false, "")
-			}
-		case "const_declaration":
-			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-		}
-	}
-	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
-}
-
-func phpIsPrivate(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	vis := findChildByType(n, "visibility_modifier", lang)
-	if vis == nil {
+// PHPPrivate reports a private member of a class; interface members are all
+// public.
+func PHPPrivate(c *Ctx, parent, n *gotreesitter.Node) bool {
+	if c.Type(parent) == "interface_declaration" {
 		return false
 	}
-	return strings.TrimSpace(vis.Text(src)) == "private"
+	vis := findChildByType(n, "visibility_modifier", c.Lang)
+	return vis != nil && strings.TrimSpace(c.Text(vis)) == "private"
 }

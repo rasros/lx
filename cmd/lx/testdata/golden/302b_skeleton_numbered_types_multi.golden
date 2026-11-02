@@ -28,7 +28,7 @@
 ```typescript
  1: /** Geometric shape contract. */
  2: export interface Shape {
- 3:     area(): number;
+...
  4:     name: string; // display label
  5: }
 ...

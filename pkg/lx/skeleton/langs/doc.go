@@ -5,27 +5,85 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
+// CommentSyntax says which lines above a declaration make up its leading
+// doc block in one language: its comments, and attributes written on lines
+// of their own outside the declaration's syntax node.
+type CommentSyntax struct {
+	// Prefixes are line starts (after indentation) that continue a doc
+	// block: line comments, block comment openers and "*" continuation or
+	// closing lines, and attribute markers such as Rust's "#".
+	Prefixes []string
+	// Blocks are multi-line comments: a line that ends one is followed up
+	// to the line that opens it.
+	Blocks []BlockComment
+}
+
+// BlockComment is a multi-line comment's delimiters.
+type BlockComment struct {
+	Open, Close string
+	// WholeLine delimiters stand alone on their line, as Ruby's =begin and
+	// =end do.
+	WholeLine bool
+}
+
+var (
+	// CComments is // and /* */ with "*" continuation lines, the comment
+	// syntax of the brace languages. Preprocessor lines (#include, #define,
+	// #region) are not comments.
+	CComments = CommentSyntax{
+		Prefixes: []string{"//", "/*", "*"},
+		Blocks:   []BlockComment{{Open: "/*", Close: "*/"}},
+	}
+	// RustComments is CComments plus "#" attribute lines such as
+	// #[derive(Debug)], which are sibling nodes of the item they annotate.
+	RustComments = CommentSyntax{
+		Prefixes: []string{"//", "/*", "*", "#"},
+		Blocks:   CComments.Blocks,
+	}
+	// PHPComments is CComments plus # comments and #[Attribute] lines.
+	PHPComments = RustComments
+	// ZigComments is // only: Zig has no block comments.
+	ZigComments = CommentSyntax{Prefixes: []string{"//"}}
+	// HashComments is # line comments (Python).
+	HashComments = CommentSyntax{Prefixes: []string{"#"}}
+	// RubyComments is # and =begin/=end.
+	RubyComments = CommentSyntax{
+		Prefixes: []string{"#", "=begin"},
+		Blocks:   []BlockComment{{Open: "=begin", Close: "=end", WholeLine: true}},
+	}
+	// HaskellComments is -- and {- -}.
+	HaskellComments = CommentSyntax{
+		Prefixes: []string{"--", "{-", "-}"},
+		Blocks:   []BlockComment{{Open: "{-", Close: "-}"}},
+	}
+	// OCamlComments is (* *) with "*" continuation lines.
+	OCamlComments = CommentSyntax{
+		Prefixes: []string{"(*", "*"},
+		Blocks:   []BlockComment{{Open: "(*", Close: "*)"}},
+	}
+)
+
 // LeadingDocStart returns the first row of a contiguous comment block
 // immediately preceding row, or row itself if there is none. A blank line
 // terminates the block.
-func LeadingDocStart(lines [][]byte, row int) int {
+func (cs *CommentSyntax) LeadingDocStart(lines [][]byte, row int) int {
 	r := row - 1
 	for r >= 0 {
 		line := lines[r]
 		if isBlankLine(line) {
 			break
 		}
-		if isDocCommentLine(line) {
+		if cs.isDocLine(line) {
 			r--
 			continue
 		}
-		closer, opener := blockCommentClosers(line)
-		if closer == "" {
+		block, ok := cs.closedBlock(line)
+		if !ok {
 			break
 		}
 		found := false
 		for r >= 0 {
-			if hasOpener(lines[r], opener) {
+			if block.opens(lines[r]) {
 				r--
 				found = true
 				break
@@ -42,23 +100,24 @@ func LeadingDocStart(lines [][]byte, row int) int {
 	return row
 }
 
-// EmitWithDoc appends [LeadingDocStart(lines, startRow) .. endRow] to out.
-func EmitWithDoc(out []internal.LineRange, lines [][]byte, startRow, endRow int) []internal.LineRange {
-	return internal.KeepLines(out, lines, LeadingDocStart(lines, startRow), endRow)
+// EmitLeadingDoc appends only the leading doc block above row, if any.
+func (c *Ctx) EmitLeadingDoc(out []internal.LineRange, row int) []internal.LineRange {
+	docStart := c.Comments.LeadingDocStart(c.Lines, row)
+	if docStart < row {
+		return internal.KeepLines(out, c.Lines, docStart, row-1)
+	}
+	return out
+}
+
+// EmitWithDoc appends the leading doc block above startRow and the rows
+// startRow..endRow.
+func (c *Ctx) EmitWithDoc(out []internal.LineRange, startRow, endRow int) []internal.LineRange {
+	return internal.KeepLines(out, c.Lines, c.Comments.LeadingDocStart(c.Lines, startRow), endRow)
 }
 
 // EmitLineWithDoc appends the leading doc block plus row itself.
-func EmitLineWithDoc(out []internal.LineRange, lines [][]byte, row int) []internal.LineRange {
-	return EmitWithDoc(out, lines, row, row)
-}
-
-// EmitLeadingDoc appends only the leading doc block above row, if any.
-func EmitLeadingDoc(out []internal.LineRange, lines [][]byte, row int) []internal.LineRange {
-	docStart := LeadingDocStart(lines, row)
-	if docStart < row {
-		return internal.KeepLines(out, lines, docStart, row-1)
-	}
-	return out
+func (c *Ctx) EmitLineWithDoc(out []internal.LineRange, row int) []internal.LineRange {
+	return c.EmitWithDoc(out, row, row)
 }
 
 // AppendPyDocstring appends the Python docstring (if any) of n's body to out.
@@ -95,70 +154,46 @@ func PyDocstring(n *gotreesitter.Node, lang *gotreesitter.Language) (int, int) {
 	return -1, -1
 }
 
-func isDocCommentLine(line []byte) bool {
-	i := 0
-	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
-		i++
-	}
-	if i == len(line) {
+func (cs *CommentSyntax) isDocLine(line []byte) bool {
+	s := trimLeadingSpace(line)
+	if len(s) == 0 {
 		return false
 	}
-	s := line[i:]
-	switch {
-	case hasPrefix(s, "///"), hasPrefix(s, "//!"), hasPrefix(s, "//"):
-		return true
-	case hasPrefix(s, "/**"), hasPrefix(s, "/*!"), hasPrefix(s, "/*"):
-		return true
-	case hasPrefix(s, "*/"):
-		return true
-	case s[0] == '*':
-		return true
-	case s[0] == '#':
-		return true
-	case hasPrefix(s, "--"):
-		return true
-	case hasPrefix(s, "{-"), hasPrefix(s, "-}"):
-		return true
-	case hasPrefix(s, "(*"), hasPrefix(s, "*)"):
-		return true
-	case hasPrefix(s, "=begin"):
-		// =end is handled by blockCommentClosers, not here.
-		return true
+	for _, p := range cs.Prefixes {
+		if hasPrefix(s, p) {
+			return true
+		}
 	}
 	return false
 }
 
-func blockCommentClosers(line []byte) (string, string) {
+// closedBlock returns the block comment that line ends, if any.
+func (cs *CommentSyntax) closedBlock(line []byte) (BlockComment, bool) {
 	end := trimTrailingSpace(line)
-	for _, p := range [...]struct{ closer, opener string }{
-		{"*/", "/*"},
-		{"*)", "(*"},
-		{"-}", "{-"},
-	} {
-		if !hasSuffix(end, p.closer) {
+	for _, b := range cs.Blocks {
+		if b.WholeLine {
+			if equalTrimmed(line, b.Close) {
+				return b, true
+			}
+			continue
+		}
+		if !hasSuffix(end, b.Close) {
 			continue
 		}
 		// Self-contained inline (e.g. `int x; /* note */`) is not a multi-line closer.
-		if bytesContains(end[:len(end)-len(p.closer)], p.opener) {
-			return "", ""
+		if bytesContains(end[:len(end)-len(b.Close)], b.Open) {
+			return BlockComment{}, false
 		}
-		return p.closer, p.opener
+		return b, true
 	}
-	if equalTrimmed(line, "=end") {
-		return "=end", "=begin"
-	}
-	return "", ""
+	return BlockComment{}, false
 }
 
-func hasOpener(line []byte, opener string) bool {
-	if opener == "=begin" {
-		return equalTrimmed(line, "=begin")
+func (b BlockComment) opens(line []byte) bool {
+	if b.WholeLine {
+		return equalTrimmed(line, b.Open)
 	}
-	i := 0
-	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
-		i++
-	}
-	return hasPrefix(line[i:], opener)
+	return hasPrefix(trimLeadingSpace(line), b.Open)
 }
 
 func isBlankLine(line []byte) bool {
@@ -168,6 +203,14 @@ func isBlankLine(line []byte) bool {
 		}
 	}
 	return true
+}
+
+func trimLeadingSpace(line []byte) []byte {
+	i := 0
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	return line[i:]
 }
 
 func trimTrailingSpace(line []byte) []byte {
@@ -183,70 +226,20 @@ func trimTrailingSpace(line []byte) []byte {
 }
 
 func hasPrefix(s []byte, p string) bool {
-	if len(s) < len(p) {
-		return false
-	}
-	for i := 0; i < len(p); i++ {
-		if s[i] != p[i] {
-			return false
-		}
-	}
-	return true
+	return len(s) >= len(p) && string(s[:len(p)]) == p
 }
 
 func hasSuffix(s []byte, suf string) bool {
-	if len(s) < len(suf) {
-		return false
-	}
-	off := len(s) - len(suf)
-	for i := 0; i < len(suf); i++ {
-		if s[off+i] != suf[i] {
-			return false
-		}
-	}
-	return true
+	return len(s) >= len(suf) && string(s[len(s)-len(suf):]) == suf
 }
 
 func equalTrimmed(line []byte, want string) bool {
-	i := 0
-	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
-		i++
-	}
-	end := len(line)
-	for end > i {
-		c := line[end-1]
-		if c != ' ' && c != '\t' && c != '\r' {
-			break
-		}
-		end--
-	}
-	if end-i != len(want) {
-		return false
-	}
-	for k := 0; k < len(want); k++ {
-		if line[i+k] != want[k] {
-			return false
-		}
-	}
-	return true
+	return string(trimTrailingSpace(trimLeadingSpace(line))) == want
 }
 
 func bytesContains(s []byte, sub string) bool {
-	if len(sub) == 0 {
-		return true
-	}
-	if len(s) < len(sub) {
-		return false
-	}
 	for i := 0; i+len(sub) <= len(s); i++ {
-		match := true
-		for j := 0; j < len(sub); j++ {
-			if s[i+j] != sub[j] {
-				match = false
-				break
-			}
-		}
-		if match {
+		if string(s[i:i+len(sub)]) == sub {
 			return true
 		}
 	}

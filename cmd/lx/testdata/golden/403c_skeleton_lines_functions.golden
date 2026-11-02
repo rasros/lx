@@ -2,9 +2,9 @@
 [1/2] skeleton/main.go (32 rows, function signatures)
 ---
 ```go
-// NewPerson creates a Person with the given name.
-func NewPerson(name string) Person {
-... (7 rows skipped)
+/* Worker defines the work contract. */
+type Worker interface {
+... (13 rows skipped)
 ) Person {
 ...
 func (p Person) Greet() string {
@@ -13,10 +13,9 @@ func (p Person) Greet() string {
 [2/2] skeleton/main.py (31 rows, function signatures)
 ---
 ```python
-def top_level():
-...
-# factory helper
-... (2 rows skipped)
+class Animal:
+    """Base class for all animals."""
+... (20 rows skipped)
     tag: str = "default",
 ) -> "Animal":
 ```

@@ -12,83 +12,93 @@ func PyFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language
 	return name != nil && !isPrivateName(name.Text(src))
 }
 
-func PyEmitClass(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	nameNode := n.ChildByFieldName("name", lang)
-	if nameNode == nil || isPrivateName(nameNode.Text(src)) {
+// PyEmitClass emits a Python class. It stays custom because the body is
+// indentation, not braces: there is no closing row, the header ends the row
+// before the body, the docstring belongs with the header, members can be
+// wrapped in decorated_definition, class variables are bare assignment
+// statements kept by their first line, and visibility is a "_" name prefix.
+func PyEmitClass(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+	nameNode := n.ChildByFieldName("name", c.Lang)
+	if nameNode == nil || isPrivateName(c.Text(nameNode)) {
 		return out
 	}
-	bodyNode := n.ChildByFieldName("body", lang)
+	bodyNode := n.ChildByFieldName("body", c.Lang)
 	if bodyNode == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		if !c.Structs {
+			return out
+		}
+		return c.KeepNode(out, n)
 	}
-	out = internal.KeepLines(out, lines, int(n.StartPoint().Row), int(bodyNode.StartPoint().Row)-1)
-	out = AppendPyDocstring(out, lines, n, lang)
+	var inner []internal.LineRange
 	for i := 0; i < bodyNode.ChildCount(); i++ {
-		out = pyProcessMember(out, src, lines, bodyNode.Child(i), lang, functions)
+		inner = pyProcessMember(c, inner, bodyNode.Child(i))
 	}
-	return out
+	if !c.Structs && len(inner) == 0 {
+		return out
+	}
+	out = internal.KeepLines(out, c.Lines, startRow(n), startRow(bodyNode)-1)
+	out = AppendPyDocstring(out, c.Lines, n, c.Lang)
+	return append(out, inner...)
 }
 
-func pyProcessMember(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
+func pyProcessMember(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	actual := n
-	if n.Type(lang) == "decorated_definition" {
-		if defNode := n.ChildByFieldName("definition", lang); defNode != nil {
+	if c.Type(n) == "decorated_definition" {
+		if defNode := n.ChildByFieldName("definition", c.Lang); defNode != nil {
 			actual = defNode
 		}
 	}
-	outerStart := int(n.StartPoint().Row)
-	switch actual.Type(lang) {
+	outerStart := startRow(n)
+	switch c.Type(actual) {
 	case "function_definition":
-		if !functions {
+		if !c.Functions {
 			return out
 		}
-		nameNode := actual.ChildByFieldName("name", lang)
-		if nameNode == nil || isPrivateName(nameNode.Text(src)) {
+		nameNode := actual.ChildByFieldName("name", c.Lang)
+		if nameNode == nil || isPrivateName(c.Text(nameNode)) {
 			return out
 		}
-		out = EmitLeadingDoc(out, lines, outerStart)
-		out = EmitDecorators(out, lines, outerStart, int(actual.StartPoint().Row))
-		out = emitFuncSig(out, lines, actual, lang, true, "")
-		out = AppendPyDocstring(out, lines, actual, lang)
-		return out
+		out = c.EmitLeadingDoc(out, outerStart)
+		out = EmitDecorators(out, c.Lines, outerStart, startRow(actual))
+		out = EmitFuncSig(out, c.Lines, actual, c.Lang, true, "")
+		return AppendPyDocstring(out, c.Lines, actual, c.Lang)
 	case "class_definition":
-		out = EmitLeadingDoc(out, lines, outerStart)
-		out = EmitDecorators(out, lines, outerStart, int(actual.StartPoint().Row))
-		return PyEmitClass(out, src, lines, actual, lang, functions)
+		sub := PyEmitClass(c, nil, actual)
+		if len(sub) == 0 {
+			return out
+		}
+		out = c.EmitLeadingDoc(out, outerStart)
+		out = EmitDecorators(out, c.Lines, outerStart, startRow(actual))
+		return append(out, sub...)
 	default:
-		if pyIsClassVar(n, lang) {
-			name := pyVarName(n, lines)
+		if c.Structs && pyIsClassVar(c, n) {
+			name := pyVarName(n, c.Lines)
 			if name != "" && !isPrivateName(name) {
-				return EmitLineWithDoc(out, lines, int(n.StartPoint().Row))
+				return c.EmitLineWithDoc(out, startRow(n))
 			}
 		}
 	}
 	return out
 }
 
-func pyIsClassVar(n *gotreesitter.Node, lang *gotreesitter.Language) bool {
-	t := n.Type(lang)
+func pyIsClassVar(c *Ctx, n *gotreesitter.Node) bool {
+	t := c.Type(n)
 	if t == "assignment" || t == "annotated_assignment" || t == "augmented_assignment" {
 		return true
 	}
 	if t == "expression_statement" && n.ChildCount() > 0 {
-		ct := n.Child(0).Type(lang)
+		ct := c.Type(n.Child(0))
 		return ct == "assignment" || ct == "annotated_assignment" || ct == "augmented_assignment"
 	}
 	return false
 }
 
 func pyVarName(n *gotreesitter.Node, lines [][]byte) string {
-	row := int(n.StartPoint().Row)
+	row := startRow(n)
 	if row >= len(lines) {
 		return ""
 	}
-	line := lines[row]
-	start := 0
-	for start < len(line) && (line[start] == ' ' || line[start] == '\t') {
-		start++
-	}
-	stripped := line[start:]
+	stripped := trimLeadingSpace(lines[row])
 	for i, ch := range string(stripped) {
 		if ch == '=' || ch == ':' {
 			return strings.TrimSpace(string(stripped[:i]))

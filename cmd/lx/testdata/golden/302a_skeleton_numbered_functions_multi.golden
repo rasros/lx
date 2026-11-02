@@ -2,6 +2,12 @@
 [1/4] skeleton/main.go (32 rows, function signatures)
 ---
 ```go
+ 9: /* Worker defines the work contract. */
+10: type Worker interface {
+11: 	Work()
+...
+13: }
+...
 15: // NewPerson creates a Person with the given name.
 16: func NewPerson(name string) Person {
 ...
@@ -17,6 +23,12 @@
 [2/4] skeleton/main.py (31 rows, function signatures)
 ---
 ```python
+ 4: class Animal:
+ 5:     """Base class for all animals."""
+...
+10:     def speak(self):
+11:         """Return the animal's sound."""
+...
 20: def top_level():
 ...
 23: # factory helper
@@ -29,6 +41,24 @@
 [3/4] skeleton/main.ts (45 rows, function signatures)
 ---
 ```typescript
+ 1: /** Geometric shape contract. */
+ 2: export interface Shape {
+ 3:     area(): number;
+...
+ 5: }
+...
+ 7: /**
+ 8:  * Immutable 2-D point.
+ 9:  */
+10: export class Point {
+...
+15:     constructor(x: number, y: number) {
+...
+21:     // Scale this point by a factor.
+22:     public scale(factor: number): Point {
+...
+27: }
+...
 29: // Top-level utility.
 30: export function topLevel(x: number): number {
 ...
@@ -45,6 +75,19 @@
 [4/4] skeleton/main.rs (44 rows, function signatures)
 ---
 ```rust
+13: /// Greeting behaviour.
+14: pub trait Greet {
+15:     fn greet(&self) -> String;
+16: }
+...
+18: /* User method implementations. */
+19: impl User {
+20:     pub fn new(name: String) -> Self {
+...
+24:     pub fn display(&self) -> String {
+...
+29: }
+...
 31: /// Create a User from a name alone.
 32: pub fn create(name: String) -> User {
 ...

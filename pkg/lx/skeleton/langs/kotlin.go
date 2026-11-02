@@ -6,95 +6,47 @@ import (
 )
 
 func KtFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	return !ktIsPrivate(n, src, lang)
+	return !KotlinPrivate(&Ctx{Src: src, Lang: lang}, nil, n)
 }
 
-func KotlinEmitClass(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	// "object : ..." parses as infix_expression with object_literal first child.
-	if n.Type(lang) == "infix_expression" {
-		first := n.Child(0)
-		if first == nil || first.Type(lang) != "object_literal" {
-			return out
-		}
-		return kotlinEmitObject(out, src, lines, n, lang, functions)
-	}
-
-	body := findChildByType(n, "class_body", lang)
-	if body == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerStart := int(n.StartPoint().Row)
-	headerEnd := int(body.StartPoint().Row)
-	out = internal.KeepLines(out, lines, headerStart, headerEnd)
-	for i := 0; i < body.ChildCount(); i++ {
-		child := body.Child(i)
-		if ktIsPrivate(child, src, lang) {
-			continue
-		}
-		switch child.Type(lang) {
-		case "property_declaration":
-			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-		case "function_declaration":
-			if functions {
-				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
-				out = emitFuncSig(out, lines, child, lang, false, "function_body")
-			}
-		case "class_declaration", "object_declaration":
-			out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
-			out = KotlinEmitClass(out, src, lines, child, lang, functions)
-		}
-	}
-	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
-}
-
-func kotlinEmitObject(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	body := findChildByType(n, "lambda_literal", lang)
-	if body == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerEnd := int(body.StartPoint().Row)
-	out = internal.KeepLines(out, lines, int(n.StartPoint().Row), headerEnd)
-
-	stmts := findChildByType(body, "statements", lang)
-	if stmts != nil {
-		for i := 0; i < stmts.ChildCount(); i++ {
-			child := stmts.Child(i)
-			if ktIsPrivate(child, src, lang) {
-				continue
-			}
-			switch child.Type(lang) {
-			case "property_declaration":
-				out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-			case "function_declaration":
-				if functions {
-					out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
-					out = emitFuncSig(out, lines, child, lang, false, "function_body")
-				}
-			}
-		}
-	}
-
-	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
-}
-
-func ktIsPrivate(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	mods := findChildByType(n, "modifiers", lang)
+// KotlinPrivate reports a member with a private visibility modifier.
+func KotlinPrivate(c *Ctx, _, n *gotreesitter.Node) bool {
+	mods := findChildByType(n, "modifiers", c.Lang)
 	if mods == nil {
 		return false
 	}
 	for i := 0; i < mods.ChildCount(); i++ {
 		child := mods.Child(i)
-		if child.Type(lang) == "visibility_modifier" {
-			if child.Text(src) == "private" {
-				return true
-			}
+		if c.Type(child) == "visibility_modifier" && c.Text(child) == "private" {
+			return true
 		}
 	}
 	return false
+}
+
+// KotlinEmitter wraps the generic walker for Kotlin's one irregular shape:
+// a top-level `object : Base { ... }` parses as an infix_expression whose
+// members are the statements of a lambda_literal. Other infix expressions are
+// not declarations and keep nothing.
+func KotlinEmitter(m *Members) Emitter {
+	return func(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+		if c.Type(n) != "infix_expression" {
+			return m.Emit(c, out, n)
+		}
+		if first := n.Child(0); first == nil || c.Type(first) != "object_literal" {
+			return out
+		}
+		body := findChildByType(n, "lambda_literal", c.Lang)
+		if body == nil {
+			if !c.Structs {
+				return out
+			}
+			return c.KeepNode(out, n)
+		}
+		items := findChildByType(body, "statements", c.Lang)
+		if items == nil {
+			items = body // nothing inside: header and closing row only
+		}
+		return m.Walk(c, out, n, body, items)
+	}
 }

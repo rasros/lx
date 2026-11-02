@@ -6,11 +6,42 @@
 package langs
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
 	"github.com/rasros/lx/pkg/lx/internal"
 )
+
+// Ctx is the file being reduced to a skeleton and what to keep of it:
+// function and method signatures (Functions), types and their fields
+// (Structs), or both.
+type Ctx struct {
+	Src      []byte
+	Lines    [][]byte
+	Lang     *gotreesitter.Language
+	Comments *CommentSyntax
+
+	Functions bool
+	Structs   bool
+}
+
+// Emitter appends the rows kept of node n to out.
+type Emitter func(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange
+
+// Type returns the node type of n.
+func (c *Ctx) Type(n *gotreesitter.Node) string { return n.Type(c.Lang) }
+
+// Text returns the source text of n.
+func (c *Ctx) Text(n *gotreesitter.Node) string { return n.Text(c.Src) }
+
+// KeepNode appends all rows of n.
+func (c *Ctx) KeepNode(out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+	return internal.KeepLines(out, c.Lines, startRow(n), endRow(n))
+}
+
+func startRow(n *gotreesitter.Node) int { return int(n.StartPoint().Row) }
+func endRow(n *gotreesitter.Node) int   { return int(n.EndPoint().Row) }
 
 func isUppercase(name string) bool {
 	return len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z'
@@ -45,11 +76,8 @@ func hasDescendantOfType(n *gotreesitter.Node, typ string, lang *gotreesitter.La
 // EmitFuncSig appends the rows of a function signature (without body) to out.
 // A body that starts and ends on the signature's own line is cut from it,
 // keeping an opening brace.
-func EmitFuncSig(out []internal.LineRange, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string, singleLineSig bool) []internal.LineRange {
+func EmitFuncSig(out []internal.LineRange, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string) []internal.LineRange {
 	startRow := int(n.StartPoint().Row)
-	if singleLineSig {
-		return internal.KeepLine(out, lines, startRow)
-	}
 
 	body := n.ChildByFieldName("body", lang)
 	if body == nil && bodyChildType != "" {
@@ -105,10 +133,6 @@ func sigEndRow(n, body *gotreesitter.Node, lang *gotreesitter.Language, startRow
 	return end
 }
 
-func emitFuncSig(out []internal.LineRange, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, indentBody bool, bodyChildType string) []internal.LineRange {
-	return EmitFuncSig(out, lines, n, lang, indentBody, bodyChildType, false)
-}
-
 // EmitDecorators appends the decorator/annotation lines in [fromRow, sigRow-1].
 func EmitDecorators(out []internal.LineRange, lines [][]byte, fromRow, sigRow int) []internal.LineRange {
 	if fromRow < sigRow {
@@ -117,17 +141,15 @@ func EmitDecorators(out []internal.LineRange, lines [][]byte, fromRow, sigRow in
 	return out
 }
 
-// PrecedingAnnotationRow returns the start row of the contiguous decorator/
-// annotation siblings before child (index i in body), or child's own start row.
-func PrecedingAnnotationRow(body, child *gotreesitter.Node, i int, lang *gotreesitter.Language) int {
-	row := int(child.StartPoint().Row)
+// precedingSiblingsRow returns the start row of the contiguous siblings of one
+// of types right before child (index i in parent), or child's own start row.
+func precedingSiblingsRow(parent, child *gotreesitter.Node, i int, types []string, lang *gotreesitter.Language) int {
+	row := startRow(child)
 	for j := i - 1; j >= 0; j-- {
-		switch body.Child(j).Type(lang) {
-		case "decorator", "annotation":
-			row = int(body.Child(j).StartPoint().Row)
-		default:
-			return row
+		if !slices.Contains(types, parent.Child(j).Type(lang)) {
+			break
 		}
+		row = startRow(parent.Child(j))
 	}
 	return row
 }

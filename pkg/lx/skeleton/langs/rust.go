@@ -4,28 +4,21 @@ import (
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal"
 )
 
 func RustFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	if n.ChildCount() > 0 && n.Child(0).Type(lang) == "visibility_modifier" {
-		return strings.HasPrefix(n.Child(0).Text(src), "pub")
-	}
-	return false
+	return rustIsPublic(n, src, lang)
 }
 
-func RustEmitItem(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	switch n.Type(lang) {
-	case "struct_item":
-		return rustEmitStruct(out, src, lines, n, lang)
-	case "enum_item":
-		return rustEmitEnum(out, src, lines, n, lang)
-	case "trait_item":
-		return rustEmitTrait(out, src, lines, n, lang, functions)
-	case "impl_item":
-		return rustEmitImpl(out, src, lines, n, lang, functions)
+// RustPrivate reports a struct field or impl item without a pub visibility.
+// Enum variants and trait items have no visibility of their own: they are as
+// visible as the enum or trait.
+func RustPrivate(c *Ctx, parent, n *gotreesitter.Node) bool {
+	switch c.Type(parent) {
+	case "enum_item", "trait_item":
+		return false
 	}
-	return out
+	return !rustIsPublic(n, c.Src, c.Lang)
 }
 
 func rustIsPublic(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
@@ -33,91 +26,4 @@ func rustIsPublic(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language)
 		return strings.HasPrefix(n.Child(0).Text(src), "pub")
 	}
 	return false
-}
-
-func rustEmitStruct(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
-	fieldList := findChildByType(n, "field_declaration_list", lang)
-	if fieldList == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerStart := int(n.StartPoint().Row)
-	headerEnd := int(fieldList.StartPoint().Row)
-	out = internal.KeepLines(out, lines, headerStart, headerEnd)
-	for i := 0; i < fieldList.ChildCount(); i++ {
-		child := fieldList.Child(i)
-		if child.Type(lang) == "field_declaration" && rustIsPublic(child, src, lang) {
-			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-		}
-	}
-	if closingRow := int(fieldList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
-}
-
-func rustEmitEnum(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
-	variantList := findChildByType(n, "enum_variant_list", lang)
-	if variantList == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerStart := int(n.StartPoint().Row)
-	headerEnd := int(variantList.StartPoint().Row)
-	out = internal.KeepLines(out, lines, headerStart, headerEnd)
-	for i := 0; i < variantList.ChildCount(); i++ {
-		child := variantList.Child(i)
-		if child.Type(lang) == "enum_variant" {
-			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-		}
-	}
-	if closingRow := int(variantList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
-}
-
-func rustEmitTrait(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	declList := findChildByType(n, "declaration_list", lang)
-	if declList == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerStart := int(n.StartPoint().Row)
-	headerEnd := int(declList.StartPoint().Row)
-	out = internal.KeepLines(out, lines, headerStart, headerEnd)
-	if functions {
-		for i := 0; i < declList.ChildCount(); i++ {
-			child := declList.Child(i)
-			t := child.Type(lang)
-			if t == "function_item" || t == "function_signature_item" {
-				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
-				out = emitFuncSig(out, lines, child, lang, false, "")
-			}
-		}
-	}
-	if closingRow := int(declList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
-}
-
-func rustEmitImpl(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	declList := findChildByType(n, "declaration_list", lang)
-	if declList == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerStart := int(n.StartPoint().Row)
-	headerEnd := int(declList.StartPoint().Row)
-	out = internal.KeepLines(out, lines, headerStart, headerEnd)
-	if functions {
-		for i := 0; i < declList.ChildCount(); i++ {
-			child := declList.Child(i)
-			if child.Type(lang) == "function_item" && rustIsPublic(child, src, lang) {
-				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
-				out = emitFuncSig(out, lines, child, lang, false, "")
-			}
-		}
-	}
-	if closingRow := int(declList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
 }

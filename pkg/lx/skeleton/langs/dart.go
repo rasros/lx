@@ -1,48 +1,19 @@
 package langs
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/odvcencio/gotreesitter"
-	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-func DartEmitClass(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	body := n.ChildByFieldName("body", lang)
-	if body == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerEnd := int(body.StartPoint().Row)
-	out = internal.KeepLines(out, lines, int(n.StartPoint().Row), headerEnd)
-
-	for i := 0; i < body.ChildCount(); i++ {
-		child := body.Child(i)
-		if dartMemberIsPrivate(lines, child) {
-			continue
-		}
-		switch child.Type(lang) {
-		case "declaration":
-			out = EmitWithDoc(out, lines, PrecedingAnnotationRow(body, child, i, lang), int(child.EndPoint().Row))
-		case "method_signature":
-			if functions {
-				out = EmitWithDoc(out, lines, PrecedingAnnotationRow(body, child, i, lang), int(child.EndPoint().Row))
-			}
-		}
-	}
-
-	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
-}
-
-// dartMemberIsPrivate reports library-private members via "_" prefix.
-func dartMemberIsPrivate(lines [][]byte, n *gotreesitter.Node) bool {
-	row := int(n.StartPoint().Row)
-	if row >= len(lines) {
+// DartPrivate reports a library-private member: its name starts with "_".
+func DartPrivate(c *Ctx, _, n *gotreesitter.Node) bool {
+	row := startRow(n)
+	if row >= len(c.Lines) {
 		return false
 	}
-	line := strings.TrimSpace(string(lines[row]))
+	line := strings.TrimSpace(string(c.Lines[row]))
 	if idx := strings.Index(line, "//"); idx >= 0 {
 		line = strings.TrimSpace(line[:idx])
 	}
@@ -54,4 +25,30 @@ func dartMemberIsPrivate(lines [][]byte, n *gotreesitter.Node) bool {
 		return false
 	}
 	return isPrivateName(parts[len(parts)-1])
+}
+
+// dartSignatures are the children of a Dart class-body declaration that make
+// it a method or constructor declared without a body rather than a field.
+var dartSignatures = []string{
+	"function_signature", "getter_signature", "setter_signature", "operator_signature",
+	"constructor_signature", "constant_constructor_signature",
+	"factory_constructor_signature", "redirecting_factory_constructor_signature",
+}
+
+// DartMember classifies a Dart class-body member. A method with a body is a
+// method_signature (its function_body is the next sibling); one without is a
+// declaration holding a signature. Any other declaration is a field.
+func DartMember(c *Ctx, n *gotreesitter.Node) MemberKind {
+	switch c.Type(n) {
+	case "method_signature":
+		return Method
+	case "declaration":
+		for i := 0; i < n.ChildCount(); i++ {
+			if slices.Contains(dartSignatures, c.Type(n.Child(i))) {
+				return Method
+			}
+		}
+		return Field
+	}
+	return Skip
 }

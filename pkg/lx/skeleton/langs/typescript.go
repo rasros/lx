@@ -7,98 +7,32 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-// TSEmitClassOrInterface emits skeleton for TypeScript/JavaScript class and interface declarations.
-func TSEmitClassOrInterface(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	if n.Type(lang) == "interface_declaration" {
-		return tsEmitInterface(out, src, lines, n, lang)
-	}
-	return tsEmitClass(out, src, lines, n, lang, functions)
-}
-
-func tsEmitClass(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	body := findChildByType(n, "class_body", lang)
-	if body == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerStart := int(n.StartPoint().Row)
-	headerEnd := int(body.StartPoint().Row)
-	out = internal.KeepLines(out, lines, headerStart, headerEnd)
-	for i := 0; i < body.ChildCount(); i++ {
-		child := body.Child(i)
-		if tsIsPrivate(child, src, lang) {
-			continue
-		}
-		switch child.Type(lang) {
-		case "public_field_definition", "field_definition":
-			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-		case "method_definition":
-			if functions {
-				decoRow := PrecedingAnnotationRow(body, child, i, lang)
-				out = EmitLeadingDoc(out, lines, decoRow)
-				out = EmitDecorators(out, lines, decoRow, int(child.StartPoint().Row))
-				out = emitFuncSig(out, lines, child, lang, false, "")
-			}
-		}
-	}
-	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
-}
-
-func tsEmitInterface(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
-	body := n.ChildByFieldName("body", lang)
-	if body == nil {
-		body = findChildByType(n, "interface_body", lang)
-	}
-	if body == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
-	}
-	headerStart := int(n.StartPoint().Row)
-	headerEnd := int(body.StartPoint().Row)
-	out = internal.KeepLines(out, lines, headerStart, headerEnd)
-	for i := 0; i < body.ChildCount(); i++ {
-		child := body.Child(i)
-		switch child.Type(lang) {
-		case "method_signature", "property_signature", "call_signature", "construct_signature", "index_signature":
-			out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-		}
-	}
-	if closingRow := int(body.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
-	}
-	return out
-}
-
-func tsIsPrivate(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	acc := findChildByType(n, "accessibility_modifier", lang)
-	if acc != nil {
-		return strings.TrimSpace(acc.Text(src)) == "private"
-	}
-	return false
+// TSPrivate reports a class member with the private accessibility modifier.
+func TSPrivate(c *Ctx, _, n *gotreesitter.Node) bool {
+	acc := findChildByType(n, "accessibility_modifier", c.Lang)
+	return acc != nil && strings.TrimSpace(c.Text(acc)) == "private"
 }
 
 // TSEmitFunc handles top-level function_declaration and lexical_declaration (arrow/const functions).
-func TSEmitFunc(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language) []internal.LineRange {
-	if n.Type(lang) == "function_declaration" {
-		return emitFuncSig(out, lines, n, lang, false, "")
+func TSEmitFunc(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+	if c.Type(n) == "function_declaration" {
+		return EmitFuncSig(out, c.Lines, n, c.Lang, false, "")
 	}
-	decl := findChildByType(n, "variable_declarator", lang)
+	decl := findChildByType(n, "variable_declarator", c.Lang)
 	if decl == nil {
 		return out
 	}
-	val := decl.ChildByFieldName("value", lang)
+	val := decl.ChildByFieldName("value", c.Lang)
 	if val == nil {
 		return out
 	}
-	valType := val.Type(lang)
+	valType := c.Type(val)
 	if valType != "arrow_function" && valType != "function_expression" {
 		return out
 	}
-	body := val.ChildByFieldName("body", lang)
-	startRow := int(n.StartPoint().Row)
-	if body != nil && body.Type(lang) == "statement_block" {
-		return internal.KeepLines(out, lines, startRow, int(body.StartPoint().Row))
+	body := val.ChildByFieldName("body", c.Lang)
+	if body != nil && c.Type(body) == "statement_block" {
+		return internal.KeepLines(out, c.Lines, startRow(n), startRow(body))
 	}
-	return internal.KeepLines(out, lines, startRow, int(n.EndPoint().Row))
+	return c.KeepNode(out, n)
 }

@@ -338,7 +338,8 @@ Interleaved option:
           files are included.
   -u, --functions
           Filter files in the next section to show only function and method
-          signatures.
+          signatures. A method keeps the header and closing line of the type
+          around it for context; fields and types without methods are left out.
           
           Uses an AST-based parser to extract function definitions from source
           files. A "..." line marks where source lines were left out. Head/tail
@@ -348,7 +349,8 @@ Interleaved option:
           Pairs with --types (-Y) to show a full code skeleton.
   -Y, --types
           Filter files in the next section to show only type and class
-          definitions, including their field/variable declarations.
+          definitions, including their field/variable declarations. Methods are
+          left out.
           
           Uses an AST-based parser to extract type definitions from source
           files. A "..." line marks where source lines were left out. Head/tail
