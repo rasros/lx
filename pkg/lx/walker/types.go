@@ -14,10 +14,6 @@ type Rule struct {
 	// root: the walk root's path relative to that directory, with a trailing
 	// slash. Walk paths are prefixed with it before matching.
 	PathOffset string
-	// offsetFloats lets floating patterns match the PathOffset directories
-	// too. It is set when the walk root is a single file, whose parent
-	// directories were not named explicitly.
-	offsetFloats bool
 }
 
 // Walker configures the file traversal.
@@ -27,6 +23,9 @@ type Walker struct {
 	// LoadAncestorRules. They apply after BaseRules and before the walk's
 	// own ignore files.
 	AncestorRules []Rule
+	// RootIgnored reports that the walk root or a directory above it is
+	// ignored. As in git, nothing below an ignored directory is included.
+	RootIgnored   bool
 	OverrideRules []Rule
 	IgnoreEnabled bool
 	SkipHidden    bool

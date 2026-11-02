@@ -50,7 +50,13 @@ type resolveContext struct {
 	// ancestorRules caches Walker.LoadAncestorRules by walk filesystem root,
 	// so file arguments sharing a directory read its ancestors once. Nil
 	// disables the cache.
-	ancestorRules map[string][]lx.Rule
+	ancestorRules map[string]ancestorState
+}
+
+// ancestorState is what Walker.LoadAncestorRules computes for one root.
+type ancestorState struct {
+	rules       []lx.Rule
+	rootIgnored bool
 }
 
 // resolveOp discovers every input one file argument refers to. The content pass
@@ -204,12 +210,12 @@ func walkInputs(ctx context.Context, t walkTargetArgs, rc resolveContext) []lx.I
 	walker := lx.NewWalker(baseRules, overrideRules)
 	walker.IgnoreEnabled = !section.RunCfg.NoIgnore
 	if walker.IgnoreEnabled && t.fsysRoot != "" {
-		if rules, ok := rc.ancestorRules[t.fsysRoot]; ok {
-			walker.AncestorRules = rules
+		if st, ok := rc.ancestorRules[t.fsysRoot]; ok {
+			walker.AncestorRules, walker.RootIgnored = st.rules, st.rootIgnored
 		} else {
 			walker.LoadAncestorRules(t.fsysRoot)
 			if rc.ancestorRules != nil {
-				rc.ancestorRules[t.fsysRoot] = walker.AncestorRules
+				rc.ancestorRules[t.fsysRoot] = ancestorState{walker.AncestorRules, walker.RootIgnored}
 			}
 		}
 	}

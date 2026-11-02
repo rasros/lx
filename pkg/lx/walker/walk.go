@@ -15,6 +15,13 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 		return walkFn(root, nil, err)
 	}
 
+	if w.IgnoreEnabled && w.RootIgnored {
+		if w.OnIgnore != nil {
+			w.OnIgnore(root, "parent directory")
+		}
+		return nil
+	}
+
 	if !info.IsDir() {
 		if w.SkipHidden && isHiddenName(path.Base(root)) {
 			if w.OnIgnore != nil {
@@ -45,10 +52,7 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 
 		effectiveRules := make([]Rule, 0, len(w.BaseRules)+len(w.AncestorRules)+len(localRules)+len(w.OverrideRules))
 		effectiveRules = append(effectiveRules, w.BaseRules...)
-		for _, r := range w.AncestorRules {
-			r.offsetFloats = true
-			effectiveRules = append(effectiveRules, r)
-		}
+		effectiveRules = append(effectiveRules, w.AncestorRules...)
 		effectiveRules = append(effectiveRules, localRules...)
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 
