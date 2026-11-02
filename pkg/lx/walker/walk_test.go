@@ -297,9 +297,9 @@ func TestIsMatch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.pattern+"|"+tt.path, func(t *testing.T) {
-			got := IsMatch(tt.pattern, tt.path)
+			got := IsMatchAnyCompiled(CompileSpecs([]string{tt.pattern}), tt.path)
 			if got != tt.want {
-				t.Errorf("IsMatch(%q, %q) = %v, want %v", tt.pattern, tt.path, got, tt.want)
+				t.Errorf("match(%q, %q) = %v, want %v", tt.pattern, tt.path, got, tt.want)
 			}
 		})
 	}

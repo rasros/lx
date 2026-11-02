@@ -9,9 +9,8 @@ import (
 )
 
 type Section struct {
-	RunCfg   lx.RunnerConfig
-	Includes []string
-	Excludes []string
+	Render   lx.RenderOptions
+	Discover lx.DiscoverOptions
 	Ops      []Op
 
 	treeStrings map[int]string
@@ -19,9 +18,9 @@ type Section struct {
 	resolved    map[int][]lx.InputFile
 }
 
-func parseSections(ops []Op, defaultRunCfg lx.RunnerConfig) []Section {
+func parseSections(ops []Op, defaultRender lx.RenderOptions) []Section {
 	var sections []Section
-	current := Section{RunCfg: defaultRunCfg}
+	current := Section{Render: defaultRender}
 	hasFiles := false
 	var trailingOps []Op
 
@@ -30,7 +29,7 @@ func parseSections(ops []Op, defaultRunCfg lx.RunnerConfig) []Section {
 		case CmdInterleaved:
 			if hasFiles {
 				sections = append(sections, current)
-				current = Section{RunCfg: defaultRunCfg}
+				current = Section{Render: defaultRender}
 				hasFiles = false
 				trailingOps = nil
 			}
@@ -72,54 +71,54 @@ func applyInterleaved(op Op, s *Section) {
 	case "head":
 		val, _ := strconv.Atoi(op.Value)
 		slog.Debug("Setting head limit", "value", val)
-		s.RunCfg.Head, s.RunCfg.Tail = val, 0
+		s.Render.Head, s.Render.Tail = val, 0
 	case "tail":
 		val, _ := strconv.Atoi(op.Value)
 		slog.Debug("Setting tail limit", "value", val)
-		s.RunCfg.Tail, s.RunCfg.Head = val, 0
+		s.Render.Tail, s.Render.Head = val, 0
 	case "lines":
 		val, _ := strconv.Atoi(op.Value)
 		slog.Debug("Setting lines limit", "value", val)
-		s.RunCfg.Head, s.RunCfg.Tail = (val+1)/2, val/2
+		s.Render.Head, s.Render.Tail = (val+1)/2, val/2
 	case "max-size":
 		val, _ := parseSizeLimit(op.Value)
 		slog.Debug("Setting max file size", "bytes", val)
-		s.RunCfg.MaxSize = val
+		s.Render.MaxSize = val
 	case "line-numbers":
 		slog.Debug("Enabling line numbers")
-		s.RunCfg.LineNumbers = true
+		s.Render.LineNumbers = true
 	case "functions":
 		slog.Debug("Enabling function skeleton")
-		s.RunCfg.SkeletonFunctions = true
+		s.Render.SkeletonFunctions = true
 	case "types":
 		slog.Debug("Enabling type skeleton")
-		s.RunCfg.SkeletonTypes = true
+		s.Render.SkeletonTypes = true
 	case "documents":
 		slog.Debug("Enabling document extraction")
-		s.RunCfg.ExtractDocuments = true
+		s.Render.ExtractDocuments = true
 	case "media":
 		slog.Debug("Enabling media metadata extraction")
-		s.RunCfg.ExtractMedia = true
+		s.Render.ExtractMedia = true
 	case "expand":
 		slog.Debug("Enabling archive expansion")
-		s.RunCfg.ExpandArchives = true
+		s.Discover.ExpandArchives = true
 	case "hidden":
 		slog.Debug("Enabling show hidden files")
-		s.RunCfg.ShowHidden = true
+		s.Discover.ShowHidden = true
 	case "follow":
 		slog.Debug("Enabling follow dir symlinks")
-		s.RunCfg.FollowDirSymlinks = true
+		s.Discover.FollowDirSymlinks = true
 	case "no-links":
 		slog.Debug("Enabling skip file symlinks")
-		s.RunCfg.SkipFileSymlinks = true
+		s.Discover.SkipFileSymlinks = true
 	case "no-ignore":
 		slog.Debug("Disabling gitignore filtering")
-		s.RunCfg.NoIgnore = true
+		s.Discover.NoIgnore = true
 	case "include":
 		slog.Debug("Adding include filter", "pattern", op.Value)
-		s.Includes = append(s.Includes, op.Value)
+		s.Discover.Includes = append(s.Discover.Includes, op.Value)
 	case "exclude":
 		slog.Debug("Adding exclude filter", "pattern", op.Value)
-		s.Excludes = append(s.Excludes, op.Value)
+		s.Discover.Excludes = append(s.Discover.Excludes, op.Value)
 	}
 }

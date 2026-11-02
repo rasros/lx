@@ -30,13 +30,6 @@ func buildPathMatchInfo(relPath string) pathMatchInfo {
 	}
 }
 
-// IsMatch checks if a path matches a pattern. Exposed for CLI filtering.
-func IsMatch(pattern, relPath string) bool {
-	spec := compileSpec(pattern)
-	ctx := buildPathMatchInfo(normalizePathForMatch(relPath))
-	return matchCompiledSpec(spec, ctx)
-}
-
 func parseRules(lines []string, basePath, source string) []Rule {
 	var rules []Rule
 	basePathPrefix := ""

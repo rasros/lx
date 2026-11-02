@@ -153,11 +153,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 		}
 	}
 
-	defaultRunCfg := lx.RunnerConfig{
-		Head: -1,
-		Tail: 0,
-	}
-	stream, err := lx.NewStream(cfg, defaultRunCfg)
+	stream, err := lx.NewStream(cfg)
 	if err != nil {
 		return err
 	}
@@ -165,29 +161,18 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 	stream.WithOnFileError(func(f lx.InputFile, err error) {
 		slog.Error("Failed to read file", "path", f.Path, "error", err)
 	})
-	var tempCleanups []func()
-	defer func() {
-		for _, cleanup := range tempCleanups {
-			cleanup()
-		}
-	}()
-
 	slog.Debug("Processing operations", "total_ops", len(parsed.Ops))
 
-	globalIgnoreRules, gitExcludes := LoadGlobalIgnorePatterns()
+	ignoreRules, gitExcludes := lx.UserIgnoreRules()
 	promptResolver := newPromptResolver(resolvePromptsDir(parsed, cliOpts), cliOpts.PromptExtensions)
-	sections := parseSections(parsed.Ops, defaultRunCfg)
+	sections := parseSections(parsed.Ops, lx.RenderOptions{Head: -1})
+	for i := range sections {
+		d := &sections[i].Discover
+		d.IgnoreRules, d.GitExcludes, d.OutPath = ignoreRules, gitExcludes, outPath
+	}
 	applyWorkloadConcurrency(stream, sections, runtime.NumCPU())
-	debugLoggingEnabled := slog.Default().Enabled(ctx, slog.LevelDebug)
 
-	unresolved := resolveSections(ctx, sections, resolveContext{
-		ignoreRules: globalIgnoreRules,
-		gitExcludes: gitExcludes,
-		outPath:     outPath,
-		debug:       debugLoggingEnabled,
-		cleanups:    &tempCleanups,
-		rules:       lx.NewRuleCache(nil),
-	})
+	unresolved := resolveSections(ctx, sections, lx.NewCollector())
 	precomputeTrees(sections)
 	var metaFields map[string]string
 	var metaBody string
@@ -200,7 +185,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 
 	for si, section := range sections {
 		slog.Debug("Processing section", "index", si, "ops", len(section.Ops))
-		stream.WithRunnerConfig(section.RunCfg)
 
 		for oi, op := range section.Ops {
 			slog.Debug("Processing op", "action", op.Action, "value", op.Value)
@@ -219,12 +203,12 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 						slog.Error("Failed to read from stdin", "error", err)
 						continue
 					}
-					stream.AddFile(lx.NewBufferInputFile("stdin", data))
+					stream.AddFile(lx.NewBufferInputFile("stdin", data), section.Render)
 					continue
 				}
 
 				for _, f := range section.resolved[oi] {
-					stream.AddFile(f)
+					stream.AddFile(f, section.Render)
 				}
 
 			case "tree", "tree-only":
@@ -318,7 +302,7 @@ func workloadConcurrency(sections []Section, cpuCount int) (int, bool) {
 	}
 
 	for _, section := range sections {
-		if section.RunCfg.SkeletonFunctions || section.RunCfg.SkeletonTypes {
+		if section.Render.SkeletonFunctions || section.Render.SkeletonTypes {
 			if cpuCount > maxSkeletonWorkers {
 				return maxSkeletonWorkers, true
 			}

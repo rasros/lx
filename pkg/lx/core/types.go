@@ -22,21 +22,23 @@ type GlobalContext struct {
 	FailedFiles   int
 }
 
-// RunnerConfig defines slicing and formatting state for the rendering processor.
-type RunnerConfig struct {
-	Head              int
-	Tail              int
-	MaxSize           int64
-	LineNumbers       bool
+// RenderOptions decide how a file is rendered. Head and Tail count lines from
+// the start and end; a negative Head renders the whole file, and zero for both
+// renders only the header.
+type RenderOptions struct {
+	Head        int
+	Tail        int
+	LineNumbers bool
+	// MaxSize skips files larger than this many bytes; zero disables it.
+	MaxSize int64
+	// SkeletonFunctions and SkeletonTypes reduce source files to signatures
+	// and definitions.
 	SkeletonFunctions bool
 	SkeletonTypes     bool
-	ExpandArchives    bool
-	ExtractDocuments  bool
-	ExtractMedia      bool
-	ShowHidden        bool
-	FollowDirSymlinks bool
-	SkipFileSymlinks  bool
-	NoIgnore          bool
+	// ExtractDocuments converts documents to text, and HTML to Markdown.
+	ExtractDocuments bool
+	// ExtractMedia replaces audio and video with their container metadata.
+	ExtractMedia bool
 }
 
 // TemplateEngine holds the parsed text/template instances.

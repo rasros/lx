@@ -14,10 +14,11 @@ import (
 
 func TestStream_Integration(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1, Tail: -1})
+	opts := core.RenderOptions{Head: -1, Tail: -1}
+	stream, _ := NewStream(cfg)
 
 	stream.AddSection("Header Test")
-	stream.AddFile(sources.NewBufferInputFile("A.txt", []byte("Content A")))
+	stream.AddFile(sources.NewBufferInputFile("A.txt", []byte("Content A")), opts)
 	stream.AddPrompt("Analyze this")
 
 	var buf strings.Builder
@@ -37,11 +38,12 @@ func TestStream_Integration(t *testing.T) {
 
 func TestStream_ContextCancellation(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1})
+	opts := core.RenderOptions{Head: -1}
+	stream, _ := NewStream(cfg)
 	stream.WithConcurrency(2)
 
 	for i := 0; i < 50; i++ {
-		stream.AddFile(sources.NewBufferInputFile("file.txt", []byte("data")))
+		stream.AddFile(sources.NewBufferInputFile("file.txt", []byte("data")), opts)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -60,10 +62,11 @@ func (m MockTokenizer) Estimate(size int64, _ interface{}) int64 { return 999 }
 
 func TestStream_TokenizerIntegration(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1})
+	opts := core.RenderOptions{Head: -1}
+	stream, _ := NewStream(cfg)
 	stream.WithTokenizer(MockTokenizer{})
 
-	stream.AddFile(sources.NewBufferInputFile("test.txt", []byte("abc")))
+	stream.AddFile(sources.NewBufferInputFile("test.txt", []byte("abc")), opts)
 
 	stats := stream.GetGlobalContext()
 	if stats.TokenEstimate != 999 {
@@ -73,13 +76,14 @@ func TestStream_TokenizerIntegration(t *testing.T) {
 
 func TestStream_Prepare_Counts(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1})
+	opts := core.RenderOptions{Head: -1}
+	stream, _ := NewStream(cfg)
 
 	stream.AddSection("S1")
-	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("aaa")))
-	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("bb")))
+	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("aaa")), opts)
+	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("bb")), opts)
 	stream.AddSection("S2")
-	stream.AddFile(sources.NewBufferInputFile("c.txt", []byte("c")))
+	stream.AddFile(sources.NewBufferInputFile("c.txt", []byte("c")), opts)
 
 	g := stream.GetGlobalContext()
 	if g.TotalFiles != 3 {
@@ -95,14 +99,15 @@ func TestStream_Prepare_Counts(t *testing.T) {
 
 func TestStream_Prepare_SizeUnknownForNegativeSizeFile(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1})
+	opts := core.RenderOptions{Head: -1}
+	stream, _ := NewStream(cfg)
 
-	stream.AddFile(sources.NewBufferInputFile("known.txt", []byte("abc")))
+	stream.AddFile(sources.NewBufferInputFile("known.txt", []byte("abc")), opts)
 	stream.AddFile(sources.InputFile{
 		Path: "https://example.com/doc",
 		Size: -1,
 		Open: func() (io.ReadCloser, error) { return io.NopCloser(strings.NewReader("")), nil },
-	})
+	}, opts)
 
 	g := stream.GetGlobalContext()
 	if !g.SizeUnknown {
@@ -115,10 +120,11 @@ func TestStream_Prepare_SizeUnknownForNegativeSizeFile(t *testing.T) {
 
 func TestStream_TotalRows_AfterExecute(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1, Tail: -1})
+	opts := core.RenderOptions{Head: -1, Tail: -1}
+	stream, _ := NewStream(cfg)
 
-	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("one\ntwo\nthree")))
-	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("alpha\nbeta")))
+	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("one\ntwo\nthree")), opts)
+	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("alpha\nbeta")), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {
@@ -133,10 +139,11 @@ func TestStream_TotalRows_AfterExecute(t *testing.T) {
 
 func TestStream_MaxSizeSkipsOversizedFiles(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1, MaxSize: 10})
+	opts := core.RenderOptions{Head: -1, MaxSize: 10}
+	stream, _ := NewStream(cfg)
 
-	stream.AddFile(sources.NewBufferInputFile("small.txt", []byte("tiny")))
-	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 64))))
+	stream.AddFile(sources.NewBufferInputFile("small.txt", []byte("tiny")), opts)
+	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 64))), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {
@@ -157,12 +164,13 @@ func TestStream_MaxSizeSkipsOversizedFiles(t *testing.T) {
 
 func TestStream_MaxSizeKeepsUnknownSizeInputs(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1, MaxSize: 10})
+	opts := core.RenderOptions{Head: -1, MaxSize: 10}
+	stream, _ := NewStream(cfg)
 
 	// Remote inputs report a negative size until they are fetched.
 	f := sources.NewBufferInputFile("remote.txt", []byte("fetched later"))
 	f.Size = -1
-	stream.AddFile(f)
+	stream.AddFile(f, opts)
 
 	if n := stream.GetGlobalContext().TotalFiles; n != 1 {
 		t.Errorf("TotalFiles = %d, want 1 (unknown size must not be skipped)", n)
@@ -171,9 +179,10 @@ func TestStream_MaxSizeKeepsUnknownSizeInputs(t *testing.T) {
 
 func TestStream_MaxSizeUnsetKeepsEverything(t *testing.T) {
 	cfg := core.NewConfig()
-	stream, _ := NewStream(cfg, core.RunnerConfig{Head: -1})
+	opts := core.RenderOptions{Head: -1}
+	stream, _ := NewStream(cfg)
 
-	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 4096))))
+	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 4096))), opts)
 
 	if n := stream.GetGlobalContext().TotalFiles; n != 1 {
 		t.Errorf("TotalFiles = %d, want 1", n)
@@ -187,11 +196,12 @@ func (sizeTokenizer) Estimate(size int64, _ interface{}) int64 { return size }
 
 func tokenEstimateFor(t *testing.T, content string) int64 {
 	t.Helper()
-	stream, err := NewStream(core.NewConfig(), core.RunnerConfig{Head: -1})
+	opts := core.RenderOptions{Head: -1}
+	stream, err := NewStream(core.NewConfig())
 	if err != nil {
 		t.Fatalf("NewStream failed: %v", err)
 	}
-	stream.AddFile(sources.NewBufferInputFile("sample.txt", []byte(content)))
+	stream.AddFile(sources.NewBufferInputFile("sample.txt", []byte(content)), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {
@@ -222,17 +232,18 @@ func TestStream_TokenEstimateReflectsContentShape(t *testing.T) {
 }
 
 func TestStream_TokenEstimateCoversAllEmittedBytes(t *testing.T) {
-	stream, err := NewStream(core.NewConfig(), core.RunnerConfig{Head: -1})
+	opts := core.RenderOptions{Head: -1}
+	stream, err := NewStream(core.NewConfig())
 	if err != nil {
 		t.Fatalf("NewStream failed: %v", err)
 	}
 	stream.WithTokenizer(sizeTokenizer{})
 
 	stream.AddSection("First")
-	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("content a")))
+	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("content a")), opts)
 	stream.AddPrompt("Analyze this")
 	stream.AddSection("Second")
-	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("content b")))
+	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("content b")), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {
@@ -252,13 +263,14 @@ func TestStream_TokenEstimateCoversAllEmittedBytes(t *testing.T) {
 func TestStream_PerFileTokenEstimateIsContentDerived(t *testing.T) {
 	cfg := core.NewConfig()
 	cfg.FileContentTemplate = "{{ .TokenEstimate }}"
-	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1})
+	opts := core.RenderOptions{Head: -1}
+	stream, err := NewStream(cfg)
 	if err != nil {
 		t.Fatalf("NewStream failed: %v", err)
 	}
 
 	content := strings.Repeat(`{"a":1},`, 60)
-	stream.AddFile(sources.NewBufferInputFile("dense.json", []byte(content)))
+	stream.AddFile(sources.NewBufferInputFile("dense.json", []byte(content)), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {
@@ -280,14 +292,15 @@ func TestStream_PerFileTokenEstimateIsContentDerived(t *testing.T) {
 }
 
 func TestStream_SkippedBySizeIsCounted(t *testing.T) {
-	stream, err := NewStream(core.NewConfig(), core.RunnerConfig{Head: -1, MaxSize: 10})
+	opts := core.RenderOptions{Head: -1, MaxSize: 10}
+	stream, err := NewStream(core.NewConfig())
 	if err != nil {
 		t.Fatalf("NewStream failed: %v", err)
 	}
 
-	stream.AddFile(sources.NewBufferInputFile("small.txt", []byte("tiny")))
-	stream.AddFile(sources.NewBufferInputFile("big1.txt", []byte(strings.Repeat("x", 64))))
-	stream.AddFile(sources.NewBufferInputFile("big2.txt", []byte(strings.Repeat("y", 99))))
+	stream.AddFile(sources.NewBufferInputFile("small.txt", []byte("tiny")), opts)
+	stream.AddFile(sources.NewBufferInputFile("big1.txt", []byte(strings.Repeat("x", 64))), opts)
+	stream.AddFile(sources.NewBufferInputFile("big2.txt", []byte(strings.Repeat("y", 99))), opts)
 
 	g := stream.GetGlobalContext()
 	if g.SkippedBySize != 2 {
@@ -301,13 +314,14 @@ func TestStream_SkippedBySizeIsCounted(t *testing.T) {
 func TestStream_OriginalSizeIsPreConversionSize(t *testing.T) {
 	cfg := core.NewConfig()
 	cfg.FileContentTemplate = "{{ .OriginalSize }} {{ .Size }}"
-	stream, err := NewStream(cfg, core.RunnerConfig{Head: -1, SkeletonFunctions: true})
+	opts := core.RenderOptions{Head: -1, SkeletonFunctions: true}
+	stream, err := NewStream(cfg)
 	if err != nil {
 		t.Fatalf("NewStream failed: %v", err)
 	}
 
 	src := "package main\n\nfunc Alpha() int {\n\treturn 1\n}\n\nfunc Beta() int {\n\treturn 2\n}\n"
-	stream.AddFile(sources.NewBufferInputFile("main.go", []byte(src)))
+	stream.AddFile(sources.NewBufferInputFile("main.go", []byte(src)), opts)
 
 	var buf strings.Builder
 	if err := stream.Execute(context.Background(), &buf); err != nil {
@@ -343,14 +357,15 @@ func TestStream_TokenEstimateIgnoresWriteChunking(t *testing.T) {
 		cfg.SectionHeaderTemplate = tmpl.sectionHeader
 		cfg.OutputHeaderTemplate = tmpl.outputHeader
 		cfg.OutputFooterTemplate = tmpl.outputFooter
-		stream, err := NewStream(cfg, core.RunnerConfig{Head: -1})
+		opts := core.RenderOptions{Head: -1}
+		stream, err := NewStream(cfg)
 		if err != nil {
 			t.Fatalf("NewStream failed: %v", err)
 		}
 		stream.WithTokenizer(callTokenizer{})
 		stream.AddSection("S")
-		stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("content a")))
-		stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("content b")))
+		stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("content a")), opts)
+		stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("content b")), opts)
 		var buf strings.Builder
 		if err := stream.Execute(context.Background(), &buf); err != nil {
 			t.Fatalf("Execute failed: %v", err)

@@ -19,6 +19,12 @@ import (
 // FileErrorHandler handles per-file read errors.
 type FileErrorHandler func(f sources.InputFile, err error)
 
+// FileItem is a file queued for rendering with the options it renders with.
+type FileItem struct {
+	File sources.InputFile
+	Opts core.RenderOptions
+}
+
 // PreparedItem carries precomputed context for deterministic render order.
 type PreparedItem struct {
 	Raw              interface{}
@@ -76,8 +82,8 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 	var templateToUse *template.Template
 
 	switch v := item.Raw.(type) {
-	case sources.InputFile:
-		fCtx, err := p.prepareFileContext(v, item.FileIndexGlobal, scratchBuf)
+	case FileItem:
+		fCtx, err := p.prepareFileContext(v.File, v.Opts, item.FileIndexGlobal, scratchBuf)
 		if err != nil {
 			return stats, err
 		}
@@ -191,7 +197,7 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 // Order matters only if two ever match the same file; the first match wins.
 type converter struct {
 	name    string
-	applies func(f sources.InputFile, format *internal.Format) bool
+	applies func(f sources.InputFile, opts core.RenderOptions, format *internal.Format) bool
 	convert func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error)
 	// language of the produced content; empty means detect as usual.
 	language func(f sources.InputFile) string
@@ -200,8 +206,8 @@ type converter struct {
 var converters = []converter{
 	{
 		name: "document",
-		applies: func(f sources.InputFile, _ *internal.Format) bool {
-			if !f.Config.ExtractDocuments {
+		applies: func(f sources.InputFile, opts core.RenderOptions, _ *internal.Format) bool {
+			if !opts.ExtractDocuments {
 				return false
 			}
 			return sources.IsDocumentInput(f)
@@ -217,8 +223,8 @@ var converters = []converter{
 	},
 	{
 		name: "media",
-		applies: func(f sources.InputFile, format *internal.Format) bool {
-			return f.Config.ExtractMedia && format.IsMedia()
+		applies: func(_ sources.InputFile, opts core.RenderOptions, format *internal.Format) bool {
+			return opts.ExtractMedia && format.IsMedia()
 		},
 		convert: sources.ExtractMediaMetadata,
 	},
@@ -229,12 +235,12 @@ var converters = []converter{
 //
 // An image that is about to be embedded is left alone: the picture itself says
 // more than a description of it would.
-func applyConverters(file sources.InputFile, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool) {
+func applyConverters(file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool) {
 	if embedImages && format.IsImage() {
 		return reader, size, "", "", false
 	}
 	for _, c := range converters {
-		if !c.applies(file, format) {
+		if !c.applies(file, opts, format) {
 			continue
 		}
 		text, err := c.convert(file, reader, size)
@@ -287,7 +293,7 @@ type skeletonView struct {
 // applySkeleton reduces source to signatures and definitions, or returns nil
 // when the file is not reduced. Unlike a converter it runs after detection,
 // because it needs the detected language.
-func applySkeleton(cfg core.RunnerConfig, lang string, reader io.ReaderAt, size int64, isBinary, isImage bool) *skeletonView {
+func applySkeleton(cfg core.RenderOptions, lang string, reader io.ReaderAt, size int64, isBinary, isImage bool) *skeletonView {
 	if isBinary || isImage || (!cfg.SkeletonFunctions && !cfg.SkeletonTypes) || !skeleton.Supported(lang) {
 		return nil
 	}
@@ -308,7 +314,7 @@ func applySkeleton(cfg core.RunnerConfig, lang string, reader io.ReaderAt, size 
 // skeleton lines, as they count the lines of any other content, but each line
 // keeps its source row, and the gap between them counts the source rows it
 // leaves out, the same rows the header and line numbers count.
-func skeletonSlices(sk *skeletonView, cfg core.RunnerConfig) excerpt {
+func skeletonSlices(sk *skeletonView, cfg core.RenderOptions) excerpt {
 	n := sk.lines.Len()
 	sl := excerpt{rows: sk.rows, exact: true}
 	head, tail := cfg.Head, max(cfg.Tail, 0)
@@ -354,7 +360,7 @@ func skeletonModeLabel(functions, types bool) string {
 	}
 }
 
-func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratch []byte) (core.FileContext, error) {
+func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOptions, index int, scratch []byte) (core.FileContext, error) {
 	rc, err := file.Open()
 	if err != nil {
 		if p.onFileError != nil {
@@ -378,7 +384,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 
 	format, verified := classify(file.Path, reader, scratch)
 	reader, size, convertedFrom, convertedLang, converted := applyConverters(
-		file, format, reader, size, p.engine.EmbedImages && verified)
+		file, cfg, format, reader, size, p.engine.EmbedImages && verified)
 
 	isBinary, lang := detectContent(file.Path, reader, scratch)
 	if convertedLang != "" {
@@ -387,7 +393,6 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	// A converted image is no longer an image but the text describing it, which
 	// the content templates render and the image template would discard.
 	isImage := format.IsImage() && verified && !converted
-	cfg := file.Config
 
 	skel := applySkeleton(cfg, lang, reader, size, isBinary, isImage)
 	var skeletonMode string
@@ -471,7 +476,7 @@ type excerpt struct {
 // readSlices reads what cfg asks for from lines. A head and tail that meet or
 // overlap cover the whole file, which then renders whole, and any read that
 // covers the whole file yields an exact row count.
-func readSlices(lines *internal.LineSource, cfg core.RunnerConfig) (excerpt, error) {
+func readSlices(lines *internal.LineSource, cfg core.RenderOptions) (excerpt, error) {
 	if cfg.Head < 0 {
 		all, err := lines.All()
 		return excerpt{head: terminate(all), rows: internal.CountLines(all), exact: true}, err
@@ -553,14 +558,14 @@ const (
 // EstimatePreparedBufferSize returns a best-effort render output size hint.
 func EstimatePreparedBufferSize(item PreparedItem) int {
 	switch v := item.Raw.(type) {
-	case sources.InputFile:
-		hint := minPreparedBufferHint + len(v.Path)
-		cfg := v.Config
+	case FileItem:
+		hint := minPreparedBufferHint + len(v.File.Path)
+		cfg := v.Opts
 		switch {
 		case cfg.Head == 0 && cfg.Tail == 0:
 			// Compact view: header-only output.
 		case cfg.Head < 0:
-			hint += clampHint(v.Size)
+			hint += clampHint(v.File.Size)
 		default:
 			// Sliced view: usually much smaller than full file content.
 			hint += 16 * 1024

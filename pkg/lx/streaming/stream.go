@@ -26,7 +26,6 @@ type Stream struct {
 	items       []interface{}
 	tokenizer   core.Tokenizer
 	engine      *core.TemplateEngine
-	renderCfg   core.RunnerConfig
 	workDir     string
 	finalStats  *core.GlobalContext
 	sections    []*core.SectionContext
@@ -37,7 +36,7 @@ type Stream struct {
 	skippedBySize int
 }
 
-func NewStream(cfg *core.Config, runnerCfg core.RunnerConfig) (*Stream, error) {
+func NewStream(cfg *core.Config) (*Stream, error) {
 	engine, err := templatex.Compile(cfg)
 	if err != nil {
 		return nil, err
@@ -45,7 +44,6 @@ func NewStream(cfg *core.Config, runnerCfg core.RunnerConfig) (*Stream, error) {
 
 	return &Stream{
 		engine:      engine,
-		renderCfg:   runnerCfg,
 		tokenizer:   defaultTokenizer{},
 		workDir:     ".",
 		concurrency: runtime.NumCPU(),
@@ -66,26 +64,20 @@ func (s *Stream) WithTokenizer(t core.Tokenizer) *Stream {
 	return s
 }
 
-func (s *Stream) WithRunnerConfig(cfg core.RunnerConfig) *Stream {
-	s.renderCfg = cfg
-	return s
-}
-
 func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
 	s.onFileError = h
 	return s
 }
 
-// AddFile enqueues a file, unless it exceeds the configured MaxSize. Inputs
-// with an unknown size (negative, as for remote URLs) are always kept.
-func (s *Stream) AddFile(f sources.InputFile) *Stream {
-	f.Config = s.renderCfg
-	if s.renderCfg.MaxSize > 0 && f.Size > s.renderCfg.MaxSize {
-		slog.Debug("Skipped by size limit (-m)", "path", f.Path, "size", f.Size, "max_size", s.renderCfg.MaxSize)
+// AddFile enqueues a file to render with opts, unless it exceeds opts.MaxSize.
+// Inputs with an unknown size (negative, as for remote URLs) are always kept.
+func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
+	if opts.MaxSize > 0 && f.Size > opts.MaxSize {
+		slog.Debug("Skipped by size limit (-m)", "path", f.Path, "size", f.Size, "max_size", opts.MaxSize)
 		s.skippedBySize++
 		return s
 	}
-	s.items = append(s.items, f)
+	s.items = append(s.items, render.FileItem{File: f, Opts: opts})
 	return s
 }
 
@@ -151,7 +143,8 @@ func (s *Stream) Prepare() core.GlobalContext {
 			continue
 		}
 
-		if f, ok := item.(sources.InputFile); ok {
+		if fi, ok := item.(render.FileItem); ok {
+			f := fi.File
 			currentSection.TotalFiles++
 			global.TotalFiles++
 			if f.Size < 0 {

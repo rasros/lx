@@ -66,9 +66,13 @@ func makeTestTarGz(t *testing.T, entries [][2]string) string {
 	return f.Name()
 }
 
-type collectingSink struct{ files []InputFile }
+// includeSelector accepts the entries matching one of its patterns.
+type includeSelector []string
 
-func (s *collectingSink) Add(f InputFile) { s.files = append(s.files, f) }
+func (includeSelector) Descend(string) bool { return true }
+func (s includeSelector) Accept(entry, _ string) bool {
+	return walker.IsMatchAnyCompiled(walker.CompileSpecs(s), entry)
+}
 
 func filePaths(files []InputFile) []string {
 	out := make([]string, len(files))
@@ -106,14 +110,14 @@ func TestIsArchivePath(t *testing.T) {
 func TestExpandArchive_BasicEntries(t *testing.T) {
 	path := makeTestZip(t, [][2]string{{"hello.txt", "Hello!"}, {"nested/world.go", "package nested"}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "archive.zip", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "archive.zip", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	paths := filePaths(s.files)
+	paths := filePaths(files)
 	sort.Strings(paths)
 	assertContains(t, paths, "archive.zip/hello.txt")
 	assertContains(t, paths, "archive.zip/nested/world.go")
@@ -122,18 +126,18 @@ func TestExpandArchive_BasicEntries(t *testing.T) {
 func TestExpandArchive_DisplayPathPrefix(t *testing.T) {
 	path := makeTestZip(t, [][2]string{{"a.txt", "hi"}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "path/to/archive.zip", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "path/to/archive.zip", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	if len(s.files) != 1 {
-		t.Fatalf("expected 1 file, got %d", len(s.files))
+	if len(files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(files))
 	}
-	if s.files[0].Path != "path/to/archive.zip/a.txt" {
-		t.Errorf("Path = %q, want path/to/archive.zip/a.txt", s.files[0].Path)
+	if files[0].Path != "path/to/archive.zip/a.txt" {
+		t.Errorf("Path = %q, want path/to/archive.zip/a.txt", files[0].Path)
 	}
 }
 
@@ -141,18 +145,18 @@ func TestExpandArchive_ContentReadable(t *testing.T) {
 	const content = "package main\n"
 	path := makeTestZip(t, [][2]string{{"main.go", content}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "archive.zip", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "archive.zip", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	if len(s.files) != 1 {
-		t.Fatalf("expected 1 file, got %d", len(s.files))
+	if len(files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(files))
 	}
 
-	rc, err := s.files[0].Open()
+	rc, err := files[0].Open()
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}
@@ -170,19 +174,19 @@ func TestExpandArchive_ContentReadable(t *testing.T) {
 func TestExpandArchive_OpenIsIndependent(t *testing.T) {
 	path := makeTestZip(t, [][2]string{{"a.txt", "AAA"}, {"b.txt", "BBB"}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "arc", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	if len(s.files) != 2 {
-		t.Fatalf("expected 2 files, got %d", len(s.files))
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(files))
 	}
 
 	want := map[string]string{"arc/a.txt": "AAA", "arc/b.txt": "BBB"}
-	for _, f := range s.files {
+	for _, f := range files {
 		rc, err := f.Open()
 		if err != nil {
 			t.Fatalf("Open(%q) error: %v", f.Path, err)
@@ -198,14 +202,14 @@ func TestExpandArchive_OpenIsIndependent(t *testing.T) {
 func TestExpandArchive_HiddenFiltered(t *testing.T) {
 	path := makeTestZip(t, [][2]string{{".hidden", "secret"}, {"visible.txt", "visible"}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{Override: []string{".*"}})
 
-	if err := ExpandArchive(context.Background(), path, "arc", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	paths := filePaths(s.files)
+	paths := filePaths(files)
 	assertContains(t, paths, "arc/visible.txt")
 	assertNotContains(t, paths, "arc/.hidden")
 }
@@ -213,14 +217,14 @@ func TestExpandArchive_HiddenFiltered(t *testing.T) {
 func TestExpandArchive_HiddenIncluded(t *testing.T) {
 	path := makeTestZip(t, [][2]string{{".hidden", "secret"}, {"visible.txt", "visible"}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "arc", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	paths := filePaths(s.files)
+	paths := filePaths(files)
 	assertContains(t, paths, "arc/visible.txt")
 	assertContains(t, paths, "arc/.hidden")
 }
@@ -228,14 +232,14 @@ func TestExpandArchive_HiddenIncluded(t *testing.T) {
 func TestExpandArchive_IncludeFilter(t *testing.T) {
 	path := makeTestZip(t, [][2]string{{"main.go", "package main"}, {"util.go", "package main"}, {"readme.txt", "docs"}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "arc", w, []string{"*.go"}, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "arc", w, includeSelector{"*.go"})
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	paths := filePaths(s.files)
+	paths := filePaths(files)
 	assertContains(t, paths, "arc/main.go")
 	assertContains(t, paths, "arc/util.go")
 	assertNotContains(t, paths, "arc/readme.txt")
@@ -244,14 +248,14 @@ func TestExpandArchive_IncludeFilter(t *testing.T) {
 func TestExpandArchive_ExcludeViaWalkerRule(t *testing.T) {
 	path := makeTestZip(t, [][2]string{{"main.go", "package main"}, {"secret.txt", "do not include"}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{Override: []string{"secret.txt"}})
 
-	if err := ExpandArchive(context.Background(), path, "arc", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	paths := filePaths(s.files)
+	paths := filePaths(files)
 	assertContains(t, paths, "arc/main.go")
 	assertNotContains(t, paths, "arc/secret.txt")
 }
@@ -259,35 +263,34 @@ func TestExpandArchive_ExcludeViaWalkerRule(t *testing.T) {
 func TestExpandArchive_EmptyZip(t *testing.T) {
 	path := makeTestZip(t, nil)
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "arc", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	if len(s.files) != 0 {
-		t.Errorf("expected 0 files from empty zip, got %d", len(s.files))
+	if len(files) != 0 {
+		t.Errorf("expected 0 files from empty zip, got %d", len(files))
 	}
 }
 
 func TestExpandArchive_UnknownExtension(t *testing.T) {
-	s := &collectingSink{}
 	w := walker.New(walker.Options{IgnoreEnabled: true})
 
-	if err := ExpandArchive(context.Background(), "/any/path/file.go", "file.go", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), "/any/path/file.go", "file.go", w, nil)
+	if err != nil {
 		t.Fatalf("expected nil for non-archive path, got: %v", err)
 	}
-	if len(s.files) != 0 {
-		t.Errorf("expected 0 files for non-archive path, got %d", len(s.files))
+	if len(files) != 0 {
+		t.Errorf("expected 0 files for non-archive path, got %d", len(files))
 	}
 }
 
 func TestExpandArchive_BadZipPath(t *testing.T) {
-	s := &collectingSink{}
 	w := walker.New(walker.Options{IgnoreEnabled: true})
 
-	err := ExpandArchive(context.Background(), "/nonexistent/path/archive.zip", "arc", w, nil, "", s)
+	_, err := ExpandArchive(context.Background(), "/nonexistent/path/archive.zip", "arc", w, nil)
 	if err == nil {
 		t.Fatal("expected error for nonexistent archive, got nil")
 	}
@@ -296,14 +299,14 @@ func TestExpandArchive_BadZipPath(t *testing.T) {
 func TestExpandArchive_TarGz_BasicEntries(t *testing.T) {
 	path := makeTestTarGz(t, [][2]string{{"hello.txt", "Hello from tar!"}, {"nested/world.go", "package nested"}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "archive.tar.gz", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "archive.tar.gz", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	paths := filePaths(s.files)
+	paths := filePaths(files)
 	sort.Strings(paths)
 	assertContains(t, paths, "archive.tar.gz/hello.txt")
 	assertContains(t, paths, "archive.tar.gz/nested/world.go")
@@ -313,18 +316,18 @@ func TestExpandArchive_TarGz_ContentReadable(t *testing.T) {
 	const content = "package main\n"
 	path := makeTestTarGz(t, [][2]string{{"main.go", content}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "arc.tar.gz", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "arc.tar.gz", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	if len(s.files) != 1 {
-		t.Fatalf("expected 1 file, got %d", len(s.files))
+	if len(files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(files))
 	}
 
-	rc, err := s.files[0].Open()
+	rc, err := files[0].Open()
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}
@@ -360,18 +363,18 @@ func TestExpandArchive_Gz_SingleEntry(t *testing.T) {
 	const content = "hello from gzip\n"
 	path := makeTestGz(t, "data.txt.gz", content)
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "data.txt.gz", w, nil, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "data.txt.gz", w, nil)
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	if len(s.files) != 1 {
-		t.Fatalf("expected 1 file, got %d", len(s.files))
+	if len(files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(files))
 	}
 
-	rc, err := s.files[0].Open()
+	rc, err := files[0].Open()
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}
@@ -386,14 +389,14 @@ func TestExpandArchive_Gz_SingleEntry(t *testing.T) {
 func TestExpandArchive_TarGz_IncludeFilter(t *testing.T) {
 	path := makeTestTarGz(t, [][2]string{{"main.go", "package main"}, {"notes.txt", "notes"}})
 
-	s := &collectingSink{}
 	w := walker.New(walker.Options{})
 
-	if err := ExpandArchive(context.Background(), path, "arc.tar.gz", w, []string{"*.go"}, "", s); err != nil {
+	files, err := ExpandArchive(context.Background(), path, "arc.tar.gz", w, includeSelector{"*.go"})
+	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
 
-	paths := filePaths(s.files)
+	paths := filePaths(files)
 	assertContains(t, paths, "arc.tar.gz/main.go")
 	assertNotContains(t, paths, "arc.tar.gz/notes.txt")
 }

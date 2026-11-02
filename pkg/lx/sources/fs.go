@@ -5,8 +5,6 @@ import (
 	"io"
 	"io/fs"
 	"time"
-
-	"github.com/rasros/lx/pkg/lx/core"
 )
 
 type InputFile struct {
@@ -14,8 +12,6 @@ type InputFile struct {
 	AbsPath string
 	Size    int64
 	ModTime time.Time
-
-	Config core.RunnerConfig
 
 	Open func() (io.ReadCloser, error)
 
