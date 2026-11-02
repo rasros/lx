@@ -10,7 +10,6 @@ import (
 // must apply when lx walks a subdirectory. It returns the repository root.
 func SetupAncestorIgnoreFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, ".git")
@@ -42,7 +41,6 @@ func SetupAncestorIgnoreFixture(t *testing.T) string {
 // file by itself. It returns the repository root.
 func SetupIgnoredParentDirFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, ".git")
@@ -58,7 +56,6 @@ func SetupIgnoredParentDirFixture(t *testing.T) string {
 // info/exclude. It returns the worktree root.
 func SetupWorktreeExcludeFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, "main/.git")
@@ -81,7 +78,6 @@ func SetupWorktreeExcludeFixture(t *testing.T) string {
 // info/exclude is never read. It returns the repository root.
 func SetupStrayGitDirFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, ".git")
@@ -104,7 +100,6 @@ func SetupStrayGitDirFixture(t *testing.T) string {
 // the project. It returns the project directory.
 func SetupStrayGitDirAboveFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
@@ -124,7 +119,6 @@ func SetupStrayGitDirAboveFixture(t *testing.T) string {
 // repository. It returns the directory.
 func SetupParentIgnoreFilesFixture(t *testing.T, repo bool) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	if repo {
@@ -147,7 +141,6 @@ func SetupParentIgnoreFilesFixture(t *testing.T, repo bool) string {
 // returns the repository root.
 func SetupNegatedIgnoredDirFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, ".git")
@@ -167,7 +160,6 @@ func SetupNegatedIgnoredDirFixture(t *testing.T) string {
 // rule ending in /**.
 func SetupIgnoredDirNegationsFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, ".git")

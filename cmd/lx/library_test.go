@@ -15,9 +15,16 @@ import (
 // The library flow in the package documentation renders a directory exactly
 // as lx <dir> does, ancestor ignore rules included.
 func TestLibraryMatchesCLI(t *testing.T) {
+	t.Parallel()
 	dir := setupAncestorIgnoreFixture(t)
 	cwd := filepath.Join(dir, "sub")
-	lookupEnv := os.LookupEnv
+	configDir := mockConfigDir(t)
+	lookupEnv := func(key string) (string, bool) {
+		if key == "XDG_CONFIG_HOME" {
+			return configDir, true
+		}
+		return os.LookupEnv(key)
+	}
 	ctx := context.Background()
 
 	var want, stderr bytes.Buffer

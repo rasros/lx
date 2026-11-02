@@ -8,14 +8,6 @@ import (
 	"testing"
 )
 
-func setupMockConfig(t *testing.T) {
-	t.Helper()
-	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, "lx"), 0755)
-	os.WriteFile(filepath.Join(dir, "lx", "ignore"), []byte(""), 0644)
-	t.Setenv("XDG_CONFIG_HOME", dir)
-}
-
 func writeFile(t *testing.T, dir, path, content string, perm os.FileMode) {
 	t.Helper()
 	fp := filepath.Join(dir, path)

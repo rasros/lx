@@ -1,14 +1,19 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
 
 // --output redirects the bundle to a file, which moves stats to stdout and
-// makes the output file itself a walk candidate.
+// makes the output file itself a walk candidate. The file is there from an
+// earlier run: the cases replace it as they finish, and none walks it.
 func TestGoldenOutputFile(t *testing.T) {
 	dir := setupWalkFixture(t)
+	if err := os.WriteFile(filepath.Join(dir, "bundle.md"), []byte("an earlier bundle\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "170_output_file_stats_to_stdout", args: []string{"--stats", "-o", "bundle.md", "main.go"}},
 		{name: "171_output_file_excluded_from_own_walk", args: []string{"--stats", "-o", "bundle.md", "."}},
@@ -42,7 +47,7 @@ func TestGoldenConfigDrivenBehaviour(t *testing.T) {
 
 func TestGoldenPromptsDir(t *testing.T) {
 	dir := setupPromptLibFixture(t)
-	runTestGolden(t, dir, []goldenTestCase{
+	runTestGoldenEnv(t, dir, map[string]string{"LX_PROMPTS_DIR": filepath.Join(dir, "prompts")}, []goldenTestCase{
 		{name: "181_list_prompts", args: []string{"--list-prompts"}},
 		{name: "182_prompts_dir_override", args: []string{
 			"--prompts-dir", filepath.Join(dir, "prompts", "area"), "-P", "note", "main.go",

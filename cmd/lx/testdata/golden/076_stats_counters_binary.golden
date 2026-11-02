@@ -10,6 +10,6 @@ func main() {}
 
 
 --- STDERR ---
-  1 binary
-  ~46 tokens
 ▎ 2 files · 2 rows · 1 section · 31 B
+  ~46 tokens
+  1 binary

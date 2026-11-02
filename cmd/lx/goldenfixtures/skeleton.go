@@ -7,7 +7,6 @@ import (
 
 func SetupSkeletonFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	languageFiles := []string{

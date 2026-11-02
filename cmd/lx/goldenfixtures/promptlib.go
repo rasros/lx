@@ -1,13 +1,11 @@
 package goldenfixtures
 
 import (
-	"path/filepath"
 	"testing"
 )
 
 func SetupPromptLibFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}\n", 0644)
@@ -21,8 +19,6 @@ func SetupPromptLibFixture(t *testing.T) string {
 	writeFile(t, dir, "prompts/b/dup.md", "Second duplicate.\n", 0644)
 	writeFile(t, dir, "prompts/area/note.md", "Shallow nested note.\n", 0644)
 	writeFile(t, dir, "prompts/area/sub/note.md", "Deeper nested note.\n", 0644)
-
-	t.Setenv("LX_PROMPTS_DIR", filepath.Join(dir, "prompts"))
 
 	return dir
 }

@@ -1,10 +1,13 @@
 package main
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestGoldenPromptLib(t *testing.T) {
 	dir := setupPromptLibFixture(t)
-	runTestGolden(t, dir, []goldenTestCase{
+	runTestGoldenEnv(t, dir, map[string]string{"LX_PROMPTS_DIR": filepath.Join(dir, "prompts")}, []goldenTestCase{
 		{name: "800_promptlib_nested", args: []string{"-P", "go/test", "main.go"}},
 		{name: "801_promptlib_basename", args: []string{"-P", "refactor", "main.go"}},
 		{name: "802_promptlib_extension_probe", args: []string{"-P", "plan", "main.go"}},

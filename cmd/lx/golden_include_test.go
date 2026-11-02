@@ -35,7 +35,7 @@ func TestGoldenIncludePaths(t *testing.T) {
 func TestGoldenURLArchiveDownloadFailure(t *testing.T) {
 	dir := t.TempDir()
 	server := httptest.NewServer(http.NotFoundHandler())
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "112k_url_archive_download_failure", args: []string{"--stats", "-Z", server.URL + "/missing.zip"}},

@@ -2,6 +2,6 @@
 
 
 --- STDERR ---
+CLI Error: prompt "dup" is ambiguous in /ROOT/prompts; candidates:
   a/dup.md
   b/dup.md
-CLI Error: prompt "dup" is ambiguous in /ROOT/prompts; candidates:

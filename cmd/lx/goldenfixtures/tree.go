@@ -4,7 +4,6 @@ import "testing"
 
 func SetupTreeFixture(t *testing.T) string {
 	t.Helper()
-	setupMockConfig(t)
 	dir := t.TempDir()
 
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
