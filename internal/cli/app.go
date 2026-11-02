@@ -17,7 +17,7 @@ import (
 
 // Run runs lx with args against env, which stands for the process: Run reads
 // and writes nothing else of it, and logs to env.Stderr through a logger of
-// its own.
+// its own. A run that ctx cancels returns ctx's error without logging it.
 func Run(ctx context.Context, args []string, env Env) error {
 	parsed, err := Parse(args, definitions)
 	if err != nil {
@@ -143,7 +143,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 	if out.path != "" {
 		// A bad path fails before any work, but the file only receives the
 		// output once all of it is written, so a failed run leaves it as it was.
-		if sink, err = createFileSink(out.path, out.name); err != nil {
+		if sink, err = createFileSink(out.path, out.name, env.TempDir); err != nil {
 			return err
 		}
 		defer sink.Abort()
@@ -244,6 +244,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 	log.Info("Executing stream pipeline...")
 	err = stream.Execute(ctx, w)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		log.Error("Pipeline execution failed", "error", err)
 		return err
 	}

@@ -27,6 +27,7 @@ func TestLibraryMatchesCLI(t *testing.T) {
 		Stderr:    &stderr,
 		LookupEnv: lookupEnv,
 		Cwd:       cwd,
+		TempDir:   t.TempDir(),
 	})
 	if err != nil {
 		t.Fatal(err, stderr.String())
