@@ -162,6 +162,11 @@ func couldMatchDescendant(spec CompiledSpec, dir string) bool {
 	}
 
 	literalPrefix := prefixBeforeMeta(pattern)
+	if literalPrefix != pattern {
+		// Only whole directory names before the first wildcard are literal:
+		// "src*/x.go" can match below srcfoo.
+		literalPrefix = literalPrefix[:strings.LastIndexByte(literalPrefix, '/')+1]
+	}
 	if literalPrefix == "" {
 		return true
 	}
@@ -193,10 +198,12 @@ func starWildcardPrefixSuffix(pattern string) (string, string) {
 	return pattern[:firstStar], pattern[lastStar+1:]
 }
 
+// prefixBeforeMeta returns the literal start of pattern, up to its first
+// wildcard or escape.
 func prefixBeforeMeta(pattern string) string {
 	for i := 0; i < len(pattern); i++ {
 		switch pattern[i] {
-		case '*', '?', '[', '{':
+		case '*', '?', '[', '{', '\\':
 			return pattern[:i]
 		}
 	}
