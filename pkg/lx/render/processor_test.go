@@ -252,7 +252,7 @@ func TestApplyConvertersLeavesContentWhenNoneApply(t *testing.T) {
 	src := []byte("package main\n")
 	file := sources.NewBufferInputFile("main.go", src)
 
-	reader, size, from, _ := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
+	reader, size, from, _, _ := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
 	if from != "" {
 		t.Errorf("convertedFrom = %q, want empty", from)
 	}
@@ -277,7 +277,7 @@ func TestApplyConvertersRunsMatchingConverter(t *testing.T) {
 	t.Cleanup(func() { converters = converters[:len(converters)-1] })
 
 	file := sources.NewBufferInputFile("doc.zzz", []byte("raw"))
-	reader, size, from, _ := applyConverters(file, nil, bytes.NewReader([]byte("raw")), 3, false)
+	reader, size, from, _, _ := applyConverters(file, nil, bytes.NewReader([]byte("raw")), 3, false)
 
 	if from != "zzz" {
 		t.Errorf("convertedFrom = %q, want %q", from, "zzz")
@@ -301,7 +301,7 @@ func TestApplyConvertersKeepsContentOnFailure(t *testing.T) {
 	t.Cleanup(func() { converters = converters[:len(converters)-1] })
 
 	src := []byte("raw content")
-	reader, size, from, _ := applyConverters(
+	reader, size, from, _, _ := applyConverters(
 		sources.NewBufferInputFile("doc.zzz", src), nil, bytes.NewReader(src), int64(len(src)), false)
 
 	if from != "" {
@@ -408,7 +408,7 @@ func TestApplyConvertersReportsProducedLanguage(t *testing.T) {
 	file := sources.NewBufferInputFile("page.html", src)
 	file.Config = core.RunnerConfig{Head: -1, ExtractDocuments: true}
 
-	_, _, from, lang := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
+	_, _, from, lang, _ := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
 	if from != "html" {
 		t.Errorf("convertedFrom = %q, want html", from)
 	}
@@ -424,10 +424,10 @@ func TestApplyConvertersLeavesImagesBeingEmbedded(t *testing.T) {
 	file := sources.NewBufferInputFile("logo.png", src)
 	file.Config = core.RunnerConfig{Head: -1, ExtractMedia: true}
 
-	if _, _, from, _ := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), true); from != "" {
+	if _, _, from, _, _ := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), true); from != "" {
 		t.Errorf("convertedFrom = %q, want empty while embedding", from)
 	}
-	if _, _, from, _ := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false); from != "png" {
+	if _, _, from, _, _ := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false); from != "png" {
 		t.Errorf("convertedFrom = %q, want png when not embedding", from)
 	}
 }
@@ -436,8 +436,53 @@ func TestApplyConvertersReportsNoLanguageWhenNoneApply(t *testing.T) {
 	src := []byte("package main\n")
 	file := sources.NewBufferInputFile("main.go", src)
 
-	_, _, from, lang := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
+	_, _, from, lang, _ := applyConverters(file, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
 	if from != "" || lang != "" {
 		t.Errorf("got from=%q lang=%q, want both empty", from, lang)
+	}
+}
+
+// An input with no extension is still converted when its content is media, and
+// the conversion is what decides that it is no longer rendered as a picture.
+func TestPrepareFileContextConvertsExtensionlessImage(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "..", "..", "cmd", "lx", "testdata", "media", "sample.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, _ := templatex.Compile(core.NewConfig())
+	proc := NewProcessor(engine, core.GlobalContext{}, nil)
+
+	file := sources.NewBufferInputFile("avatar", src)
+	file.Config = core.RunnerConfig{Head: -1, ExtractMedia: true}
+	ctx, err := proc.prepareFileContext(file, 1, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ctx.IsImage || ctx.IsBinary || ctx.ConvertedFrom != "png" {
+		t.Errorf("IsImage=%v IsBinary=%v ConvertedFrom=%q, want a png converted to text",
+			ctx.IsImage, ctx.IsBinary, ctx.ConvertedFrom)
+	}
+	if s, _ := ctx.Content.(string); !strings.Contains(s, "Container: png") {
+		t.Errorf("content = %q", s)
+	}
+}
+
+// Only bytes that bear the format out are rendered as a picture.
+func TestClassifyVerifiesBeforeTreatingAsImage(t *testing.T) {
+	scratch := make([]byte, 1024)
+	cases := []struct {
+		path string
+		data []byte
+		want bool
+	}{
+		{"logo.png", []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\x0d"), true},
+		{"corrupt.png", []byte{0, 1, 2, 3, 4}, false},
+		{"counts.dat", append([]byte("BM"), make([]byte, 60)...), false},
+	}
+	for _, c := range cases {
+		format, verified := classify(c.path, bytes.NewReader(c.data), scratch)
+		if got := format.IsImage() && verified; got != c.want {
+			t.Errorf("%s: image=%v, want %v", c.path, got, c.want)
+		}
 	}
 }

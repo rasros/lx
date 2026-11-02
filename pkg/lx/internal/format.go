@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"encoding/binary"
 	"path"
 	"strings"
 )
@@ -43,8 +44,27 @@ type Format struct {
 	MIME string
 	Exts []string
 
+	// family groups formats that share a container layout and differ only in
+	// what they declare inside it, such as the ISO brands. Within a family the
+	// extension is the better guide to intent, since the declarations overlap.
+	family     string
 	signatures []signature
 	parse      func(*byteReader) *MediaInfo
+}
+
+// Verify reports whether the header plausibly is this format: either a strong
+// signature matches, or the parser makes sense of it. A weak signature or an
+// extension alone proves nothing about the bytes.
+func (f *Format) Verify(header []byte) bool {
+	if f == nil {
+		return false
+	}
+	for _, s := range f.signatures {
+		if s.strength == Strong && s.match(header) {
+			return true
+		}
+	}
+	return f.parse != nil && f.parse(headerReader(header)) != nil
 }
 
 // IsImage reports whether the format is a picture, which renders embedded
@@ -65,9 +85,29 @@ func magicAt(off int, want string) func([]byte) bool {
 func strong(match func([]byte) bool) signature { return signature{Strong, match} }
 func weak(match func([]byte) bool) signature   { return signature{Weak, match} }
 
-// isoBrand matches an ISO base media file whose ftyp box declares one of the
-// brands, which are the only thing telling apart formats that share the box
-// layout entirely. With no brands given, any ftyp box matches.
+// isoBrands lists the brands an ftyp box declares: the major brand, then the
+// compatible brands that follow the minor version, up to the end of the box or
+// of the header, whichever comes first.
+func isoBrands(h []byte) []string {
+	if len(h) < 12 {
+		return nil
+	}
+	brands := []string{strings.TrimSpace(string(h[8:12]))}
+	end := int(binary.BigEndian.Uint32(h[:4]))
+	if end > len(h) {
+		end = len(h)
+	}
+	for off := 16; off+4 <= end; off += 4 {
+		brands = append(brands, strings.TrimSpace(string(h[off:off+4])))
+	}
+	return brands
+}
+
+// isoBrand matches an ISO base media file that declares one of the brands,
+// major or compatible, which are the only thing telling apart formats that
+// share the box layout entirely. With no brands given, any ftyp box matches.
+// Formats that share brands (an AVIF also lists the generic HEIF mif1) are
+// told apart by registry order, the specific one first.
 func isoBrand(brands ...string) func([]byte) bool {
 	return func(h []byte) bool {
 		if !magicAt(4, "ftyp")(h) {
@@ -76,13 +116,11 @@ func isoBrand(brands ...string) func([]byte) bool {
 		if len(brands) == 0 {
 			return true
 		}
-		if len(h) < 12 {
-			return false
-		}
-		got := strings.TrimSpace(string(h[8:12]))
-		for _, b := range brands {
-			if got == b {
-				return true
+		for _, got := range isoBrands(h) {
+			for _, b := range brands {
+				if got == b {
+					return true
+				}
 			}
 		}
 		return false
@@ -121,21 +159,21 @@ var formats = []*Format{
 		signatures: []signature{strong(func(h []byte) bool { return magicAt(0, "RIFF")(h) && magicAt(8, "WEBP")(h) })},
 		parse:      parseWebP},
 	{Name: "webm", Kind: KindVideo, MIME: "video/webm", Exts: []string{".webm"},
-		signatures: []signature{strong(isWebM)}, parse: parseMatroska},
+		signatures: []signature{strong(isWebM)}, family: "matroska", parse: parseMatroska},
 	{Name: "mkv", Kind: KindVideo, MIME: "video/x-matroska", Exts: []string{".mkv"},
-		signatures: []signature{strong(magicAt(0, "\x1a\x45\xdf\xa3"))}, parse: parseMatroska},
+		signatures: []signature{strong(magicAt(0, "\x1a\x45\xdf\xa3"))}, family: "matroska", parse: parseMatroska},
 	// AVIF and HEIC are the same boxes as an mp4, holding a still rather than a
 	// track.
 	{Name: "avif", Kind: KindImage, MIME: "image/avif", Exts: []string{".avif"},
-		signatures: []signature{strong(isoBrand("avif", "avis"))}, parse: parseMP4},
+		signatures: []signature{strong(isoBrand("avif", "avis"))}, family: "iso", parse: parseMP4},
 	{Name: "heic", Kind: KindImage, MIME: "image/heic", Exts: []string{".heic"},
-		signatures: []signature{strong(isoBrand("heic", "heix", "hevc", "hevx", "mif1", "msf1"))}, parse: parseMP4},
+		signatures: []signature{strong(isoBrand("heic", "heix", "hevc", "hevx", "mif1", "msf1"))}, family: "iso", parse: parseMP4},
 	{Name: "mov", Kind: KindVideo, MIME: "video/quicktime", Exts: []string{".mov"},
-		signatures: []signature{strong(isoBrand("qt"))}, parse: parseMP4},
+		signatures: []signature{strong(isoBrand("qt"))}, family: "iso", parse: parseMP4},
 	{Name: "m4a", Kind: KindAudio, MIME: "audio/mp4", Exts: []string{".m4a"},
-		signatures: []signature{strong(isoBrand("M4A"))}, parse: parseMP4},
+		signatures: []signature{strong(isoBrand("M4A"))}, family: "iso", parse: parseMP4},
 	{Name: "mp4", Kind: KindVideo, MIME: "video/mp4", Exts: []string{".mp4", ".m4v"},
-		signatures: []signature{strong(isoBrand())}, parse: parseMP4},
+		signatures: []signature{strong(isoBrand())}, family: "iso", parse: parseMP4},
 	// A sync word is only eleven set bits, so a bare frame header is weak; an ID3
 	// tag is not.
 	{Name: "mp3", Kind: KindAudio, MIME: "audio/mpeg", Exts: []string{".mp3"},
@@ -174,7 +212,8 @@ const SniffLen = 1024
 
 // sniffFormat identifies a format from the header alone. Strong signatures are
 // tried before weak ones so that a short magic cannot shadow a specific one,
-// and weak signatures count only for binary content.
+// and weak signatures count only for binary content that the format's parser
+// makes sense of: two bytes of "BM" are not a bitmap on their own.
 func sniffFormat(header []byte) (*Format, Strength) {
 	if len(header) == 0 {
 		return nil, 0
@@ -183,7 +222,7 @@ func sniffFormat(header []byte) (*Format, Strength) {
 		return f, Strong
 	}
 	if IsBinary(header) {
-		if f := sniffWith(header, Weak); f != nil {
+		if f := sniffWith(header, Weak); f != nil && f.Verify(header) {
 			return f, Weak
 		}
 	}
@@ -208,8 +247,11 @@ func sniffWith(header []byte, strength Strength) *Format {
 //   - content that looks like text is never a registered format, whatever the
 //     extension says, since a mislabelled text file (such as a Git LFS pointer)
 //     is still text;
-//   - a strong signature overrides the extension;
-//   - otherwise the extension decides, and failing that a weak signature.
+//   - a strong signature overrides the extension, except between formats of
+//     one family (an .m4a declaring only the generic isom brand), where the
+//     extension is the better guide;
+//   - otherwise the extension decides, and failing that a weak signature the
+//     format's parser accepts.
 //
 // An empty header carries no evidence, so the extension alone decides.
 func Classify(p string, header []byte) *Format {
@@ -222,6 +264,9 @@ func Classify(p string, header []byte) *Format {
 	}
 	sniffed, strength := sniffFormat(header)
 	if strength == Strong {
+		if byExt != nil && byExt.family != "" && byExt.family == sniffed.family {
+			return byExt
+		}
 		return sniffed
 	}
 	if byExt != nil {

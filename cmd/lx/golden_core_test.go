@@ -290,5 +290,9 @@ func TestGoldenMediaLookalikes(t *testing.T) {
 		{name: "170c_media_lfs_pointer_png", args: []string{"-M", "x.png"}},
 		{name: "170d_media_lfs_pointer_png_html", args: []string{"--html", "x.png"}},
 		{name: "170e_media_tif_extension", args: []string{"-M", "x.tif"}},
+		{name: "170f_media_suffixless_image", args: []string{"-M", "avatar"}},
+		{name: "170g_media_suffixless_image_html", args: []string{"--html", "avatar"}},
+		{name: "170h_media_weak_magic_binary", args: []string{"-M", "counts.dat", "data.bin"}},
+		{name: "170i_media_weak_magic_binary_html", args: []string{"--html", "counts.dat", "data.bin"}},
 	})
 }

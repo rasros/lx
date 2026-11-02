@@ -295,6 +295,10 @@ func parseBMP(b *byteReader) *MediaInfo {
 	}}
 }
 
+// icoBitDepths are the depths an icon entry can state; zero leaves it to the
+// image data.
+var icoBitDepths = map[uint16]bool{0: true, 1: true, 2: true, 4: true, 8: true, 16: true, 24: true, 32: true}
+
 // parseICO reports the largest image in the file, an icon being a bundle of
 // sizes rather than one picture.
 func parseICO(b *byteReader) *MediaInfo {
@@ -314,6 +318,12 @@ func parseICO(b *byteReader) *MediaInfo {
 		if !ok {
 			break
 		}
+		// The reserved byte, plane count and bit depth only take a few values, so
+		// an entry outside them means the file is not an icon at all.
+		planes, bits := binary.LittleEndian.Uint16(entry[4:6]), binary.LittleEndian.Uint16(entry[6:8])
+		if entry[3] != 0 || planes > 1 || !icoBitDepths[bits] {
+			return nil
+		}
 		// A zero in either dimension means 256, which does not fit in the byte.
 		width, height := int(entry[0]), int(entry[1])
 		if width == 0 {
@@ -324,8 +334,11 @@ func parseICO(b *byteReader) *MediaInfo {
 		}
 		if width*height > img.Width*img.Height {
 			img.Width, img.Height = width, height
-			img.BitDepth = int(binary.LittleEndian.Uint16(entry[6:8]))
+			img.BitDepth = int(bits)
 		}
+	}
+	if img.Width == 0 {
+		return nil // not one entry could be read
 	}
 
 	if count > 1 {

@@ -5,6 +5,16 @@ import (
 	"testing"
 )
 
+// isoHeader builds an ftyp box with a major brand and compatible brands,
+// followed by an empty free box so the header reads as binary.
+func isoHeader(major string, compatible ...string) []byte {
+	payload := append([]byte(major), zeros(4)...)
+	for _, b := range compatible {
+		payload = append(payload, b...)
+	}
+	return append(box("ftyp", payload), box("free")...)
+}
+
 func formatName(f *Format) string {
 	if f == nil {
 		return ""
@@ -50,6 +60,25 @@ func TestClassify(t *testing.T) {
 		{"ico binary without a name", "blob", icoFile([][2]byte{{16, 16}}), "ico"},
 		{"mp3 sync binary without a name", "blob", append(mp3Header(1, 3, 9, 0, 2), zeros(64)...), "mp3"},
 		{"weak magic loses to the name", "a.wav", bmpFile(40, 16, 16, 24), "wav"},
+		// ...and only when the parser makes sense of what follows.
+		{"BM then zeros", "counts.dat", append([]byte("BM\xd2\x04"), zeros(60)...), ""},
+		{"ico magic then a counter", "data.bin",
+			[]byte{0, 0, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}, ""},
+		{"ico magic then noise", "blob",
+			[]byte{0, 0, 1, 0, 0x9b, 0xc0, 0x10, 0x3a, 0x79, 0x74, 0xd3, 0x66, 4, 0xb8, 0x17, 0xfc, 0x29, 0x8c, 0xef, 0xf2, 0x82, 0x35}, ""},
+		{"ico header with no entries", "blob", []byte{0, 0, 1, 0, 1, 0}, ""},
+
+		// ISO brands: compatible brands count, the specific brand wins, and
+		// within the family the extension decides.
+		{"avif under the generic mif1 brand", "photo", isoHeader("mif1", "avif", "mif1", "miaf"), "avif"},
+		{"avif under the generic mif1 brand, named", "photo.avif", isoHeader("mif1", "avif", "mif1", "miaf"), "avif"},
+		{"heic under mif1", "photo", isoHeader("mif1", "mif1", "heic"), "heic"},
+		{"m4a declared in compatible brands", "song", isoHeader("isom", "M4A ", "isom"), "m4a"},
+		{"m4a with only generic brands", "song.m4a", isoHeader("isom", "isom", "mp42"), "m4a"},
+		{"mp4 named m4a keeps the name", "song.m4a", isoHeader("mp42", "mp42", "isom"), "m4a"},
+		{"mp4 named mov keeps the name", "clip.mov", isoHeader("isom", "isom"), "mov"},
+		{"generic iso without a name", "clip", isoHeader("isom", "isom", "mp42"), "mp4"},
+		{"iso content named as another family", "song.mp3", isoHeader("M4A ", "M4A "), "m4a"},
 
 		// Not a registered format at all.
 		{"source", "main.go", []byte("package main\n"), ""},
@@ -127,6 +156,36 @@ func TestDataURIUsesContentType(t *testing.T) {
 	want := "data:image/png;base64,"
 	if len(got) < len(want) || got[:len(want)] != want {
 		t.Errorf("DataURI = %q, want prefix %q", got, want)
+	}
+}
+
+// A name or a weak signature does not prove the bytes; a strong signature or a
+// parse that makes sense of them does.
+func TestVerify(t *testing.T) {
+	cases := []struct {
+		name   string
+		format string
+		header []byte
+		want   bool
+	}{
+		{"png signature", "png", pngFile(16, 16, 8, 2), true},
+		{"png name on other bytes", "png", []byte{0, 1, 2, 3}, false},
+		{"real bitmap", "bmp", bmpFile(40, 16, 16, 24), true},
+		{"BM then zeros", "bmp", append([]byte("BM"), zeros(60)...), false},
+		{"real icon", "ico", icoFile([][2]byte{{16, 16}}), true},
+		{"icon entry with a bad depth", "ico", []byte{0, 0, 1, 0, 1, 0, 16, 16, 0, 0, 1, 0, 0xf8, 0xf9, 0, 0, 0, 0, 0, 0, 0, 0}, false},
+		{"icon entry with a reserved byte set", "ico", []byte{0, 0, 1, 0, 1, 0, 16, 16, 0, 5, 1, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0}, false},
+		{"mp3 frame", "mp3", append(mp3Header(1, 3, 9, 0, 2), zeros(64)...), true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := FormatByName(c.format).Verify(c.header); got != c.want {
+				t.Errorf("Verify = %v, want %v", got, c.want)
+			}
+		})
+	}
+	if (*Format)(nil).Verify(pngFile(1, 1, 8, 2)) {
+		t.Error("a nil format verified")
 	}
 }
 
