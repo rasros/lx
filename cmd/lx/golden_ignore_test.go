@@ -10,6 +10,7 @@ func TestGoldenAncestorIgnore(t *testing.T) {
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "104_ancestor_ignore_subdir", args: []string{"sub"}},
 		{name: "105_ancestor_ignore_explicit_dir", args: []string{"dist"}},
+		{name: "105b_ancestor_ignore_anchored_dir", args: []string{"build"}},
 	})
 }
 

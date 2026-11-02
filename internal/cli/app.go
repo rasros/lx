@@ -185,7 +185,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 		debug:       debugLoggingEnabled,
 		cleanups:    &tempCleanups,
 
-		ancestorRules: map[string][]lx.Rule{},
+		ancestorRules: map[string]ancestorState{},
 	})
 	precomputeTrees(sections)
 	var metaFields map[string]string

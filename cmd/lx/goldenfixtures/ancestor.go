@@ -16,7 +16,8 @@ func SetupAncestorIgnoreFixture(t *testing.T) string {
 	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, dir, ".gitignore", "*.log\ndist\n/sub/skip.txt\n!keep.log\n", 0644)
+	writeFile(t, dir, ".gitignore", "*.log\ndist\n/build\n/sub/skip.txt\n!keep.log\n", 0644)
+	writeFile(t, dir, "build/gen.go", "package build", 0644)
 	writeFile(t, dir, "sub/.gitignore", "local.txt\n", 0644)
 	writeFile(t, dir, "sub/a.log", "ignored by root pattern", 0644)
 	writeFile(t, dir, "sub/keep.log", "re-included by root negation", 0644)

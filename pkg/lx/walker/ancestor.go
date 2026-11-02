@@ -11,8 +11,13 @@ import (
 // at. It reads up to the enclosing git repository's root, or outside a
 // repository up to the working directory when dir is below it. dir's own
 // ignore files are left to the walk.
+//
+// It also sets RootIgnored when dir or a directory above it is ignored,
+// checking each directory from the top down with the rules that apply at its
+// level, BaseRules included, as git does.
 func (w *Walker) LoadAncestorRules(dir string) {
 	w.AncestorRules = nil
+	w.RootIgnored = false
 	dir = filepath.Clean(dir)
 	root, ok := ancestorRoot(dir)
 	if !ok || root == dir {
@@ -24,6 +29,7 @@ func (w *Walker) LoadAncestorRules(dir string) {
 	}
 
 	parts := strings.Split(filepath.ToSlash(rel), "/")
+	levels := make([]int, len(w.BaseRules))
 	cur := root
 	for i, part := range parts {
 		offset := strings.Join(parts[i:], "/") + "/"
@@ -31,9 +37,33 @@ func (w *Walker) LoadAncestorRules(dir string) {
 			r.PathOffset = offset
 			r.Source = filepath.Join(cur, r.Source)
 			w.AncestorRules = append(w.AncestorRules, r)
+			levels = append(levels, i)
+		}
+		if !w.RootIgnored {
+			w.RootIgnored = w.dirIgnored(parts, i, levels)
 		}
 		cur = filepath.Join(cur, part)
 	}
+}
+
+// dirIgnored reports whether the directory parts[:i+1] is ignored. levels
+// gives, for BaseRules followed by AncestorRules, the depth of the directory
+// each rule was loaded from, so it can be matched relative to that directory.
+func (w *Walker) dirIgnored(parts []string, i int, levels []int) bool {
+	ignored := false
+	for k, level := range levels {
+		var r Rule
+		if k < len(w.BaseRules) {
+			r = w.BaseRules[k]
+		} else {
+			r = w.AncestorRules[k-len(w.BaseRules)]
+			r.PathOffset = ""
+		}
+		if match(r, strings.Join(parts[level:i+1], "/"), true) {
+			ignored = !r.Negate
+		}
+	}
+	return ignored
 }
 
 // ancestorRoot picks the highest directory whose ignore files apply to dir.

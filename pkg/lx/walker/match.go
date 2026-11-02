@@ -11,43 +11,24 @@ type pathMatchInfo struct {
 	relPath  string
 	baseName string
 	parts    []string
-	// floatFrom is the first directory component a floating pattern may
-	// match. Components before it lead to the walk root, which was named
-	// explicitly and so is never excluded by a rule from above it.
-	floatFrom int
 }
 
-// offsetPathInfo rewrites a walk-relative path for a rule loaded above the
-// walk root. With offsetFloats, floating patterns may also match the offset's
-// directories, as they lead to a named file rather than a named directory.
-func offsetPathInfo(offset string, offsetFloats bool, ctx pathMatchInfo) pathMatchInfo {
-	full := offset + ctx.relPath
-	if ctx.relPath == "." {
-		full = strings.TrimSuffix(offset, "/")
-	}
-	info := buildPathMatchInfo(full)
-	if !offsetFloats {
-		info.floatFrom = strings.Count(offset, "/")
-	}
-	return info
-}
-
-// offsetInfoCache keeps the last offset rewrite of one path, so consecutive
-// rules loaded from the same ancestor directory share it.
+// offsetInfoCache keeps the last offset rewrite of one walk path, so
+// consecutive rules loaded from the same ancestor directory share it.
 type offsetInfoCache struct {
 	set    bool
 	offset string
-	floats bool
 	info   pathMatchInfo
 }
 
-func (c *offsetInfoCache) get(offset string, floats bool, ctx pathMatchInfo) pathMatchInfo {
+// get rewrites a walk-relative path for a rule loaded above the walk root.
+func (c *offsetInfoCache) get(offset string, ctx pathMatchInfo) pathMatchInfo {
 	if c == nil {
-		return offsetPathInfo(offset, floats, ctx)
+		return buildPathMatchInfo(offset + ctx.relPath)
 	}
-	if !c.set || c.offset != offset || c.floats != floats {
-		c.set, c.offset, c.floats = true, offset, floats
-		c.info = offsetPathInfo(offset, floats, ctx)
+	if !c.set || c.offset != offset {
+		c.set, c.offset = true, offset
+		c.info = buildPathMatchInfo(offset + ctx.relPath)
 	}
 	return c.info
 }
@@ -121,7 +102,7 @@ func matchCompiledSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 		return true
 	}
 
-	for i := ctx.floatFrom; i < len(ctx.parts)-1; i++ {
+	for i := 0; i < len(ctx.parts)-1; i++ {
 		if spec.Pattern.matchCandidate(ctx.parts[i]) {
 			return true
 		}
@@ -141,7 +122,7 @@ func matchWithPathInfo(rule Rule, ctx pathMatchInfo, isDir bool, offsets *offset
 
 	target := ctx
 	if rule.PathOffset != "" {
-		target = offsets.get(rule.PathOffset, rule.offsetFloats, ctx)
+		target = offsets.get(rule.PathOffset, ctx)
 	} else if rule.BasePathPrefix != "" {
 		if !strings.HasPrefix(ctx.relPath, rule.BasePathPrefix) && ctx.relPath != rule.BasePath {
 			return false
@@ -186,6 +167,7 @@ func checkIgnore(relPath string, isDir bool, rules []Rule, parentIgnored bool, w
 
 func hasNestedException(walkDirPath string, rules []Rule) bool {
 	walkDirParts := strings.Split(walkDirPath, "/")
+	var offsets offsetInfoCache
 
 	for _, rule := range rules {
 		if !rule.Negate {
@@ -194,8 +176,8 @@ func hasNestedException(walkDirPath string, rules []Rule) bool {
 
 		dirPath, dirParts := walkDirPath, walkDirParts
 		if rule.PathOffset != "" {
-			dirPath = rule.PathOffset + walkDirPath
-			dirParts = strings.Split(dirPath, "/")
+			info := offsets.get(rule.PathOffset, pathMatchInfo{relPath: walkDirPath})
+			dirPath, dirParts = info.relPath, info.parts
 		}
 
 		if rule.BasePath != "" && rule.BasePath != "." {
