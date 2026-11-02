@@ -19,6 +19,14 @@ func TestGoldenAncestorIgnore(t *testing.T) {
 	})
 }
 
+func TestGoldenIgnoredParentDir(t *testing.T) {
+	dir := setupIgnoredParentDirFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "105g_warn_named_file_in_dir_only_ignored_dir", args: []string{"build/out.js"}},
+		{name: "105h_force_named_file_in_dir_only_ignored_dir", args: []string{"-f", "build/out.js"}},
+	})
+}
+
 func TestGoldenAncestorIgnoreFromSubdir(t *testing.T) {
 	dir := setupAncestorIgnoreFixture(t)
 	runTestGolden(t, filepath.Join(dir, "sub"), []goldenTestCase{

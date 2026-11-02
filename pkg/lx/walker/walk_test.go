@@ -537,3 +537,154 @@ func TestWalkFollowTerminatesOnSymlinkCycle(t *testing.T) {
 		t.Fatal("walk did not terminate on a symlink cycle")
 	}
 }
+
+// walkNamed walks the single path name inside dir and returns the paths
+// passed to the callback and the reasons given for ignored ones.
+func walkNamed(t *testing.T, w *Walker, dir, name string) (got []string, ignored map[string]string) {
+	t.Helper()
+	ignored = map[string]string{}
+	w.OnIgnore = func(p, reason string) { ignored[p] = reason }
+	err := w.Walk(os.DirFS(dir), name, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		got = append(got, p)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk failed: %v", err)
+	}
+	return got, ignored
+}
+
+func TestWalker_NamedFileInIgnoredDir(t *testing.T) {
+	tests := []struct {
+		name     string
+		files    map[string]string
+		target   string
+		included bool
+		reason   string
+	}{
+		{
+			name:   "ignored parent",
+			files:  map[string]string{".gitignore": "build/\n", "build/out.js": "x"},
+			target: "build/out.js",
+			reason: `parent directory build: rule "build/" in .gitignore`,
+		},
+		{
+			name:   "ignored grandparent",
+			files:  map[string]string{".gitignore": "build/\n", "build/js/out.js": "x"},
+			target: "build/js/out.js",
+			reason: `parent directory build: rule "build/" in .gitignore`,
+		},
+		{
+			name:   "ignored by a nested ignore file",
+			files:  map[string]string{"src/.gitignore": "gen/\n", "src/gen/out.js": "x"},
+			target: "src/gen/out.js",
+			reason: `parent directory src/gen: rule "gen/" in .gitignore`,
+		},
+		{
+			// Matches what a walk of the parent includes (see hasNestedException).
+			name: "negation re-includes like a walk",
+			files: map[string]string{
+				".gitignore":   "build/\n!build/out.js\n",
+				"build/out.js": "x",
+			},
+			target:   "build/out.js",
+			included: true,
+		},
+		{
+			name: "unrelated negation does not re-include",
+			files: map[string]string{
+				".gitignore":   "build/\n!other/keep.js\n",
+				"build/out.js": "x",
+			},
+			target: "build/out.js",
+			reason: `parent directory build: rule "build/" in .gitignore`,
+		},
+		{
+			name: "negated directory stays included",
+			files: map[string]string{
+				".gitignore":   "build/\n!build/\n",
+				"build/out.js": "x",
+			},
+			target:   "build/out.js",
+			included: true,
+		},
+		{
+			name: "nested repository resets the rules",
+			files: map[string]string{
+				".gitignore":     "out/\n",
+				"sub/.git/HEAD":  "ref: refs/heads/main\n",
+				"sub/out/out.js": "x",
+			},
+			target:   "sub/out/out.js",
+			included: true,
+		},
+		{
+			name: "nested repository itself ignored",
+			files: map[string]string{
+				".gitignore":    "sub/\n",
+				"sub/.git/HEAD": "ref: refs/heads/main\n",
+				"sub/main.go":   "x",
+			},
+			target: "sub/main.go",
+			reason: `parent directory sub: rule "sub/" in .gitignore`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for p, content := range tt.files {
+				mustMkdir(t, dir, filepath.Dir(p))
+				mustWriteFile(t, dir, p, content)
+			}
+			got, ignored := walkNamed(t, NewWalker(nil, nil), dir, tt.target)
+			if tt.included {
+				if !reflect.DeepEqual(got, []string{tt.target}) {
+					t.Errorf("got %v, want %s included; ignored: %v", got, tt.target, ignored)
+				}
+				return
+			}
+			if len(got) != 0 {
+				t.Errorf("got %v, want nothing", got)
+			}
+			if ignored[tt.target] != tt.reason {
+				t.Errorf("reason = %q, want %q", ignored[tt.target], tt.reason)
+			}
+		})
+	}
+}
+
+func TestWalker_NamedFileInIgnoredDir_IgnoreDisabled(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, dir, "build")
+	mustWriteFile(t, dir, ".gitignore", "build/\n")
+	mustWriteFile(t, dir, "build/out.js", "x")
+
+	// -f disables ignore files and drops the base and override rules.
+	w := NewWalker(nil, nil)
+	w.IgnoreEnabled = false
+	got, ignored := walkNamed(t, w, dir, "build/out.js")
+	if !reflect.DeepEqual(got, []string{"build/out.js"}) {
+		t.Errorf("got %v, want build/out.js; ignored: %v", got, ignored)
+	}
+}
+
+func TestWalker_NamedFileInExcludedDir(t *testing.T) {
+	dir := t.TempDir()
+	mustMkdir(t, dir, "build")
+	mustWriteFile(t, dir, "build/out.js", "x")
+
+	// Override rules apply to directories even with ignore files disabled,
+	// as they do in a walk.
+	w := NewWalker(nil, []string{"build/"})
+	w.IgnoreEnabled = false
+	got, ignored := walkNamed(t, w, dir, "build/out.js")
+	if len(got) != 0 {
+		t.Errorf("got %v, want nothing", got)
+	}
+	if want := `parent directory build: rule "build/" in override flags`; ignored["build/out.js"] != want {
+		t.Errorf("reason = %q, want %q", ignored["build/out.js"], want)
+	}
+}
