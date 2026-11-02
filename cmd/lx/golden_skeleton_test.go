@@ -122,12 +122,13 @@ func TestGoldenSkeletonMembers(t *testing.T) {
 // guards and other preprocessor conditionals (#elif, continued #if), extern
 // "C" blocks and the `#ifdef __cplusplus` idiom around them in C and C++,
 // function pointers (variables, not functions), typedef and using aliases
-// (types), forward declarations, a struct declared with a variable, and C++
-// in a .h file (pure virtuals, default arguments).
+// (types), forward declarations, a struct declared with a variable, C++
+// default arguments in a .h file read as C, and directives inside raw
+// strings.
 func TestGoldenSkeletonTopLevel(t *testing.T) {
 	dir := setupSkeletonFixture(t)
 	var cases []goldenTestCase
-	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "widget.h", "idiom.h", "rawstring.cpp"} {
+	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "defaults.h", "idiom.h", "rawstring.cpp"} {
 		stem := strings.TrimSuffix(file, filepath.Ext(file))
 		cases = append(cases, skeletonModeCases(650+3*i, stem, []string{file})...)
 	}

@@ -1,7 +1,6 @@
 package skeleton
 
 import (
-	"bytes"
 	"slices"
 	"sync"
 
@@ -33,17 +32,9 @@ func extract(langName string, src []byte, lines [][]byte, functions, structs boo
 	if !found {
 		return nil, false
 	}
-	var tree *gotreesitter.Tree
-	var lang *gotreesitter.Language
-	if def.cppDialect != "" && langs.LooksLikeCpp(src) {
-		tree, lang, def = def.dialect(langName, src)
-	} else {
-		var err error
-		if tree, lang, err = parse(langName, def, src); err != nil {
-			return nil, false
-		}
-	}
-	if tree == nil {
+	pool, lang := parserPoolFor(langName, def.newLang)
+	tree, err := pool.Parse(src)
+	if err != nil {
 		return nil, false
 	}
 	defer tree.Release()
@@ -64,57 +55,6 @@ func extract(langName string, src []byte, lines [][]byte, functions, structs boo
 		out = langs.BalanceConditionals(lines, out, literalRows(c, root))
 	}
 	return out, true
-}
-
-// dialect parses src, C with C++-only syntax in it, as C++ or C (see
-// cppDialect): C++ when that parses cleanly or leaves under 5% of src
-// unparsed (sparing the C parse), C when that parses cleanly, and else the
-// one that leaves clearly fewer bytes unparsed: C unless C++ leaves less
-// than half as many. It returns a nil tree when neither parses.
-func (def langDef) dialect(langName string, src []byte) (*gotreesitter.Tree, *gotreesitter.Language, langDef) {
-	cppDef := langDefs[def.cppDialect]
-	cpp, cppLang, err := parse(def.cppDialect, cppDef, src)
-	if err == nil && cpp.RootNode().ChildCount() > 0 && (!cpp.RootNode().HasError() || 20*unparsed(cppLang, cpp.RootNode(), src) < len(src)) {
-		return cpp, cppLang, cppDef
-	}
-	tree, lang, cErr := parse(langName, def, src)
-	switch {
-	case cErr != nil && err != nil:
-		return nil, nil, def
-	case cErr != nil:
-		return cpp, cppLang, cppDef
-	case err != nil:
-		return tree, lang, def
-	}
-	if tree.RootNode().HasError() && 2*unparsed(cppLang, cpp.RootNode(), src) < unparsed(lang, tree.RootNode(), src) {
-		tree.Release()
-		return cpp, cppLang, cppDef
-	}
-	cpp.Release()
-	return tree, lang, def
-}
-
-// unparsed counts the bytes of src the tree rooted at root could not fit:
-// the whole span of its outermost error nodes and of nodes the grammar hides
-// (which only error recovery leaves in a tree, at times without an error
-// node around them), and anything past the tree's end. A tree with nothing
-// in it fits nothing.
-func unparsed(lang *gotreesitter.Language, root *gotreesitter.Node, src []byte) int {
-	if root.ChildCount() == 0 {
-		return len(bytes.TrimSpace(src))
-	}
-	return unparsedBytes(lang, root) + len(src) - int(root.EndByte())
-}
-
-func unparsedBytes(lang *gotreesitter.Language, n *gotreesitter.Node) int {
-	if n.IsError() || hidden(lang, n) {
-		return int(n.EndByte() - n.StartByte())
-	}
-	sum := 0
-	for i := 0; i < n.ChildCount(); i++ {
-		sum += unparsedBytes(lang, n.Child(i))
-	}
-	return sum
 }
 
 // literalRows reports the rows inside comments and string literals that
@@ -141,12 +81,6 @@ func literalRows(c *langs.Ctx, root *gotreesitter.Node) []bool {
 	}
 	walk(root)
 	return rows
-}
-
-func parse(langName string, def langDef, src []byte) (*gotreesitter.Tree, *gotreesitter.Language, error) {
-	pool, lang := parserPoolFor(langName, def.newLang)
-	tree, err := pool.Parse(src)
-	return tree, lang, err
 }
 
 func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*gotreesitter.ParserPool, *gotreesitter.Language) {

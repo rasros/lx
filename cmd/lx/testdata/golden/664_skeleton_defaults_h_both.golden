@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/defaults.h (7 rows, definitions)
+---
+```c
+// C++ default arguments in a header read as C: still functions.
+void render(int x, int y = 0);
+int scale(int v, int factor = 2);
+```
+
+
+--- STDERR ---
