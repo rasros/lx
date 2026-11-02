@@ -37,15 +37,12 @@ type Processor struct {
 	tokenCounter core.TokenCounter
 }
 
-// ConvertError is a converter that failed on a file, which then rendered as
+// ConvertFailure is a converter that failed on a file, which then rendered as
 // its raw content.
-type ConvertError struct {
+type ConvertFailure struct {
 	Converter string
 	Err       error
 }
-
-func (e *ConvertError) Error() string { return e.Converter + ": " + e.Err.Error() }
-func (e *ConvertError) Unwrap() error { return e.Err }
 
 // FileIssues are the problems a file met while rendering, which workers hand
 // back for the caller to report in output order.
@@ -53,8 +50,8 @@ type FileIssues struct {
 	// ReadErr is why a file that rendered as an error row could not be
 	// opened.
 	ReadErr error
-	// ConvertErr is a converter that failed, leaving the raw content.
-	ConvertErr *ConvertError
+	// Convert is a converter that failed, leaving the raw content.
+	Convert *ConvertFailure
 }
 
 // RenderStats reports what one rendered item turned out to be. A non-file item
@@ -251,7 +248,7 @@ var converters = []converter{
 //
 // An image that is about to be embedded is left alone: the picture itself says
 // more than a description of it would.
-func applyConverters(file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool, *ConvertError) {
+func applyConverters(file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool, *ConvertFailure) {
 	if embedImages && format.IsImage() {
 		return reader, size, "", "", false, nil
 	}
@@ -261,7 +258,7 @@ func applyConverters(file sources.InputFile, opts core.RenderOptions, format *in
 		}
 		text, err := c.convert(file, reader, size)
 		if err != nil {
-			return reader, size, "", "", false, &ConvertError{Converter: c.name, Err: err}
+			return reader, size, "", "", false, &ConvertFailure{Converter: c.name, Err: err}
 		}
 		lang := ""
 		if c.language != nil {
@@ -399,9 +396,9 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 	}
 
 	format, verified := classify(file.Path, reader, scratch)
-	reader, size, convertedFrom, convertedLang, converted, convertErr := applyConverters(
+	reader, size, convertedFrom, convertedLang, converted, convertFailure := applyConverters(
 		file, cfg, format, reader, size, p.engine.EmbedImages && verified)
-	issues.ConvertErr = convertErr
+	issues.Convert = convertFailure
 
 	isBinary, lang := detectContent(file.Path, reader, scratch)
 	if convertedLang != "" {

@@ -1,9 +1,11 @@
 package streaming
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 	"testing"
@@ -446,5 +448,39 @@ func TestStream_FileErrorsInOutputOrder(t *testing.T) {
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("reported %v, want %v", got, want)
+	}
+}
+
+// Converters that fail are logged in output order too.
+func TestStream_ConverterFailuresInOutputOrder(t *testing.T) {
+	var logs bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	stream, err := NewStream(core.NewConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for i := range 64 {
+		// Not a zip, so the document converter fails on it.
+		f := sources.NewBufferInputFile("doc-"+strconv.Itoa(i)+".docx", []byte("not a document"))
+		want = append(want, f.Path)
+		stream.AddFile(f, core.RenderOptions{Head: -1, ExtractDocuments: true})
+	}
+	stream.WithConcurrency(8).WithLogger(log)
+	if err := stream.Execute(context.Background(), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+
+	var got []string
+	for _, line := range strings.Split(logs.String(), "\n") {
+		if !strings.Contains(line, `msg="Converter failed, keeping raw content"`) {
+			continue
+		}
+		_, path, _ := strings.Cut(line, " path=")
+		path, _, _ = strings.Cut(path, " ")
+		got = append(got, path)
+	}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("logged %v, want %v", got, want)
 	}
 }
