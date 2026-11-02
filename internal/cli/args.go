@@ -231,8 +231,12 @@ func addOp(res *ParsedArgs, def CommandDef, val string, isShort bool) error {
 			return fmt.Errorf("flag %s%s: %w", prefix, def.Name, err)
 		}
 	case ValueGlob:
-		if err := lx.IncludeGlob(val).Validate(); err != nil {
-			return fmt.Errorf("flag %s%s: %w", prefix, def.Name, err)
+		g := lx.IncludeGlob(val)
+		if def.Name == "exclude" {
+			g = lx.ExcludeGlob(val)
+		}
+		if g.Validate() != nil {
+			return fmt.Errorf("flag %s%s: invalid glob %q", prefix, def.Name, val)
 		}
 	}
 

@@ -55,6 +55,14 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "952_glob_root_as_written", args: []string{"-n0", "-i", "src/../build/*.js", "-i", "build/sub/*", "src/../build"}},
 		{name: "953_glob_comment_and_empty_add_nothing", args: []string{"-n0", "-i", "#b.txt", "-i", "", "-e", "*.go", "-e", "*.js", "."}},
 		{name: "954_glob_invalid", args: []string{"-n0", "-i", "src/[ab", "."}},
+		{name: "954b_glob_invalid_unopened_brace", args: []string{"-n0", "-i", "a}", "."}},
+		{name: "954c_glob_invalid_exclude_as_typed", args: []string{"-n0", "-e", "!{a", "."}},
+		{name: "954d_glob_invalid_exclude_hash", args: []string{"-n0", "-e", "#[", "."}},
+		// A "]" opening a class is part of it, as in rg.
+		{name: "957_glob_class_leading_bracket", args: []string{"-n0", "-i", "[]a]*", "-i", "[!]a]*.go", "."}},
+		// An empty -e matches every path, as rg's -g '!' does, so only what a
+		// later glob keeps is left.
+		{name: "958_glob_empty_exclude_drops_everything", args: []string{"-n0", "-e", "", "-i", "b.txt", "."}},
 
 		// rg takes no paths on stdin; a piped path is kept as a walk of the
 		// working directory would keep it.

@@ -1,0 +1,5 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: argument parsing failed: flag --include: invalid glob "a}"
