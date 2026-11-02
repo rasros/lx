@@ -96,5 +96,10 @@ func TestGoldenGlobsOutsideCwd(t *testing.T) {
 		{name: "942_glob_absolute_root_above_cwd", args: []string{"-n0", "-i", "/x.js", dir}},
 		{name: "943_glob_absolute_root_outside_cwd", args: []string{"-n0", "-i", "**/ovr/keep.js", "-i", "ovr/drop.js", filepath.Join(dir, "ovr")}},
 		{name: "944_glob_absolute_archive_outside_cwd", args: []string{"-n0", "-Z", "-i", "**/a.zip/src/*.go", "-i", "arch/a.zip/notes.txt", filepath.Join(dir, "arch", "a.zip")}},
+		// A piped absolute path is judged as a root named that way: the
+		// directories above it are not, and below a directory above the
+		// working directory paths are matched relative to it.
+		{name: "945_glob_stdin_absolute_dir_above_cwd", args: []string{"-n0", "-i", "sub/*", "-i", "/x.js"}, stdin: dir},
+		{name: "946_glob_stdin_absolute_path_parents_not_judged", args: []string{"-n0", "-e", "ovr", "-e", "drop.js"}, stdin: filepath.Join(dir, "ovr", "keep.js") + "\n" + filepath.Join(dir, "ovr", "drop.js")},
 	}, pkgDir, dir, canonical)
 }

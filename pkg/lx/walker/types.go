@@ -81,5 +81,9 @@ func New(opts Options) *Walker {
 // working directory: neither it nor a directory above it is excluded, and in
 // whitelist mode a file must be included. Ignore files are not consulted.
 func (w *Walker) Accepts(path string, isDir bool) bool {
-	return w.overrides == nil || w.overrides.accepts(w.cache.Anchor(path).Path("."), isDir)
+	if w.overrides == nil {
+		return true
+	}
+	a := w.cache.Anchor(path)
+	return w.overrides.accepts(a, a.Path("."), isDir)
 }

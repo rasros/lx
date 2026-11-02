@@ -146,22 +146,31 @@ func (o *overrides) reachBelow(dir string) bool {
 	return false
 }
 
-// accepts reports whether the path p, from the working directory, would be
-// found by a walk from it: no directory above it is ignored, and neither is
-// p itself.
-func (o *overrides) accepts(p string, isDir bool) bool {
+// accepts reports whether the path p, named as a gives it, would be found by
+// a walk: neither p nor a directory above it that the walk judges is
+// ignored. A walk judges the directories below its root, so the directories
+// of an absolute path, and the leading ".." of a relative one, are not
+// judged, as those of a root named that way are not. A directory above the
+// working directory is kept, since paths below it are matched relative to
+// the working directory.
+func (o *overrides) accepts(a Anchor, p string, isDir bool) bool {
 	if p == "." {
 		return true
 	}
-	for i := 1; i < len(p); i++ {
-		if p[i] != '/' {
-			continue
+	if !filepath.IsAbs(p) && !strings.HasPrefix(p, "/") {
+		start := 0
+		for strings.HasPrefix(p[start:], "../") {
+			start += 3
 		}
-		dir := p[:i]
-		if m, _ := o.match(dir, true, false); m == matchIgnore {
-			return false
+		for i := start + 1; i < len(p); i++ {
+			if p[i] != '/' {
+				continue
+			}
+			if m, _ := o.match(p[:i], true, false); m == matchIgnore {
+				return false
+			}
 		}
 	}
 	m, _ := o.match(p, isDir, false)
-	return m != matchIgnore && (!isDir || o.reachBelow(p))
+	return m != matchIgnore && (!isDir || o.reachBelow(p) || a.leadsToWD(p))
 }
