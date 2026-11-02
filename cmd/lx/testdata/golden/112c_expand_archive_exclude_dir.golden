@@ -1,0 +1,9 @@
+--- STDOUT ---
+archive.tar.gz/hello.txt (1 rows)
+---
+```text
+Hello from tar!
+```
+
+
+--- STDERR ---

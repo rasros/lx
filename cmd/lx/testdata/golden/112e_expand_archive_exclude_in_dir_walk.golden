@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] archive.zip/nested/world.go (1 rows)
+---
+```go
+package nested
+```
+
+[2/2] docs.zip/guide.html (1 rows)
+---
+```html
+<h1>Guide</h1><p>Inside an archive.</p>
+```
+
+
+--- STDERR ---
