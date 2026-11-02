@@ -77,17 +77,33 @@ func (c *Cache) hostTree() *ruleTree {
 // overridePrefix returns what to put before a path below absRoot to name it
 // relative to the working directory, where ripgrep anchors its -g globs: a
 // path outside it, such as one below "..", keeps its leading "../", which an
-// anchored glob cannot match.
+// anchored glob cannot match. The working directory may be named through a
+// symlink and absRoot by its real path, or the other way round, so a root
+// below either name of it counts as below it.
 func (c *Cache) overridePrefix(absRoot string) string {
 	c.hostTree()
 	if c.wd == "" {
 		return ""
 	}
 	rel, err := filepath.Rel(c.wd, absRoot)
-	if err != nil || rel == "." {
+	if err != nil || isOutside(rel) {
+		for _, p := range [][2]string{{c.ht.cwd, absRoot}, {c.ht.cwd, c.ht.real(absRoot)}} {
+			if r, err := filepath.Rel(p[0], p[1]); err == nil && !isOutside(r) {
+				rel = r
+				break
+			}
+		}
+	}
+	if rel == "." || rel == "" {
 		return ""
 	}
 	return filepath.ToSlash(rel) + "/"
+}
+
+// isOutside reports whether rel, a path from filepath.Rel, leaves the
+// directory it is relative to.
+func isOutside(rel string) bool {
+	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // tree is a namespace of directories that frames are built over: absolute
@@ -144,7 +160,7 @@ func (t hostTree) display(p string) string {
 		return p
 	}
 	rel, err := filepath.Rel(t.cwd, p)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	if err != nil || isOutside(rel) {
 		return p
 	}
 	return rel

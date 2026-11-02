@@ -395,6 +395,38 @@ func TestWalkPath_NamedPathsAreNotFiltered(t *testing.T) {
 	}
 }
 
+// -e patterns are anchored at the working directory however it and the root
+// are named: through a symlink or by their real paths.
+func TestCache_OverridePrefix(t *testing.T) {
+	top, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	real := filepath.Join(top, "real", "e1")
+	mustMkdir(t, top, "real/e1/sub")
+	mustMkdir(t, top, "L")
+	link := filepath.Join(top, "L", "e")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	other := filepath.Join(top, "other")
+	for _, tt := range []struct{ cwd, root, want string }{
+		{link, link, ""},
+		{link, real, ""},
+		{real, link, ""},
+		{link, filepath.Join(real, "sub"), "sub/"},
+		{link, filepath.Join(link, "sub"), "sub/"},
+		{real, filepath.Join(link, "sub"), "sub/"},
+		{link, other, "../../other/"},
+		{real, other, "../../other/"},
+	} {
+		if got := NewCache(newTestHost(tt.cwd)).overridePrefix(tt.root); got != tt.want {
+			t.Errorf("cwd %s, root %s: got %q, want %q", tt.cwd, tt.root, got, tt.want)
+		}
+	}
+}
+
 func TestCache_ConcurrentWalks(t *testing.T) {
 	top := t.TempDir()
 	mustGitDir(t, top, ".git")
