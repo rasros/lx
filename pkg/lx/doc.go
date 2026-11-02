@@ -40,6 +40,7 @@
 // Stream methods:
 //
 //   - AddFile, AddSection, AddPrompt, AddMeta enqueue content.
+//   - Admit reports whether AddFile keeps a file under its RenderOptions.
 //   - AddTree enqueues a directory tree of the files Admit keeps.
 //   - Execute renders output to an io.Writer.
 //   - GetGlobalContext exposes aggregate statistics.

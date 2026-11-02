@@ -58,6 +58,9 @@ func NewStream(cfg *Config) (*Stream, error) {
 	return &Stream{inner: s}, nil
 }
 
+// WithConcurrency sets the concurrent workers for file processing. The stream
+// lowers it to 2 while any queued file renders as a skeleton, because
+// tree-sitter parsing does not scale past two workers.
 func (s *Stream) WithConcurrency(n int) *Stream {
 	s.inner.WithConcurrency(n)
 	return s
@@ -88,8 +91,9 @@ func (s *Stream) AddPrompt(text string) *Stream {
 	return s
 }
 
-// AddTree enqueues a directory tree of the files among files that Admit keeps
-// under opts. A tree with no admitted files is left out.
+// AddTree enqueues a directory tree of the files Admit keeps under opts; only
+// opts.MaxSize applies. The files need not be added with AddFile, so a tree can
+// stand in for content. A tree with no admitted files is left out.
 func (s *Stream) AddTree(files []InputFile, opts RenderOptions) *Stream {
 	s.inner.AddTree(files, opts)
 	return s
