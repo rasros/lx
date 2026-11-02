@@ -1,0 +1,23 @@
+--- STDOUT ---
+[1/2] /ROOT/sample.mkv (5 rows)
+---
+```
+Container: mkv
+Duration: 00:00:01.128
+Bitrate: 45 kbps
+Video: h264, 32x32
+Audio: aac, 8000 Hz, mono
+```
+
+[2/2] /ROOT/sample.webm (5 rows)
+---
+```
+Container: webm
+Duration: 00:00:01.008
+Bitrate: 82 kbps
+Video: vp9, 32x32
+Audio: opus, 8000 Hz, mono
+```
+
+
+--- STDERR ---

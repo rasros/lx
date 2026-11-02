@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -296,6 +297,45 @@ func TestGoldenMedia(t *testing.T) {
 		{name: "169_media_wrong_suffix", args: []string{"-M", "mislabelled.jpg"}},
 		{name: "170_media_suffixless_not_media", args: []string{"-M", "notes"}},
 	})
+}
+
+// Media over HTTP arrives as a stream rather than a file, with a declared
+// length (FileServer) or without one (chunked), and must describe itself the
+// same way a local file does.
+func TestGoldenMediaURL(t *testing.T) {
+	dir := setupMediaFixture(t)
+	files := http.FileServer(http.Dir(dir))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name, chunked := strings.CutPrefix(r.URL.Path, "/chunked")
+		if !chunked {
+			files.ServeHTTP(w, r)
+			return
+		}
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		// Flushing before the body leaves the length unknown, so it is chunked.
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		w.Write(data)
+	}))
+	defer server.Close()
+
+	u := server.URL
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "170j_media_url_mp4", args: []string{"-M", u + "/sample.mp4"}},
+		{name: "170k_media_url_mkv_webm", args: []string{"-M", u + "/sample.mkv", u + "/sample.webm"}},
+		{name: "170l_media_url_audio", args: []string{"-M", u + "/sample.mp3", u + "/sample.wav", u + "/sample.flac", u + "/sample.m4a"}},
+		{name: "170m_media_url_images", args: []string{"-M", u + "/sample.gif", u + "/sample.webp", u + "/sample.tiff", u + "/sample.jpg", u + "/sample.png", u + "/sample.bmp", u + "/sample.avif"}},
+		{name: "170n_media_url_no_flag", args: []string{u + "/sample.mp4", u + "/notes.txt"}},
+		{name: "170o_media_url_stats", args: []string{"-M", "--stats", u + "/sample.mp4", u + "/notes.txt"}},
+		{name: "170p_media_url_chunked", args: []string{"-M", u + "/chunked/sample.mp4", u + "/chunked/sample.mkv", u + "/chunked/notes.txt"}},
+		{name: "170q_media_url_truncated_suffixless", args: []string{"-M", u + "/truncated.mp4", u + "/suffixless", u + "/mislabelled.jpg"}},
+		{name: "170r_media_url_html_embeds", args: []string{"--html", "-M", u + "/sample.png"}},
+		{name: "170s_url_compact", args: []string{"-n0", u + "/notes.txt", u + "/chunked/notes.txt", u + "/sample.mp4"}},
+	}, u)
 }
 
 // Content decides over the name: text is never media, whatever it is called or

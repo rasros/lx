@@ -152,9 +152,16 @@ func (p *Processor) errorContext(file sources.InputFile, index int, msg string) 
 	}
 }
 
-// readerFor adapts an opened file to random access, buffering the content only
-// when the reader cannot provide it directly. Cases are ordered most to least
-// specific.
+// contentLengther is a stream that declares its length up front, as an HTTP
+// response body does.
+type contentLengther interface {
+	ContentLength() int64
+}
+
+// readerFor adapts an opened file to random access. Cases are ordered most to
+// least specific. A stream that offers neither is read lazily, as far as the
+// consumers ask: a converter that needs only headers leaves the rest unread.
+// Its size is the length it declares, or else what reading it to the end finds.
 func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 	switch v := rc.(type) {
 	case *os.File:
@@ -169,8 +176,12 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 			return v, sizeHint
 		}
 	}
-	data, _ := io.ReadAll(rc)
-	return bytes.NewReader(data), int64(len(data))
+	declared := int64(-1)
+	if cl, ok := rc.(contentLengther); ok {
+		declared = cl.ContentLength()
+	}
+	lr := internal.NewLazyReader(rc, declared)
+	return lr, lr.Size()
 }
 
 // converter replaces a file's bytes with a text rendering of them. Converters

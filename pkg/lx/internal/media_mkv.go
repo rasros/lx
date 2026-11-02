@@ -59,9 +59,14 @@ func parseMatroska(b *byteReader) *MediaInfo {
 
 		timeScale := uint64(mkvDefaultTimeScale)
 		var scaledDuration float64
-		b.ebmlChildren(start, stop, func(id uint64, start, stop int64) {
+		// A segment holds at most one Info and one Tracks, and everything after
+		// them is clusters, cues and tags, often the whole file. Stopping once
+		// both are seen keeps a stream from being read through to its end.
+		var seenInfo, seenTracks bool
+		b.ebmlChildrenUntil(start, stop, func(id uint64, start, stop int64) bool {
 			switch id {
 			case mkvInfo:
+				seenInfo = true
 				b.ebmlChildren(start, stop, func(id uint64, start, stop int64) {
 					switch id {
 					case mkvTimeScale:
@@ -73,12 +78,14 @@ func parseMatroska(b *byteReader) *MediaInfo {
 					}
 				})
 			case mkvTracks:
+				seenTracks = true
 				b.ebmlChildren(start, stop, func(id uint64, start, stop int64) {
 					if id == mkvTrackEntry {
 						b.mkvTrack(start, stop, info)
 					}
 				})
 			}
+			return !seenInfo || !seenTracks
 		})
 
 		// Duration is a count of ticks, and the scale says how many nanoseconds
@@ -229,12 +236,22 @@ func (b *byteReader) ebmlNumber(off int64, keepMarker bool) (value uint64, lengt
 }
 
 func (b *byteReader) ebmlChildren(start, stop int64, fn func(id uint64, start, stop int64)) {
+	b.ebmlChildrenUntil(start, stop, func(id uint64, start, stop int64) bool {
+		fn(id, start, stop)
+		return true
+	})
+}
+
+// ebmlChildrenUntil visits children until fn returns false.
+func (b *byteReader) ebmlChildrenUntil(start, stop int64, fn func(id uint64, start, stop int64) bool) {
 	for off := start; off < stop; {
 		id, childStart, childStop, ok := b.ebmlElement(off)
 		if !ok || childStop <= off || childStop > stop {
 			return
 		}
-		fn(id, childStart, childStop)
+		if !fn(id, childStart, childStop) {
+			return
+		}
 		off = childStop
 	}
 }
