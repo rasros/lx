@@ -25,7 +25,9 @@ const (
 
 // Override is one of lx's -i and -e globs, which ripgrep calls overrides:
 // the last one to match a path decides it, ahead of ignore files and
-// hidden-file skipping. Glob has gitignore syntax, without a leading "!".
+// hidden-file skipping. Glob has gitignore syntax; Kind takes the place of
+// the one leading "!" IncludeOverride and ExcludeOverride strip, so Glob may
+// still start with "!": IncludeOverride("!!x") is an Exclude of "!x".
 type Override struct {
 	Glob string
 	Kind OverrideKind
