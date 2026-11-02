@@ -7,9 +7,9 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-func PyFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	name := n.ChildByFieldName("name", lang)
-	return name != nil && !isPrivateName(name.Text(src))
+func PyFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
+	name := n.ChildByFieldName("name", c.Lang)
+	return name != nil && !isPrivateName(c.Text(name))
 }
 
 // PyEmitClass emits a Python class. It stays custom because the body is

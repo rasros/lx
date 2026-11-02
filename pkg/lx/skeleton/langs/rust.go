@@ -6,8 +6,8 @@ import (
 	"github.com/odvcencio/gotreesitter"
 )
 
-func RustFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	return rustIsPublic(n, src, lang)
+func RustFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
+	return rustIsPublic(n, c.Src, c.Lang)
 }
 
 // RustPrivate reports a struct field or inherent impl item without a pub

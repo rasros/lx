@@ -7,9 +7,9 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-func GoFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	name := n.ChildByFieldName("name", lang)
-	return name != nil && isUppercase(name.Text(src))
+func GoFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
+	name := n.ChildByFieldName("name", c.Lang)
+	return name != nil && isUppercase(c.Text(name))
 }
 
 // GoEmitTypeDecl emits a Go type declaration. It stays custom because one

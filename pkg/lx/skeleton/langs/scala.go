@@ -6,8 +6,8 @@ import (
 	"github.com/odvcencio/gotreesitter"
 )
 
-func ScalaFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Language) bool {
-	return !ScalaPrivate(&Ctx{Src: src, Lang: lang}, nil, n)
+func ScalaFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
+	return !ScalaPrivate(c, nil, n)
 }
 
 // ScalaPrivate reports a member whose access modifier is private or
