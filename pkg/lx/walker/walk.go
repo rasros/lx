@@ -46,13 +46,25 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 				dirs = append(dirs, strings.Join(parts[:i+1], "/"))
 			}
 		}
+		// parentIgnored mirrors recursiveWalk: an ignored directory is still
+		// descended when a negation could re-include something below it, but
+		// everything under it stays ignored unless a rule re-includes it.
+		parentIgnored, parentReason := false, ""
 		for _, d := range dirs {
 			if d != "." {
-				if ignored, reason := w.dirIgnoredBy(d, effectiveRules); ignored {
+				ignored, descend, reason := w.dirIgnoredBy(d, effectiveRules, parentIgnored)
+				if reason == "parent directory" && parentReason != "" {
+					reason = parentReason
+				}
+				if ignored && !descend {
 					if w.OnIgnore != nil {
 						w.OnIgnore(root, reason)
 					}
 					return nil
+				}
+				parentIgnored = ignored
+				if ignored && reason != "" {
+					parentReason = reason
 				}
 			}
 			if !w.IgnoreEnabled {
@@ -65,8 +77,11 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 		}
 		effectiveRules = append(effectiveRules, w.OverrideRules...)
 
-		isIgnored, reason := checkIgnore(root, info.IsDir(), effectiveRules, false, w.OnIgnore != nil)
+		isIgnored, reason := checkIgnore(root, info.IsDir(), effectiveRules, parentIgnored, w.OnIgnore != nil)
 		if isIgnored {
+			if parentIgnored && reason == "parent directory" && parentReason != "" {
+				reason = parentReason
+			}
 			if w.OnIgnore != nil {
 				w.OnIgnore(root, reason)
 			}
@@ -83,22 +98,22 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 
 // dirIgnoredBy reports whether the walk-relative directory dir is ignored by
 // rules, the ignore rules in effect at its parent, followed by the override
-// rules as the walk applies them. The reason names the directory.
-func (w *Walker) dirIgnoredBy(dir string, rules []Rule) (bool, string) {
+// rules as the walk applies them. descend reports whether a negation could
+// still re-include something below an ignored dir, in which case recursiveWalk
+// enters it with its parent marked ignored. The reason names the directory.
+func (w *Walker) dirIgnoredBy(dir string, rules []Rule, parentIgnored bool) (ignored, descend bool, reason string) {
 	if len(w.OverrideRules) > 0 {
 		rules = append(rules[:len(rules):len(rules)], w.OverrideRules...)
 	}
-	ignored, reason := checkIgnore(dir, true, rules, false, w.OnIgnore != nil)
-	// Descend into an ignored directory when a negation could re-include
-	// something below it, as recursiveWalk does, so a named file and a walk
-	// agree.
-	if ignored && hasNestedException(dir, rules) {
-		return false, ""
+	ignored, reason = checkIgnore(dir, true, rules, parentIgnored, w.OnIgnore != nil)
+	if !ignored {
+		return false, false, ""
 	}
-	if ignored && w.OnIgnore != nil {
+	descend = hasNestedException(dir, rules)
+	if w.OnIgnore != nil && reason != "parent directory" {
 		reason = fmt.Sprintf("parent directory %s: %s", dir, reason)
 	}
-	return ignored, reason
+	return true, descend, reason
 }
 
 // resolveEntry reports how an entry should be treated, applying symlink policy.

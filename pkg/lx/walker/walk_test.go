@@ -594,6 +594,44 @@ func TestWalker_NamedFileInIgnoredDir(t *testing.T) {
 			included: true,
 		},
 		{
+			name: "sibling of a re-included file stays ignored",
+			files: map[string]string{
+				".gitignore":    "build/\n!build/keep.js\n",
+				"build/keep.js": "x",
+				"build/out.js":  "x",
+			},
+			target: "build/out.js",
+			reason: `parent directory build: rule "build/" in .gitignore`,
+		},
+		{
+			name: "floating negation does not re-include other files",
+			files: map[string]string{
+				".gitignore": "build/\n!*.js\n",
+				"build/a.go": "x",
+			},
+			target: "build/a.go",
+			reason: `parent directory build: rule "build/" in .gitignore`,
+		},
+		{
+			name: "deep sibling under an anchored ignored dir",
+			files: map[string]string{
+				".gitignore":  "/a/b/\n!/a/b/c/d.txt\n",
+				"a/b/c/d.txt": "x",
+				"a/b/c/e.txt": "x",
+			},
+			target: "a/b/c/e.txt",
+			reason: `parent directory a/b: rule "/a/b/" in .gitignore`,
+		},
+		{
+			name: "deep re-included file",
+			files: map[string]string{
+				".gitignore":  "/a/b/\n!/a/b/c/d.txt\n",
+				"a/b/c/d.txt": "x",
+			},
+			target:   "a/b/c/d.txt",
+			included: true,
+		},
+		{
 			name: "unrelated negation does not re-include",
 			files: map[string]string{
 				".gitignore":   "build/\n!other/keep.js\n",
