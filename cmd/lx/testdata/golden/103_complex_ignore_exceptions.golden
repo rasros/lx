@@ -1,5 +1,9 @@
 --- STDOUT ---
-[1/8] ignore_exception_test/assets/logo.png - binary file skipped (10 B)
+[1/8] ignore_exception_test/assets/logo.png (1 rows)
+---
+```
+image_data
+```
 
 [2/8] ignore_exception_test/data/index.json (1 rows)
 ---

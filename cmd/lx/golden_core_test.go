@@ -280,3 +280,15 @@ func TestGoldenMedia(t *testing.T) {
 		{name: "170_media_suffixless_not_media", args: []string{"-M", "notes"}},
 	})
 }
+
+// Content decides over the name: text is never media, whatever it is called or
+// however it starts.
+func TestGoldenMediaLookalikes(t *testing.T) {
+	dir := setupMediaLookalikeFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "170b_media_weak_magic_text", args: []string{"-M", "bm25"}},
+		{name: "170c_media_lfs_pointer_png", args: []string{"-M", "x.png"}},
+		{name: "170d_media_lfs_pointer_png_html", args: []string{"--html", "x.png"}},
+		{name: "170e_media_tif_extension", args: []string{"-M", "x.tif"}},
+	})
+}

@@ -173,12 +173,12 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 
 // converter replaces a file's bytes with a text rendering of them. Converters
 // run before binary and language detection, so detection describes what will
-// actually be rendered, and they select on the path rather than the content, so
-// choosing one needs no detection. Order matters only if two ever match the
-// same path; the first match wins.
+// actually be rendered. They select on the path and on the format the file was
+// classified as, which is decided from its content before any converter runs.
+// Order matters only if two ever match the same file; the first match wins.
 type converter struct {
 	name    string
-	applies func(sources.InputFile) bool
+	applies func(f sources.InputFile, format *internal.Format) bool
 	convert func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error)
 	// language of the produced content; empty means detect as usual.
 	language func(f sources.InputFile) string
@@ -187,7 +187,7 @@ type converter struct {
 var converters = []converter{
 	{
 		name: "document",
-		applies: func(f sources.InputFile) bool {
+		applies: func(f sources.InputFile, _ *internal.Format) bool {
 			if !f.Config.ExtractDocuments {
 				return false
 			}
@@ -204,8 +204,8 @@ var converters = []converter{
 	},
 	{
 		name: "media",
-		applies: func(f sources.InputFile) bool {
-			return f.Config.ExtractMedia && sources.IsMediaCandidate(f.Path)
+		applies: func(f sources.InputFile, format *internal.Format) bool {
+			return f.Config.ExtractMedia && format.IsMedia()
 		},
 		convert: sources.ExtractMediaMetadata,
 	},
@@ -216,12 +216,12 @@ var converters = []converter{
 //
 // An image that is about to be embedded is left alone: the picture itself says
 // more than a description of it would.
-func applyConverters(file sources.InputFile, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string) {
-	if embedImages && internal.IsImage(file.Path) {
+func applyConverters(file sources.InputFile, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string) {
+	if embedImages && format.IsImage() {
 		return reader, size, "", ""
 	}
 	for _, c := range converters {
-		if !c.applies(file) {
+		if !c.applies(file, format) {
 			continue
 		}
 		text, err := c.convert(file, reader, size)
@@ -237,6 +237,13 @@ func applyConverters(file sources.InputFile, reader io.ReaderAt, size int64, emb
 		return bytes.NewReader(text), int64(len(text)), fileFormat(file.Path), lang
 	}
 	return reader, size, "", ""
+}
+
+// classify reads the start of the file and decides its format before any
+// converter sees it, so that the content rather than the name has the last word.
+func classify(path string, reader io.ReaderAt, scratch []byte) *internal.Format {
+	n, _ := reader.ReadAt(scratch[:min(len(scratch), internal.SniffLen)], 0)
+	return internal.Classify(path, scratch[:n])
 }
 
 // detectContent sniffs the header for binary content and a language hint.
@@ -270,7 +277,7 @@ func applySkeleton(cfg core.RunnerConfig, lang string, reader io.ReaderAt, size 
 // imageDataURI encodes the image from the bytes already open here. Reading them
 // back by path in a template would fail for archive entries and URLs, which
 // have no readable AbsPath.
-func imageDataURI(path string, reader io.ReaderAt, size int64) string {
+func imageDataURI(format *internal.Format, reader io.ReaderAt, size int64) string {
 	if size <= 0 {
 		return ""
 	}
@@ -278,7 +285,7 @@ func imageDataURI(path string, reader io.ReaderAt, size int64) string {
 	if _, err := reader.ReadAt(data, 0); err != nil {
 		return ""
 	}
-	return internal.DataURI(path, data)
+	return internal.DataURIWithType(format.MIME, data)
 }
 
 func fileFormat(path string) string {
@@ -313,11 +320,13 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	}
 
 	reader, size := readerFor(rc, file.Size)
-	reader, size, convertedFrom, convertedLang := applyConverters(file, reader, size, p.engine.EmbedImages)
 
 	if scratch == nil {
 		scratch = make([]byte, 1024)
 	}
+
+	format := classify(file.Path, reader, scratch)
+	reader, size, convertedFrom, convertedLang := applyConverters(file, format, reader, size, p.engine.EmbedImages)
 
 	isBinary, lang := detectContent(file.Path, reader, scratch)
 	if convertedLang != "" {
@@ -325,14 +334,14 @@ func (p *Processor) prepareFileContext(file sources.InputFile, index int, scratc
 	}
 	// A converted image is no longer an image but the text describing it, which
 	// the content templates render and the image template would discard.
-	isImage := internal.IsImage(file.Path) && convertedFrom == ""
+	isImage := format.IsImage() && convertedFrom == ""
 	cfg := file.Config
 
 	reader, size, skeletonMode, originalRows := applySkeleton(cfg, lang, reader, size, isBinary, isImage)
 
 	var dataURI string
 	if isImage && p.engine.EmbedImages {
-		dataURI = imageDataURI(file.Path, reader, size)
+		dataURI = imageDataURI(format, reader, size)
 	}
 
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0

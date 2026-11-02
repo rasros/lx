@@ -3,62 +3,44 @@ package sources
 import (
 	"fmt"
 	"io"
-	"path/filepath"
-	"strings"
 
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-// mediaSuffixes maps a file extension to the container it names. Extensions
-// decide the parser: sniffing would only distinguish containers the extension
-// already names, and a mislabelled file falls back to reporting its container
-// either way.
-var mediaSuffixes = map[string]string{
-	".mp4":  "mp4",
-	".m4v":  "mp4",
-	".m4a":  "m4a",
-	".mov":  "mov",
-	".mkv":  "mkv",
-	".webm": "webm",
-	".mp3":  "mp3",
-	".wav":  "wav",
-	".flac": "flac",
-	".png":  "png",
-	".jpg":  "jpeg",
-	".jpeg": "jpeg",
-	".gif":  "gif",
-	".webp": "webp",
-	".bmp":  "bmp",
-	".ico":  "ico",
-	".tif":  "tiff",
-	".tiff": "tiff",
-	".avif": "avif",
-	".heic": "heic",
-}
-
-// IsMediaPath reports whether the path names an audio or video container whose
-// metadata can be described.
+// IsMediaPath reports whether the path's extension names an audio, video or
+// image format whose metadata can be described. It judges the name alone;
+// ExtractMediaMetadata looks at the content as well.
 func IsMediaPath(path string) bool {
-	_, ok := mediaSuffixes[strings.ToLower(filepath.Ext(path))]
-	return ok
-}
-
-// IsMediaCandidate reports whether a path is worth offering to media
-// extraction. A recognised suffix settles it, and a path with no suffix at all
-// is offered too: URLs frequently have none, and the header is what identifies
-// those. Extraction rejects what turns out not to be media.
-func IsMediaCandidate(path string) bool {
-	return IsMediaPath(path) || filepath.Ext(path) == ""
+	return internal.FormatByExt(path).IsMedia()
 }
 
 // ExtractMediaMetadata describes a media file's container, duration and streams.
 // Media is otherwise skipped as binary, so the point is that the file's
 // existence and shape reach the bundle at all.
 //
-// It fails only for a file that is not media, which leaves the content untouched
-// for the binary handling to describe as it would have anyway.
+// It fails for a file that is not media, judged by its content as well as its
+// name, which leaves the content untouched for the text or binary handling to
+// describe as it would have anyway. Text named like media (a Git LFS pointer,
+// say) is not media.
 func ExtractMediaMetadata(f InputFile, r io.ReaderAt, size int64) ([]byte, error) {
-	container := mediaSuffixes[strings.ToLower(filepath.Ext(f.Path))]
+	n := size
+	if n > internal.SniffLen {
+		n = internal.SniffLen
+	}
+	header := make([]byte, max(n, 0))
+	read, _ := r.ReadAt(header, 0)
+	format := internal.Classify(f.Path, header[:read])
+	if !format.IsMedia() {
+		return nil, fmt.Errorf("no media container found in %s", f.Path)
+	}
+
+	// The container is named only when the name agrees with the content: a name
+	// alone vouches for a file that will not parse, and content that was merely
+	// sniffed does not.
+	container := ""
+	if format == internal.FormatByExt(f.Path) {
+		container = format.Name
+	}
 	data, ok := internal.MediaMetadata(container, r, size)
 	if !ok {
 		return nil, fmt.Errorf("no media container found in %s", f.Path)
