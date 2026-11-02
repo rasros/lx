@@ -1,0 +1,45 @@
+--- STDOUT ---
+[1/7] ../any/z.txt (1 rows)
+---
+```text
+z.txt under a/**/**
+```
+
+[2/7] ../deep/keep.js (1 rows)
+---
+```javascript
+re-included: deep/** leaves deep/ itself alone
+```
+
+[3/7] ../ovr/keep.js (1 rows)
+---
+```javascript
+ovr keep
+```
+
+[4/7] ../ovr/out.js (1 rows)
+---
+```javascript
+ovr out
+```
+
+[5/7] ../src/main.go (1 rows)
+---
+```go
+package src
+```
+
+[6/7] ../two/a/d.txt (1 rows)
+---
+```text
+a/d.txt under a/**/*/**
+```
+
+[7/7] ../two/z.txt (1 rows)
+---
+```text
+z.txt under a/**/*/**
+```
+
+
+--- STDERR ---
