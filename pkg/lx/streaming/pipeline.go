@@ -3,6 +3,7 @@ package streaming
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -13,6 +14,7 @@ import (
 type seqJob struct {
 	seqID int
 	item  render.PreparedItem
+	out   chan<- render.Result
 }
 
 var bufferPool = sync.Pool{New: func() interface{} { return new(bytes.Buffer) }}
@@ -28,15 +30,31 @@ type pipelineTotals struct {
 	failed int
 }
 
+// reorderWindow is how many dispatched items may wait to be written behind
+// the one the consumer is currently waiting on. It bounds the memory held by
+// rendered buffers when an early item is slow.
+func reorderWindow(workers int) int {
+	return 2 * workers
+}
+
+// executePipeline renders the prepared items on s.concurrency workers and
+// writes them to dest in order. The feeder hands each job a one-slot result
+// channel and enqueues that channel in a bounded FIFO, so the consumer reads
+// results in order and the feeder stalls once the window is full.
 func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global core.GlobalContext) (pipelineTotals, error) {
+	var totals pipelineTotals
 	numWorkers := s.concurrency
 	jobsCh := make(chan seqJob, numWorkers)
-	resultsCh := make(chan render.Result, numWorkers)
+	pending := make(chan chan render.Result, reorderWindow(numWorkers))
 
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	var wg sync.WaitGroup
+	// On any return, stop the feeder and workers and wait for them to exit.
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
+
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func() {
@@ -63,8 +81,8 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				itemStats, err := proc.RenderPrepared(localCounter, j.item, readBuf)
 				readPool.Put(readBufPtr)
 
-				select {
-				case resultsCh <- render.Result{
+				// j.out has one slot reserved for this job, so this never blocks.
+				j.out <- render.Result{
 					Index:        j.seqID,
 					Buffer:       buf,
 					Stats:        localCounter.count,
@@ -74,36 +92,42 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					IsError:      itemStats.IsError,
 					Err:          err,
 					SectionIndex: j.item.Section.Index,
-				}:
-				case <-ctx.Done():
-					return
 				}
 			}
 		}()
 	}
 
+	wg.Add(1)
 	go func() {
-	Loop:
+		defer wg.Done()
+		defer close(pending)
+		defer close(jobsCh)
 		for _, item := range s.prepared {
+			out := make(chan render.Result, 1)
 			select {
-			case jobsCh <- seqJob{seqID: item.StreamIndex, item: item}:
+			case pending <- out:
 			case <-ctx.Done():
-				break Loop
+				return
+			}
+			select {
+			case jobsCh <- seqJob{seqID: item.StreamIndex, item: item, out: out}:
+			case <-ctx.Done():
+				return
 			}
 		}
-		close(jobsCh)
-		wg.Wait()
-		close(resultsCh)
 	}()
 
 	layout := render.NewLayoutWriter(dest, s.engine, s.sections, s.engine.UseSeparators)
-	defer layout.Close()
 
-	nextSeq := 0
-	buffer := make(map[int]render.Result)
-	var totals pipelineTotals
-
-	for res := range resultsCh {
+	written := 0
+Loop:
+	for out := range pending {
+		var res render.Result
+		select {
+		case res = <-out:
+		case <-ctx.Done():
+			break Loop
+		}
 		if res.Err != nil {
 			return totals, res.Err
 		}
@@ -114,20 +138,21 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		if res.IsError {
 			totals.failed++
 		}
-		buffer[res.Index] = res
-
-		for {
-			next, ok := buffer[nextSeq]
-			if !ok {
-				break
-			}
-			if err := layout.WriteItem(next); err != nil {
-				return totals, err
-			}
-			bufferPool.Put(next.Buffer)
-			delete(buffer, nextSeq)
-			nextSeq++
+		if err := layout.WriteItem(res); err != nil {
+			return totals, err
 		}
+		bufferPool.Put(res.Buffer)
+		written++
+	}
+
+	if err := ctx.Err(); err != nil {
+		return totals, err
+	}
+	if written != len(s.prepared) {
+		return totals, fmt.Errorf("pipeline wrote %d of %d items", written, len(s.prepared))
+	}
+	if err := layout.Close(); err != nil {
+		return totals, err
 	}
 	return totals, nil
 }
