@@ -22,7 +22,7 @@ need.
 
 ## Everyday use
 
-With no arguments lx bundles the current directory to stdout, respecting .gitignore, .ignore, and .lxignore,
+With no arguments lx bundles the current directory to stdout, respecting .gitignore, .git/info/exclude, .ignore, and .lxignore,
 skipping hidden files, and dropping binaries. Name any paths you like, and add `-c` to copy instead:
 
 ```bash

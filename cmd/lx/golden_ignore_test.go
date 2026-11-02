@@ -15,6 +15,7 @@ func TestGoldenAncestorIgnore(t *testing.T) {
 		{name: "105d_force_ignored_dir", args: []string{"-f", "dist"}},
 		{name: "105e_warn_named_file_in_ignored_dir", args: []string{"dist/out.js"}},
 		{name: "105f_stdin_ignored_file_quiet", args: []string{}, stdin: "sub/a.log\nsub/main.go"},
+		{name: "108_info_exclude_repo_root", args: []string{"."}},
 	})
 }
 
@@ -24,4 +25,11 @@ func TestGoldenAncestorIgnoreFromSubdir(t *testing.T) {
 		{name: "106_ancestor_ignore_cwd_subdir", args: []string{"."}},
 		{name: "107_ancestor_ignore_nested_dir", args: []string{"deep"}},
 	}, dir)
+}
+
+func TestGoldenWorktreeInfoExclude(t *testing.T) {
+	dir := setupWorktreeExcludeFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "109_info_exclude_linked_worktree", args: []string{"."}},
+	}, filepath.Dir(dir))
 }
