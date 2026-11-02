@@ -13,6 +13,8 @@ type Rule struct {
 	Spec           CompiledSpec
 
 	scope ruleScope
+	// invalid marks a glob the matcher accepts but ripgrep rejects.
+	invalid bool
 }
 
 // Options configures a Walker.
