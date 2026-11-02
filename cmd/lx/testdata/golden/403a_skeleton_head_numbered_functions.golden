@@ -2,19 +2,18 @@
 [1/2] skeleton/main.go (32 rows, function signatures)
 ---
 ```go
-15: // NewPerson creates a Person with the given name.
-16: func NewPerson(name string) Person {
-...
-20: // NewWorker creates a worker with name and role.
+ 9: /* Worker defines the work contract. */
+10: type Worker interface {
+11: 	Work()
 ```
 
 [2/2] skeleton/main.py (31 rows, function signatures)
 ---
 ```python
-20: def top_level():
+ 4: class Animal:
+ 5:     """Base class for all animals."""
 ...
-23: # factory helper
-24: def create(
+10:     def speak(self):
 ```
 
 

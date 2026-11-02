@@ -2,6 +2,14 @@
 skeleton/main.groovy (27 rows, function signatures)
 ---
 ```groovy
+/** Animal with name and species. */
+class Animal {
+...
+    // Make the animal speak.
+    def speak() {
+...
+}
+...
 // Standalone increment.
 def standalone(x) {
 ...

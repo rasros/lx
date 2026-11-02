@@ -2,6 +2,12 @@
 skeleton/main.go (32 rows, function signatures)
 ---
 ```go
+/* Worker defines the work contract. */
+type Worker interface {
+	Work()
+...
+}
+...
 // NewPerson creates a Person with the given name.
 func NewPerson(name string) Person {
 ...

@@ -1,10 +1,12 @@
 package skeleton
 
 import (
+	"slices"
+	"sync"
+
 	"github.com/odvcencio/gotreesitter"
 	"github.com/rasros/lx/pkg/lx/internal"
 	"github.com/rasros/lx/pkg/lx/skeleton/langs"
-	"sync"
 )
 
 type parserRuntime struct {
@@ -38,10 +40,17 @@ func extract(langName string, src []byte, lines [][]byte, functions, structs boo
 	}
 	defer tree.Release()
 
+	c := &langs.Ctx{
+		Src:       src,
+		Lines:     lines,
+		Lang:      lang,
+		Comments:  def.comments,
+		Functions: functions,
+		Structs:   structs,
+	}
 	root := tree.RootNode()
-
 	for i := 0; i < root.ChildCount(); i++ {
-		out = def.processNode(root.Child(i), out, src, lines, lang, functions, structs)
+		out = def.processNode(c, out, root.Child(i))
 	}
 	return out, true
 }
@@ -69,12 +78,12 @@ func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*got
 	return rt.pool, rt.lang
 }
 
-func (def *langDef) processNode(node *gotreesitter.Node, out []internal.LineRange, src []byte, lines [][]byte, lang *gotreesitter.Language, functions, structs bool) []internal.LineRange {
-	nodeType := node.Type(lang)
+func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *gotreesitter.Node) []internal.LineRange {
+	nodeType := c.Type(node)
 
-	if len(def.iterateChildren) > 0 && containsStr(def.iterateChildren, nodeType) {
+	if slices.Contains(def.iterateChildren, nodeType) {
 		for i := 0; i < node.ChildCount(); i++ {
-			out = def.processNode(node.Child(i), out, src, lines, lang, functions, structs)
+			out = def.processNode(c, out, node.Child(i))
 		}
 		return out
 	}
@@ -82,43 +91,49 @@ func (def *langDef) processNode(node *gotreesitter.Node, out []internal.LineRang
 	outerStart := int(node.StartPoint().Row)
 
 	if def.decoratedType != "" && nodeType == def.decoratedType {
-		if defNode := node.ChildByFieldName(def.definitionField, lang); defNode != nil {
+		if defNode := node.ChildByFieldName(def.definitionField, c.Lang); defNode != nil {
 			node = defNode
-			nodeType = node.Type(lang)
+			nodeType = c.Type(node)
 		}
 	}
+	sigStart := int(node.StartPoint().Row)
 
 	switch {
-	case functions && containsStr(def.funcTypes, nodeType):
-		if def.funcVisible == nil || def.funcVisible(node, src, lang) {
-			out = prependDoc(out, lines, outerStart)
-			out = langs.EmitDecorators(out, lines, outerStart, int(node.StartPoint().Row))
+	case c.Functions && slices.Contains(def.funcTypes, nodeType):
+		if def.funcVisible == nil || def.funcVisible(node, c.Src, c.Lang) {
+			out = c.EmitLeadingDoc(out, outerStart)
+			out = langs.EmitDecorators(out, c.Lines, outerStart, sigStart)
 			if def.emitFunc != nil {
-				out = def.emitFunc(out, src, lines, node, lang)
+				out = def.emitFunc(c, out, node)
 			} else {
-				out = langs.EmitFuncSig(out, lines, node, lang, def.indentBody, def.bodyChildType, def.singleLineSig)
+				out = langs.EmitFuncSig(out, c.Lines, node, c.Lang, def.indentBody, def.bodyChildType)
 				if def.indentBody {
-					out = langs.AppendPyDocstring(out, lines, node, lang)
+					out = langs.AppendPyDocstring(out, c.Lines, node, c.Lang)
 				}
 			}
 		}
-	case structs && containsStr(def.structTypes, nodeType):
-		out = prependDoc(out, lines, outerStart)
-		out = langs.EmitDecorators(out, lines, outerStart, int(node.StartPoint().Row))
-		out = def.emitStruct(out, src, lines, node, lang, functions)
+	case slices.Contains(def.structTypes, nodeType):
+		// Types are walked with either flag: with functions alone they keep
+		// the methods they hold. Their doc and decorators go only with a
+		// type that keeps something.
+		if typ := def.emitType(c, node); len(typ) > 0 {
+			out = c.EmitLeadingDoc(out, outerStart)
+			out = langs.EmitDecorators(out, c.Lines, outerStart, sigStart)
+			out = append(out, typ...)
+		}
 	}
 	return out
 }
 
-func prependDoc(out []internal.LineRange, lines [][]byte, startRow int) []internal.LineRange {
-	return langs.EmitLeadingDoc(out, lines, startRow)
-}
-
-func containsStr(ss []string, s string) bool {
-	for _, v := range ss {
-		if v == s {
-			return true
-		}
+// emitType returns the rows kept of the type declaration n.
+func (def *langDef) emitType(c *langs.Ctx, n *gotreesitter.Node) []internal.LineRange {
+	switch {
+	case def.emitStruct != nil:
+		return def.emitStruct(c, nil, n)
+	case def.members != nil:
+		return def.members.Emit(c, nil, n)
+	case c.Structs:
+		return c.KeepNode(nil, n)
 	}
-	return false
+	return nil
 }

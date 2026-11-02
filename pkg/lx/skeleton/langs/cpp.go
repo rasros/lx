@@ -14,52 +14,35 @@ func CppFuncVisible(n *gotreesitter.Node, src []byte, lang *gotreesitter.Languag
 	return true
 }
 
-func CppEmitClassOrStruct(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	if n.Type(lang) == "type_definition" {
-		return CEmitTypedef(out, src, lines, n, lang, functions)
-	}
-
-	fieldList := findChildByType(n, "field_declaration_list", lang)
-	if fieldList == nil {
-		return out
-	}
-	headerStart := int(n.StartPoint().Row)
-	headerEnd := int(fieldList.StartPoint().Row)
-	out = internal.KeepLines(out, lines, headerStart, headerEnd)
-
-	isPrivateSection := n.Type(lang) == "class_specifier"
-
-	for i := 0; i < fieldList.ChildCount(); i++ {
-		child := fieldList.Child(i)
-		if child.Type(lang) == "access_specifier" {
-			isPrivateSection = strings.TrimSpace(child.Text(src)) == "private:"
-			continue
+// CppMember classifies a C++ class member: a function_definition is a
+// method, and so is a field_declaration or declaration (constructors) that
+// declares a function; any other of those is a field.
+func CppMember(c *Ctx, n *gotreesitter.Node) MemberKind {
+	switch c.Type(n) {
+	case "function_definition":
+		return Method
+	case "field_declaration", "declaration":
+		if hasDescendantOfType(n, "function_declarator", c.Lang) {
+			return Method
 		}
-		if isPrivateSection {
-			continue
-		}
-		switch child.Type(lang) {
-		case "field_declaration":
-			if !hasDescendantOfType(child, "function_declarator", lang) {
-				out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-			}
-		case "function_definition":
-			if functions {
-				out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
-				out = emitFuncSig(out, lines, child, lang, false, "")
-			}
-		case "declaration":
-			if hasDescendantOfType(child, "function_declarator", lang) {
-				if functions {
-					out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-				}
-			} else {
-				out = EmitWithDoc(out, lines, int(child.StartPoint().Row), int(child.EndPoint().Row))
-			}
-		}
+		return Field
 	}
-	if closingRow := int(fieldList.EndPoint().Row); closingRow > headerEnd {
-		out = internal.KeepLine(out, lines, closingRow)
+	return Skip
+}
+
+// CppSectionPrivate reports a private: section label. The grammar keeps the
+// colon out of the access_specifier node.
+func CppSectionPrivate(c *Ctx, label *gotreesitter.Node) bool {
+	return strings.TrimSuffix(strings.TrimSpace(c.Text(label)), ":") == "private"
+}
+
+// CppEmitter emits C++ type declarations: typedefs as in C, the rest with
+// the generic member walker.
+func CppEmitter(m *Members) Emitter {
+	return func(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+		if c.Type(n) == "type_definition" {
+			return CEmitTypedef(c, out, n)
+		}
+		return m.Emit(c, out, n)
 	}
-	return out
 }

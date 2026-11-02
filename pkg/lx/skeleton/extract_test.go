@@ -315,13 +315,6 @@ func TestJava_AnnotatedPrivateMethodExcluded(t *testing.T) {
 	}
 }
 
-func TestJava_FunctionsOnlyNoClassMembers(t *testing.T) {
-	out := string(Extract("java", []byte(javaSrc), true, false))
-	if strings.Contains(out, "public int add") {
-		t.Errorf("Java methods should not appear with functions flag alone:\n%s", out)
-	}
-}
-
 var pySrc = `"""Module docstring."""
 
 MAX = 100
@@ -360,11 +353,13 @@ func TestPython_Functions(t *testing.T) {
 	if !strings.Contains(out, "def standalone(x, y):") {
 		t.Errorf("expected standalone(), got:\n%s", out)
 	}
-	if strings.Contains(out, "def __init__") {
-		t.Errorf("class method should not appear without structs flag:\n%s", out)
+	for _, want := range []string{"class Animal:", "    def __init__(self, name):", "    def speak(self):", "class Dog(Animal):"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q with the functions flag alone, got:\n%s", want, out)
+		}
 	}
-	if strings.Contains(out, "def speak") {
-		t.Errorf("class method should not appear without structs flag:\n%s", out)
+	if strings.Contains(out, "species") {
+		t.Errorf("class variable should not appear without structs flag:\n%s", out)
 	}
 	if strings.Contains(out, "_private_helper") {
 		t.Errorf("private function should not appear:\n%s", out)
@@ -707,8 +702,11 @@ func TestTypeScript_Structs(t *testing.T) {
 	if !strings.Contains(out, "export interface Shape {") {
 		t.Errorf("expected Shape interface, got:\n%s", out)
 	}
-	if !strings.Contains(out, "area(): number;") {
-		t.Errorf("expected interface method area, got:\n%s", out)
+	if strings.Contains(out, "area(): number;") {
+		t.Errorf("interface methods should not appear in structs-only mode:\n%s", out)
+	}
+	if !strings.Contains(out, "name: string;") {
+		t.Errorf("expected interface property name, got:\n%s", out)
 	}
 	if !strings.Contains(out, "export class Point {") {
 		t.Errorf("expected Point class, got:\n%s", out)

@@ -22,6 +22,12 @@ def create(
 [2/2] skeleton/main.py (31 rows, function signatures)
 ---
 ```python
+class Animal:
+    """Base class for all animals."""
+...
+    def speak(self):
+        """Return the animal's sound."""
+...
 def top_level():
 ...
 # factory helper

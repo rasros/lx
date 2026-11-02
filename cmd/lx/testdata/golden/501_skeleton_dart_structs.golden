@@ -7,8 +7,6 @@ class Animal {
   final String name;
   final String species; // taxonomy
 ...
-  Animal(this.name, this.species);
-...
 }
 ```
 

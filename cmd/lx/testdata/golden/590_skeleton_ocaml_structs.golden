@@ -12,11 +12,6 @@ type point = {
   y: float;
 }
 ...
-(* Greet by prepending "Hello, ". *)
-...
-(* Combine name and greeting
-   with a separator. *)
-...
 (* Module for geometry utilities. *)
 module Geometry = struct
   type shape = Circle | Square

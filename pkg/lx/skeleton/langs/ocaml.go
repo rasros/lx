@@ -5,56 +5,67 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-func OCamlEmitDefinition(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	switch n.Type(lang) {
-	case "type_definition":
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+// OCamlEmitDefinition emits an OCaml top-level or module-level definition.
+// It stays custom because OCaml has no class bodies to walk: functions are
+// let bindings whose signature runs up to the row before the body
+// expression, and a module's members are definitions again, nested inside a
+// module_binding's structure.
+func OCamlEmitDefinition(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+	switch c.Type(n) {
+	case "type_definition", "module_type_definition":
+		if c.Structs {
+			return c.KeepNode(out, n)
+		}
 	case "value_definition":
-		if !functions {
+		if !c.Functions {
 			return out
 		}
-		binding := findChildByType(n, "let_binding", lang)
+		sigRow := startRow(n)
+		binding := findChildByType(n, "let_binding", c.Lang)
 		if binding == nil {
-			return internal.KeepLine(out, lines, int(n.StartPoint().Row))
+			return internal.KeepLine(out, c.Lines, sigRow)
 		}
-		body := binding.ChildByFieldName("body", lang)
+		body := binding.ChildByFieldName("body", c.Lang)
 		if body == nil {
-			return internal.KeepLine(out, lines, int(n.StartPoint().Row))
+			return internal.KeepLine(out, c.Lines, sigRow)
 		}
-		sigRow := int(n.StartPoint().Row)
-		bodyRow := int(body.StartPoint().Row)
-		if bodyRow > sigRow {
-			return internal.KeepLines(out, lines, sigRow, bodyRow-1)
+		if bodyRow := startRow(body); bodyRow > sigRow {
+			return internal.KeepLines(out, c.Lines, sigRow, bodyRow-1)
 		}
-		return internal.KeepLine(out, lines, sigRow)
-	case "module_type_definition":
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		return internal.KeepLine(out, c.Lines, sigRow)
 	case "module_definition":
-		return ocamlEmitModule(out, src, lines, n, lang, functions)
+		return ocamlEmitModule(c, out, n)
 	}
 	return out
 }
 
-func ocamlEmitModule(out []internal.LineRange, src []byte, lines [][]byte, n *gotreesitter.Node, lang *gotreesitter.Language, functions bool) []internal.LineRange {
-	binding := findChildByType(n, "module_binding", lang)
-	if binding == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+func ocamlEmitModule(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+	binding := findChildByType(n, "module_binding", c.Lang)
+	var structure *gotreesitter.Node
+	if binding != nil {
+		structure = findChildByType(binding, "structure", c.Lang)
 	}
-	structure := findChildByType(binding, "structure", lang)
 	if structure == nil {
-		return internal.KeepLines(out, lines, int(n.StartPoint().Row), int(n.EndPoint().Row))
+		if !c.Structs {
+			return out
+		}
+		return c.KeepNode(out, n)
 	}
-	out = internal.KeepLines(out, lines, int(n.StartPoint().Row), int(structure.StartPoint().Row))
+	var inner []internal.LineRange
 	for i := 0; i < structure.ChildCount(); i++ {
 		child := structure.Child(i)
-		before := len(out)
-		out = OCamlEmitDefinition(out, src, lines, child, lang, functions)
-		if len(out) > before {
-			out = EmitLeadingDoc(out, lines, int(child.StartPoint().Row))
+		if sub := OCamlEmitDefinition(c, nil, child); len(sub) > 0 {
+			inner = c.EmitLeadingDoc(inner, startRow(child))
+			inner = append(inner, sub...)
 		}
 	}
-	if endRow := int(structure.EndPoint().Row); endRow > int(structure.StartPoint().Row) {
-		out = internal.KeepLine(out, lines, endRow)
+	if !c.Structs && len(inner) == 0 {
+		return out
+	}
+	out = internal.KeepLines(out, c.Lines, startRow(n), startRow(structure))
+	out = append(out, inner...)
+	if end := endRow(structure); end > startRow(structure) {
+		out = internal.KeepLine(out, c.Lines, end)
 	}
 	return out
 }

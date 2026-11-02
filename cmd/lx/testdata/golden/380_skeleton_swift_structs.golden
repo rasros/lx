@@ -4,8 +4,7 @@ skeleton/main.swift (41 rows, type definitions)
 ```swift
 /// Geometric shape contract.
 public protocol Shape {
-    func area() -> Double
-    func perimeter() -> Double
+...
 }
 ...
 /**
