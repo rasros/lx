@@ -35,6 +35,11 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "914_glob_named_dir_not_filtered", args: []string{"-n0", "-e", "ign", "ign"}},
 		{name: "915_glob_absolute_root_below_cwd", args: []string{"-n0", "-i", "build/*.js", filepath.Join(dir, "build")}},
 		{name: "916_glob_trailing_exclude_matches_last", args: []string{"-n0", "-i", "*.go", ".", "-e", "/a.go"}},
+		// -s starts a section with its globs reset, and globs no file follows
+		// before the next -s or the end apply to the section before them.
+		{name: "917_section_resets_globs", args: []string{"-s", "A", "-n0", "-i", "*.js", "build", "-s", "B", "-n0", "src"}},
+		{name: "918_section_trailing_glob_applies_to_last", args: []string{"-s", "A", "-n0", "build", "-s", "B", "-n0", "src", "-e", "*_test.go"}},
+		{name: "919_section_glob_before_next_section", args: []string{"-s", "A", "-n0", "src", "-e", "*_test.go", "-s", "B", "-n0", "src"}},
 
 		// rg takes no paths on stdin; a piped path is kept as a walk of the
 		// working directory would keep it.
