@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -252,6 +253,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 
 	if out.clip != nil {
 		log.Info("Copying output to clipboard", "bytes", out.clip.Len())
+		if env.Clipboard == nil {
+			return errors.New("clipboard write failed: no clipboard")
+		}
 		if err := env.Clipboard(out.clip.String()); err != nil {
 			return fmt.Errorf("clipboard write failed: %w", err)
 		}

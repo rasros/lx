@@ -10,21 +10,21 @@ import (
 
 	"github.com/atotto/clipboard"
 	"github.com/rasros/lx/internal/ansi"
-	"github.com/rasros/lx/internal/userdir"
+	"github.com/rasros/lx/internal/osenv"
 )
 
 // Env is everything a run sees of the process it runs in, so that runs can be
-// driven side by side, as the golden tests do. Every field must be set;
-// Clipboard is only called when the output is copied.
+// driven side by side, as the golden tests do. Run needs every field but
+// Clipboard, which may be nil: a run that copies its output then fails.
 type Env struct {
 	Stdin  io.Reader
 	Stdout io.Writer
 	Stderr io.Writer
 	// LookupEnv looks an environment variable up, as os.LookupEnv does.
-	LookupEnv func(key string) (string, bool)
+	LookupEnv osenv.Lookup
 	// Cwd is the absolute working directory relative paths resolve against.
 	Cwd string
-	// Clipboard receives the output of a run that copies it.
+	// Clipboard receives the output of a run that copies it, if not nil.
 	Clipboard func(text string) error
 }
 
@@ -51,10 +51,7 @@ type ExitError struct{ Code int }
 func (e ExitError) Error() string { return fmt.Sprintf("exit status %d", e.Code) }
 
 // getenv returns the value of the variable key, or "" when it is unset.
-func (e Env) getenv(key string) string {
-	v, _ := e.LookupEnv(key)
-	return v
-}
+func (e Env) getenv(key string) string { return e.LookupEnv.Get(key) }
 
 // abs returns p as an absolute path, resolved against the working directory.
 func (e Env) abs(p string) string {
@@ -99,5 +96,5 @@ func asGiven(err error, name string) error {
 // paint returns the Painter for output written to w.
 func (e Env) paint(w io.Writer) ansi.Painter { return ansi.For(w, e.LookupEnv) }
 
-func (e Env) homeDir() (string, error)   { return userdir.Home(e.LookupEnv) }
-func (e Env) configDir() (string, error) { return userdir.Config(e.LookupEnv) }
+func (e Env) homeDir() (string, error)   { return osenv.Home(e.LookupEnv) }
+func (e Env) configDir() (string, error) { return osenv.Config(e.LookupEnv) }

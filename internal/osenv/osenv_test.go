@@ -1,4 +1,4 @@
-package userdir
+package osenv
 
 import (
 	"os"

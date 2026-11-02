@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rasros/lx/internal/userdir"
+	"github.com/rasros/lx/internal/osenv"
 	"github.com/rasros/lx/pkg/lx/sources"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
@@ -150,12 +150,17 @@ func UserIgnoreRules(env func(key string) (string, bool), log *slog.Logger) (ign
 	if log == nil {
 		log = slog.Default()
 	}
-	home, _ := userdir.Home(env)
-	if configDir, err := userdir.Config(env); err == nil {
+	home, _ := osenv.Home(env)
+	if configDir, err := osenv.Config(env); err == nil {
 		ignoreRules = readIgnorePatterns(log, filepath.Join(configDir, "lx", "ignore"))
 	}
 
+	// A relative XDG_CONFIG_HOME is invalid, as the XDG spec says, rather
+	// than relative to some working directory.
 	xdgConfig, _ := env("XDG_CONFIG_HOME")
+	if !filepath.IsAbs(xdgConfig) {
+		xdgConfig = ""
+	}
 	if xdgConfig == "" && home != "" {
 		xdgConfig = filepath.Join(home, ".config")
 	}
