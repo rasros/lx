@@ -2,6 +2,7 @@ package walker
 
 import (
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -39,7 +40,7 @@ func compilePattern(pattern string) CompiledPattern {
 
 	cp := CompiledPattern{
 		Pattern:       pattern,
-		IsLiteral:     !strings.ContainsAny(pattern, "*?[{"),
+		IsLiteral:     !strings.ContainsAny(pattern, "*?[{\\"),
 		HasSlash:      strings.Contains(pattern, "/"),
 		HasDoubleStar: strings.Contains(pattern, "**"),
 	}
@@ -89,8 +90,19 @@ func compileNormalizedSpec(normalizedPattern string) CompiledSpec {
 	}
 }
 
+// normalizePattern cleans an -i or -e pattern. On Windows a backslash there
+// is a path separator; elsewhere, as in an ignore file, it escapes the next
+// character.
 func normalizePattern(raw string) string {
-	raw = strings.ReplaceAll(raw, "\\", "/")
+	if filepath.Separator == '\\' {
+		raw = strings.ReplaceAll(raw, "\\", "/")
+	}
+	return cleanPattern(raw)
+}
+
+// cleanPattern cleans a pattern, keeping a trailing slash, which makes it
+// match directories only.
+func cleanPattern(raw string) string {
 	hasTrailingSlash := strings.HasSuffix(raw, "/")
 	cleaned := path.Clean(raw)
 	if hasTrailingSlash && cleaned != "/" {
@@ -100,7 +112,9 @@ func normalizePattern(raw string) string {
 }
 
 func normalizePathForMatch(raw string) string {
-	raw = strings.ReplaceAll(raw, "\\", "/")
+	if filepath.Separator == '\\' {
+		raw = strings.ReplaceAll(raw, "\\", "/")
+	}
 	return path.Clean(raw)
 }
 
@@ -163,7 +177,7 @@ func couldMatchDescendant(spec CompiledSpec, dir string) bool {
 func hasOnlyStarWildcards(pattern string) bool {
 	for i := 0; i < len(pattern); i++ {
 		switch pattern[i] {
-		case '?', '[', '{':
+		case '?', '[', '{', '\\':
 			return false
 		}
 	}

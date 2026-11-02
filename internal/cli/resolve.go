@@ -84,15 +84,11 @@ func resolveOp(ctx context.Context, op Op, rc resolveContext) (files []lx.InputF
 		return nil, 1
 	}
 
-	// A piped file list is filtered by the -i and -e patterns, matched
-	// against the path relative to the working directory as in a walk of
-	// it. Ignore files and hidden-file skipping are left to the lister.
-	if op.Piped && !lx.IsKept(cwdRelative(rawPath, absPath), rc.section.Includes, rc.section.Excludes) {
+	stat, err := os.Stat(absPath)
+	if op.Piped && !pipedPathKept(rawPath, absPath, err == nil && stat.IsDir(), rc.section) {
 		slog.Debug("Skipping piped path due to filters", "path", rawPath)
 		return nil, 0
 	}
-
-	stat, err := os.Stat(absPath)
 	if err != nil {
 		slog.Error("Failed to stat path", "path", absPath, "error", err)
 		return nil, 1
@@ -108,8 +104,19 @@ func resolveOp(ctx context.Context, op Op, rc resolveContext) (files []lx.InputF
 	}, rc), 0
 }
 
-// resolveURL fetches a named URL. Like a named path it is never filtered
-// itself; an archive's entries are.
+// pipedPathKept reports whether a path from a piped file list passes the -i
+// and -e patterns, matched against the path relative to the working
+// directory as in a walk of it. A directory is kept when -i could match
+// something below it, and then walked with the patterns applied inside.
+// Ignore files and hidden-file skipping are left to the lister.
+func pipedPathKept(rawPath, absPath string, isDir bool, section Section) bool {
+	rel := cwdRelative(rawPath, absPath)
+	if !isDir {
+		return lx.IsKept(rel, section.Includes, section.Excludes)
+	}
+	return lx.IsKept(rel, nil, section.Excludes) && lx.CouldMatchAnyDescendant(lx.CompileSpecs(section.Includes), rel)
+}
+
 // cwdRelative returns absPath relative to the working directory, or rawPath
 // when it is outside it.
 func cwdRelative(rawPath, absPath string) string {
@@ -121,6 +128,8 @@ func cwdRelative(rawPath, absPath string) string {
 	return filepath.ToSlash(filepath.Clean(rawPath))
 }
 
+// resolveURL fetches a named URL. Like a named path it is never filtered
+// itself; an archive's entries are.
 func resolveURL(ctx context.Context, rawPath string, forceExpand bool, rc resolveContext) ([]lx.InputFile, int) {
 	section := rc.section
 

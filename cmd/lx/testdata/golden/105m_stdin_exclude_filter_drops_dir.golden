@@ -1,0 +1,9 @@
+--- STDOUT ---
+sub/main.go (1 rows)
+---
+```go
+package sub
+```
+
+
+--- STDERR ---

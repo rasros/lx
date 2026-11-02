@@ -1,20 +1,26 @@
 --- STDOUT ---
-[1/3] .github/workflow.yml (1 rows)
+[1/4] .github/workflow.yml (1 rows)
 ---
 ```yaml
 on: push
 ```
 
-[2/3] .kunitconfig (1 rows)
+[2/4] .kunitconfig (1 rows)
 ---
 ```
 re-included by a negation
 ```
 
-[3/3] trail (1 rows)
+[3/4] trail (1 rows)
 ---
 ```
 kept: the pattern ends in a space
+```
+
+[4/4] x.go (1 rows)
+---
+```go
+kept: \*.go names only *.go
 ```
 
 

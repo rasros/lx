@@ -1,0 +1,9 @@
+--- STDOUT ---
+sub/deep/util.go (1 rows)
+---
+```go
+package deep
+```
+
+
+--- STDERR ---

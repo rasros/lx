@@ -57,7 +57,8 @@ func SetupSymlinkedRootsFixture(t *testing.T) string {
 
 // SetupIgnoreSyntaxFixture builds a repository whose .gitignore re-includes
 // hidden paths with negations, which wins over skipping hidden files as in
-// ripgrep, and ends patterns with spaces, which git strips unless escaped.
+// ripgrep, ends patterns with spaces, which git strips unless escaped, and
+// escapes a star and a space with backslashes.
 // It returns the repository root.
 func SetupIgnoreSyntaxFixture(t *testing.T) string {
 	t.Helper()
@@ -65,7 +66,10 @@ func SetupIgnoreSyntaxFixture(t *testing.T) string {
 	dir := t.TempDir()
 
 	makeGitDir(t, dir, ".git")
-	writeFile(t, dir, ".gitignore", "!.kunitconfig\n!.github/\ntrail\\ \ntrail2   \n", 0644)
+	writeFile(t, dir, ".gitignore", "!.kunitconfig\n!.github/\ntrail\\ \ntrail2   \n\\*.go\na\\ b.go\n", 0644)
+	writeFile(t, dir, "*.go", "ignored: the escaped star is literal", 0644)
+	writeFile(t, dir, "x.go", "kept: \\*.go names only *.go", 0644)
+	writeFile(t, dir, "a b.go", "ignored by the escaped space", 0644)
 	writeFile(t, dir, ".kunitconfig", "re-included by a negation", 0644)
 	writeFile(t, dir, ".hidden", "hidden", 0644)
 	writeFile(t, dir, ".github/workflow.yml", "on: push", 0644)
