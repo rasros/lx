@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/rasros/lx/pkg/lx/walker"
 )
 
 var colorEnv = []string{"NO_COLOR", "CLICOLOR", "CLICOLOR_FORCE", "FORCE_COLOR", "TERM"}
@@ -102,14 +104,18 @@ func TestNoEscapesOutsidePackage(t *testing.T) {
 	}
 	root := filepath.Join(pkgDir, "..", "..")
 
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	// Walk with lx's own walker so gitignored files, such as local checkouts
+	// of other repositories, are skipped like hidden and testdata dirs.
+	w := walker.NewWalker(nil, nil)
+	w.SkipHidden = true
+	err = w.Walk(os.DirFS(root), ".", func(rel string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		path := filepath.Join(root, filepath.FromSlash(rel))
 		if d.IsDir() {
-			name := d.Name()
-			if path == pkgDir || (path != root && (strings.HasPrefix(name, ".") || name == "testdata")) {
-				return filepath.SkipDir
+			if path == pkgDir || d.Name() == "testdata" {
+				return fs.SkipDir
 			}
 			return nil
 		}
