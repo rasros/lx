@@ -12,8 +12,9 @@ import (
 	"github.com/rasros/lx/pkg/lx/templatex"
 )
 
-// FileErrorHandler handles file read errors during render.
-type FileErrorHandler = render.FileErrorHandler
+// FileErrorHandler handles a file that could not be opened during render. It
+// is called from the goroutine running Execute, in output order.
+type FileErrorHandler func(f sources.InputFile, err error)
 
 type defaultTokenizer struct{}
 
@@ -30,6 +31,7 @@ type Stream struct {
 	finalStats  *core.GlobalContext
 	sections    []*core.SectionContext
 	onFileError FileErrorHandler
+	log         *slog.Logger
 	concurrency int
 	prepared    []render.PreparedItem
 
@@ -66,6 +68,7 @@ func NewStream(cfg *core.Config) (*Stream, error) {
 		tokenizer:   defaultTokenizer{},
 		workDir:     ".",
 		concurrency: runtime.NumCPU(),
+		log:         slog.Default(),
 	}, nil
 }
 
@@ -93,6 +96,15 @@ func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
 	return s
 }
 
+// WithLogger sets where the stream logs; the default is slog.Default().
+func (s *Stream) WithLogger(log *slog.Logger) *Stream {
+	if log == nil {
+		log = slog.Default()
+	}
+	s.log = log
+	return s
+}
+
 // Admit reports whether the stream keeps f when added with opts: a file over
 // opts.MaxSize is dropped. Inputs with an unknown size (negative, as for
 // remote URLs) are always kept. AddFile and AddTree both decide by it.
@@ -103,7 +115,7 @@ func (s *Stream) Admit(f sources.InputFile, opts core.RenderOptions) bool {
 // AddFile enqueues a file to render with opts, unless Admit drops it.
 func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
 	if !s.Admit(f, opts) {
-		slog.Debug("Skipped by size limit (-m)", "path", f.Path, "size", f.Size, "max_size", opts.MaxSize)
+		s.log.Debug("Skipped by size limit (-m)", "path", f.Path, "size", f.Size, "max_size", opts.MaxSize)
 		s.skippedBySize++
 		return s
 	}
@@ -131,7 +143,7 @@ func (s *Stream) AddPrompt(text string) *Stream {
 func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *Stream {
 	if t := s.lastTree; len(files) > 0 && len(files) == len(t.files) &&
 		&files[0] == &t.files[0] && opts.MaxSize == t.maxSize {
-		slog.Debug("Adding tree", "files", t.admitted)
+		s.log.Debug("Adding tree", "files", t.admitted)
 		s.items = append(s.items, core.TreeContext{Body: t.body})
 		return s
 	}
@@ -142,11 +154,11 @@ func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *St
 		}
 	}
 	if len(paths) == 0 {
-		slog.Debug("Skipping empty tree (no admitted files)")
+		s.log.Debug("Skipping empty tree (no admitted files)")
 		return s
 	}
 	s.lastTree = builtTree{files: files, maxSize: opts.MaxSize, admitted: len(paths), body: buildTree(paths)}
-	slog.Debug("Adding tree", "files", len(paths))
+	s.log.Debug("Adding tree", "files", len(paths))
 	s.items = append(s.items, core.TreeContext{Body: s.lastTree.body})
 	return s
 }

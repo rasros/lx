@@ -421,3 +421,30 @@ func TestStream_TreeListsOnlyAdmittedFiles(t *testing.T) {
 		t.Fatalf("tree = %q, want %q", got, want)
 	}
 }
+
+// Files that cannot be opened are reported in output order, whichever worker
+// rendered them first.
+func TestStream_FileErrorsInOutputOrder(t *testing.T) {
+	stream, err := NewStream(core.NewConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for i := range 64 {
+		path := "missing-" + strconv.Itoa(i)
+		want = append(want, path)
+		stream.AddFile(sources.InputFile{Path: path, Open: func() (io.ReadCloser, error) {
+			return nil, fmt.Errorf("open %s: gone", path)
+		}}, core.RenderOptions{Head: -1})
+	}
+	var got []string
+	stream.WithConcurrency(8).WithOnFileError(func(f sources.InputFile, err error) {
+		got = append(got, f.Path)
+	})
+	if err := stream.Execute(context.Background(), io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("reported %v, want %v", got, want)
+	}
+}

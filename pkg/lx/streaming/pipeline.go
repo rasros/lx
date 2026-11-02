@@ -9,6 +9,7 @@ import (
 
 	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/render"
+	"github.com/rasros/lx/pkg/lx/sources"
 )
 
 type seqJob struct {
@@ -62,7 +63,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 			defer wg.Done()
 
 			// One processor per worker: it no longer carries per-item state.
-			proc := render.NewProcessor(s.engine, global, s.onFileError)
+			proc := render.NewProcessor(s.engine, global, s.log)
 			proc.SetTokenCounter(s.tokenizer.Estimate)
 
 			for j := range jobsCh {
@@ -97,6 +98,8 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					IsCompact:    itemStats.IsCompact,
 					IsBinary:     itemStats.IsBinary,
 					IsError:      itemStats.IsError,
+					ReadErr:      itemStats.ReadErr,
+					File:         fileOf(j.item),
 					Err:          err,
 					SectionIndex: j.item.Section.Index,
 				}
@@ -143,6 +146,9 @@ Loop:
 		if res.IsBinary {
 			totals.binary++
 		}
+		if res.ReadErr != nil && s.onFileError != nil {
+			s.onFileError(res.File, res.ReadErr)
+		}
 		if res.IsError {
 			totals.failed++
 		}
@@ -176,4 +182,10 @@ func (b *byteCounter) Write(p []byte) (n int, err error) {
 	n, err = b.w.Write(p)
 	b.count += int64(n)
 	return
+}
+
+// fileOf returns the file of a file item, or the zero InputFile.
+func fileOf(item render.PreparedItem) sources.InputFile {
+	fi, _ := item.Raw.(render.FileItem)
+	return fi.File
 }

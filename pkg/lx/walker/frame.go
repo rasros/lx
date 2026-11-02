@@ -40,32 +40,34 @@ func (OSHost) EvalSymlinks(path string) (string, error) {
 // only shapes how paths are named in reasons, never which rules apply.
 type Cache struct {
 	host Host
+	log  *slog.Logger
 	once sync.Once
 	wd   string // the working directory as the host names it
 	ht   hostTree
 	tree *ruleTree
 }
 
-// NewCache returns an empty cache over host, or the OS when host is nil. The
-// host's working directory is read once, on first use.
-func NewCache(host Host) *Cache {
+// NewCache returns an empty cache over host, or the OS when host is nil, that
+// logs to log, or slog.Default() when log is nil. The host's working
+// directory is read once, on first use.
+func NewCache(host Host, log *slog.Logger) *Cache {
 	if host == nil {
 		host = OSHost{}
 	}
-	return &Cache{host: host}
+	return &Cache{host: host, log: orDefault(log)}
 }
 
 func (c *Cache) hostTree() *ruleTree {
 	c.once.Do(func() {
 		cwd, err := c.host.Getwd()
 		if err != nil {
-			slog.Debug("Failed to read the working directory", "error", err)
+			c.log.Debug("Failed to read the working directory", "error", err)
 			cwd = ""
 		} else {
 			cwd = filepath.Clean(cwd)
 		}
 		c.wd = cwd
-		c.ht = hostTree{h: c.host}
+		c.ht = hostTree{h: c.host, log: c.log}
 		if cwd != "" {
 			c.ht.cwd = c.ht.real(cwd)
 		}
@@ -181,6 +183,7 @@ type tree interface {
 type hostTree struct {
 	h   Host
 	cwd string
+	log *slog.Logger
 }
 
 // real returns p with symlinks resolved, or p itself when it cannot be.
@@ -199,7 +202,7 @@ func (t hostTree) parent(dir string) (string, bool) {
 func (hostTree) child(dir, name string) string { return filepath.Join(dir, name) }
 
 func (t hostTree) gitDir(dir string) (gitFS, string, bool) {
-	g := hostGitFS{t.h}
+	g := hostGitFS{t.h, t.log}
 	gitDir, ok := findGitDir(g, dir)
 	return g, gitDir, ok
 }
@@ -207,7 +210,7 @@ func (t hostTree) gitDir(dir string) (gitFS, string, bool) {
 func (t hostTree) readFile(dir, name string) ([]byte, string, error) {
 	p := filepath.Join(dir, name)
 	data, err := t.h.ReadFile(p)
-	logReadError(p, err)
+	logReadError(t.log, p, err)
 	return data, t.display(p), err
 }
 
@@ -226,7 +229,10 @@ func (t hostTree) display(p string) string {
 
 // fsTree is a walked fs.FS that stands alone: its root is the top, and a
 // .git pointing outside it cannot be followed.
-type fsTree struct{ fsys fs.FS }
+type fsTree struct {
+	fsys fs.FS
+	log  *slog.Logger
+}
 
 func (fsTree) parent(dir string) (string, bool) {
 	if dir == "." {
@@ -239,7 +245,7 @@ func (fsTree) child(dir, name string) string { return joinRel(dir, name) }
 func (fsTree) display(p string) string       { return p }
 
 func (t fsTree) gitDir(dir string) (gitFS, string, bool) {
-	g := subGitFS{t.fsys}
+	g := subGitFS{t.fsys, t.log}
 	gitDir, ok := findGitDir(g, dir)
 	return g, gitDir, ok
 }
@@ -247,7 +253,7 @@ func (t fsTree) gitDir(dir string) (gitFS, string, bool) {
 func (t fsTree) readFile(dir, name string) ([]byte, string, error) {
 	p := joinRel(dir, name)
 	data, err := fs.ReadFile(t.fsys, p)
-	logReadError(p, err)
+	logReadError(t.log, p, err)
 	return data, p, err
 }
 

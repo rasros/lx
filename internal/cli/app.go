@@ -162,7 +162,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 	})
 	slog.Debug("Processing operations", "total_ops", len(parsed.Ops))
 
-	ignoreRules, gitExcludes := lx.UserIgnoreRules()
+	ignoreRules, gitExcludes := lx.UserIgnoreRules(os.LookupEnv, nil)
 	promptResolver := newPromptResolver(resolvePromptsDir(parsed, cliOpts), cliOpts.PromptExtensions)
 	sections := parseSections(parsed.Ops, lx.RenderOptions{Head: -1})
 	for i := range sections {
@@ -170,7 +170,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 		d.IgnoreRules, d.GitExcludes, d.OutPath = ignoreRules, gitExcludes, outPath
 	}
 
-	unresolved, err := resolveSections(ctx, sections, lx.NewCollector())
+	unresolved, err := resolveSections(ctx, sections, lx.NewCollector("", nil))
 	if err != nil {
 		return err
 	}

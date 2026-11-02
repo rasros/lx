@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"log/slog"
 
 	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/discover"
@@ -47,8 +48,10 @@ func NewConfig() *Config { return core.NewConfig() }
 func Merge(dst *Config, src *Config) { core.Merge(dst, src) }
 
 // NewCollector returns a Collector, which finds the inputs of the targets of
-// one run as lx does.
-func NewCollector() *Collector { return discover.NewCollector() }
+// one run as lx does. Relative targets resolve against cwd, or the process's
+// working directory when it is empty, and problems are logged to log, or
+// slog.Default() when it is nil.
+func NewCollector(cwd string, log *slog.Logger) *Collector { return discover.NewCollector(cwd, log) }
 
 // IncludeGlob returns lx's -i pattern p, ripgrep's -g p: a GlobInclude, or a
 // GlobExclude of what follows a leading "!". Glob.Validate reports a glob
@@ -60,8 +63,11 @@ func IncludeGlob(p string) Glob { return walker.IncludeOverride(p) }
 func ExcludeGlob(p string) Glob { return walker.ExcludeOverride(p) }
 
 // UserIgnoreRules reads the ignore files lx applies everywhere, for
-// DiscoverOptions.IgnoreRules and GitExcludes.
-func UserIgnoreRules() (ignoreRules, gitExcludes []string) { return discover.UserIgnoreRules() }
+// DiscoverOptions.IgnoreRules and GitExcludes, finding them through env, as
+// os.LookupEnv looks variables up. It logs to log, or slog.Default() when nil.
+func UserIgnoreRules(env func(key string) (string, bool), log *slog.Logger) (ignoreRules, gitExcludes []string) {
+	return discover.UserIgnoreRules(env, log)
+}
 
 func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	return sources.NewInputFile(fsys, path, info)
@@ -91,8 +97,16 @@ func (s *Stream) WithConcurrency(n int) *Stream {
 	return s
 }
 
+// WithOnFileError sets h to be told about each file that cannot be opened,
+// in output order, from the goroutine running Execute.
 func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
 	s.inner.WithOnFileError(h)
+	return s
+}
+
+// WithLogger sets where the stream logs; nil means slog.Default().
+func (s *Stream) WithLogger(log *slog.Logger) *Stream {
+	s.inner.WithLogger(log)
 	return s
 }
 

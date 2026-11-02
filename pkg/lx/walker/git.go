@@ -22,7 +22,7 @@ func infoExclude(g gitFS, gitDir, basePath string) []Rule {
 	}
 	p := g.Join(common, "info", "exclude")
 	data, err := g.ReadFile(p)
-	logReadError(p, err)
+	logReadError(g.logger(), p, err)
 	if err != nil {
 		return nil
 	}
@@ -37,9 +37,9 @@ func parseRuleFile(data []byte, basePath, source string) []Rule {
 
 // logReadError records why a rule file that exists could not be read, so a
 // silently missing set of rules shows up in --debug output.
-func logReadError(path string, err error) {
+func logReadError(log *slog.Logger, path string, err error) {
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		slog.Debug("Failed to read ignore rules", "path", path, "error", err)
+		orDefault(log).Debug("Failed to read ignore rules", "path", path, "error", err)
 	}
 }
 
@@ -54,10 +54,17 @@ type gitFS interface {
 	// Resolve resolves a path read from a .git or commondir file against
 	// base, reporting false when it cannot be reached.
 	Resolve(base, target string) (string, bool)
+	// logger is where lookups report what they skip.
+	logger() *slog.Logger
 }
 
 // hostGitFS looks git directories up on the host filesystem.
-type hostGitFS struct{ Host }
+type hostGitFS struct {
+	Host
+	log *slog.Logger
+}
+
+func (g hostGitFS) logger() *slog.Logger { return orDefault(g.log) }
 
 func (hostGitFS) Join(elem ...string) string { return filepath.Join(elem...) }
 func (hostGitFS) Resolve(base, target string) (string, bool) {
@@ -66,7 +73,12 @@ func (hostGitFS) Resolve(base, target string) (string, bool) {
 
 // subGitFS looks git directories up within a walked fs.FS. Paths that leave
 // it, absolute or through "..", cannot be followed.
-type subGitFS struct{ fsys fs.FS }
+type subGitFS struct {
+	fsys fs.FS
+	log  *slog.Logger
+}
+
+func (g subGitFS) logger() *slog.Logger { return orDefault(g.log) }
 
 func (g subGitFS) Stat(name string) (fs.FileInfo, error)  { return fs.Stat(g.fsys, name) }
 func (g subGitFS) Lstat(name string) (fs.FileInfo, error) { return fs.Lstat(g.fsys, name) }
@@ -94,30 +106,30 @@ func findGitDir(g gitFS, repo string) (string, bool) {
 	dotGit := g.Join(repo, ".git")
 	info, err := g.Stat(dotGit)
 	if err != nil {
-		logReadError(dotGit, err)
+		logReadError(g.logger(), dotGit, err)
 		return "", false
 	}
 	gitDir := dotGit
 	if !info.IsDir() {
 		data, err := g.ReadFile(dotGit)
 		if err != nil {
-			logReadError(dotGit, err)
+			logReadError(g.logger(), dotGit, err)
 			return "", false
 		}
 		line := strings.TrimSpace(strings.SplitN(string(data), "\n", 2)[0])
 		target, ok := strings.CutPrefix(line, "gitdir:")
 		target = strings.TrimSpace(target)
 		if !ok || target == "" {
-			slog.Debug("Ignoring .git file without a gitdir line", "path", dotGit)
+			g.logger().Debug("Ignoring .git file without a gitdir line", "path", dotGit)
 			return "", false
 		}
 		if gitDir, ok = g.Resolve(repo, target); !ok {
-			slog.Debug("Keeping .git file whose gitdir cannot be followed as a repository root", "path", dotGit)
+			g.logger().Debug("Keeping .git file whose gitdir cannot be followed as a repository root", "path", dotGit)
 			return "", true
 		}
 	}
 	if !isGitDir(g, gitDir) {
-		slog.Debug("Ignoring .git that is not a valid git directory", "path", dotGit, "gitdir", gitDir)
+		g.logger().Debug("Ignoring .git that is not a valid git directory", "path", dotGit, "gitdir", gitDir)
 		return "", false
 	}
 	return gitDir, true
@@ -190,7 +202,7 @@ func commonDir(g gitFS, gitDir string) (string, bool) {
 	p := g.Join(gitDir, "commondir")
 	data, err := g.ReadFile(p)
 	if err != nil {
-		logReadError(p, err)
+		logReadError(g.logger(), p, err)
 		return gitDir, true
 	}
 	common := strings.TrimSpace(string(data))
@@ -211,4 +223,12 @@ func resolveRelative(base, target string) string {
 		base = real
 	}
 	return filepath.Join(base, target)
+}
+
+// orDefault returns log, or slog.Default() when log is nil.
+func orDefault(log *slog.Logger) *slog.Logger {
+	if log == nil {
+		return slog.Default()
+	}
+	return log
 }

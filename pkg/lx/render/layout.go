@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	"github.com/rasros/lx/pkg/lx/core"
+	"github.com/rasros/lx/pkg/lx/sources"
 )
 
 // Result is one rendered item produced by the worker pipeline.
@@ -20,6 +21,8 @@ type Result struct {
 	IsError      bool
 	Err          error
 	SectionIndex int
+	ReadErr      error // why File, a file item, could not be opened
+	File         sources.InputFile
 }
 
 // LayoutWriter acts as a middleman between the pipeline assembler and the output writer.

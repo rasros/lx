@@ -51,7 +51,11 @@ type archiveCandidate struct {
 // ExpandArchive returns the files in the archive at absPath, displayed below
 // displayPath, that w walks to.
 // Entries are read into memory, so the archive is not needed once it returns.
-func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker) ([]InputFile, error) {
+// Problems with single entries are logged to log, or slog.Default() when nil.
+func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, log *slog.Logger) ([]InputFile, error) {
+	if log == nil {
+		log = slog.Default()
+	}
 	if !IsArchivePath(absPath) {
 		return nil, nil
 	}
@@ -71,7 +75,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 
 	err = w.Walk(fsys, ".", func(entryPath string, d fs.DirEntry, err error) error {
 		if err != nil {
-			slog.Warn("Error accessing archive entry", "archive", displayPath, "path", entryPath, "error", err)
+			log.Warn("Error accessing archive entry", "archive", displayPath, "path", entryPath, "error", err)
 			return nil
 		}
 		if d.IsDir() {
@@ -94,12 +98,12 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 
 		info, err := d.Info()
 		if err != nil {
-			slog.Error("Failed to stat archive entry", "path", entryPath, "error", err)
+			log.Error("Failed to stat archive entry", "path", entryPath, "error", err)
 			return nil
 		}
 
 		if _, exists := candidateByKey[key]; exists {
-			slog.Warn("Skipping duplicate archive entry path", "archive", displayPath, "path", key)
+			log.Warn("Skipping duplicate archive entry path", "archive", displayPath, "path", key)
 			return nil
 		}
 
@@ -118,11 +122,11 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 	}
 
 	if len(candidates) == 0 {
-		slog.Debug("Archive expansion finished", "archive", displayPath, "files_found", 0)
+		log.Debug("Archive expansion finished", "archive", displayPath, "files_found", 0)
 		return nil, nil
 	}
 
-	usedExtractor, err := materializeWithExtractor(ctx, absPath, candidates, candidateByKey)
+	usedExtractor, err := materializeWithExtractor(ctx, absPath, candidates, candidateByKey, log)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +137,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 		}
 		data, err := snapshotArchiveEntry(fsys, candidates[i].entryPath, candidates[i].size)
 		if err != nil {
-			slog.Warn("Failed to read archive entry", "archive", displayPath, "path", candidates[i].entryPath, "error", err)
+			log.Warn("Failed to read archive entry", "archive", displayPath, "path", candidates[i].entryPath, "error", err)
 			continue
 		}
 		candidates[i].data = data
@@ -155,11 +159,11 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 				return newByteReaderReadCloser(cached), nil
 			},
 		}
-		slog.Debug("File accepted from archive", "path", f.Path, "size", f.Size)
+		log.Debug("File accepted from archive", "path", f.Path, "size", f.Size)
 		files = append(files, f)
 	}
 
-	slog.Debug("Archive expansion finished", "archive", displayPath, "files_found", len(files), "used_extractor", usedExtractor)
+	log.Debug("Archive expansion finished", "archive", displayPath, "files_found", len(files), "used_extractor", usedExtractor)
 	return files, nil
 }
 
@@ -222,7 +226,7 @@ func snapshotArchiveEntry(fsys fs.FS, path string, sizeHint int64) ([]byte, erro
 	return readAllWithSizeHint(f, sizeHint)
 }
 
-func materializeWithExtractor(ctx context.Context, absPath string, candidates []archiveCandidate, candidateByKey map[string]int) (bool, error) {
+func materializeWithExtractor(ctx context.Context, absPath string, candidates []archiveCandidate, candidateByKey map[string]int, log *slog.Logger) (bool, error) {
 	file, err := os.Open(absPath)
 	if err != nil {
 		return false, err
@@ -260,17 +264,17 @@ func materializeWithExtractor(ctx context.Context, absPath string, candidates []
 
 		rc, err := info.Open()
 		if err != nil {
-			slog.Warn("Failed to open extractor entry", "archive", absPath, "path", key, "error", err)
+			log.Warn("Failed to open extractor entry", "archive", absPath, "path", key, "error", err)
 			return nil
 		}
 		data, readErr := readAllWithSizeHint(rc, info.Size())
 		closeErr := rc.Close()
 		if readErr != nil {
-			slog.Warn("Failed to read extractor entry", "archive", absPath, "path", key, "error", readErr)
+			log.Warn("Failed to read extractor entry", "archive", absPath, "path", key, "error", readErr)
 			return nil
 		}
 		if closeErr != nil {
-			slog.Warn("Failed to close extractor entry", "archive", absPath, "path", key, "error", closeErr)
+			log.Warn("Failed to close extractor entry", "archive", absPath, "path", key, "error", closeErr)
 			return nil
 		}
 
