@@ -14,19 +14,6 @@ import (
 	"github.com/rasros/lx/pkg/lx/walker"
 )
 
-// Glob is one of lx's -i and -e globs. IncludeGlob and ExcludeGlob make them.
-type Glob = walker.Override
-
-// IncludeGlob returns lx's -i pattern p, which works as ripgrep's -g p: it
-// keeps what it matches, and once there is one, a file must be kept by some
-// glob. A leading "!" makes it exclude instead.
-func IncludeGlob(p string) Glob { return walker.IncludeOverride(p) }
-
-// ExcludeGlob returns lx's -e pattern p, which works as ripgrep's -g '!p':
-// it drops what it matches. A leading "!" makes it keep what it matches, as
-// an -i glob does, without requiring a file to be kept by some glob.
-func ExcludeGlob(p string) Glob { return walker.ExcludeOverride(p) }
-
 // Options decide what Collect finds for a target.
 type Options struct {
 	// Globs filter what is found below a target, as ripgrep's -g globs do:
@@ -38,7 +25,7 @@ type Options struct {
 	// "pkg/a.zip/src/*.go" names entries of pkg/a.zip; the entries of a URL
 	// archive are below the URL. A named target is never filtered by them,
 	// nor by anything but OutPath.
-	Globs []Glob
+	Globs []walker.Override
 
 	// IgnoreRules apply everywhere, below every ignore file, and GitExcludes,
 	// git's global excludes, inside a repository. UserIgnoreRules reads the
