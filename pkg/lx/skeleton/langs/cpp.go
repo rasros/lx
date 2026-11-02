@@ -52,7 +52,8 @@ func CppUnwrap(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node {
 // function_definition, or a declaration whose declarator declares a
 // function (a friend function too), is a method; a class, struct, union or
 // enum is a nested type; other declarations, including function pointers,
-// friend classes and enumerators, are fields.
+// friend classes and enumerators, are fields, and so are member type aliases
+// (typedef, using X = ...), kept whole like top-level ones.
 func CppMember(c *Ctx, n *gotreesitter.Node) MemberKind {
 	switch t := c.Type(n); {
 	case t == "function_definition":
@@ -64,7 +65,7 @@ func CppMember(c *Ctx, n *gotreesitter.Node) MemberKind {
 			return Method
 		}
 		return Field
-	case t == "enumerator" || t == "friend_declaration":
+	case t == "enumerator" || t == "friend_declaration" || t == "type_definition" || t == "alias_declaration":
 		return Field
 	}
 	return Skip

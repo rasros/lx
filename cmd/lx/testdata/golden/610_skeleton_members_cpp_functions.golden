@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.cpp (63 rows, function signatures)
+skeleton/members.cpp (69 rows, function signatures)
 ---
 ```cpp
 // Widget holds a value.

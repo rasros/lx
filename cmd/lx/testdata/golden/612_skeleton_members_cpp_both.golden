@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/members.cpp (63 rows, definitions)
+skeleton/members.cpp (69 rows, definitions)
 ---
 ```cpp
 // Widget holds a value.
@@ -20,6 +20,11 @@ public:
     };
     void (*callback)(int);
     int plain;
+    // Member aliases are types.
+    typedef std::vector<int> values;
+    using size_type = unsigned long;
+    template <typename T>
+    using ptr = T*;
     template <typename T>
     T get(T x) {
 ...
