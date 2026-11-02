@@ -172,7 +172,10 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string) er
 	}
 	applyWorkloadConcurrency(stream, sections, runtime.NumCPU())
 
-	unresolved := resolveSections(ctx, sections, lx.NewCollector())
+	unresolved, err := resolveSections(ctx, sections, lx.NewCollector())
+	if err != nil {
+		return err
+	}
 	precomputeTrees(sections)
 	var metaFields map[string]string
 	var metaBody string

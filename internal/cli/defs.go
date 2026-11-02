@@ -311,6 +311,10 @@ were regular files in the directory tree. The archive path is used as a
 prefix for entries inside it (e.g. archive.zip/hello.txt).
 
 Active include (-i) and exclude (-e) filters apply to entries inside the archive.
+An archive found while walking a directory is matched like a directory there:
+its entries by their paths through it (e.g. -i "pkg/a.zip/src/**"). The
+entries of a named archive are matched from its root, like those of a named
+directory.
 Hidden entry filtering (leading dot) is also respected.
 
 Supported formats:

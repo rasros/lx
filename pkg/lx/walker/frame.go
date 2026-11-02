@@ -74,13 +74,13 @@ func (c *Cache) hostTree() *ruleTree {
 	return c.tree
 }
 
-// overridePrefix returns what to put before a path below absRoot to name it
+// OverridePrefix returns what to put before a path below absRoot to name it
 // relative to the working directory, where ripgrep anchors its -g globs: a
 // path outside it, such as one below "..", keeps its leading "../", which an
 // anchored glob cannot match. The working directory may be named through a
 // symlink and absRoot by its real path, or the other way round, so a root
 // below either name of it counts as below it.
-func (c *Cache) overridePrefix(absRoot string) string {
+func (c *Cache) OverridePrefix(absRoot string) string {
 	c.hostTree()
 	if c.wd == "" {
 		return ""
