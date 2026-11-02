@@ -1,0 +1,27 @@
+--- STDOUT ---
+[1/4] ../a.tmp (1 rows)
+---
+```
+ignored by .gitignore in a repository
+```
+
+[2/4] ../bin/x.txt (1 rows)
+---
+```text
+ignored by .gitignore in a repository
+```
+
+[3/4] ../src/b.tmp (1 rows)
+---
+```
+ignored by .gitignore in a repository
+```
+
+[4/4] ../src/ok.txt (1 rows)
+---
+```text
+always included
+```
+
+
+--- STDERR ---

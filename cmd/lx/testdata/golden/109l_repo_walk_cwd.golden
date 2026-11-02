@@ -1,0 +1,9 @@
+--- STDOUT ---
+ok.txt (1 rows)
+---
+```text
+always included
+```
+
+
+--- STDERR ---

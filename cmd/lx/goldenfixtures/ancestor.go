@@ -117,6 +117,30 @@ func SetupStrayGitDirAboveFixture(t *testing.T) string {
 	return filepath.Join(dir, "proj")
 }
 
+// SetupParentIgnoreFilesFixture builds a directory whose .gitignore ignores
+// *.tmp and bin/ and whose .ignore ignores *.ign, with a subdirectory src to
+// run lx from. With repo set the directory is a git repository root. As in
+// ripgrep, .ignore applies either way and .gitignore only inside the
+// repository. It returns the directory.
+func SetupParentIgnoreFilesFixture(t *testing.T, repo bool) string {
+	t.Helper()
+	setupMockConfig(t)
+	dir := t.TempDir()
+
+	if repo {
+		makeGitDir(t, dir, ".git")
+	}
+	writeFile(t, dir, ".gitignore", "*.tmp\nbin/\n", 0644)
+	writeFile(t, dir, ".ignore", "*.ign\n", 0644)
+	writeFile(t, dir, "a.tmp", "ignored by .gitignore in a repository", 0644)
+	writeFile(t, dir, "bin/x.txt", "ignored by .gitignore in a repository", 0644)
+	writeFile(t, dir, "src/ok.txt", "always included", 0644)
+	writeFile(t, dir, "src/b.tmp", "ignored by .gitignore in a repository", 0644)
+	writeFile(t, dir, "src/c.ign", "always ignored by .ignore", 0644)
+
+	return dir
+}
+
 // SetupNegatedIgnoredDirFixture builds a git repository whose .gitignore
 // ignores the build directory but re-includes one file in it, and holds a
 // subdirectory x to run lx from. It returns the repository root.

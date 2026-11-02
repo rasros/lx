@@ -39,6 +39,19 @@ func makeGitDir(t *testing.T, dir, path string) {
 	writeFile(t, dir, filepath.Join(path, "HEAD"), "ref: refs/heads/main\n", 0644)
 }
 
+// repoTempDir returns an empty directory inside a git repository, so its
+// .gitignore files apply, without a .git in the directory itself.
+func repoTempDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	makeGitDir(t, dir, ".git")
+	work := filepath.Join(dir, "work")
+	if err := os.Mkdir(work, 0755); err != nil {
+		t.Fatalf("mkdir %s: %v", work, err)
+	}
+	return work
+}
+
 func makeSymlink(dir, target, name string) {
 	fp := filepath.Join(dir, name)
 	os.MkdirAll(filepath.Dir(fp), 0755)

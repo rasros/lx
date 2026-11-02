@@ -1,6 +1,6 @@
 --- STDOUT ---
-
+../secret/locked.txt - error: open locked.txt: PERMISSION_DENIED
 
 
 --- STDERR ---
-Warning: Skipping path, use -f to include it (path=../secret/locked.txt reason=parent directory /ROOT/secret: rule "secret/" in /ROOT/.gitignore)
+Error: Failed to read file: open locked.txt: PERMISSION_DENIED (path=../secret/locked.txt)
