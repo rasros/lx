@@ -2,16 +2,12 @@
 skeleton/api.hpp (21 rows, type definitions)
 ---
 ```cpp
-#ifndef API_HPP
-...
 /* Operations table. */
 struct ops {
     int (*run)(int code);
 };
 ...
 enum color { RED, GREEN };
-...
-#endif
 ```
 
 

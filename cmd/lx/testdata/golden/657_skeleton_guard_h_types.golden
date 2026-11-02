@@ -2,8 +2,6 @@
 skeleton/guard.h (38 rows, type definitions)
 ---
 ```c
-#ifndef GUARD_H
-...
 /* Declared before its definition. */
 struct fwd;
 ...
@@ -12,8 +10,6 @@ struct settings {
     int verbose;
     int level;
 } default_settings;
-...
-#endif /* GUARD_H */
 ```
 
 

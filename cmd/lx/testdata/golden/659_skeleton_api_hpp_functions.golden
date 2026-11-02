@@ -2,11 +2,7 @@
 skeleton/api.hpp (21 rows, function signatures)
 ---
 ```cpp
-#ifndef API_HPP
-...
 int afunc(void);
-...
-#endif
 ```
 
 

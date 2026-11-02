@@ -34,10 +34,11 @@ type langDef struct {
 	// namespaces are node types whose "body" holds declarations walked like
 	// top-level ones, kept between the namespace's header and closing row.
 	namespaces []string
-	// frames are preprocessor conditionals whose children are walked like
-	// top-level declarations, kept between their #if and #endif rows.
-	frames []string
-	// recoverErrors walks the declarations inside error nodes.
+	// conditionals keeps the directive rows of the preprocessor
+	// conditionals around kept rows (see langs.BalanceConditionals).
+	conditionals bool
+	// recoverErrors walks the declarations inside error nodes, and inside
+	// nodes the grammar hides, which error recovery leaves in a tree.
 	recoverErrors bool
 	// unwrap returns the declaration a top-level node wraps (a C++
 	// template_declaration's class or function), or the node itself. Rows
@@ -222,11 +223,12 @@ var langDefs = map[string]langDef{
 		comments:    &langs.CComments,
 		funcVisible: langs.CFuncVisible,
 		namespaces:  []string{"linkage_specification"},
-		frames:      preprocGroups,
 		unwrap:      langs.CppUnwrap,
 		emitStruct:  langs.CppEmitter(cppMembers),
 
-		recoverErrors: true,
+		iterateChildren: preprocGroups,
+		conditionals:    true,
+		recoverErrors:   true,
 	},
 
 	"cpp": {
@@ -236,11 +238,12 @@ var langDefs = map[string]langDef{
 		comments:    &langs.CComments,
 		funcVisible: langs.CFuncVisible,
 		namespaces:  []string{"namespace_definition", "linkage_specification"},
-		frames:      preprocGroups,
 		unwrap:      langs.CppUnwrap,
 		emitStruct:  langs.CppEmitter(cppMembers),
 
-		recoverErrors: true,
+		iterateChildren: preprocGroups,
+		conditionals:    true,
+		recoverErrors:   true,
 	},
 
 	"java": {
