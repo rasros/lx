@@ -95,6 +95,9 @@ func SetupSymlinksFixture(t *testing.T) string {
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
 	writeFile(t, dir, "pkg/util.go", "package pkg", 0644)
 	buildSymlinksDir(t, dir)
+	// Relative target path shorter than the file it points to, so content
+	// sized from the link itself would be truncated.
+	makeSymlinkRaw(dir, "../main.go", "rellinks/main.go")
 
 	return dir
 }

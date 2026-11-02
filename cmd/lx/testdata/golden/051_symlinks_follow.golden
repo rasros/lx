@@ -25,7 +25,7 @@ a
 b
 ```
 
-[6/9] links/link_to_main.go (~1 rows)
+[6/9] links/link_to_main.go (2 rows)
 ---
 ```go
 package main

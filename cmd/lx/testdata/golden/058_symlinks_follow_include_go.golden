@@ -1,5 +1,5 @@
 --- STDOUT ---
-[1/2] links/link_to_main.go (~1 rows)
+[1/2] links/link_to_main.go (2 rows)
 ---
 ```go
 package main
