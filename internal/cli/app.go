@@ -138,6 +138,17 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 	applyOutputFormatOverrides(cfg, parsed)
 
 	out := determineOutput(parsed.Globals, cliOpts.OutputMode, env, log)
+	w := out.w
+	var sink *fileSink
+	if out.path != "" {
+		// A bad path fails before any work, but the file only receives the
+		// output once all of it is written, so a failed run leaves it as it was.
+		if sink, err = createFileSink(out.path, out.name); err != nil {
+			return err
+		}
+		defer sink.Abort()
+		w = sink
+	}
 
 	stream, err := lx.NewStream(cfg)
 	if err != nil {
@@ -226,17 +237,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 		}
 	}
 
-	w := out.w
-	var sink *fileSink
-	if out.path != "" {
-		// The output file is only replaced once the whole bundle is written,
-		// so a failed run leaves an earlier one in place.
-		if sink, err = createFileSink(out.path, out.name); err != nil {
-			return err
-		}
-		defer sink.Abort()
+	if sink != nil {
 		log.Info("Writing output to file", "path", out.name)
-		w = sink
 	}
 
 	log.Info("Executing stream pipeline...")
