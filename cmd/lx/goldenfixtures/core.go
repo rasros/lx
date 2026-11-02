@@ -216,20 +216,28 @@ func SetupComplexFixture(t *testing.T) string {
 	writeFile(t, dir, "parent_ignore_test/level1/level2/ignore_me.tmp", "ignore", 0644)
 	writeFile(t, dir, "parent_ignore_test/level1/level2/keep_me.go", "package level2", 0644)
 
-	ignoreContent := "*\n!*/\n!/src/**\n!/migrations/**\n!/assets/**\n!/data/**/*.data.xlsx\n!/data/**/index.json\n!langgraph.json\n!pyproject.toml\n!uv.lock\n"
-	writeFile(t, dir, "ignore_exception_test/.gitignore", ignoreContent, 0644)
-	writeFile(t, dir, "ignore_exception_test/src/main.go", "package main", 0644)
-	writeFile(t, dir, "ignore_exception_test/migrations/001_init.sql", "SELECT 1;", 0644)
-	writeFile(t, dir, "ignore_exception_test/assets/logo.png", "image_data", 0644)
-	writeFile(t, dir, "ignore_exception_test/data/nested/deep/my.data.xlsx", "excel_data", 0644)
-	writeFile(t, dir, "ignore_exception_test/data/index.json", "{}", 0644)
-	writeFile(t, dir, "ignore_exception_test/langgraph.json", "{}", 0644)
-	writeFile(t, dir, "ignore_exception_test/pyproject.toml", "[tool]", 0644)
-	writeFile(t, dir, "ignore_exception_test/uv.lock", "lock_data", 0644)
-	writeFile(t, dir, "ignore_exception_test/should_ignore.txt", "ignore me", 0644)
-	writeFile(t, dir, "ignore_exception_test/data/secret.csv", "1,2,3", 0644)
-	writeFile(t, dir, "ignore_exception_test/data/nested/deep/ignore.xlsx", "ignore", 0644)
-	writeFile(t, dir, "ignore_exception_test/other_dir/file.go", "package other", 0644)
+	// The same exceptions twice: with "!*/" they re-include files, and
+	// without it "*" ignores every directory, which no negation of what is
+	// inside one can undo.
+	exceptions := "!/src/**\n!/migrations/**\n!/assets/**\n!/data/**/*.data.xlsx\n!/data/**/index.json\n!langgraph.json\n!pyproject.toml\n!uv.lock\n"
+	for _, d := range []struct{ dir, ignore string }{
+		{"ignore_exception_test", "*\n!*/\n" + exceptions},
+		{"ignore_exception_no_dirs", "*\n" + exceptions},
+	} {
+		writeFile(t, dir, d.dir+"/.gitignore", d.ignore, 0644)
+		writeFile(t, dir, d.dir+"/src/main.go", "package main", 0644)
+		writeFile(t, dir, d.dir+"/migrations/001_init.sql", "SELECT 1;", 0644)
+		writeFile(t, dir, d.dir+"/assets/logo.png", "image_data", 0644)
+		writeFile(t, dir, d.dir+"/data/nested/deep/my.data.xlsx", "excel_data", 0644)
+		writeFile(t, dir, d.dir+"/data/index.json", "{}", 0644)
+		writeFile(t, dir, d.dir+"/langgraph.json", "{}", 0644)
+		writeFile(t, dir, d.dir+"/pyproject.toml", "[tool]", 0644)
+		writeFile(t, dir, d.dir+"/uv.lock", "lock_data", 0644)
+		writeFile(t, dir, d.dir+"/should_ignore.txt", "ignore me", 0644)
+		writeFile(t, dir, d.dir+"/data/secret.csv", "1,2,3", 0644)
+		writeFile(t, dir, d.dir+"/data/nested/deep/ignore.xlsx", "ignore", 0644)
+		writeFile(t, dir, d.dir+"/other_dir/file.go", "package other", 0644)
+	}
 
 	return dir
 }

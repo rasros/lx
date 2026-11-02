@@ -197,6 +197,7 @@ func TestGoldenComplex(t *testing.T) {
 		{name: "101_stdin_null_terminated", args: []string{"-0"}, stdin: "main.go\x00README.md\x00spaces/file with spaces.txt\x00"},
 		{name: "102_walk_nested_respects_root_ignore", args: []string{"parent_ignore_test/level1/level2"}},
 		{name: "103_complex_ignore_exceptions", args: []string{"ignore_exception_test"}},
+		{name: "103b_ignore_exceptions_inside_ignored_dirs", args: []string{"ignore_exception_no_dirs"}},
 	})
 }
 
