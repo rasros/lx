@@ -96,6 +96,13 @@ func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
 	return s
 }
 
+// WithDir sets what relative paths in templates, such as dataURI's, resolve
+// against; the default is the process's working directory.
+func (s *Stream) WithDir(dir string) *Stream {
+	s.engine.Dir = dir
+	return s
+}
+
 // WithLogger sets where the stream logs; the default is slog.Default().
 func (s *Stream) WithLogger(log *slog.Logger) *Stream {
 	if log == nil {

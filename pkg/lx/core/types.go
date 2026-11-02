@@ -65,6 +65,10 @@ type TemplateEngine struct {
 	// renderers do not branch on the format name.
 	EmbedImages   bool
 	UseSeparators bool
+
+	// Dir is what relative paths in templates, such as dataURI's, resolve
+	// against. Empty means the process's working directory.
+	Dir string
 }
 
 // Config represents the core library configuration. The yaml tags are the

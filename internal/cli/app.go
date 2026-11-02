@@ -143,7 +143,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 		return err
 	}
 
-	stream.WithLogger(log).WithOnFileError(func(f lx.InputFile, err error) {
+	stream.WithLogger(log).WithDir(env.Cwd).WithOnFileError(func(f lx.InputFile, err error) {
 		log.Error("Failed to read file", "path", f.Path, "error", err)
 	})
 	log.Debug("Processing operations", "total_ops", len(parsed.Ops))

@@ -2,6 +2,8 @@ package templatex
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -11,7 +13,7 @@ import (
 )
 
 func TestTemplateFuncs_Humanize(t *testing.T) {
-	humanize := templateFuncs()["humanize"].(func(int64) string)
+	humanize := templateFuncs(&core.TemplateEngine{})["humanize"].(func(int64) string)
 
 	tests := []struct {
 		in   int64
@@ -36,7 +38,7 @@ func TestTemplateFuncs_Humanize(t *testing.T) {
 }
 
 func TestTemplateFuncs_Date(t *testing.T) {
-	dateFn := templateFuncs()["date"].(func(string, time.Time) string)
+	dateFn := templateFuncs(&core.TemplateEngine{})["date"].(func(string, time.Time) string)
 
 	ts := time.Date(2025, 12, 17, 14, 0, 0, 0, time.UTC)
 	got := dateFn("2006-01-02", ts)
@@ -46,7 +48,7 @@ func TestTemplateFuncs_Date(t *testing.T) {
 }
 
 func TestTemplateFuncs_EndNewline(t *testing.T) {
-	endNewline := templateFuncs()["endNewline"].(func(interface{}) string)
+	endNewline := templateFuncs(&core.TemplateEngine{})["endNewline"].(func(interface{}) string)
 
 	tests := []struct {
 		in   interface{}
@@ -67,7 +69,7 @@ func TestTemplateFuncs_EndNewline(t *testing.T) {
 }
 
 func TestTemplateFuncs_Commafy(t *testing.T) {
-	commafy := templateFuncs()["commafy"].(func(interface{}) string)
+	commafy := templateFuncs(&core.TemplateEngine{})["commafy"].(func(interface{}) string)
 	tests := []struct {
 		in   interface{}
 		want string
@@ -88,7 +90,7 @@ func TestTemplateFuncs_Commafy(t *testing.T) {
 }
 
 func TestTemplateFuncs_TokenLabel(t *testing.T) {
-	tokenLabel := templateFuncs()["tokenLabel"].(func(int64, bool) string)
+	tokenLabel := templateFuncs(&core.TemplateEngine{})["tokenLabel"].(func(int64, bool) string)
 
 	if got := tokenLabel(15, false); got != "~15 tokens" {
 		t.Errorf("tokenLabel(15,false) = %q, want %q", got, "~15 tokens")
@@ -119,7 +121,7 @@ func TestTemplateFuncs_TokenLabel(t *testing.T) {
 }
 
 func TestTemplateFuncs_Plural(t *testing.T) {
-	plural := templateFuncs()["plural"].(func(interface{}, string, string) string)
+	plural := templateFuncs(&core.TemplateEngine{})["plural"].(func(interface{}, string, string) string)
 	if got := plural(1, "file", "files"); got != "file" {
 		t.Errorf("plural(1) = %q", got)
 	}
@@ -132,7 +134,7 @@ func TestTemplateFuncs_Plural(t *testing.T) {
 }
 
 func TestTemplateFuncs_Escape(t *testing.T) {
-	escape := templateFuncs()["escape"].(func(interface{}) string)
+	escape := templateFuncs(&core.TemplateEngine{})["escape"].(func(interface{}) string)
 
 	tests := []struct {
 		in   interface{}
@@ -237,4 +239,20 @@ func TestDefaultStatsTemplate_Render(t *testing.T) {
 			t.Errorf("expected accent on leader: %q", out)
 		}
 	})
+}
+
+// dataURI reads a relative path from the engine's Dir, not the process's
+// working directory.
+func TestDataURIResolvesAgainstDir(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "logo.svg"), []byte("<svg/>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dataURI := templateFuncs(&core.TemplateEngine{Dir: dir})["dataURI"].(func(string) string)
+	if got := dataURI("logo.svg"); !strings.HasPrefix(got, "data:") {
+		t.Errorf("dataURI(logo.svg) = %q, want a data URI of the file in Dir", got)
+	}
+	if got := dataURI("missing.svg"); got != "" {
+		t.Errorf("dataURI(missing.svg) = %q, want empty", got)
+	}
 }
