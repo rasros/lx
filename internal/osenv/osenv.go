@@ -20,20 +20,11 @@ func (env Lookup) Get(key string) string {
 // Home returns the user's home directory, as os.UserHomeDir does.
 func Home(env Lookup) (string, error) {
 	key := "HOME"
-	switch runtime.GOOS {
-	case "windows":
+	if runtime.GOOS == "windows" {
 		key = "USERPROFILE"
-	case "plan9":
-		key = "home"
 	}
 	if v := env.Get(key); v != "" {
 		return v, nil
-	}
-	switch runtime.GOOS {
-	case "android":
-		return "/sdcard", nil
-	case "ios":
-		return "/", nil
 	}
 	return "", errors.New("$" + key + " is not defined")
 }
@@ -48,18 +39,12 @@ func Config(env Lookup) (string, error) {
 			return dir, nil
 		}
 		return "", errors.New("%AppData% is not defined")
-	case "darwin", "ios":
+	case "darwin":
 		home := env.Get("HOME")
 		if home == "" {
 			return "", errors.New("$HOME is not defined")
 		}
 		return filepath.Join(home, "Library", "Application Support"), nil
-	case "plan9":
-		home := env.Get("home")
-		if home == "" {
-			return "", errors.New("$home is not defined")
-		}
-		return filepath.Join(home, "lib"), nil
 	}
 	if dir := XDGConfigHome(env); dir != "" {
 		return dir, nil
