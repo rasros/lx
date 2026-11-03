@@ -3,16 +3,42 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 )
 
+// untilDone returns what read returns, or ctx's error once ctx is done. A
+// read that ctx abandons is left running: a read of stdin cannot be
+// interrupted, and a cancelled run is about to end the process anyway.
+func untilDone[T any](ctx context.Context, read func() (T, error)) (T, error) {
+	type result struct {
+		v   T
+		err error
+	}
+	var zero T
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+	ch := make(chan result, 1)
+	go func() {
+		v, err := read()
+		ch <- result{v, err}
+	}()
+	select {
+	case r := <-ch:
+		return r.v, r.err
+	case <-ctx.Done():
+		return zero, ctx.Err()
+	}
+}
+
 // readFilenamesFromStdin reads the paths piped to stdin, one per line or, with
-// useNull, NUL-terminated. It reports false when stdin is a terminal; any
-// reader that is not a file counts as a pipe.
-func readFilenamesFromStdin(stdin io.Reader, useNull bool) ([]string, bool, error) {
+// useNull, NUL-terminated, until ctx is done. It reports false when stdin is a
+// terminal; any reader that is not a file counts as a pipe.
+func readFilenamesFromStdin(ctx context.Context, stdin io.Reader, useNull bool) ([]string, bool, error) {
 	if f, ok := stdin.(*os.File); ok {
 		info, err := f.Stat()
 		if err != nil {
@@ -22,7 +48,11 @@ func readFilenamesFromStdin(stdin io.Reader, useNull bool) ([]string, bool, erro
 			return nil, false, nil
 		}
 	}
+	paths, err := untilDone(ctx, func() ([]string, error) { return scanFilenames(stdin, useNull) })
+	return paths, true, err
+}
 
+func scanFilenames(stdin io.Reader, useNull bool) ([]string, error) {
 	sc := bufio.NewScanner(stdin)
 	if useNull {
 		sc.Split(scanNullTerminated)
@@ -41,10 +71,9 @@ func readFilenamesFromStdin(stdin io.Reader, useNull bool) ([]string, bool, erro
 		paths = append(paths, text)
 	}
 	if err := sc.Err(); err != nil {
-		return nil, true, fmt.Errorf("read stdin: %w", err)
+		return nil, fmt.Errorf("read stdin: %w", err)
 	}
-
-	return paths, true, nil
+	return paths, nil
 }
 
 func scanNullTerminated(data []byte, atEOF bool) (advance int, token []byte, err error) {

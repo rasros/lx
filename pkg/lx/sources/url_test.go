@@ -4,12 +4,14 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestIsHTTPURL(t *testing.T) {
@@ -73,7 +75,7 @@ func TestNewURLInputFile_OpenSuccess(t *testing.T) {
 		t.Fatalf("NewURLInputFile error: %v", err)
 	}
 
-	rc, err := f.Open()
+	rc, err := f.Open(context.Background())
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}
@@ -99,7 +101,7 @@ func TestNewURLInputFile_OpenStatusError(t *testing.T) {
 		t.Fatalf("NewURLInputFile error: %v", err)
 	}
 
-	rc, err := f.Open()
+	rc, err := f.Open(context.Background())
 	if rc != nil {
 		rc.Close()
 		t.Fatalf("Open returned non-nil reader on error")
@@ -109,6 +111,48 @@ func TestNewURLInputFile_OpenStatusError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unexpected status") {
 		t.Fatalf("Open error = %q, want status error", err.Error())
+	}
+}
+
+// A body that stalls mid-download stops reading once ctx is done.
+func TestNewURLInputFile_CancelStopsStalledBody(t *testing.T) {
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("first bytes"))
+		w.(http.Flusher).Flush()
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	defer server.Close()
+	defer close(release)
+
+	f, err := NewURLInputFile(server.URL + "/slow.txt")
+	if err != nil {
+		t.Fatalf("NewURLInputFile error: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rc, err := f.Open(ctx)
+	if err != nil {
+		t.Fatalf("Open error: %v", err)
+	}
+	defer rc.Close()
+
+	time.AfterFunc(20*time.Millisecond, cancel)
+	done := make(chan error, 1)
+	go func() {
+		_, err := io.ReadAll(rc)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("ReadAll error = %v, want context.Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("reading a stalled body did not stop when cancelled")
 	}
 }
 
@@ -212,7 +256,7 @@ func TestNewURLInputFileRecordsMediaType(t *testing.T) {
 		t.Error("IsHTMLInput = true before Open, when no media type is known yet")
 	}
 
-	rc, err := f.Open()
+	rc, err := f.Open(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

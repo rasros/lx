@@ -109,7 +109,7 @@ func TestStream_Prepare_SizeUnknownForNegativeSizeFile(t *testing.T) {
 	stream.AddFile(sources.InputFile{
 		Path: "https://example.com/doc",
 		Size: -1,
-		Open: func() (io.ReadCloser, error) { return io.NopCloser(strings.NewReader("")), nil },
+		Open: func(context.Context) (io.ReadCloser, error) { return io.NopCloser(strings.NewReader("")), nil },
 	}, opts)
 
 	g := stream.Plan()
@@ -475,7 +475,7 @@ func TestStream_FailuresInOutputOrder(t *testing.T) {
 			stream.AddFailure(core.Failure{Kind: core.FailedStat, Path: path, Err: errors.New("gone")})
 			continue
 		}
-		stream.AddFile(sources.InputFile{Path: path, Open: func() (io.ReadCloser, error) {
+		stream.AddFile(sources.InputFile{Path: path, Open: func(context.Context) (io.ReadCloser, error) {
 			return nil, fmt.Errorf("open %s: gone", path)
 		}}, core.RenderOptions{Head: -1})
 	}

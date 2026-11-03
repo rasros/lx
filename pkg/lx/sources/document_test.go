@@ -3,6 +3,8 @@ package sources
 import (
 	"archive/zip"
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -197,7 +199,7 @@ func TestConvertInput_PDFMediaTypeWithoutExtension(t *testing.T) {
 	data := makeTestPDF(t, "URLPdfContent")
 	mediaType := "application/pdf; charset=binary"
 	f := InputFile{Path: "https://arxiv.org/pdf/2608.26263", mediaType: &mediaType}
-	text, err := ConvertInput(f, bytes.NewReader(data), int64(len(data)))
+	text, err := ConvertInput(context.Background(), f, bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -311,7 +313,7 @@ func TestExtractXLSXText_CellValues(t *testing.T) {
 		"B2": 42,
 	})
 	r := bytes.NewReader(data)
-	text, err := extractXLSXText(r, int64(len(data)))
+	text, err := extractXLSXText(context.Background(), r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -326,7 +328,7 @@ func TestExtractXLSXText_CellValues(t *testing.T) {
 func TestExtractXLSXText_SheetNameInOutput(t *testing.T) {
 	data := makeTestXLSX(t, "SalesData", map[string]interface{}{"A1": "Q1"})
 	r := bytes.NewReader(data)
-	text, err := extractXLSXText(r, int64(len(data)))
+	text, err := extractXLSXText(context.Background(), r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -346,7 +348,7 @@ func TestExtractXLSXText_MultipleSheets(t *testing.T) {
 	data := buf.Bytes()
 
 	r := bytes.NewReader(data)
-	text, err := extractXLSXText(r, int64(len(data)))
+	text, err := extractXLSXText(context.Background(), r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -366,7 +368,7 @@ func TestExtractXLSXText_RowsSeparatedByTabs(t *testing.T) {
 		"C1": "Col3",
 	})
 	r := bytes.NewReader(data)
-	text, err := extractXLSXText(r, int64(len(data)))
+	text, err := extractXLSXText(context.Background(), r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -378,7 +380,7 @@ func TestExtractXLSXText_RowsSeparatedByTabs(t *testing.T) {
 func TestExtractXLSXText_Corrupted(t *testing.T) {
 	data := []byte("not a xlsx file at all")
 	r := bytes.NewReader(data)
-	_, err := extractXLSXText(r, int64(len(data)))
+	_, err := extractXLSXText(context.Background(), r, int64(len(data)))
 	if err == nil {
 		t.Error("expected error for corrupted XLSX, got nil")
 	}
@@ -414,7 +416,7 @@ func TestExtractPDFText_TruncatedHeader(t *testing.T) {
 func TestExtractDocumentText_UnsupportedExtension(t *testing.T) {
 	data := []byte("some data")
 	r := bytes.NewReader(data)
-	_, err := ExtractDocumentText("file.odt", r, int64(len(data)))
+	_, err := ExtractDocumentText(context.Background(), "file.odt", r, int64(len(data)))
 	if err == nil {
 		t.Error("expected error for unsupported extension, got nil")
 	}
@@ -426,7 +428,7 @@ func TestExtractDocumentText_UnsupportedExtension(t *testing.T) {
 func TestExtractDocumentText_DispatchToPDF(t *testing.T) {
 	data := makeTestPDF(t, "PDF dispatch content")
 	r := bytes.NewReader(data)
-	text, err := ExtractDocumentText("file.pdf", r, int64(len(data)))
+	text, err := ExtractDocumentText(context.Background(), "file.pdf", r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -438,7 +440,7 @@ func TestExtractDocumentText_DispatchToPDF(t *testing.T) {
 func TestExtractDocumentText_DispatchToDOCX(t *testing.T) {
 	data := makeTestDOCX(t, "DOCX dispatch content")
 	r := bytes.NewReader(data)
-	text, err := ExtractDocumentText("file.docx", r, int64(len(data)))
+	text, err := ExtractDocumentText(context.Background(), "file.docx", r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -453,7 +455,7 @@ func TestExtractDocumentText_DispatchToXLSX(t *testing.T) {
 		"B1": "content",
 	})
 	r := bytes.NewReader(data)
-	text, err := ExtractDocumentText("file.xlsx", r, int64(len(data)))
+	text, err := ExtractDocumentText(context.Background(), "file.xlsx", r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -466,7 +468,7 @@ func TestExtractDocumentText_DispatchToXLSX(t *testing.T) {
 func TestExtractDocumentText_DispatchToPPTX(t *testing.T) {
 	data := []byte("garbage")
 	r := bytes.NewReader(data)
-	_, err := ExtractDocumentText("file.pptx", r, int64(len(data)))
+	_, err := ExtractDocumentText(context.Background(), "file.pptx", r, int64(len(data)))
 	if err != nil && strings.Contains(err.Error(), "unsupported") {
 		t.Errorf("pptx extension was not dispatched: %v", err)
 	}
@@ -475,7 +477,7 @@ func TestExtractDocumentText_DispatchToPPTX(t *testing.T) {
 func TestExtractPPTXText_SingleSlide(t *testing.T) {
 	data := makeTestPPTX(t, "Hello PPTX World")
 	r := bytes.NewReader(data)
-	text, err := extractPPTXText(r, int64(len(data)))
+	text, err := extractPPTXText(context.Background(), r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -487,7 +489,7 @@ func TestExtractPPTXText_SingleSlide(t *testing.T) {
 func TestExtractPPTXText_MultipleSlides(t *testing.T) {
 	data := makeTestPPTX(t, "Slide one content", "Slide two content", "Slide three content")
 	r := bytes.NewReader(data)
-	text, err := extractPPTXText(r, int64(len(data)))
+	text, err := extractPPTXText(context.Background(), r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -502,7 +504,7 @@ func TestExtractPPTXText_MultipleSlides(t *testing.T) {
 func TestExtractPPTXText_Corrupted(t *testing.T) {
 	data := []byte("not a pptx file")
 	r := bytes.NewReader(data)
-	_, err := extractPPTXText(r, int64(len(data)))
+	_, err := extractPPTXText(context.Background(), r, int64(len(data)))
 	if err == nil {
 		t.Error("expected error for corrupted PPTX, got nil")
 	}
@@ -511,7 +513,7 @@ func TestExtractPPTXText_Corrupted(t *testing.T) {
 func TestExtractDocumentText_CaseInsensitiveExtension(t *testing.T) {
 	data := makeTestDOCX(t, "case test")
 	r := bytes.NewReader(data)
-	text, err := ExtractDocumentText("LETTER.DOCX", r, int64(len(data)))
+	text, err := ExtractDocumentText(context.Background(), "LETTER.DOCX", r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -544,13 +546,45 @@ func TestIsDocumentPathIncludesHTML(t *testing.T) {
 func TestExtractDocumentTextConvertsHTML(t *testing.T) {
 	for _, name := range []string{"page.html", "page.htm", "page.xhtml"} {
 		src := []byte("<h1>Title</h1><p>Body <code>x</code></p>")
-		got, err := ExtractDocumentText(name, bytes.NewReader(src), int64(len(src)))
+		got, err := ExtractDocumentText(context.Background(), name, bytes.NewReader(src), int64(len(src)))
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		want := "# Title\n\nBody `x`\n"
 		if string(got) != want {
 			t.Errorf("%s: got %q, want %q", name, got, want)
+		}
+	}
+}
+
+// cancellingReader cancels the run on its first read, as a signal arriving
+// mid-conversion would.
+type cancellingReader struct {
+	r      *bytes.Reader
+	cancel context.CancelFunc
+}
+
+func (c cancellingReader) ReadAt(p []byte, off int64) (int, error) {
+	c.cancel()
+	return c.r.ReadAt(p, off)
+}
+
+// A conversion cancelled midway returns ctx's error, never what the parse
+// made of its cut-short input.
+func TestExtractDocumentTextStopsWhenCancelled(t *testing.T) {
+	docs := map[string][]byte{
+		"a.pdf":  makeTestPDF(t, "pdf text"),
+		"a.docx": makeTestDOCX(t, "docx text"),
+		"a.xlsx": makeTestXLSX(t, "Sheet1", map[string]interface{}{"A1": "xlsx text"}),
+		"a.pptx": makeTestPPTX(t, "pptx text"),
+		"a.html": []byte("<p>html text</p>"),
+	}
+	for name, data := range docs {
+		ctx, cancel := context.WithCancel(context.Background())
+		r := cancellingReader{r: bytes.NewReader(data), cancel: cancel}
+		text, err := ExtractDocumentText(ctx, name, r, int64(len(data)))
+		if !errors.Is(err, context.Canceled) || text != nil {
+			t.Errorf("%s: got %q, %v; want context.Canceled", name, text, err)
 		}
 	}
 }

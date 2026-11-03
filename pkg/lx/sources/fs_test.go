@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"context"
 	"io"
 	"io/fs"
 	"os"
@@ -19,7 +20,7 @@ func TestStdinInputFile(t *testing.T) {
 		t.Errorf("Size = %d, want %d", f.Size, len(content))
 	}
 
-	rc, err := f.Open()
+	rc, err := f.Open(context.Background())
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}
@@ -51,7 +52,7 @@ func TestInputFile_DirFS(t *testing.T) {
 		t.Errorf("Path = %q, want test.txt", f.Path)
 	}
 
-	rc, err := f.Open()
+	rc, err := f.Open(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

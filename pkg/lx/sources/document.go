@@ -2,6 +2,7 @@ package sources
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -46,10 +47,11 @@ func isHTMLMediaType(value string) bool {
 }
 
 // ConvertInput converts a document input to text, choosing the HTML path by
-// suffix or media type and falling back to the suffix-driven extractors.
-func ConvertInput(f InputFile, r io.ReaderAt, size int64) ([]byte, error) {
+// suffix or media type and falling back to the suffix-driven extractors. It
+// stops reading once ctx is done and returns ctx's error.
+func ConvertInput(ctx context.Context, f InputFile, r io.ReaderAt, size int64) ([]byte, error) {
 	if IsHTMLInput(f) {
-		return internal.HTMLToMarkdown(io.NewSectionReader(r, 0, size))
+		return htmlToMarkdown(ctx, r, size)
 	}
 	path := f.Path
 	if !IsDocumentPath(path) && f.mediaType != nil {
@@ -57,7 +59,7 @@ func ConvertInput(f InputFile, r io.ReaderAt, size int64) ([]byte, error) {
 			path += suffix
 		}
 	}
-	return ExtractDocumentText(path, r, size)
+	return ExtractDocumentText(ctx, path, r, size)
 }
 
 // IsDocumentPath reports whether the path has a document file extension.
@@ -98,22 +100,44 @@ func IsDocumentInput(f InputFile) bool {
 	return f.mediaType != nil && documentSuffixForMediaType(*f.mediaType) != ""
 }
 
-// ExtractDocumentText extracts plain text from a document file.
-func ExtractDocumentText(path string, r io.ReaderAt, size int64) ([]byte, error) {
+// ExtractDocumentText extracts plain text from a document file. It stops
+// reading once ctx is done and returns ctx's error.
+func ExtractDocumentText(ctx context.Context, path string, r io.ReaderAt, size int64) ([]byte, error) {
 	ext := strings.ToLower(filepath.Ext(path))
+	var (
+		text []byte
+		err  error
+	)
 	switch ext {
 	case ".pdf":
-		return extractPDFText(r, size)
+		text, err = extractPDFText(internal.ContextReaderAt(ctx, r), size)
 	case ".docx":
-		return extractDOCXText(r, size)
+		text, err = extractDOCXText(internal.ContextReaderAt(ctx, r), size)
 	case ".xlsx":
-		return extractXLSXText(r, size)
+		text, err = extractXLSXText(ctx, internal.ContextReaderAt(ctx, r), size)
 	case ".pptx":
-		return extractPPTXText(r, size)
+		text, err = extractPPTXText(ctx, internal.ContextReaderAt(ctx, r), size)
 	case ".html", ".htm", ".xhtml":
-		return internal.HTMLToMarkdown(io.NewSectionReader(r, 0, size))
+		return htmlToMarkdown(ctx, r, size)
+	default:
+		return nil, fmt.Errorf("unsupported document type: %s", ext)
 	}
-	return nil, fmt.Errorf("unsupported document type: %s", ext)
+	return orCtxErr(ctx, text, err)
+}
+
+func htmlToMarkdown(ctx context.Context, r io.ReaderAt, size int64) ([]byte, error) {
+	text, err := internal.HTMLToMarkdown(io.NewSectionReader(internal.ContextReaderAt(ctx, r), 0, size))
+	return orCtxErr(ctx, text, err)
+}
+
+// orCtxErr returns ctx's error in place of what an extractor made of a
+// cancelled read: a library may stop early without an error, or report what
+// the failed read did to its parse rather than why the read failed.
+func orCtxErr(ctx context.Context, text []byte, err error) ([]byte, error) {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
+	}
+	return text, err
 }
 
 func extractPDFText(r io.ReaderAt, size int64) ([]byte, error) {
@@ -137,7 +161,7 @@ func extractDOCXText(r io.ReaderAt, size int64) ([]byte, error) {
 	return []byte(xmlToText(strings.NewReader(doc.Editable().GetContent()))), nil
 }
 
-func extractPPTXText(r io.ReaderAt, size int64) ([]byte, error) {
+func extractPPTXText(ctx context.Context, r io.ReaderAt, size int64) ([]byte, error) {
 	zr, err := zip.NewReader(r, size)
 	if err != nil {
 		return nil, err
@@ -167,6 +191,9 @@ func extractPPTXText(r io.ReaderAt, size int64) ([]byte, error) {
 
 	var sb strings.Builder
 	for _, s := range slides {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		rc, err := s.f.Open()
 		if err != nil {
 			continue
@@ -199,7 +226,7 @@ func xmlToText(r io.Reader) string {
 	return sb.String()
 }
 
-func extractXLSXText(r io.ReaderAt, size int64) ([]byte, error) {
+func extractXLSXText(ctx context.Context, r io.ReaderAt, size int64) ([]byte, error) {
 	f, err := excelize.OpenReader(io.NewSectionReader(r, 0, size))
 	if err != nil {
 		return nil, err
@@ -207,6 +234,9 @@ func extractXLSXText(r io.ReaderAt, size int64) ([]byte, error) {
 	defer f.Close()
 	var sb strings.Builder
 	for _, sheet := range f.GetSheetList() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		rows, err := f.GetRows(sheet)
 		if err != nil {
 			continue

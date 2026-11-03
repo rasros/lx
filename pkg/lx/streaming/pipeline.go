@@ -78,7 +78,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				if capHint := render.EstimatePreparedBufferSize(j.item); capHint > 0 {
 					buf.Grow(capHint)
 				}
-				itemStats, err := proc.RenderPrepared(buf, j.item, readBuf)
+				itemStats, err := proc.RenderPrepared(ctx, buf, j.item, readBuf)
 				readPool.Put(readBufPtr)
 
 				// One estimate over the whole rendered item, so how the template

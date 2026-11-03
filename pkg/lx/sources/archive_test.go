@@ -153,7 +153,7 @@ func TestExpandArchive_ContentReadable(t *testing.T) {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
 
-	rc, err := files[0].Open()
+	rc, err := files[0].Open(context.Background())
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestExpandArchive_OpenIsIndependent(t *testing.T) {
 
 	want := map[string]string{"arc/a.txt": "AAA", "arc/b.txt": "BBB"}
 	for _, f := range files {
-		rc, err := f.Open()
+		rc, err := f.Open(context.Background())
 		if err != nil {
 			t.Fatalf("Open(%q) error: %v", f.Path, err)
 		}
@@ -324,7 +324,7 @@ func TestExpandArchive_TarGz_ContentReadable(t *testing.T) {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
 
-	rc, err := files[0].Open()
+	rc, err := files[0].Open(context.Background())
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestExpandArchive_Gz_SingleEntry(t *testing.T) {
 		t.Fatalf("expected 1 file, got %d", len(files))
 	}
 
-	rc, err := files[0].Open()
+	rc, err := files[0].Open(context.Background())
 	if err != nil {
 		t.Fatalf("Open error: %v", err)
 	}

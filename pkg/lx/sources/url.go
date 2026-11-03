@@ -43,8 +43,9 @@ func NewURLInputFile(raw string) (InputFile, error) {
 		AbsPath:   uri,
 		Size:      -1,
 		mediaType: mediaType,
-		Open: func() (io.ReadCloser, error) {
-			req, err := http.NewRequest(http.MethodGet, uri, nil)
+		Open: func(ctx context.Context) (io.ReadCloser, error) {
+			// ctx bounds the body as well: reading it fails once ctx is done.
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 			if err != nil {
 				return nil, err
 			}
