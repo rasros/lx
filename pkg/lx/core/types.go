@@ -112,10 +112,11 @@ type Config struct {
 	OutputFormat string `yaml:"output_format"`
 
 	// Separators puts a blank line between rendered items, or a newline
-	// between compact ones, when set; nil keeps the format's choice.
+	// between compact ones, when set; nil keeps the format's choice. Set it
+	// with new(true) or new(false).
 	Separators *bool `yaml:"separators"`
 	// EmbedImages reads images into FileContext.DataURI when set; nil keeps
-	// the format's choice.
+	// the format's choice. Set it with new(true) or new(false).
 	EmbedImages *bool `yaml:"embed_images"`
 }
 
@@ -156,9 +157,9 @@ func (f FileContext) TokenEstimate() int64 {
 	return tc(f.Size, f.Content)
 }
 
-// SetTokenCounter sets the estimator behind f's TokenEstimate. It is a
-// function rather than a method so templates, which see FileContext's
-// methods, do not.
+// SetTokenCounter sets the estimator behind f's TokenEstimate. Only the
+// renderer sets it, so it is a function rather than a method: a method would
+// be part of FileContext, which lx exports as the template contract.
 func SetTokenCounter(f *FileContext, tc TokenCounter) {
 	f.tokenCounter = tc
 }

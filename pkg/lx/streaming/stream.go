@@ -19,12 +19,6 @@ import (
 // Execute.
 type FailureHandler func(core.Failure)
 
-type defaultTokenizer struct{}
-
-func (defaultTokenizer) Estimate(size int64, content interface{}) int64 {
-	return core.DefaultTokenCounter(size, content)
-}
-
 // Stream manages a collection of files, sections, and prompts for rendering.
 // It is not safe for concurrent use: build it and execute it from one
 // goroutine. It renders once: once Execute has started, the methods that
@@ -71,7 +65,7 @@ func NewStream(cfg *core.Config) (*Stream, error) {
 
 	return &Stream{
 		engine:      engine,
-		tokenizer:   defaultTokenizer{},
+		tokenizer:   core.DefaultTokenizer(),
 		workDir:     ".",
 		concurrency: runtime.NumCPU(),
 		log:         slog.Default(),

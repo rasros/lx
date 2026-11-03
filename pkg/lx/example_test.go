@@ -34,3 +34,24 @@ func Example() {
 		panic(err)
 	}
 }
+
+// ExampleConfig overrides a layout property of a format's profile: without
+// separators, Markdown's files run together.
+func ExampleConfig() {
+	cfg := lx.NewConfig()
+	cfg.Separators = new(false)
+	cfg.FileContentTemplate = "{{ .Path }}: {{ .Content }}"
+
+	stream, err := lx.NewStream(cfg)
+	if err != nil {
+		panic(err)
+	}
+	stream.AddFile(lx.NewBufferInputFile("a.txt", []byte("one\n")), lx.RenderOptions{Head: -1})
+	stream.AddFile(lx.NewBufferInputFile("b.txt", []byte("two\n")), lx.RenderOptions{Head: -1})
+	if _, err := stream.Execute(context.Background(), os.Stdout); err != nil {
+		panic(err)
+	}
+	// Output:
+	// a.txt: one
+	// b.txt: two
+}
