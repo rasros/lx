@@ -284,15 +284,12 @@ const defaultBarePrompt = ``
 const defaultBareTree = ``
 const defaultBareMeta = ``
 
-// contentString renders template content as text.
-func contentString(v interface{}) string {
-	switch s := v.(type) {
-	case nil:
-		return ""
-	case string:
+// text is a template value as text, without copying a string.
+func text(v interface{}) string {
+	if s, ok := v.(string); ok {
 		return s
 	}
-	return fmt.Sprintf("%v", v)
+	return fmt.Sprint(v)
 }
 
 // Funcs returns the functions every template can call, with dataURI
@@ -323,7 +320,7 @@ func templateFuncs(engine *core.TemplateEngine) template.FuncMap {
 			return fmt.Sprintf("%.1f %s", val, suffix)
 		},
 		"endNewline": func(s interface{}) string {
-			str := contentString(s)
+			str := text(s)
 			if str != "" && !strings.HasSuffix(str, "\n") {
 				return str + "\n"
 			}
@@ -346,7 +343,7 @@ func templateFuncs(engine *core.TemplateEngine) template.FuncMap {
 			return internal.DataURI(path, data), nil
 		},
 		"escape": func(s interface{}) string {
-			return html.EscapeString(contentString(s))
+			return html.EscapeString(text(s))
 		},
 		"commafy": func(n interface{}) string {
 			v, ok := asInt64(n)

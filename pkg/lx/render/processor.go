@@ -379,7 +379,7 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 	isCompact := (cfg.Head == 0 && cfg.Tail == 0) || isBinary || size == 0
 
 	var (
-		content      interface{}
+		content      string
 		totalRows    int
 		rowsAreExact = true
 	)

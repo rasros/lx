@@ -135,7 +135,7 @@ FileContext is bound to the six file templates (`file_content_template`, `file_e
 | `TotalRows`        | int            | Lines in the whole file, however it is sliced.     |
 | `IsEstimate`       | bool           | True if `TotalRows` is an estimate: only for a file over 64 MiB that is sliced or compact, so not read in full. |
 | `Language`         | string         | Detected language hint for fenced code blocks.     |
-| `Content`          | interface{}    | Pair with `endNewline`.                            |
+| `Content`          | string         | Pair with `endNewline`.                            |
 | `IsBinary`         | bool           |                                                    |
 | `IsImage`          | bool           |                                                    |
 | `DataURI`          | string         | An image's content as a `data:` URI, in the HTML format. |
