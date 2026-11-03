@@ -3,47 +3,13 @@ package discover
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
-	"sync"
 	"testing"
 
 	"github.com/rasros/lx/pkg/lx/sources"
-	"github.com/rasros/lx/pkg/lx/walker"
 )
-
-// countingHost is the OS seen from a fixed working directory, counting the
-// ignore files read and the .git entries stat'ed.
-type countingHost struct {
-	walker.OSHost
-	cwd string
-
-	mu    sync.Mutex
-	reads map[string]int
-}
-
-func (h *countingHost) Getwd() (string, error) { return h.cwd, nil }
-
-func (h *countingHost) ReadFile(name string) ([]byte, error) {
-	h.count(name)
-	return os.ReadFile(name)
-}
-
-func (h *countingHost) Stat(name string) (fs.FileInfo, error) {
-	h.count(name)
-	return os.Stat(name)
-}
-
-func (h *countingHost) count(name string) {
-	switch filepath.Base(name) {
-	case ".gitignore", ".ignore", ".lxignore", ".git":
-		h.mu.Lock()
-		h.reads[name]++
-		h.mu.Unlock()
-	}
-}
 
 func paths(files []sources.InputFile) []string {
 	out := make([]string, 0, len(files))

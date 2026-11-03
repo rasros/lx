@@ -26,25 +26,24 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	return w.walkDir(rt, fsys, rt.frame(w, root), root, Anchor{prefix: w.opts.OverridePrefix}, walkFn, []fs.FileInfo{info})
 }
 
-// WalkPath walks root on the cache's host with the ignore rules of every
+// WalkPath walks root on the host with the ignore rules of every
 // directory above it, as ripgrep does. Paths passed to fn are relative to a
 // directory root; a file root is passed as its base name. Overrides match
 // the path as root was named. As in ripgrep, root itself is never filtered.
 func (w *Walker) WalkPath(root string, fn fs.WalkDirFunc) error {
-	h := w.cache.host
 	absRoot := filepath.Clean(root)
 	if !filepath.IsAbs(absRoot) {
 		w.cache.hostTree()
 		absRoot = filepath.Join(w.cache.wd, absRoot)
 	}
-	info, err := h.Stat(absRoot)
+	info, err := os.Stat(absRoot)
 	if err != nil {
 		return fn(filepath.Base(absRoot), nil, err)
 	}
 	if !info.IsDir() {
 		return fn(filepath.Base(absRoot), dirEntryAdapter{info}, nil)
 	}
-	fsys := h.DirFS(absRoot)
+	fsys := os.DirFS(absRoot)
 	// Stat "." to check the directory can be searched, not just stat'd.
 	if info, err = fs.Stat(fsys, "."); err != nil {
 		return fn(".", nil, err)

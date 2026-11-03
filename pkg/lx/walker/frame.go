@@ -7,78 +7,41 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
-// Host is the host filesystem and working directory as WalkPath sees them.
-type Host interface {
-	Getwd() (string, error)
-	Stat(name string) (fs.FileInfo, error)
-	Lstat(name string) (fs.FileInfo, error)
-	ReadLink(name string) (string, error)
-	ReadFile(name string) ([]byte, error)
-	EvalSymlinks(path string) (string, error)
-	DirFS(dir string) fs.FS
-}
-
-// OSHost is the Host of the running process.
-type OSHost struct{}
-
-func (OSHost) Getwd() (string, error)                 { return os.Getwd() }
-func (OSHost) Stat(name string) (fs.FileInfo, error)  { return os.Stat(name) }
-func (OSHost) Lstat(name string) (fs.FileInfo, error) { return os.Lstat(name) }
-func (OSHost) ReadLink(name string) (string, error)   { return os.Readlink(name) }
-func (OSHost) ReadFile(name string) ([]byte, error)   { return os.ReadFile(name) }
-func (OSHost) DirFS(dir string) fs.FS                 { return os.DirFS(dir) }
-func (OSHost) EvalSymlinks(path string) (string, error) {
-	return filepath.EvalSymlinks(path)
-}
-
 // Cache holds the ignore rules found on the host, keyed by absolute
-// directory, so the walkers of one run read each ignore file once. It is
+// directory, so the walkers of one run read each ignore file once. It is not
 // safe for concurrent use.
 type Cache struct {
-	host Host
 	log  *slog.Logger
-	once sync.Once
-	wd   string // the working directory as the host names it
+	wd   string // the working directory, or "" when it is unknown
 	ht   hostTree
 	tree *ruleTree
 }
 
-// NewCache returns an empty cache over host, or the OS when host is nil. A
-// nil log means slog.Default().
-func NewCache(host Host, log *slog.Logger) *Cache {
-	if host == nil {
-		host = OSHost{}
-	}
-	return &Cache{host: host, log: orDefault(log)}
-}
-
-// orDefault returns log, or slog.Default() when log is nil.
-func orDefault(log *slog.Logger) *slog.Logger {
-	if log == nil {
-		return slog.Default()
-	}
-	return log
+// NewCache returns an empty cache that resolves relative roots against cwd,
+// or the process's working directory when cwd is empty.
+func NewCache(cwd string, log *slog.Logger) *Cache {
+	return &Cache{wd: cwd, log: log}
 }
 
 func (c *Cache) hostTree() *ruleTree {
-	c.once.Do(func() {
-		cwd, err := c.host.Getwd()
-		if err != nil {
+	if c.tree != nil {
+		return c.tree
+	}
+	if c.wd == "" {
+		if wd, err := os.Getwd(); err != nil {
 			c.log.Debug("Failed to read the working directory", "error", err)
-			cwd = ""
 		} else {
-			cwd = filepath.Clean(cwd)
+			c.wd = wd
 		}
-		c.wd = cwd
-		c.ht = newHostTree(c.host, "", c.log)
-		if cwd != "" {
-			c.ht.cwd = c.ht.real(cwd)
-		}
-		c.tree = newRuleTree(c.ht, true)
-	})
+	}
+	c.ht = hostTree{log: c.log}
+	if c.wd != "" {
+		c.wd = filepath.Clean(c.wd)
+		c.ht.cwd = c.ht.real(c.wd)
+	}
+	c.tree = newRuleTree(c.ht, true)
 	return c.tree
 }
 
@@ -146,25 +109,18 @@ type tree interface {
 	// directory, or "" when it has none to read.
 	gitDir(dir string) (gitDir string, ok bool)
 	readFile(dir, name string) (data []byte, source string, err error)
-	// display names a path in an ignore reason.
-	display(p string) string
 }
 
 // hostTree is the host filesystem seen from cwd. Its directories are real
 // paths, as ripgrep resolves them.
 type hostTree struct {
-	h   Host
 	cwd string
 	log *slog.Logger
 }
 
-func newHostTree(h Host, cwd string, log *slog.Logger) hostTree {
-	return hostTree{h: h, cwd: cwd, log: log}
-}
-
 // real returns p with symlinks resolved, or p itself when it cannot be.
 func (t hostTree) real(p string) string {
-	if r, err := t.h.EvalSymlinks(p); err == nil {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
 		return r
 	}
 	return p
@@ -177,11 +133,11 @@ func (t hostTree) parent(dir string) (string, bool) {
 
 func (hostTree) child(dir, name string) string { return filepath.Join(dir, name) }
 
-func (t hostTree) gitDir(dir string) (string, bool) { return findGitDir(t.h, dir) }
+func (t hostTree) gitDir(dir string) (string, bool) { return findGitDir(dir) }
 
 func (t hostTree) readFile(dir, name string) ([]byte, string, error) {
 	p := filepath.Join(dir, name)
-	data, err := t.h.ReadFile(p)
+	data, err := os.ReadFile(p)
 	logReadError(t.log, p, err)
 	return data, t.display(p), err
 }
@@ -219,7 +175,6 @@ func (fsTree) parent(dir string) (string, bool) {
 }
 
 func (fsTree) child(dir, name string) string { return joinRel(dir, name) }
-func (fsTree) display(p string) string       { return p }
 
 func (t fsTree) gitDir(dir string) (string, bool) { return "", t.repoRoot && dir == "." }
 
@@ -243,7 +198,6 @@ type ruleTree struct {
 	t           tree
 	ignoreFiles bool
 
-	mu    sync.Mutex
 	nodes map[string]*node
 	sets  map[string]*frameSet
 }
@@ -349,8 +303,6 @@ type frame struct {
 
 // frame returns the frame of dir for w's base rules.
 func (rt *ruleTree) frame(w *Walker, dir string) *frame {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
 	set, ok := rt.sets[w.baseKey]
 	if !ok {
 		set = &frameSet{base: w.base, git: w.gitExcludes, frames: map[string]*frame{}}

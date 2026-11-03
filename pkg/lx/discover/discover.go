@@ -74,20 +74,8 @@ func NewCollector(cwd string, log *slog.Logger) *Collector {
 	if log == nil {
 		log = slog.Default()
 	}
-	return newCollector(cwdHost{wd: cwd}, cwd, log)
+	return &Collector{cache: walker.NewCache(cwd, log), cwd: cwd, log: log}
 }
-
-func newCollector(host walker.Host, cwd string, log *slog.Logger) *Collector {
-	return &Collector{cache: walker.NewCache(host, log), cwd: cwd, log: log}
-}
-
-// cwdHost is the OS seen from the working directory wd.
-type cwdHost struct {
-	walker.OSHost
-	wd string
-}
-
-func (h cwdHost) Getwd() (string, error) { return h.wd, nil }
 
 // Collect returns the inputs target refers to: a file, every file below a
 // directory, the entries of an archive, or a URL. As in ripgrep, a named

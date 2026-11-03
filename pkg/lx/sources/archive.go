@@ -51,12 +51,12 @@ type ArchiveOptions struct {
 	// Origin names the archive in each entry's InputFile.Archive: its
 	// absolute path, or its URL when it was downloaded.
 	Origin string
-	// Walker picks the entries; nil keeps them all.
+	// Walker picks the entries.
 	Walker *walker.Walker
 	// MaxSize, when positive, leaves larger entries unread so the stream
 	// drops them. It should match RenderOptions.MaxSize.
 	MaxSize int64
-	// Log is nil for slog.Default().
+	// Log reports what is skipped.
 	Log *slog.Logger
 }
 
@@ -67,9 +67,6 @@ type ArchiveOptions struct {
 func ExpandArchive(ctx context.Context, absPath string, opts ArchiveOptions) ([]InputFile, []core.Failure, error) {
 	if !IsArchivePath(absPath) {
 		return nil, nil, nil
-	}
-	if opts.Walker == nil {
-		opts.Walker = walker.New(walker.Options{})
 	}
 	file, err := os.Open(absPath)
 	if err != nil {
@@ -83,9 +80,6 @@ func ExpandArchive(ctx context.Context, absPath string, opts ArchiveOptions) ([]
 	}
 
 	x := expansion{opts: opts, log: opts.Log, base: archiveBase(opts.Display), entries: opts.Walker.Entries(), seen: map[string]bool{}}
-	if x.log == nil {
-		x.log = slog.Default()
-	}
 	switch f := format.(type) {
 	case archives.Extractor:
 		err = f.Extract(ctx, file, x.handle)

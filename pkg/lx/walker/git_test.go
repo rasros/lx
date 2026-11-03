@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// isRepoRoot reports whether dir of a tree is a repository root.
-func isRepoRoot(t tree, dir string) bool {
-	return newRuleTree(t, true).node(dir).repo
-}
-
 func TestResolveGitDir_Layouts(t *testing.T) {
 	base := t.TempDir()
 
@@ -40,7 +35,7 @@ func TestResolveGitDir_Layouts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ht := newHostTree(OSHost{}, "", slog.Default())
+			ht := hostTree{log: slog.Default()}
 			gitDir, ok := ht.gitDir(tt.repo)
 			if !ok {
 				t.Fatal("expected a repository root")
