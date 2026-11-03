@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"slices"
 	"strings"
 	"sync"
 )
@@ -55,24 +56,38 @@ type repoRewriter struct {
 
 func trimRepo(s string) string { return strings.TrimSuffix(s, ".git") }
 
+// parseOwnerRepo parses the "/owner/repo[/refPrefix.../{ref}]" paths of a
+// host that names a ref below refPrefix.
+func parseOwnerRepo(refPrefix ...string) func(parts []string) (owner, repo, ref string, ok bool) {
+	return func(parts []string) (owner, repo, ref string, ok bool) {
+		if len(parts) < 2 {
+			return "", "", "", false
+		}
+		owner, repo = parts[0], trimRepo(parts[1])
+		rest := parts[2:]
+		if len(rest) == 0 {
+			return owner, repo, "", true
+		}
+		if len(rest) > len(refPrefix) && slices.Equal(rest[:len(refPrefix)], refPrefix) {
+			return owner, repo, strings.Join(rest[len(refPrefix):], "/"), true
+		}
+		return "", "", "", false
+	}
+}
+
+// refOrHead is ref, or HEAD, the default branch, when ref is "".
+func refOrHead(ref string) string {
+	if ref == "" {
+		return "HEAD"
+	}
+	return ref
+}
+
 var (
 	repoHostsMu sync.RWMutex
 	repoHosts   = map[string]repoRewriter{
 		"github.com": {
-			parse: func(parts []string) (owner, repo, ref string, ok bool) {
-				if len(parts) < 2 {
-					return "", "", "", false
-				}
-				owner, repo = parts[0], trimRepo(parts[1])
-				rest := parts[2:]
-				if len(rest) == 0 {
-					return owner, repo, "", true
-				}
-				if rest[0] == "tree" && len(rest) >= 2 {
-					return owner, repo, strings.Join(rest[1:], "/"), true
-				}
-				return "", "", "", false
-			},
+			parse: parseOwnerRepo("tree"),
 			archiveURL: func(owner, repo, ref string) string {
 				if ref == "" {
 					return "https://github.com/" + owner + "/" + repo + "/archive/HEAD.zip"
@@ -111,57 +126,20 @@ var (
 				return "", "", "", false
 			},
 			archiveURL: func(owner, repo, ref string) string {
-				r := ref
-				if r == "" {
-					r = "HEAD"
-				}
+				r := refOrHead(ref)
 				return "https://gitlab.com/" + owner + "/" + repo + "/-/archive/" + r + "/" + repo + "-" + r + ".zip"
 			},
 		},
 		"bitbucket.org": {
-			parse: func(parts []string) (owner, repo, ref string, ok bool) {
-				if len(parts) < 2 {
-					return "", "", "", false
-				}
-				owner, repo = parts[0], trimRepo(parts[1])
-				rest := parts[2:]
-				if len(rest) == 0 {
-					return owner, repo, "", true
-				}
-				if rest[0] == "src" && len(rest) >= 2 {
-					return owner, repo, strings.Join(rest[1:], "/"), true
-				}
-				return "", "", "", false
-			},
+			parse: parseOwnerRepo("src"),
 			archiveURL: func(owner, repo, ref string) string {
-				r := ref
-				if r == "" {
-					r = "HEAD"
-				}
-				return "https://bitbucket.org/" + owner + "/" + repo + "/get/" + r + ".zip"
+				return "https://bitbucket.org/" + owner + "/" + repo + "/get/" + refOrHead(ref) + ".zip"
 			},
 		},
 		"codeberg.org": {
-			parse: func(parts []string) (owner, repo, ref string, ok bool) {
-				if len(parts) < 2 {
-					return "", "", "", false
-				}
-				owner, repo = parts[0], trimRepo(parts[1])
-				rest := parts[2:]
-				if len(rest) == 0 {
-					return owner, repo, "", true
-				}
-				if len(rest) >= 3 && rest[0] == "src" && rest[1] == "branch" {
-					return owner, repo, strings.Join(rest[2:], "/"), true
-				}
-				return "", "", "", false
-			},
+			parse: parseOwnerRepo("src", "branch"),
 			archiveURL: func(owner, repo, ref string) string {
-				r := ref
-				if r == "" {
-					r = "HEAD"
-				}
-				return "https://codeberg.org/" + owner + "/" + repo + "/archive/" + r + ".zip"
+				return "https://codeberg.org/" + owner + "/" + repo + "/archive/" + refOrHead(ref) + ".zip"
 			},
 		},
 	}
