@@ -34,8 +34,8 @@ type langDef struct {
 	// namespaces are node types whose "body" holds declarations walked like
 	// top-level ones, kept between the namespace's header and closing row.
 	namespaces []string
-	// conditionals keeps the directive rows of the preprocessor
-	// conditionals around kept rows (see langs.BalanceConditionals).
+	// conditionals walks preprocessor conditionals like namespaces, keeping
+	// their directive rows around what they hold, and cuts trailing comments.
 	conditionals bool
 	// recoverErrors walks the declarations inside error and hidden nodes.
 	recoverErrors bool
@@ -238,9 +238,8 @@ var langDefs = map[string]langDef{
 		unwrap:      langs.CppUnwrap,
 		emitStruct:  langs.CppEmitter(cppMembers),
 
-		iterateChildren: preprocGroups,
-		conditionals:    true,
-		recoverErrors:   true,
+		conditionals:  true,
+		recoverErrors: true,
 	},
 
 	"cpp": {
@@ -253,9 +252,8 @@ var langDefs = map[string]langDef{
 		unwrap:      langs.CppUnwrap,
 		emitStruct:  langs.CppEmitter(cppMembers),
 
-		iterateChildren: preprocGroups,
-		conditionals:    true,
-		recoverErrors:   true,
+		conditionals:  true,
+		recoverErrors: true,
 	},
 
 	"java": {

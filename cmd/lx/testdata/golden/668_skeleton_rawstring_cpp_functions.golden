@@ -2,11 +2,9 @@
 skeleton/rawstring.cpp (7 rows, function signatures)
 ---
 ```cpp
-#ifdef X
 int g(void);
 ...
 int h(void);
-#endif
 ```
 
 

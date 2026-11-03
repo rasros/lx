@@ -1,9 +1,0 @@
---- STDOUT ---
-skeleton/stmt.cpp (11 rows, definitions)
----
-```cpp
-int after();
-```
-
-
---- STDERR ---

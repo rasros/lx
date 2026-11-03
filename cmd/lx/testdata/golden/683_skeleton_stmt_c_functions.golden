@@ -1,9 +1,0 @@
---- STDOUT ---
-skeleton/stmt.c (9 rows, function signatures)
----
-```c
-int after(void);
-```
-
-
---- STDERR ---

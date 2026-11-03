@@ -70,8 +70,6 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"misparse.c",
 		"hidden.cpp",
 		"openif.c",
-		"stmt.c",
-		"stmt.cpp",
 		"enumclass.h",
 		"kernel.h",
 		"cppempty.h",

@@ -59,7 +59,7 @@ func TestTrailingComments(t *testing.T) {
 	src := []byte("struct s {\n  int a;  /* x,\n     y */\n  /* doc\n   */\n  int b; /* one row */\n};\n")
 	p, _ := parse("c", src)
 	defer p.tree.Release()
-	_, trailing := p.comments(internal.SplitLines(src))
+	trailing := p.trailingComments(internal.SplitLines(src))
 	if len(trailing) != 1 || trailing[1] != 8 {
 		t.Errorf("trailing = %v, want map[1:8]", trailing)
 	}

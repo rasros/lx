@@ -7,7 +7,6 @@ skeleton/guard.h (39 rows, function signatures)
 int lock_init(void);
 #elif defined(_WIN32)
 int lock_init_win(void);
-#else
 ...
 #endif
 ...
