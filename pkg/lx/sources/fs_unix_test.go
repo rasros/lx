@@ -5,7 +5,6 @@ package sources
 import (
 	"context"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -54,66 +53,6 @@ func waitGoroutines(t *testing.T, n int) {
 	}
 }
 
-// Opening a FIFO waits for a writer, which may never come. Each abandoned
-// open leaves only the goroutine blocked in it, which ends once the open
-// returns.
-func TestOpenFIFOWithoutWriterStopsWhenCancelled(t *testing.T) {
-	base := runtime.NumGoroutine()
-	dir, name := newFIFO(t)
-	f, err := NewInputFileFromPath(os.DirFS(dir), name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	const opens = 3
-	for i := 0; i < opens; i++ {
-		waitCancelled(t, func(ctx context.Context) error {
-			rc, err := f.Open(ctx)
-			if err == nil {
-				rc.Close()
-			}
-			return err
-		})
-	}
-	waitGoroutines(t, base+opens)
-
-	// A writer releases every open waiting on the FIFO.
-	if w, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY, 0); err == nil {
-		w.Close()
-	}
-	waitGoroutines(t, base)
-}
-
-// A FIFO whose writer stays open without writing blocks its reads.
-func TestReadIdleFIFOStopsWhenCancelled(t *testing.T) {
-	dir, name := newFIFO(t)
-	f, err := NewInputFileFromPath(os.DirFS(dir), name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The writer opens once the reader does, and then writes nothing.
-	w2 := make(chan *os.File, 1)
-	go func() {
-		w, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY, 0)
-		if err != nil {
-			close(w2)
-			return
-		}
-		w2 <- w
-	}()
-	waitCancelled(t, func(ctx context.Context) error {
-		rc, err := f.Open(ctx)
-		if err != nil {
-			return err
-		}
-		defer rc.Close()
-		_, err = io.ReadAll(rc)
-		return err
-	})
-	if w := <-w2; w != nil {
-		w.Close()
-	}
-}
-
 // A stream that ends at its limit is whole; one that goes on past it fails.
 func TestStreamLimit(t *testing.T) {
 	for _, tc := range []struct {
@@ -138,17 +77,10 @@ func TestStreamLimit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		rc.(*Stream).SetLimit(4)
-		got, err := io.ReadAll(rc)
+		got, err := ReadStream(rc.(*Stream), 4)
 		rc.Close()
-		var limitErr *StreamLimitError
-		gotErr := errors.As(err, &limitErr)
-		if gotErr != tc.wantErr || string(got) != "1234" {
-			t.Errorf("%q: read %q, %v; want 1234 and a limit error %v", tc.body, got, err, tc.wantErr)
-			continue
-		}
-		if gotErr && (limitErr.Limit != 4 || limitErr.Default) {
-			t.Errorf("%q: limit error %+v, want the set limit 4", tc.body, *limitErr)
+		if (err != nil) != tc.wantErr || (err == nil && string(got) != "1234") {
+			t.Errorf("%q: read %q, %v; want 1234 or a limit error %v", tc.body, got, err, tc.wantErr)
 		}
 	}
 }

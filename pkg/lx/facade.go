@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
-	"time"
 
 	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/discover"
@@ -149,22 +148,12 @@ func NewBufferInputFile(name string, data []byte) InputFile {
 	return sources.NewBufferInputFile(name, data)
 }
 
-// Stream renders files, sections, prompts, trees and metadata in the order
-// they are added. It is not safe for concurrent use, and renders once.
-// StreamLimitError is a stream, such as a FIFO, a device or stdin, that went
-// on past the limit it is read to.
-type StreamLimitError = sources.StreamLimitError
-
 // ReadStream reads r to its end as lx reads a FIFO or a device: up to limit,
-// or a 64 MB default when limit is not positive, failing with a
-// *StreamLimitError past it.
+// or a 64 MB default when limit is not positive, failing past it.
 func ReadStream(r io.Reader, limit int64) ([]byte, error) { return sources.ReadStream(r, limit) }
 
-// WaitCleanups waits up to d for work a cancel abandoned that removes
-// temporary files once it finishes, and reports whether all of it finished.
-// A process about to exit after a cancel calls it.
-func WaitCleanups(d time.Duration) bool { return sources.WaitCleanups(d) }
-
+// Stream renders files, sections, prompts, trees and metadata in the order
+// they are added. It is not safe for concurrent use, and renders once.
 type Stream struct {
 	inner *streamingpkg.Stream
 }

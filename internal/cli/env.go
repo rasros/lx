@@ -45,12 +45,6 @@ func OSEnv() (Env, error) {
 	}, nil
 }
 
-// ExitError is an error Run has already reported; the process exits with
-// Code without reporting it again.
-type ExitError struct{ Code int }
-
-func (e ExitError) Error() string { return fmt.Sprintf("exit status %d", e.Code) }
-
 // getenv returns the value of the variable key, or "" when it is unset.
 func (e Env) getenv(key string) string { return e.LookupEnv.Get(key) }
 
