@@ -131,6 +131,10 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 		return nil, nil
 	}
 	if err != nil {
+		// The output file is never collected, even named before it exists.
+		if c.isOutput(target, opts.OutPath) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return c.walk(ctx, w, newRoot(c.cwd, target, absPath, stat.IsDir()), opts)
