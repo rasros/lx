@@ -72,7 +72,7 @@ func TestMaxSizeFlagParsing(t *testing.T) {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 
-	sections := parseSections(slog.Default(), parsed.Ops, defaultRender)
+	sections := compile(slog.Default(), parsed.Ops, defaultRender)
 	if len(sections) != 1 {
 		t.Fatalf("len(sections) = %d, want 1", len(sections))
 	}
@@ -88,7 +88,7 @@ func TestMaxSizeFlagAttachedShortForm(t *testing.T) {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 
-	sections := parseSections(slog.Default(), parsed.Ops, defaultRender)
+	sections := compile(slog.Default(), parsed.Ops, defaultRender)
 	if got := sections[0].Render.MaxSize; got != 2_000_000 {
 		t.Errorf("MaxSize = %d, want 2000000", got)
 	}
@@ -109,7 +109,7 @@ func TestMaxSizeIsPerSection(t *testing.T) {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 
-	sections := parseSections(slog.Default(), parsed.Ops, defaultRender)
+	sections := compile(slog.Default(), parsed.Ops, defaultRender)
 	if len(sections) != 2 {
 		t.Fatalf("len(sections) = %d, want 2", len(sections))
 	}
@@ -128,7 +128,7 @@ func TestNoMaxSizeLeavesLimitUnset(t *testing.T) {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 
-	sections := parseSections(slog.Default(), parsed.Ops, defaultRender)
+	sections := compile(slog.Default(), parsed.Ops, defaultRender)
 	if got := sections[0].Render.MaxSize; got != 0 {
 		t.Errorf("MaxSize = %d, want 0", got)
 	}

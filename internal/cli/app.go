@@ -166,83 +166,25 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 	log.Debug("Processing operations", "total_ops", len(parsed.Ops))
 
 	ignoreRules, gitExcludes := lx.UserIgnoreRules(env.LookupEnv, log)
-	promptResolver := newPromptResolver(env, resolvePromptsDir(parsed, cliOpts, env), cliOpts.PromptExtensions)
-	sections := parseSections(log, parsed.Ops, lx.RenderOptions{Head: -1})
+	sections := compile(log, parsed.Ops, lx.RenderOptions{Head: -1})
 	for i := range sections {
 		d := &sections[i].Discover
 		d.IgnoreRules, d.GitExcludes, d.OutPath = ignoreRules, gitExcludes, out.path
 	}
 
+	promptResolver := newPromptResolver(env, resolvePromptsDir(parsed, cliOpts, env), cliOpts.PromptExtensions)
+	if err := resolvePrompts(sections, promptResolver, env); err != nil {
+		return err
+	}
 	if err := resolveSections(ctx, sections, lx.NewCollector(env.Cwd, log)); err != nil {
 		return err
 	}
-	assignTrees(log, sections)
-	var metaFields map[string]string
-	var metaBody string
-	resolveSystemContext := func() (map[string]string, string) {
-		if metaFields == nil {
-			metaFields, metaBody = systemContext(rawArgs, time.Now())
-		}
-		return metaFields, metaBody
-	}
-
-	for si, section := range sections {
-		log.Debug("Processing section", "index", si, "ops", len(section.Ops))
-
-		for oi, op := range section.Ops {
-			log.Debug("Processing op", "action", op.Action, "value", op.Value)
-
-			switch op.Action {
-			case "FILE":
-				for _, f := range section.failures[oi] {
-					stream.AddFailure(f)
-				}
-				if section.skipFileOps[oi] {
-					log.Debug("Skipping file content (tree-only mode)", "path", op.Value)
-					continue
-				}
-
-				if op.Value == "-" {
-					log.Info("Reading content from stdin")
-					data, err := io.ReadAll(env.Stdin)
-					if err != nil {
-						stream.AddFailure(lx.Failure{Kind: lx.FailedRead, Path: stdinPath, Display: "stdin", Err: err})
-						continue
-					}
-					stream.AddFile(lx.NewBufferInputFile("stdin", data), section.Render)
-					continue
-				}
-
-				for _, f := range section.resolved[oi] {
-					stream.AddFile(f, section.Render)
-				}
-
-			case "tree", "tree-only":
-				stream.AddTree(section.treeFiles[oi], section.Render)
-			case "section":
-				log.Debug("Adding section", "title", op.Value)
-				stream.AddSection(op.Value)
-			case "system-context":
-				fields, body := resolveSystemContext()
-				log.Debug("Adding system context", "fields", len(fields))
-				stream.AddMeta(body, fields)
-			case "prompt":
-				log.Debug("Adding prompt", "length", len(op.Value))
-				stream.AddPrompt(op.Value)
-			case "prompt-file":
-				path, err := promptResolver.resolve(op.Value)
-				if err != nil {
-					return err
-				}
-				data, err := env.readFile(path)
-				if err != nil {
-					return fmt.Errorf("read prompt file %s: %w", path, err)
-				}
-				log.Debug("Adding prompt from file", "path", path, "length", len(data))
-				stream.AddPrompt(string(data))
-			}
+	for _, s := range sections {
+		for _, flags := range s.bareTrees {
+			log.Warn("Tree options cover no files", "flags", flags)
 		}
 	}
+	addSections(log, env, stream, sections, rawArgs)
 
 	if sink != nil {
 		log.Info("Writing output to file", "path", out.name)
@@ -280,6 +222,68 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 
 	handleStatsDisplay(log, env, parsed, cliOpts, stats, report, out.debug)
 	return nil
+}
+
+// addSections adds the items of sections to stream, in order.
+func addSections(log *slog.Logger, env Env, stream *lx.Stream, sections []Section, rawArgs []string) {
+	var metaFields map[string]string
+	var metaBody string
+	for si, section := range sections {
+		log.Debug("Processing section", "index", si, "ops", len(section.Items))
+
+		for _, it := range section.Items {
+			op := it.source()
+			log.Debug("Processing op", "action", op.Action, "value", op.Value)
+
+			switch it := it.(type) {
+			case *fileItem:
+				for _, f := range it.failures {
+					stream.AddFailure(f)
+				}
+				if it.treeOnly {
+					log.Debug("Skipping file content (tree-only mode)", "path", it.arg)
+					continue
+				}
+				for _, f := range it.files {
+					stream.AddFile(f, section.Render)
+				}
+			case *stdinItem:
+				if it.treeOnly {
+					log.Debug("Skipping file content (tree-only mode)", "path", "-")
+					continue
+				}
+				log.Info("Reading content from stdin")
+				data, err := io.ReadAll(env.Stdin)
+				if err != nil {
+					stream.AddFailure(lx.Failure{Kind: lx.FailedRead, Path: stdinPath, Display: "stdin", Err: err})
+					continue
+				}
+				stream.AddFile(lx.NewBufferInputFile("stdin", data), section.Render)
+			case *treeItem:
+				var files []lx.InputFile
+				for _, in := range it.inputs {
+					files = append(files, in.files...)
+				}
+				stream.AddTree(files, section.Render)
+			case *headingItem:
+				log.Debug("Adding section", "title", it.title)
+				stream.AddSection(it.title)
+			case *metaItem:
+				if metaFields == nil {
+					metaFields, metaBody = systemContext(rawArgs, time.Now())
+				}
+				log.Debug("Adding system context", "fields", len(metaFields))
+				stream.AddMeta(metaBody, metaFields)
+			case *promptItem:
+				if it.path != "" {
+					log.Debug("Adding prompt from file", "path", it.path, "length", len(it.text))
+				} else {
+					log.Debug("Adding prompt", "length", len(it.text))
+				}
+				stream.AddPrompt(it.text)
+			}
+		}
+	}
 }
 
 // newLogger returns the logger of a run at level, writing to env.Stderr.
