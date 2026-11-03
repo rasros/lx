@@ -46,15 +46,6 @@ func TestClassify(t *testing.T) {
 		{"text named bmp", "a.bmp", []byte("BM looks like a bitmap\n"), ""},
 		{"text starting with a strong magic", "a.gif", []byte("GIF89a is a format\n"), ""},
 
-		// Weak signatures count only on binary content.
-		{"BM text without a name", "notes", []byte("BM25 notes about ranking\n"), ""},
-		{"BM binary without a name", "blob", bmpFile(40, 16, 16, 24), "bmp"},
-		{"weak magic loses to the name", "a.wav", bmpFile(40, 16, 16, 24), "wav"},
-		// ...and only when the parser makes sense of what follows.
-		{"BM then zeros", "counts.dat", append([]byte("BM\xd2\x04"), zeros(60)...), ""},
-		{"ico magic then a counter", "data.bin",
-			[]byte{0, 0, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}, ""},
-
 		// ISO brands: compatible brands count, the specific brand wins, and
 		// within the family the extension decides.
 		{"avif under the generic mif1 brand", "photo", isoHeader("mif1", "avif", "mif1", "miaf"), "avif"},

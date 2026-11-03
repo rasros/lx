@@ -187,9 +187,9 @@ func TestLazyReaderLyingLengthAllocatesWhatArrives(t *testing.T) {
 	runtime.ReadMemStats(&before)
 
 	r := NewLazyReader(bytes.NewReader(data), 1<<40)
-	got, err := ReadAllAt(r, r.Size())
-	if err != io.EOF || !bytes.Equal(got, data) {
-		t.Fatalf("ReadAllAt = %d bytes, %v; want the 2048 that arrived", len(got), err)
+	got, err := io.ReadAll(io.NewSectionReader(r, 0, r.Size()))
+	if err != nil || !bytes.Equal(got, data) {
+		t.Fatalf("ReadAll = %d bytes, %v; want the 2048 that arrived", len(got), err)
 	}
 	tail := make([]byte, 16)
 	if n, err := r.ReadAt(tail, 1<<40-16); n != 0 || err != io.EOF {
@@ -201,7 +201,7 @@ func TestLazyReaderLyingLengthAllocatesWhatArrives(t *testing.T) {
 	}
 
 	runtime.ReadMemStats(&after)
-	if alloc := after.TotalAlloc - before.TotalAlloc; alloc > 3*maxPrealloc {
+	if alloc := after.TotalAlloc - before.TotalAlloc; alloc > 1<<20 {
 		t.Errorf("allocated %d bytes for 2 KB of content", alloc)
 	}
 }

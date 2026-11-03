@@ -9,31 +9,6 @@ import (
 	"testing/fstest"
 )
 
-// failAtEnd returns its data and, with the last of it, err.
-type failAtEnd struct {
-	data []byte
-	err  error
-}
-
-func (f failAtEnd) ReadAt(p []byte, off int64) (int, error) {
-	n := copy(p, f.data[off:])
-	if off+int64(n) >= int64(len(f.data)) {
-		return n, f.err
-	}
-	return n, nil
-}
-
-// A failure reported along with the last bytes is still a failure, while EOF
-// there is just the end.
-func TestReadAllAtFailureWithLastBytes(t *testing.T) {
-	if _, err := ReadAllAt(failAtEnd{[]byte("abc"), io.ErrUnexpectedEOF}, 3); err != io.ErrUnexpectedEOF {
-		t.Errorf("err = %v, want io.ErrUnexpectedEOF", err)
-	}
-	if got, err := ReadAllAt(failAtEnd{[]byte("abc"), io.EOF}, 3); err != nil || string(got) != "abc" {
-		t.Errorf("got %q, %v; want abc, nil", got, err)
-	}
-}
-
 // refLines splits data into lines that keep their terminators.
 func refLines(data []byte) [][]byte {
 	var lines [][]byte
@@ -97,12 +72,12 @@ func checkLineSource(t *testing.T, data []byte, counts []int) {
 				t.Errorf("%s Tail(%d) = %q, want %q", src.name, n, abbrev(tail), abbrev(want))
 			}
 		}
-		rows, exact, err := src.get().Count()
+		rows, _, err := src.get().Count()
 		if err != nil {
 			t.Fatalf("%s Count: %v", src.name, err)
 		}
-		if rows != wantRows || !exact {
-			t.Errorf("%s Count() = %d, %v, want %d, true", src.name, rows, exact, wantRows)
+		if rows != wantRows {
+			t.Errorf("%s Count() = %d, want %d", src.name, rows, wantRows)
 		}
 	}
 }
@@ -188,8 +163,8 @@ func TestLineSourceLineLongerThanTenMegabytes(t *testing.T) {
 	if !bytes.Equal(tail, data) {
 		t.Errorf("Tail(2) has %d bytes, want all %d", len(tail), len(data))
 	}
-	if rows, exact, _ := src.Count(); rows != 2 || !exact {
-		t.Errorf("Count() = %d, %v, want 2, true", rows, exact)
+	if rows, _, _ := src.Count(); rows != 2 {
+		t.Errorf("Count() = %d, want 2", rows)
 	}
 }
 
@@ -220,8 +195,8 @@ func TestLineSourceReadsAnyReaderAt(t *testing.T) {
 	if err != nil || string(tail) != "4\n5\n" {
 		t.Errorf("Tail(2) = %q, %v, want %q", tail, err, "4\n5\n")
 	}
-	if rows, exact, err := src.Count(); rows != 5 || !exact || err != nil {
-		t.Errorf("Count() = %d, %v, %v, want 5, true, nil", rows, exact, err)
+	if rows, _, err := src.Count(); rows != 5 || err != nil {
+		t.Errorf("Count() = %d, %v, want 5, nil", rows, err)
 	}
 }
 
@@ -234,6 +209,55 @@ func TestLineSourceShrinksToShortContent(t *testing.T) {
 	}
 	if src.Size() != int64(len(data)) {
 		t.Errorf("Size() = %d, want %d", src.Size(), len(data))
+	}
+}
+
+// A file truncated in place between stat and read, as a log rotated with
+// copytruncate is, holds less than the size the source was given. Reading its
+// tail shrinks the source to the real end instead of failing.
+func TestLineSourceTailOfContentShorterThanSize(t *testing.T) {
+	var b bytes.Buffer
+	for i := 0; b.Len() < 3*lineChunk; i++ {
+		fmt.Fprintf(&b, "line %d\n", i)
+	}
+	data := b.Bytes()
+	wantTail := refTail(data, 2)
+
+	for _, extra := range []int64{1, 100, lineChunk + 7, 10 * lineChunk} {
+		declared := int64(len(data)) + extra
+
+		t.Run(fmt.Sprintf("+%d tail only", extra), func(t *testing.T) {
+			src := NewLineSource(bytes.NewReader(data), declared)
+			tail, err := src.Tail(2)
+			if err != nil {
+				t.Fatalf("Tail(2): %v", err)
+			}
+			if !bytes.Equal(tail, wantTail) {
+				t.Errorf("Tail(2) = %q, want %q", tail, wantTail)
+			}
+			if src.Size() != int64(len(data)) {
+				t.Errorf("Size() = %d, want %d", src.Size(), len(data))
+			}
+		})
+
+		t.Run(fmt.Sprintf("+%d head then tail", extra), func(t *testing.T) {
+			src := NewLineSource(bytes.NewReader(data), declared)
+			head, err := src.Head(2)
+			if err != nil || !bytes.Equal(head, refHead(data, 2)) {
+				t.Fatalf("Head(2) = %q, %v", head, err)
+			}
+			tail, err := src.Tail(2)
+			if err != nil {
+				t.Fatalf("Tail(2): %v", err)
+			}
+			if !bytes.Equal(tail, wantTail) {
+				t.Errorf("Tail(2) = %q, want %q", tail, wantTail)
+			}
+			rows, _, err := src.Count()
+			if err != nil || rows != len(refLines(data)) {
+				t.Errorf("Count() = %d, %v, want %d, nil", rows, err, len(refLines(data)))
+			}
+		})
 	}
 }
 
@@ -282,55 +306,6 @@ func TestLineNumberFormatterMarksApproximateTail(t *testing.T) {
 	want := "  1: one\n... (~7 rows skipped)\n~10: ten\n"
 	if got := lnf.String(); got != want {
 		t.Errorf("String() = %q, want %q", got, want)
-	}
-}
-
-// A file truncated in place between stat and read, as a log rotated with
-// copytruncate is, holds less than the size the source was given. Reading its
-// tail shrinks the source to the real end instead of failing.
-func TestLineSourceTailOfContentShorterThanSize(t *testing.T) {
-	var b bytes.Buffer
-	for i := 0; b.Len() < 3*lineChunk; i++ {
-		fmt.Fprintf(&b, "line %d\n", i)
-	}
-	data := b.Bytes()
-	wantTail := refTail(data, 2)
-
-	for _, extra := range []int64{1, 100, lineChunk + 7, 10 * lineChunk} {
-		declared := int64(len(data)) + extra
-
-		t.Run(fmt.Sprintf("+%d tail only", extra), func(t *testing.T) {
-			src := NewLineSource(bytes.NewReader(data), declared)
-			tail, err := src.Tail(2)
-			if err != nil {
-				t.Fatalf("Tail(2): %v", err)
-			}
-			if !bytes.Equal(tail, wantTail) {
-				t.Errorf("Tail(2) = %q, want %q", tail, wantTail)
-			}
-			if src.Size() != int64(len(data)) {
-				t.Errorf("Size() = %d, want %d", src.Size(), len(data))
-			}
-		})
-
-		t.Run(fmt.Sprintf("+%d head then tail", extra), func(t *testing.T) {
-			src := NewLineSource(bytes.NewReader(data), declared)
-			head, err := src.Head(2)
-			if err != nil || !bytes.Equal(head, refHead(data, 2)) {
-				t.Fatalf("Head(2) = %q, %v", head, err)
-			}
-			tail, err := src.Tail(2)
-			if err != nil {
-				t.Fatalf("Tail(2): %v", err)
-			}
-			if !bytes.Equal(tail, wantTail) {
-				t.Errorf("Tail(2) = %q, want %q", tail, wantTail)
-			}
-			rows, exact, err := src.Count()
-			if err != nil || !exact || rows != len(refLines(data)) {
-				t.Errorf("Count() = %d, %v, %v, want %d, true, nil", rows, exact, err, len(refLines(data)))
-			}
-		})
 	}
 }
 

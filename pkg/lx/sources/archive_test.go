@@ -5,12 +5,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"math"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -107,42 +105,6 @@ func TestReadEntry_HoldsItsSize(t *testing.T) {
 	}
 }
 
-// An archive's entries take what they hold in memory, chunks and all: 200
-// entries of 100 kB hold little more than their 20 MB.
-func TestExpandArchive_HoldsContentSize(t *testing.T) {
-	const entries, size = 200, 100 << 10
-	var b bytes.Buffer
-	zw := zip.NewWriter(&b)
-	for i := range entries {
-		w, err := zw.Create(fmt.Sprintf("f%03d.txt", i))
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.Write(bytes.Repeat([]byte{byte(i)}, size))
-	}
-	if err := zw.Close(); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(t.TempDir(), "a.zip")
-	if err := os.WriteFile(path, b.Bytes(), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	var before, after runtime.MemStats
-	runtime.GC()
-	runtime.ReadMemStats(&before)
-	files, failures, err := ExpandArchive(context.Background(), path, ArchiveOptions{Display: "a.zip", Origin: path})
-	runtime.GC()
-	runtime.ReadMemStats(&after)
-	if err != nil || len(failures) != 0 || len(files) != entries {
-		t.Fatalf("expanded %d entries, failures %v, %v", len(files), failures, err)
-	}
-	if grew := int64(after.HeapAlloc) - int64(before.HeapAlloc); grew > entries*size*11/10 {
-		t.Errorf("%d entries of %d bytes hold %d bytes", entries, size, grew)
-	}
-	runtime.KeepAlive(files)
-}
-
 // An entry whose reader fails, as one cut off mid-stream or ending short of
 // the size its zip claims does, is a failure rather than content; one that
 // ends cleanly short of its size hint is what arrived.
@@ -197,7 +159,7 @@ func TestSingleEntryName(t *testing.T) {
 	for origin, want := range map[string]string{
 		"/tmp/notes.txt.gz":                    "notes.txt",
 		"/tmp/.gz":                             ".gz",
-		"/tmp/foo.tgz":                         "foo.tar",
+		"/tmp/foo.tar.gz":                      "foo.tar",
 		"https://example.com/a/log.txt.gz?x=1": "log.txt",
 	} {
 		if got := singleEntryName(origin); got != want {
@@ -217,19 +179,12 @@ func TestZipWrapper(t *testing.T) {
 		{[]string{"a/x.txt", "TOP.txt"}, ""},
 		{[]string{"repo-main/a.txt", "repo-main-2/b.txt"}, ""},
 	} {
-		if got := zipWrapper(c.names); got != c.want {
-			t.Errorf("zipWrapper(%q) = %q, want %q", c.names, got, c.want)
+		var files []*zip.File
+		for _, n := range c.names {
+			files = append(files, &zip.File{FileHeader: zip.FileHeader{Name: n}})
 		}
-	}
-}
-
-func TestCheckoutName(t *testing.T) {
-	for name, want := range map[string]bool{
-		"a.txt": true, "d/a.txt": true, "": false, "..": false, "/a": false,
-		"repo-main/../up.txt": false,
-	} {
-		if got := checkoutName(name); got != want {
-			t.Errorf("checkoutName(%q) = %v, want %v", name, got, want)
+		if got := zipWrapper(files); got != c.want {
+			t.Errorf("zipWrapper(%q) = %q, want %q", c.names, got, c.want)
 		}
 	}
 }

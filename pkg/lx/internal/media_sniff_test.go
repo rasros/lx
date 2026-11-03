@@ -23,14 +23,11 @@ func TestSniffIdentifiesContainers(t *testing.T) {
 		{"png", pngFile(16, 16, 8, 6)},
 		{"jpeg", jpegFile(0xc0, 16, 16, 3)},
 		{"gif", gifFile(16, 16, 1, 0)},
-		{"bmp", bmpFile(40, 16, 16, 24)},
 		{"tiff", tiffFile(binary.LittleEndian, 16, 16)},
 		{"tiff", tiffFile(binary.BigEndian, 16, 16)},
-		{"ico", icoFile([][2]byte{{16, 16}})},
 		{"webp", webpFile("VP8L", append([]byte{0x2f}, binary.LittleEndian.AppendUint32(nil, 15|15<<14)...))},
 		{"wav", wavFile(1, 1, 8000, 8, 800)},
 		{"flac", flacFile(44100, 1, 16, 44100)},
-		{"mp3", append(mp3Header(1, 3, 9, 0, 2), zeros(1024)...)},
 		{"mp4", mp4File(mvhd(1000, 1000))},
 	}
 

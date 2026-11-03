@@ -19,21 +19,9 @@ const (
 	KindMarkup
 )
 
-// Strength says how much a signature proves on its own.
-type Strength int
-
-const (
-	// Weak signatures are short or common enough to turn up at the start of
-	// ordinary text, so they count only for content that is already binary.
-	Weak Strength = iota + 1
-	// Strong signatures cannot be mistaken, and override the extension.
-	Strong
-)
-
-type signature struct {
-	strength Strength
-	match    func(header []byte) bool
-}
+// signature matches the start of a file of a format. A match cannot be
+// mistaken, and overrides the extension.
+type signature func(header []byte) bool
 
 // Format is everything lx knows about a file format, in one registry entry
 // so the extension, MIME, sniffer and parser tables cannot disagree.
@@ -50,14 +38,14 @@ type Format struct {
 	parse      func(*byteReader) *MediaInfo
 }
 
-// Verify reports whether the header plausibly is this format: a strong
-// signature matches, or the parser makes sense of it.
+// Verify reports whether the header plausibly is this format: a signature
+// matches, or the parser makes sense of it.
 func (f *Format) Verify(header []byte) bool {
 	if f == nil {
 		return false
 	}
 	for _, s := range f.signatures {
-		if s.strength == Strong && s.match(header) {
+		if s(header) {
 			return true
 		}
 	}
@@ -78,9 +66,6 @@ func magicAt(off int, want string) func([]byte) bool {
 		return len(h) >= off+len(want) && string(h[off:off+len(want)]) == want
 	}
 }
-
-func strong(match func([]byte) bool) signature { return signature{Strong, match} }
-func weak(match func([]byte) bool) signature   { return signature{Weak, match} }
 
 // isoBrands lists the major and compatible brands an ftyp box declares.
 func isoBrands(h []byte) []string {
@@ -132,45 +117,43 @@ func headerReader(h []byte) *byteReader {
 // specific comes first.
 var formats = []*Format{
 	{Name: "png", Kind: KindImage, MIME: "image/png", Exts: []string{".png"},
-		signatures: []signature{strong(magicAt(0, "\x89PNG\r\n\x1a\n"))}, parse: parsePNG},
+		signatures: []signature{magicAt(0, "\x89PNG\r\n\x1a\n")}, parse: parsePNG},
 	{Name: "jpeg", Kind: KindImage, MIME: "image/jpeg", Exts: []string{".jpg", ".jpeg"},
-		signatures: []signature{strong(magicAt(0, "\xff\xd8\xff"))}, parse: parseJPEG},
+		signatures: []signature{magicAt(0, "\xff\xd8\xff")}, parse: parseJPEG},
 	{Name: "gif", Kind: KindImage, MIME: "image/gif", Exts: []string{".gif"},
-		signatures: []signature{strong(magicAt(0, "GIF87a")), strong(magicAt(0, "GIF89a"))}, parse: parseGIF},
+		signatures: []signature{magicAt(0, "GIF87a"), magicAt(0, "GIF89a")}, parse: parseGIF},
 	{Name: "bmp", Kind: KindImage, MIME: "image/bmp", Exts: []string{".bmp"},
-		signatures: []signature{weak(magicAt(0, "BM"))}, parse: parseBMP},
+		parse: parseBMP},
 	{Name: "tiff", Kind: KindImage, MIME: "image/tiff", Exts: []string{".tif", ".tiff"},
-		signatures: []signature{strong(magicAt(0, "II*\x00")), strong(magicAt(0, "MM\x00*"))}, parse: parseTIFF},
+		signatures: []signature{magicAt(0, "II*\x00"), magicAt(0, "MM\x00*")}, parse: parseTIFF},
 	{Name: "ico", Kind: KindImage, MIME: "image/x-icon", Exts: []string{".ico"},
-		signatures: []signature{weak(magicAt(0, "\x00\x00\x01\x00"))}, parse: parseICO},
+		parse: parseICO},
 	{Name: "flac", Kind: KindAudio, MIME: "audio/flac", Exts: []string{".flac"},
-		signatures: []signature{strong(magicAt(0, "fLaC"))}, parse: parseFLAC},
+		signatures: []signature{magicAt(0, "fLaC")}, parse: parseFLAC},
 	{Name: "wav", Kind: KindAudio, MIME: "audio/wav", Exts: []string{".wav"},
-		signatures: []signature{strong(func(h []byte) bool { return magicAt(0, "RIFF")(h) && magicAt(8, "WAVE")(h) })},
+		signatures: []signature{func(h []byte) bool { return magicAt(0, "RIFF")(h) && magicAt(8, "WAVE")(h) }},
 		parse:      parseWAV},
 	{Name: "webp", Kind: KindImage, MIME: "image/webp", Exts: []string{".webp"},
-		signatures: []signature{strong(func(h []byte) bool { return magicAt(0, "RIFF")(h) && magicAt(8, "WEBP")(h) })},
+		signatures: []signature{func(h []byte) bool { return magicAt(0, "RIFF")(h) && magicAt(8, "WEBP")(h) }},
 		parse:      parseWebP},
 	{Name: "webm", Kind: KindVideo, MIME: "video/webm", Exts: []string{".webm"},
-		signatures: []signature{strong(isWebM)}, family: "matroska", parse: parseMatroska},
+		signatures: []signature{isWebM}, family: "matroska", parse: parseMatroska},
 	{Name: "mkv", Kind: KindVideo, MIME: "video/x-matroska", Exts: []string{".mkv"},
-		signatures: []signature{strong(magicAt(0, "\x1a\x45\xdf\xa3"))}, family: "matroska", parse: parseMatroska},
+		signatures: []signature{magicAt(0, "\x1a\x45\xdf\xa3")}, family: "matroska", parse: parseMatroska},
 	// AVIF and HEIC are the same boxes as an mp4, holding a still rather than a
 	// track.
 	{Name: "avif", Kind: KindImage, MIME: "image/avif", Exts: []string{".avif"},
-		signatures: []signature{strong(isoBrand("avif", "avis"))}, family: "iso", parse: parseMP4},
+		signatures: []signature{isoBrand("avif", "avis")}, family: "iso", parse: parseMP4},
 	{Name: "heic", Kind: KindImage, MIME: "image/heic", Exts: []string{".heic"},
-		signatures: []signature{strong(isoBrand("heic", "heix", "hevc", "hevx", "mif1", "msf1"))}, family: "iso", parse: parseMP4},
+		signatures: []signature{isoBrand("heic", "heix", "hevc", "hevx", "mif1", "msf1")}, family: "iso", parse: parseMP4},
 	{Name: "mov", Kind: KindVideo, MIME: "video/quicktime", Exts: []string{".mov"},
-		signatures: []signature{strong(isoBrand("qt"))}, family: "iso", parse: parseMP4},
+		signatures: []signature{isoBrand("qt")}, family: "iso", parse: parseMP4},
 	{Name: "m4a", Kind: KindAudio, MIME: "audio/mp4", Exts: []string{".m4a"},
-		signatures: []signature{strong(isoBrand("M4A"))}, family: "iso", parse: parseMP4},
+		signatures: []signature{isoBrand("M4A")}, family: "iso", parse: parseMP4},
 	{Name: "mp4", Kind: KindVideo, MIME: "video/mp4", Exts: []string{".mp4", ".m4v"},
-		signatures: []signature{strong(isoBrand())}, family: "iso", parse: parseMP4},
-	// A sync word is only eleven set bits, so a bare frame header is weak; an ID3
-	// tag is not.
+		signatures: []signature{isoBrand()}, family: "iso", parse: parseMP4},
 	{Name: "mp3", Kind: KindAudio, MIME: "audio/mpeg", Exts: []string{".mp3"},
-		signatures: []signature{strong(magicAt(0, "ID3")), weak(looksLikeMP3)}, parse: parseMP3},
+		signatures: []signature{magicAt(0, "ID3")}, parse: parseMP3},
 	// SVG reads better as text; it is here for its MIME type, for dataURI.
 	{Name: "svg", Kind: KindMarkup, MIME: "image/svg+xml", Exts: []string{".svg"}},
 }
@@ -202,28 +185,11 @@ func FormatByName(name string) *Format {
 // SniffLen is how much of a file's start Classify needs to see.
 const SniffLen = 1024
 
-// sniffFormat identifies a format from the header alone. Strong signatures
-// are tried first, and weak ones count only for binary content the format's
-// parser accepts.
-func sniffFormat(header []byte) (*Format, Strength) {
-	if len(header) == 0 {
-		return nil, 0
-	}
-	if f := sniffWith(header, Strong); f != nil {
-		return f, Strong
-	}
-	if IsBinary(header) {
-		if f := sniffWith(header, Weak); f != nil && f.Verify(header) {
-			return f, Weak
-		}
-	}
-	return nil, 0
-}
-
-func sniffWith(header []byte, strength Strength) *Format {
+// sniffFormat identifies a format from the header alone, or returns nil.
+func sniffFormat(header []byte) *Format {
 	for _, f := range formats {
 		for _, s := range f.signatures {
-			if s.strength == strength && s.match(header) {
+			if s(header) {
 				return f
 			}
 		}
@@ -232,10 +198,9 @@ func sniffWith(header []byte, strength Strength) *Format {
 }
 
 // Classify decides a file's format from its name and first SniffLen bytes,
-// or returns nil. Text content is never a registered format; a strong
-// signature overrides the extension except within a family; otherwise the
-// extension decides, then a weak signature. An empty header leaves it to the
-// extension.
+// or returns nil. Text content is never a registered format; a signature
+// overrides the extension except within a family; otherwise the extension
+// decides. An empty header leaves it to the extension.
 func Classify(p string, header []byte) *Format {
 	byExt := FormatByExt(p)
 	if len(header) == 0 {
@@ -244,15 +209,11 @@ func Classify(p string, header []byte) *Format {
 	if !IsBinary(header) {
 		return nil
 	}
-	sniffed, strength := sniffFormat(header)
-	if strength == Strong {
+	if sniffed := sniffFormat(header); sniffed != nil {
 		if byExt != nil && byExt.family != "" && byExt.family == sniffed.family {
 			return byExt
 		}
 		return sniffed
 	}
-	if byExt != nil {
-		return byExt
-	}
-	return sniffed
+	return byExt
 }

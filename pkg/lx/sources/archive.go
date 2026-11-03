@@ -240,7 +240,6 @@ func (x *expansion) decompress(d archives.Decompressor, file *os.File) error {
 	// Decompressed content ends, so unlike a Stream it has no default cap.
 	data, n, err := readEntry(rc, -1, x.opts.MaxSize)
 	if err != nil {
-		name := singleEntryName(x.opts.Origin)
 		x.fail(name, name, err)
 		return nil
 	}
@@ -252,31 +251,15 @@ func (x *expansion) decompress(d archives.Decompressor, file *os.File) error {
 	return nil
 }
 
-// compressionSuffixes map single-file compression suffixes to what each
-// leaves of a name.
-var compressionSuffixes = [][2]string{
-	{".tgz", ".tar"}, {".tbz2", ".tar"}, {".txz", ".tar"},
-	{".gz", ""}, {".bz2", ""}, {".xz", ""}, {".zst", ""}, {".br", ""},
-	{".lz4", ""}, {".sz", ""}, {".s2", ""}, {".lz", ""},
-}
-
 // singleEntryName names the content of the compressed file at origin: its
-// name without the compression suffix.
+// name without its extension.
 func singleEntryName(origin string) string {
 	name := filepath.Base(origin)
 	if u, err := parseHTTPURL(origin); err == nil {
 		name = path.Base(u.Path)
 	}
-	lower := strings.ToLower(name)
-	for _, s := range compressionSuffixes {
-		if strings.HasSuffix(lower, s[0]) && len(name) > len(s[0]) {
-			stem, suffix := name[:len(name)-len(s[0])], s[1]
-			if written := name[len(stem):]; written == strings.ToUpper(written) {
-				// NOTAR.TGZ holds NOTAR.TAR, in the case it was named in.
-				suffix = strings.ToUpper(suffix)
-			}
-			return stem + suffix
-		}
+	if stem := strings.TrimSuffix(name, path.Ext(name)); stem != "" {
+		return stem
 	}
 	return name
 }

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"math"
 	"strconv"
@@ -20,10 +19,6 @@ type LineNumberFormatter struct {
 	TailRows    []int
 	TotalRows   int
 	Approximate bool
-}
-
-func (lnf LineNumberFormatter) Format(f fmt.State, c rune) {
-	lnf.writeTo(f)
 }
 
 // String returns the numbered content as text.

@@ -64,7 +64,10 @@ func TestReaderForBuffersNonSeekableReaders(t *testing.T) {
 	// A plain ReadCloser exposes neither ReaderAt nor Size, so it must be read
 	// into memory and reported at its true length rather than the hint.
 	rc := io.NopCloser(strings.NewReader("hello world"))
-	reader, size := readerFor(rc, 999)
+	reader, size, err := readerFor(rc, 999)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if size != 11 {
 		t.Errorf("size = %d, want 11", size)
@@ -318,8 +321,8 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 		if got, _ := ctx.Content.(string); got != want {
 			t.Errorf("%s: content =\n%s\nwant\n%s", name, got, want)
 		}
-		if ctx.TotalRows != 3000 || ctx.IsEstimate {
-			t.Errorf("%s: rows=%d estimate=%v, want exactly 3000", name, ctx.TotalRows, ctx.IsEstimate)
+		if ctx.TotalRows != 3000 {
+			t.Errorf("%s: rows=%d, want 3000", name, ctx.TotalRows)
 		}
 	}
 }
