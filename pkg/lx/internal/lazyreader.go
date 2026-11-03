@@ -157,6 +157,11 @@ func (r *LazyReader) ReadAt(p []byte, off int64) (int, error) {
 	if n < len(p) {
 		return n, r.shortErr()
 	}
+	if r.err != nil && off+int64(n) >= r.pos {
+		// A read reaching the end of a stream that failed fails too, even
+		// once Size has shrunk to what arrived.
+		return n, r.err
+	}
 	return n, nil
 }
 

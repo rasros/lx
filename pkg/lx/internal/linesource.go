@@ -68,6 +68,10 @@ func ReadAllAt(r io.ReaderAt, size int64) ([]byte, error) {
 		n, err := r.ReadAt(buf[len(buf):len(buf)+want], int64(len(buf)))
 		buf = buf[:len(buf)+n]
 		switch {
+		case err != nil && !errors.Is(err, io.EOF):
+			// Even along with all the bytes asked for: a stream that failed
+			// at its end failed.
+			return buf, err
 		case n == want:
 			// A reader may report EOF along with the last bytes.
 		case err != nil:
@@ -274,11 +278,11 @@ func (s *LineSource) readAt(buf []byte, off int64) (int, error) {
 // the caller can start again from the new end; growth past s.size is ignored.
 func (s *LineSource) readFull(buf []byte, off int64) (shrunk bool, err error) {
 	n, err := s.r.ReadAt(buf, off)
-	if n == len(buf) {
-		return false, nil
-	}
 	if err != nil && !errors.Is(err, io.EOF) {
 		return false, err
+	}
+	if n == len(buf) {
+		return false, nil
 	}
 	end := off + int64(n)
 	if n == 0 {
