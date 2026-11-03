@@ -210,7 +210,7 @@ func TestConvertInput_PDFMediaTypeWithoutExtension(t *testing.T) {
 
 func TestDocxXMLToText_SingleParagraph(t *testing.T) {
 	xml := `<w:body><w:p><w:r><w:t>Hello World</w:t></w:r></w:p></w:body>`
-	got := xmlToText(strings.NewReader(xml))
+	got := xmlToText(context.Background(), strings.NewReader(xml))
 	if !strings.Contains(got, "Hello World") {
 		t.Errorf("expected 'Hello World', got %q", got)
 	}
@@ -218,7 +218,7 @@ func TestDocxXMLToText_SingleParagraph(t *testing.T) {
 
 func TestDocxXMLToText_ParagraphEndsWithNewline(t *testing.T) {
 	xml := `<w:body><w:p><w:r><w:t>Line 1</w:t></w:r></w:p><w:p><w:r><w:t>Line 2</w:t></w:r></w:p></w:body>`
-	got := xmlToText(strings.NewReader(xml))
+	got := xmlToText(context.Background(), strings.NewReader(xml))
 	if !strings.Contains(got, "\n") {
 		t.Errorf("expected newline between paragraphs, got %q", got)
 	}
@@ -232,27 +232,27 @@ func TestDocxXMLToText_ParagraphEndsWithNewline(t *testing.T) {
 
 func TestDocxXMLToText_MultipleRuns(t *testing.T) {
 	xml := `<w:p><w:r><w:t>Hello </w:t></w:r><w:r><w:t>World</w:t></w:r></w:p>`
-	got := xmlToText(strings.NewReader(xml))
+	got := xmlToText(context.Background(), strings.NewReader(xml))
 	if !strings.Contains(got, "Hello") || !strings.Contains(got, "World") {
 		t.Errorf("expected both run texts, got %q", got)
 	}
 }
 
 func TestDocxXMLToText_Empty(t *testing.T) {
-	got := xmlToText(strings.NewReader(""))
+	got := xmlToText(context.Background(), strings.NewReader(""))
 	if got != "" {
 		t.Errorf("expected empty string for empty input, got %q", got)
 	}
 }
 
 func TestDocxXMLToText_InvalidXML_DoesNotPanic(t *testing.T) {
-	got := xmlToText(strings.NewReader("<unclosed <tag >>"))
+	got := xmlToText(context.Background(), strings.NewReader("<unclosed <tag >>"))
 	_ = got
 }
 
 func TestDocxXMLToText_NoText(t *testing.T) {
 	xml := `<w:body><w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p></w:body>`
-	got := xmlToText(strings.NewReader(xml))
+	got := xmlToText(context.Background(), strings.NewReader(xml))
 	if strings.TrimSpace(got) != "" {
 		t.Errorf("expected no text content, got %q", got)
 	}
@@ -261,7 +261,7 @@ func TestDocxXMLToText_NoText(t *testing.T) {
 func TestExtractDOCXText_SingleParagraph(t *testing.T) {
 	data := makeTestDOCX(t, "Hello DOCX")
 	r := bytes.NewReader(data)
-	text, err := extractDOCXText(r, int64(len(data)))
+	text, err := extractDOCXText(context.Background(), r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestExtractDOCXText_SingleParagraph(t *testing.T) {
 func TestExtractDOCXText_MultipleParagraphs(t *testing.T) {
 	data := makeTestDOCX(t, "First paragraph", "Second paragraph", "Third paragraph")
 	r := bytes.NewReader(data)
-	text, err := extractDOCXText(r, int64(len(data)))
+	text, err := extractDOCXText(context.Background(), r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestExtractDOCXText_MultipleParagraphs(t *testing.T) {
 func TestExtractDOCXText_Corrupted(t *testing.T) {
 	data := []byte("this is not a zip or docx file")
 	r := bytes.NewReader(data)
-	_, err := extractDOCXText(r, int64(len(data)))
+	_, err := extractDOCXText(context.Background(), r, int64(len(data)))
 	if err == nil {
 		t.Error("expected error for corrupted DOCX, got nil")
 	}
@@ -301,7 +301,7 @@ func TestExtractDOCXText_EmptyZip(t *testing.T) {
 	w.Close()
 	data := buf.Bytes()
 	r := bytes.NewReader(data)
-	text, _ := extractDOCXText(r, int64(len(data)))
+	text, _ := extractDOCXText(context.Background(), r, int64(len(data)))
 	_ = text
 }
 
@@ -586,5 +586,52 @@ func TestExtractDocumentTextStopsWhenCancelled(t *testing.T) {
 		if !errors.Is(err, context.Canceled) || text != nil {
 			t.Errorf("%s: got %q, %v; want context.Canceled", name, text, err)
 		}
+	}
+}
+
+// Streaming a sheet's rows renders them as GetRows returns them: empty rows
+// between rows with cells kept, empty rows at the end dropped.
+func TestXLSXSheetTextMatchesGetRows(t *testing.T) {
+	data := makeTestXLSX(t, "Sheet1", map[string]interface{}{
+		"B2": "b2", "A5": "a5", "C5": 3, "A7": "",
+	})
+	f, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	rows, err := f.GetRows("Sheet1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want strings.Builder
+	for _, row := range rows {
+		want.WriteString(strings.Join(row, "\t") + "\n")
+	}
+	got, err := xlsxSheetText(context.Background(), f, "Sheet1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want.String() {
+		t.Errorf("xlsxSheetText = %q, want %q", got, want.String())
+	}
+}
+
+// A sheet stops between rows once ctx is done, not only between sheets.
+func TestXLSXSheetTextStopsWithinSheet(t *testing.T) {
+	cells := map[string]interface{}{}
+	for i := 1; i <= 3*ctxCheckEvery; i++ {
+		cells[fmt.Sprintf("A%d", i)] = i
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(makeTestXLSX(t, "Sheet1", cells)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	got, _ := xlsxSheetText(ctx, f, "Sheet1")
+	if n := strings.Count(got, "\n"); n >= ctxCheckEvery {
+		t.Errorf("read %d rows of a cancelled sheet, want fewer than %d", n, ctxCheckEvery)
 	}
 }
