@@ -2,7 +2,7 @@ package internal
 
 import "testing"
 
-func TestIsImage(t *testing.T) {
+func TestFormatIsImage(t *testing.T) {
 	tests := []struct {
 		filename string
 		want     bool
@@ -19,8 +19,8 @@ func TestIsImage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
-			if got := IsImage(tt.filename); got != tt.want {
-				t.Errorf("IsImage(%q) = %v, want %v", tt.filename, got, tt.want)
+			if got := FormatByExt(tt.filename).IsImage(); got != tt.want {
+				t.Errorf("FormatByExt(%q).IsImage() = %v, want %v", tt.filename, got, tt.want)
 			}
 		})
 	}

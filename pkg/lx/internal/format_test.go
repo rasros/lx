@@ -92,12 +92,12 @@ func TestRegistryIsConsistent(t *testing.T) {
 
 func TestIsImageAlternativeExtensions(t *testing.T) {
 	for _, p := range []string{"a.tif", "a.tiff", "a.heic", "a.avif", "a.bmp", "a.ico"} {
-		if !IsImage(p) {
+		if !FormatByExt(p).IsImage() {
 			t.Errorf("IsImage(%q) = false", p)
 		}
 	}
 	for _, p := range []string{"a.svg", "a.mp4", "a.mp3"} {
-		if IsImage(p) {
+		if FormatByExt(p).IsImage() {
 			t.Errorf("IsImage(%q) = true", p)
 		}
 	}

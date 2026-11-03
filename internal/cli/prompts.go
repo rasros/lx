@@ -184,9 +184,6 @@ func (r *promptResolver) listLib(libDir string) ([]string, error) {
 }
 
 func (r *promptResolver) hasAllowedExt(name string) bool {
-	if len(r.extensions) == 0 {
-		return true
-	}
 	lower := strings.ToLower(name)
 	for _, ext := range r.extensions {
 		if ext == "" {

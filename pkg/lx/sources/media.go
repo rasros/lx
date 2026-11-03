@@ -7,12 +7,6 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-// IsMediaPath reports whether the path's extension names an audio, video or
-// image format whose metadata can be described.
-func IsMediaPath(path string) bool {
-	return internal.FormatByExt(path).IsMedia()
-}
-
 // ExtractMediaMetadata describes a media file's container, duration and
 // streams. It fails for a file whose content is not media, such as a Git LFS
 // pointer named like media.

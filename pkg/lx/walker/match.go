@@ -8,25 +8,14 @@ import (
 type pathMatchInfo struct {
 	relPath  string
 	baseName string
-	parts    []string
 }
 
-var dotPathMatchInfo = pathMatchInfo{
-	relPath:  ".",
-	baseName: ".",
-	parts:    []string{"."},
-}
+var dotPathMatchInfo = pathMatchInfo{relPath: ".", baseName: "."}
 
 func buildPathMatchInfo(relPath string) pathMatchInfo {
-	parts := strings.Split(relPath, "/")
-	baseName := relPath
-	if len(parts) > 0 {
-		baseName = parts[len(parts)-1]
-	}
 	return pathMatchInfo{
 		relPath:  relPath,
-		baseName: baseName,
-		parts:    parts,
+		baseName: relPath[strings.LastIndexByte(relPath, '/')+1:],
 	}
 }
 
