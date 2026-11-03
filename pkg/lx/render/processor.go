@@ -182,18 +182,18 @@ type contentLengther interface {
 
 // readerFor adapts an opened file to random access. A plain stream is read
 // lazily, so a converter that needs only headers leaves the rest unread.
-func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
+func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64, error) {
 	switch v := rc.(type) {
 	case *os.File:
-		return v, sizeHint
+		return v, sizeHint, nil
 	case byteReaderProvider:
 		br := v.ByteReader()
-		return br, br.Size()
+		return br, br.Size(), nil
 	case readerAtWithSize:
-		return v, v.Size()
+		return v, v.Size(), nil
 	case io.ReaderAt:
 		if sizeHint >= 0 {
-			return v, sizeHint
+			return v, sizeHint, nil
 		}
 	}
 	declared := int64(-1)
@@ -201,7 +201,7 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 		declared = cl.ContentLength()
 	}
 	lr := internal.NewLazyReader(rc, declared)
-	return lr, lr.Size()
+	return lr, lr.Size(), nil
 }
 
 // converter replaces a file's bytes with a text rendering of them. Converters
@@ -305,7 +305,7 @@ func applySkeleton(cfg core.RenderOptions, lang string, header bool, reader io.R
 		return nil
 	}
 
-	allData, err := internal.ReadAllAt(reader, size)
+	allData, err := io.ReadAll(io.NewSectionReader(reader, 0, size))
 	if err != nil {
 		return nil
 	}
@@ -342,7 +342,7 @@ func imageDataURI(format *internal.Format, reader io.ReaderAt, size int64) strin
 	if size <= 0 {
 		return ""
 	}
-	data, err := internal.ReadAllAt(reader, size)
+	data, err := io.ReadAll(io.NewSectionReader(reader, 0, size))
 	if err != nil {
 		return ""
 	}
@@ -387,14 +387,15 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 	var reader io.ReaderAt
 	var size int64
 	if stream, ok := rc.(*sources.Stream); ok {
-		data, err := sources.ReadStream(stream, cfg.MaxSize)
-		if err != nil {
-			issues.ReadErr = err
-			return p.errorContext(file, index, err.Error()), issues
-		}
+		var data []byte
+		data, err = sources.ReadStream(stream, cfg.MaxSize)
 		reader, size = bytes.NewReader(data), int64(len(data))
 	} else {
-		reader, size = readerFor(rc, file.Size)
+		reader, size, err = readerFor(rc, file.Size)
+	}
+	if err != nil {
+		issues.ReadErr = err
+		return p.errorContext(file, index, err.Error()), issues
 	}
 
 	if scratch == nil {
@@ -494,7 +495,7 @@ type excerpt struct {
 }
 
 // readSlices reads what cfg asks for from lines. A head and tail that meet
-// render the whole file, with an exact row count.
+// render the whole file.
 func readSlices(lines *internal.LineSource, cfg core.RenderOptions) (excerpt, error) {
 	if cfg.Head < 0 {
 		all, err := lines.All()

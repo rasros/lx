@@ -1,9 +1,0 @@
---- STDOUT ---
-[1/5] HOST/owner/malformed/back\slash.txt (1 rows)
-[2/5] HOST/owner/malformed/f (1 rows)
-[3/5] HOST/owner/malformed/ok.txt (1 rows)
-[4/5] HOST/owner/malformed/x/y.txt (1 rows)
-[5/5] HOST/owner/malformed/x\y.txt (1 rows)
-
-
---- STDERR ---

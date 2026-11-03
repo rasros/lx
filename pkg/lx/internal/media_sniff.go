@@ -13,7 +13,7 @@ func sniffContainer(b *byteReader) string {
 	if !ok {
 		return ""
 	}
-	if f, _ := sniffFormat(header); f.IsMedia() {
+	if f := sniffFormat(header); f.IsMedia() {
 		return f.Name
 	}
 	return ""
@@ -34,17 +34,4 @@ func matroskaFlavour(b *byteReader) string {
 		}
 	})
 	return flavour
-}
-
-// looksLikeMP3 checks for a valid frame header at offset zero, the only
-// place a bare sync word is trusted.
-func looksLikeMP3(header []byte) bool {
-	if len(header) < 4 || header[0] != 0xff || header[1]&0xe0 != 0xe0 {
-		return false
-	}
-	if header[1]>>3&0x3 == 1 || header[1]>>1&0x3 == 0 {
-		return false // a reserved version or layer
-	}
-	bitrateIndex := header[2] >> 4 & 0xf
-	return bitrateIndex != 0 && bitrateIndex != 15 && header[2]>>2&0x3 != 3
 }

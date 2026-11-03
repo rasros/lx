@@ -201,12 +201,6 @@ func TestStream_ExecutesOnce(t *testing.T) {
 	if _, err := stream.Execute(context.Background(), io.Discard); !errors.Is(err, ErrExecuted) {
 		t.Errorf("second Execute = %v, want ErrExecuted", err)
 	}
-	defer func() {
-		if r := recover(); r != ErrExecuted {
-			t.Errorf("AddSection after Execute recovered %v, want ErrExecuted", r)
-		}
-	}()
-	stream.AddSection("late")
 }
 
 func TestStream_OriginalSizeIsPreConversionSize(t *testing.T) {

@@ -6,9 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"text/template"
 	"time"
 
@@ -139,15 +143,21 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 
 	out := determineOutput(parsed.Globals, cliOpts.OutputMode, env, log)
 	w := out.w
-	var sink *fileSink
+	// The -o file only receives the output once all of it is written, so a
+	// failed run leaves it as it was.
+	var outBuf *bytes.Buffer
 	if out.path != "" {
-		// A bad path fails before any work, but the file only receives the
-		// output once all of it is written, so a failed run leaves it as it was.
-		if sink, err = createFileSink(out.path, out.name, env.TempDir); err != nil {
-			return err
+		// A missing directory fails before any work.
+		if info, err := os.Stat(filepath.Dir(out.path)); err != nil || !info.IsDir() {
+			dirErr := error(syscall.ENOTDIR)
+			var pe *fs.PathError
+			if errors.As(err, &pe) {
+				dirErr = pe.Err
+			}
+			return &fs.PathError{Op: "open", Path: out.name, Err: dirErr}
 		}
-		defer sink.Abort()
-		w = sink
+		outBuf = &bytes.Buffer{}
+		w = outBuf
 	}
 
 	stream, err := lx.NewStream(cfg)
@@ -187,10 +197,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 		return err
 	}
 
-	if sink != nil {
-		log.Info("Writing output to file", "path", out.name)
-	}
-
 	log.Info("Executing stream pipeline...")
 	report, err := stream.Execute(ctx, w)
 	if err != nil {
@@ -199,8 +205,13 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 		}
 		return err
 	}
-	if sink != nil {
-		if err := sink.Commit(); err != nil {
+	if outBuf != nil {
+		log.Info("Writing output to file", "path", out.name)
+		if err := os.WriteFile(out.path, outBuf.Bytes(), 0o666); err != nil {
+			var pe *fs.PathError
+			if errors.As(err, &pe) {
+				pe.Path = out.name
+			}
 			return err
 		}
 	}

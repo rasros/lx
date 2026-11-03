@@ -14,13 +14,12 @@ import (
 )
 
 // FailureHandler is told about each input that could not be read, in output
-// order, from the goroutine running Execute. Changing the stream from it
-// panics.
+// order, from the goroutine running Execute. It must not change the stream.
 type FailureHandler func(core.Failure)
 
 // Stream manages a collection of files, sections, and prompts for rendering.
-// It is not safe for concurrent use. It renders once: after Execute starts,
-// changing it panics with ErrExecuted.
+// It is not safe for concurrent use. It renders once: a later Execute
+// returns ErrExecuted.
 type Stream struct {
 	items       []interface{}
 	tokenizer   core.Tokenizer
@@ -77,7 +76,6 @@ const maxSkeletonWorkers = 2
 // WithConcurrency sets the concurrent workers for file processing. The stream
 // lowers it to maxSkeletonWorkers when any queued file renders as a skeleton.
 func (s *Stream) WithConcurrency(n int) *Stream {
-	s.mustChange()
 	if n < 1 {
 		n = 1
 	}
@@ -86,7 +84,6 @@ func (s *Stream) WithConcurrency(n int) *Stream {
 }
 
 func (s *Stream) WithTokenizer(t core.Tokenizer) *Stream {
-	s.mustChange()
 	s.tokenizer = t
 	return s
 }
@@ -94,7 +91,6 @@ func (s *Stream) WithTokenizer(t core.Tokenizer) *Stream {
 // WithOnFailure sets h to be told about every failure. Without one, the
 // stream logs them.
 func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
-	s.mustChange()
 	s.onFailure = h
 	return s
 }
@@ -102,14 +98,12 @@ func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
 // WithDir sets what relative paths in templates, such as dataURI's, resolve
 // against; the default is the process's working directory.
 func (s *Stream) WithDir(dir string) *Stream {
-	s.mustChange()
 	s.engine.Dir = dir
 	return s
 }
 
 // WithLogger sets where the stream logs; the default is slog.Default().
 func (s *Stream) WithLogger(log *slog.Logger) *Stream {
-	s.mustChange()
 	if log == nil {
 		log = slog.Default()
 	}
@@ -126,7 +120,6 @@ func (s *Stream) Admit(f sources.InputFile, opts core.RenderOptions) bool {
 
 // AddFile enqueues a file to render with opts, unless Admit drops it.
 func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
-	s.mustChange()
 	if !s.Admit(f, opts) {
 		s.log.Debug("Skipped by size limit", "path", f.Path, "size", f.Size, "max_size", opts.MaxSize)
 		s.skippedBySize++
@@ -142,28 +135,24 @@ func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
 // AddFailure adds an input that could not be read. It renders nothing but is
 // reported in output order and counted in the Report's FailedFiles.
 func (s *Stream) AddFailure(f core.Failure) *Stream {
-	s.mustChange()
 	s.items = append(s.items, f)
 	return s
 }
 
 func (s *Stream) AddSection(title string) *Stream {
-	s.mustChange()
 	s.items = append(s.items, core.SectionContext{Body: title})
 	return s
 }
 
 func (s *Stream) AddPrompt(text string) *Stream {
-	s.mustChange()
 	s.items = append(s.items, core.PromptContext{Body: text})
 	return s
 }
 
 // AddTree enqueues a directory tree of the files Admit keeps under opts. The
 // files need not be added with AddFile. A tree with no admitted files is left
-// out.
+// out. Repeated calls with the same files slice and MaxSize share one tree.
 func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *Stream {
-	s.mustChange()
 	if t := s.lastTree; len(files) > 0 && len(files) == len(t.files) &&
 		&files[0] == &t.files[0] && opts.MaxSize == t.maxSize {
 		s.log.Debug("Adding tree", "files", t.admitted)
@@ -187,16 +176,8 @@ func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *St
 }
 
 func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
-	s.mustChange()
 	s.items = append(s.items, core.MetaContext{Body: body, Fields: fields})
 	return s
-}
-
-// mustChange panics once Execute has started.
-func (s *Stream) mustChange() {
-	if s.executed {
-		panic(ErrExecuted)
-	}
 }
 
 // prepare plans the items queued so far, organizing them into sections.
@@ -277,8 +258,7 @@ func (s *Stream) Plan() core.Plan {
 	return plan
 }
 
-// ErrExecuted is returned by a second Execute, and panicked with by changes
-// after Execute starts.
+// ErrExecuted is returned by Execute on a stream that already ran.
 var ErrExecuted = errors.New("stream already executed")
 
 // Execute renders the stream to w and reports what was rendered. A stream

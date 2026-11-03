@@ -284,16 +284,13 @@ const defaultBarePrompt = ``
 const defaultBareTree = ``
 const defaultBareMeta = ``
 
-// contentString renders template content as text, calling String on a
-// fmt.Stringer so it is escaped like a string.
+// contentString renders template content as text.
 func contentString(v interface{}) string {
 	switch s := v.(type) {
 	case nil:
 		return ""
 	case string:
 		return s
-	case fmt.Stringer:
-		return s.String()
 	}
 	return fmt.Sprintf("%v", v)
 }

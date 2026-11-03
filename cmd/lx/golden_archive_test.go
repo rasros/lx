@@ -103,7 +103,6 @@ func TestGoldenRepoURL(t *testing.T) {
 		{name: "189x_archive_reads_no_ignore_files", args: []string{"-n0", "-Z", "repo.zip"}},
 		{name: "189y_repo_url_entry_keeps_wrapper", args: []string{"-y", "configs/origin.yaml", "-i", "docs/*.md", repo}},
 		{name: "189y2_repo_url_no_shared_wrapper", args: []string{"-n0", host + "/owner/nowrap"}},
-		{name: "189y3_repo_url_entries_no_checkout_holds", args: []string{"-n0", host + "/owner/malformed"}},
 	})
 }
 

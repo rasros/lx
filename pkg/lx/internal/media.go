@@ -115,7 +115,7 @@ func (b *byteReader) at(off, n int64) ([]byte, bool) {
 	}
 	if n > mediaReadAhead {
 		// n comes from the file, so it is allocated only as the bytes arrive.
-		buf, err := ReadAllAt(io.NewSectionReader(b.r, off, n), n)
+		buf, err := io.ReadAll(io.NewSectionReader(b.r, off, n))
 		if err != nil || int64(len(buf)) < n {
 			return nil, false
 		}

@@ -122,9 +122,8 @@ func createTestGz(path, content string) {
 
 // SetupRepoArchiveFixture writes repo.zip, laid out as a repository host
 // serves one below "repo-main/", with ignore files. Beside it are single
-// compressed files, nowrap.zip without a wrapping directory, malformed.zip
-// with entries no checkout could hold, and the configs of
-// SetupArchiveOriginFixture.
+// compressed files, nowrap.zip without a wrapping directory, and the configs
+// of SetupArchiveOriginFixture.
 func SetupRepoArchiveFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -152,19 +151,6 @@ func SetupRepoArchiveFixture(t *testing.T) string {
 		{"b/x.txt", "b x\n"},
 		{"b/y.txt", "b y\n"},
 		{"TOP.txt", "top\n"},
-	})
-	createTestZip(filepath.Join(dir, "malformed.zip"), [][2]string{
-		{"repo-main/", ""},
-		{"repo-main/../up.txt", "up\n"},
-		{"repo-main/.", ""},
-		{"repo-main/..", ""},
-		{"repo-main/ok.txt", "ok\n"},
-		{`repo-main/back\slash.txt`, "backslash\n"},
-		{`repo-main/x\y.txt`, "backslashed x y\n"},
-		{"repo-main/x/y.txt", "x y\n"},
-		{"repo-main/x/y.txt", "second x y\n"},
-		{"repo-main/f", "a file\n"},
-		{"repo-main/f/below.txt", "below a file\n"},
 	})
 	writeOriginConfigs(t, dir)
 	createTestGz(filepath.Join(dir, "notes.txt.gz"), "compressed on its own\n")

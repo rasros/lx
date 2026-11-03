@@ -4,16 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"slices"
 )
 
 // lineChunk is how much a LineSource reads at a time when it only needs part
 // of the content.
 const lineChunk = 64 * 1024
 
-// ExactCountLimit is the largest content Count will scan in full for an exact
-// line count when the lines have not already been read. Beyond it, Count
-// extrapolates from the first chunk and reports the result as an estimate.
+// ExactCountLimit is the largest content Count scans in full when the lines
+// have not been read. Beyond it, Count extrapolates from the first chunk.
 const ExactCountLimit int64 = 64 << 20
 
 // LineSource reads lines from random-access content of a known size. Lines
@@ -45,42 +43,12 @@ func (s *LineSource) All() ([]byte, error) {
 	if s.data != nil || s.size == 0 {
 		return s.data, nil
 	}
-	buf, err := ReadAllAt(s.r, s.size)
-	if err != nil && !errors.Is(err, io.EOF) {
+	data, err := io.ReadAll(io.NewSectionReader(s.r, 0, s.size))
+	if err != nil {
 		return nil, err
 	}
-	s.keep(buf)
+	s.keep(data)
 	return s.data, nil
-}
-
-// maxPrealloc bounds what ReadAllAt allocates before any bytes arrive.
-const maxPrealloc = 64 << 20
-
-// ReadAllAt reads the first size bytes of r. A size can be a claim, such as a
-// Content-Length, rather than a fact, so the buffer grows as the bytes arrive
-// and only up to maxPrealloc is reserved in advance. Content that ends sooner
-// is returned with io.EOF.
-func ReadAllAt(r io.ReaderAt, size int64) ([]byte, error) {
-	buf := make([]byte, 0, max(min(size, maxPrealloc), 0))
-	for int64(len(buf)) < size {
-		want := int(min(size-int64(len(buf)), maxPrealloc))
-		buf = slices.Grow(buf, want)
-		n, err := r.ReadAt(buf[len(buf):len(buf)+want], int64(len(buf)))
-		buf = buf[:len(buf)+n]
-		switch {
-		case err != nil && !errors.Is(err, io.EOF):
-			// Even along with all the bytes asked for: a stream that failed
-			// at its end failed.
-			return buf, err
-		case n == want:
-			// A reader may report EOF along with the last bytes.
-		case err != nil:
-			return buf, err
-		default:
-			return buf, io.EOF
-		}
-	}
-	return buf, nil
 }
 
 // Head returns the first n lines, or all of them when n is negative.
@@ -94,109 +62,62 @@ func (s *LineSource) Head(n int) ([]byte, error) {
 	if s.data != nil {
 		return headOf(s.data, n), nil
 	}
-
 	var buf []byte
-	var off int64
-	scanned, found := 0, 0
-	for off < s.size {
-		want := int(min(int64(lineChunk), s.size-off))
-		buf = slices.Grow(buf, want)
-		got, err := s.readAt(buf[len(buf):len(buf)+want], off)
+	found := 0
+	for off := int64(0); off < s.size; {
+		chunk := make([]byte, min(int64(lineChunk), s.size-off))
+		got, err := s.readAt(chunk, off)
 		if err != nil {
 			return nil, err
 		}
-		buf = buf[:len(buf)+got]
+		buf = append(buf, chunk[:got]...)
 		off += int64(got)
-		for found < n {
-			i := bytes.IndexByte(buf[scanned:], '\n')
-			if i < 0 {
-				scanned = len(buf)
-				break
-			}
-			scanned += i + 1
-			found++
+		if got < len(chunk) {
+			break // the content ended early
 		}
-		if found == n {
-			if off >= s.size {
-				s.keep(buf)
-			}
-			return buf[:scanned], nil
+		found += bytes.Count(chunk, []byte{'\n'})
+		if found >= n {
+			return headOf(buf, n), nil
 		}
 	}
 	s.keep(buf)
-	return buf, nil
+	return headOf(buf, n), nil
 }
 
 // Tail returns the last n lines. Content that turns out shorter than the size
-// promised, as a log truncated in place between stat and read is, shrinks the
-// source and the tail is read again from the real end.
+// promised is read in full instead.
 func (s *LineSource) Tail(n int) ([]byte, error) {
-	for {
-		if n <= 0 || s.size == 0 {
-			return nil, nil
-		}
-		if s.data != nil {
-			return tailOf(s.data, n), nil
-		}
-		tail, shrunk, err := s.tailOnce(n)
-		if err != nil || !shrunk {
-			return tail, err
-		}
-		// Each shrink lowers s.size, so this ends.
+	if n <= 0 || s.size == 0 {
+		return nil, nil
 	}
-}
-
-// tailOnce reads the last n lines back from s.size, and reports instead
-// whether the content ended before s.size, which shrinks the source.
-func (s *LineSource) tailOnce(n int) ([]byte, bool, error) {
+	if s.data != nil {
+		return tailOf(s.data, n), nil
+	}
 	// The tail starts after the n-th newline from the end, not counting a
 	// final newline, which ends the last line rather than starting one.
-	var last [1]byte
-	if shrunk, err := s.readFull(last[:], s.size-1); shrunk || err != nil {
-		return nil, shrunk, err
-	}
-	need := n
-	if last[0] == '\n' {
-		need++
-	}
-
-	var chunks [][]byte // read back to front
-	off := s.size
-	start := -1 // where the tail starts within the last chunk read
-	for off > 0 && start < 0 {
+	var buf []byte
+	for off := s.size; off > 0; {
 		want := min(int64(lineChunk), off)
 		off -= want
 		chunk := make([]byte, want)
-		if shrunk, err := s.readFull(chunk, off); shrunk || err != nil {
-			return nil, shrunk, err
+		if got, err := s.r.ReadAt(chunk, off); got < len(chunk) {
+			if err != nil && !errors.Is(err, io.EOF) {
+				return nil, err
+			}
+			all, err := s.All()
+			return tailOf(all, n), err
 		}
-		chunks = append(chunks, chunk)
-		end := len(chunk)
-		for need > 0 {
-			i := bytes.LastIndexByte(chunk[:end], '\n')
-			if i < 0 {
-				break
-			}
-			end = i
-			if need--; need == 0 {
-				start = i + 1
-			}
+		buf = append(chunk, buf...)
+		if bytes.Count(bytes.TrimSuffix(buf, []byte{'\n'}), []byte{'\n'}) >= n {
+			return tailOf(buf, n), nil
 		}
 	}
-
-	var joined []byte
-	for i := len(chunks) - 1; i >= 0; i-- {
-		joined = append(joined, chunks[i]...)
-	}
-	if off == 0 {
-		s.keep(joined)
-	}
-	return joined[max(start, 0):], false, nil
+	s.keep(buf)
+	return tailOf(buf, n), nil
 }
 
-// Count returns the number of lines and whether that number is exact. It is
-// exact whenever the content has been read in full, or is small enough
-// (ExactCountLimit) to scan; otherwise it is extrapolated from the first chunk.
+// Count returns the number of lines and whether that number is exact: it is
+// unless the content is over ExactCountLimit and has not been read in full.
 func (s *LineSource) Count() (int, bool, error) {
 	if s.count >= 0 {
 		return s.count, true, nil
@@ -204,14 +125,12 @@ func (s *LineSource) Count() (int, bool, error) {
 	if s.size > ExactCountLimit {
 		return s.estimate()
 	}
-
 	buf := make([]byte, min(int64(lineChunk), s.size))
 	var off int64
 	var lastByte byte
 	newlines := 0
 	for off < s.size {
-		want := min(int64(len(buf)), s.size-off)
-		got, err := s.readAt(buf[:want], off)
+		got, err := s.readAt(buf[:min(int64(len(buf)), s.size-off)], off)
 		if err != nil {
 			return 0, false, err
 		}
@@ -238,12 +157,11 @@ func (s *LineSource) estimate() (int, bool, error) {
 		return 0, false, err
 	}
 	if got < len(buf) {
-		// The content ended within the chunk, so it was shorter than promised
-		// and has now been read whole.
+		// The content ended within the chunk, and has been read whole.
 		s.keep(buf[:got])
 		return s.count, true, nil
 	}
-	newlines := bytes.Count(buf[:got], []byte{'\n'})
+	newlines := bytes.Count(buf, []byte{'\n'})
 	if newlines == 0 {
 		return 1, false, nil
 	}
@@ -271,42 +189,6 @@ func (s *LineSource) readAt(buf []byte, off int64) (int, error) {
 		s.size = off + int64(n)
 	}
 	return n, nil
-}
-
-// readFull reads exactly len(buf) bytes at off. When the content ends sooner,
-// it shrinks the source to where the content really ends and reports that, so
-// the caller can start again from the new end; growth past s.size is ignored.
-func (s *LineSource) readFull(buf []byte, off int64) (shrunk bool, err error) {
-	n, err := s.r.ReadAt(buf, off)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return false, err
-	}
-	if n == len(buf) {
-		return false, nil
-	}
-	end := off + int64(n)
-	if n == 0 {
-		end = s.findEnd(off)
-	}
-	s.size = min(s.size, end)
-	return true, nil
-}
-
-// findEnd finds where content that ends at or before limit really ends, by
-// probing single bytes. A short read that returned some bytes already tells
-// the end; this is for one that returned none.
-func (s *LineSource) findEnd(limit int64) int64 {
-	var probe [1]byte
-	lo, hi := int64(0), limit // content ends in [lo, hi]
-	for lo < hi {
-		mid := lo + (hi-lo+1)/2
-		if n, _ := s.r.ReadAt(probe[:], mid-1); n == 1 {
-			lo = mid
-		} else {
-			hi = mid - 1
-		}
-	}
-	return lo
 }
 
 // headOf returns the first n lines of data.

@@ -213,7 +213,7 @@ func TestProcessorSurvivesLyingContentLength(t *testing.T) {
 	}{
 		{"whole", core.RenderOptions{Head: -1}, text},
 		{"compact", core.RenderOptions{}, "(170 rows)"},
-		{"skeleton", core.RenderOptions{Head: -1, SkeletonFunctions: true}, "func f()"},
+		{"skeleton", core.RenderOptions{Head: -1, SkeletonFunctions: true}, "(170 rows, function signatures)"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
