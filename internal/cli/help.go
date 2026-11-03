@@ -257,23 +257,7 @@ func makeFuncs(p ansi.Painter) template.FuncMap {
 			if d.Short != "" {
 				name = "-" + d.Short + ", " + name
 			}
-			var sb strings.Builder
-			sb.WriteString("  ")
-			sb.WriteString(bold(name))
-
-			switch d.ValueType {
-			case ValueAny:
-				sb.WriteString(" <value>")
-			case ValueNumber:
-				sb.WriteString(" <n>")
-			case ValueSize:
-				sb.WriteString(" <size>")
-			case ValueGlob:
-				sb.WriteString(" <glob>")
-			case ValueOptional:
-				sb.WriteString(" [value]")
-			}
-			return sb.String()
+			return "  " + bold(name) + valueSuffix(d.ValueType)
 		},
 
 		"compactFlag": func(d CommandDef) string {
@@ -283,21 +267,7 @@ func makeFuncs(p ansi.Painter) template.FuncMap {
 			} else {
 				flagPart += "    "
 			}
-			flagPart += "--" + d.Name
-
-			switch d.ValueType {
-			case ValueAny:
-				flagPart += " <value>"
-			case ValueNumber:
-				flagPart += " <n>"
-			case ValueSize:
-				flagPart += " <size>"
-			case ValueGlob:
-				flagPart += " <glob>"
-			case ValueOptional:
-				flagPart += " [value]"
-			case ValueNone:
-			}
+			flagPart += "--" + d.Name + valueSuffix(d.ValueType)
 
 			padding := 28
 			if len(flagPart) < padding {
@@ -309,6 +279,23 @@ func makeFuncs(p ansi.Painter) template.FuncMap {
 			return bold(flagPart) + d.Usage
 		},
 	}
+}
+
+// valueSuffix is what follows a flag in help to show the value it takes.
+func valueSuffix(t ValueType) string {
+	switch t {
+	case ValueAny:
+		return " <value>"
+	case ValueNumber:
+		return " <n>"
+	case ValueSize:
+		return " <size>"
+	case ValueGlob:
+		return " <glob>"
+	case ValueOptional:
+		return " [value]"
+	}
+	return ""
 }
 
 func printShortHelp(env Env) {

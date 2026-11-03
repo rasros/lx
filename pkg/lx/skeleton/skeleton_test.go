@@ -27,7 +27,11 @@ func TestParserPoolFor_CachesLanguageAndPool(t *testing.T) {
 	// The cache is package-wide and outlives the test, so drop the entry
 	// afterwards: a repeated run (-count) would otherwise find it cached.
 	langName := "test-cache-" + t.Name()
-	t.Cleanup(func() { parserRuntimes.Delete(langName) })
+	t.Cleanup(func() {
+		parserMu.Lock()
+		delete(parserRuntimes, langName)
+		parserMu.Unlock()
+	})
 	calls := 0
 
 	newLang := func() *gotreesitter.Language {
