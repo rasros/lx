@@ -16,8 +16,8 @@ type parserRuntime struct {
 }
 
 var (
-	parserRuntimes sync.Map // map[string]*parserRuntime
-	parserInitMu   sync.Mutex
+	parserMu       sync.Mutex
+	parserRuntimes = map[string]parserRuntime{}
 )
 
 // extract returns the rows of src (split into lines) that make up its
@@ -147,25 +147,14 @@ func (p parsed) trailingComments(lines [][]byte) map[int]int {
 }
 
 func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*gotreesitter.ParserPool, *gotreesitter.Language) {
-	if v, ok := parserRuntimes.Load(langName); ok {
-		rt := v.(*parserRuntime)
-		return rt.pool, rt.lang
+	parserMu.Lock()
+	defer parserMu.Unlock()
+	rt, ok := parserRuntimes[langName]
+	if !ok {
+		lang := newLang()
+		rt = parserRuntime{lang: lang, pool: gotreesitter.NewParserPool(lang)}
+		parserRuntimes[langName] = rt
 	}
-
-	parserInitMu.Lock()
-	defer parserInitMu.Unlock()
-
-	if v, ok := parserRuntimes.Load(langName); ok {
-		rt := v.(*parserRuntime)
-		return rt.pool, rt.lang
-	}
-
-	lang := newLang()
-	rt := &parserRuntime{
-		lang: lang,
-		pool: gotreesitter.NewParserPool(lang),
-	}
-	parserRuntimes.Store(langName, rt)
 	return rt.pool, rt.lang
 }
 
