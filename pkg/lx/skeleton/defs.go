@@ -189,6 +189,21 @@ var (
 	}
 )
 
+// tsDef is the langDef of TypeScript, JavaScript or one of their JSX
+// dialects, whose type declarations are structTypes.
+func tsDef(newLang func() *gotreesitter.Language, structTypes []string) langDef {
+	return langDef{
+		newLang:         newLang,
+		funcTypes:       []string{"function_declaration", "lexical_declaration"},
+		structTypes:     structTypes,
+		comments:        &langs.CComments,
+		decoratedType:   "export_statement",
+		definitionField: "declaration",
+		emitFunc:        langs.TSEmitFunc,
+		members:         tsMembers,
+	}
+}
+
 var langDefs = map[string]langDef{
 	"go": {
 		newLang:     grammars.GoLanguage,
@@ -259,49 +274,10 @@ var langDefs = map[string]langDef{
 		members:     rustMembers,
 	},
 
-	"typescript": {
-		newLang:         grammars.TypescriptLanguage,
-		funcTypes:       []string{"function_declaration", "lexical_declaration"},
-		structTypes:     tsTypes,
-		comments:        &langs.CComments,
-		decoratedType:   "export_statement",
-		definitionField: "declaration",
-		emitFunc:        langs.TSEmitFunc,
-		members:         tsMembers,
-	},
-
-	"tsx": {
-		newLang:         grammars.TsxLanguage,
-		funcTypes:       []string{"function_declaration", "lexical_declaration"},
-		structTypes:     tsTypes,
-		comments:        &langs.CComments,
-		decoratedType:   "export_statement",
-		definitionField: "declaration",
-		emitFunc:        langs.TSEmitFunc,
-		members:         tsMembers,
-	},
-
-	"javascript": {
-		newLang:         grammars.JavascriptLanguage,
-		funcTypes:       []string{"function_declaration", "lexical_declaration"},
-		structTypes:     []string{"class_declaration"},
-		comments:        &langs.CComments,
-		decoratedType:   "export_statement",
-		definitionField: "declaration",
-		emitFunc:        langs.TSEmitFunc,
-		members:         tsMembers,
-	},
-
-	"jsx": {
-		newLang:         grammars.JavascriptLanguage,
-		funcTypes:       []string{"function_declaration", "lexical_declaration"},
-		structTypes:     []string{"class_declaration"},
-		comments:        &langs.CComments,
-		decoratedType:   "export_statement",
-		definitionField: "declaration",
-		emitFunc:        langs.TSEmitFunc,
-		members:         tsMembers,
-	},
+	"typescript": tsDef(grammars.TypescriptLanguage, tsTypes),
+	"tsx":        tsDef(grammars.TsxLanguage, tsTypes),
+	"javascript": tsDef(grammars.JavascriptLanguage, []string{"class_declaration"}),
+	"jsx":        tsDef(grammars.JavascriptLanguage, []string{"class_declaration"}),
 
 	"kotlin": {
 		newLang:       grammars.KotlinLanguage,
