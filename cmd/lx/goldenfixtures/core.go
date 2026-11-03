@@ -116,9 +116,9 @@ func SetupSymlinksFixture(t *testing.T) string {
 	return dir
 }
 
-// writeCorruptEntryZip writes a zip at path holding good.txt and bad.txt,
+// writeCorruptEntryZip writes a zip at dir/path holding good.txt and bad.txt,
 // whose stored bytes no longer match their checksum.
-func writeCorruptEntryZip(t *testing.T, path string) {
+func writeCorruptEntryZip(t *testing.T, dir, path string) {
 	t.Helper()
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -135,12 +135,7 @@ func writeCorruptEntryZip(t *testing.T, path string) {
 	data := buf.Bytes()
 	// bad.txt comes first: its data follows the 30-byte local header and name.
 	data[30+len("bad.txt")] ^= 0x20
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, dir, path, string(data), 0644)
 }
 
 func SetupErrorsFixture(t *testing.T) string {
@@ -152,7 +147,7 @@ func SetupErrorsFixture(t *testing.T) string {
 	writeFile(t, dir, "spaces/file with spaces.txt", "content with spaces", 0644)
 	writeFile(t, dir, "broken/ok.txt", "readable", 0644)
 	writeFile(t, dir, "broken/bad.zip", "not a zip archive", 0644)
-	writeCorruptEntryZip(t, filepath.Join(dir, "corrupt", "entries.zip"))
+	writeCorruptEntryZip(t, dir, "corrupt/entries.zip")
 	if err := os.MkdirAll(filepath.Join(dir, "dangling"), 0755); err != nil {
 		t.Fatal(err)
 	}

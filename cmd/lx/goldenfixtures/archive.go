@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,14 +22,14 @@ func SetupArchiveFixture(t *testing.T) string {
 		{"nested/world.go", "package nested\n"},
 		{".hidden_in_zip", "hidden inside zip\n"},
 	})
-	createTestTarGz(filepath.Join(dir, "archive.tar.gz"), [][2]string{
+	createTestTar(filepath.Join(dir, "archive.tar.gz"), [][2]string{
 		{"hello.txt", "Hello from tar!\n"},
 		{"nested/world.go", "package nested\n"},
-	})
-	createTestTarBz2(filepath.Join(dir, "archive.tar.bz2"), [][2]string{
+	}, gzipWriter)
+	createTestTar(filepath.Join(dir, "archive.tar.bz2"), [][2]string{
 		{"hello.txt", "Hello from tar bz2!\n"},
 		{"nested/world.go", "package nested\n"},
-	})
+	}, archives.Bz2{}.OpenWriter)
 	createTestZip(filepath.Join(dir, "docs.zip"), [][2]string{
 		{"guide.html", "<h1>Guide</h1><p>Inside an archive.</p>"},
 		{"notes.txt", "plain\n"},
@@ -41,7 +42,7 @@ func SetupArchiveFixture(t *testing.T) string {
 	createTestTar(filepath.Join(dir, "archive.tar"), [][2]string{
 		{"hello.txt", "Hello from tar plain!\n"},
 		{"nested/world.go", "package nested\n"},
-	})
+	}, nil)
 
 	return dir
 }
@@ -61,83 +62,34 @@ func SetupDocumentsFixture(t *testing.T) string {
 		"sample.odt", "sample.ods", "sample.odp",
 	}
 	for _, name := range fixtures {
-		data, err := os.ReadFile(filepath.Join("testdata", "documents", name))
-		if err != nil {
-			t.Fatalf("read fixture %s: %v", name, err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, name), data, 0644); err != nil {
-			t.Fatalf("write fixture %s: %v", name, err)
-		}
+		copyFixture(t, dir, filepath.Join("documents", name), name)
 	}
 
 	return dir
 }
 
-func createTestTarGz(path string, files [][2]string) {
-	f, err := os.Create(path)
-	if err != nil {
-		panic("createTestTarGz: " + err.Error())
-	}
-	defer f.Close()
-	gw := gzip.NewWriter(f)
-	tw := tar.NewWriter(gw)
-	for _, file := range files {
-		body := []byte(file[1])
-		hdr := &tar.Header{Name: file[0], Mode: 0644, Size: int64(len(body))}
-		if err := tw.WriteHeader(hdr); err != nil {
-			panic("createTestTarGz: " + err.Error())
-		}
-		if _, err := tw.Write(body); err != nil {
-			panic("createTestTarGz: " + err.Error())
-		}
-	}
-	if err := tw.Close(); err != nil {
-		panic("createTestTarGz: " + err.Error())
-	}
-	if err := gw.Close(); err != nil {
-		panic("createTestTarGz: " + err.Error())
-	}
-}
-
-func createTestTarBz2(path string, files [][2]string) {
-	f, err := os.Create(path)
-	if err != nil {
-		panic("createTestTarBz2: " + err.Error())
-	}
-	defer f.Close()
-
-	bw, err := archives.Bz2{}.OpenWriter(f)
-	if err != nil {
-		panic("createTestTarBz2: " + err.Error())
-	}
-
-	tw := tar.NewWriter(bw)
-	for _, file := range files {
-		body := []byte(file[1])
-		hdr := &tar.Header{Name: file[0], Mode: 0644, Size: int64(len(body))}
-		if err := tw.WriteHeader(hdr); err != nil {
-			panic("createTestTarBz2: " + err.Error())
-		}
-		if _, err := tw.Write(body); err != nil {
-			panic("createTestTarBz2: " + err.Error())
-		}
-	}
-	if err := tw.Close(); err != nil {
-		panic("createTestTarBz2: " + err.Error())
-	}
-	if err := bw.Close(); err != nil {
-		panic("createTestTarBz2: " + err.Error())
-	}
-}
-
-func createTestTar(path string, files [][2]string) {
+// createTestTar writes a tar archive of files at path, through compress
+// when it is not nil.
+func createTestTar(path string, files [][2]string, compress func(io.Writer) (io.WriteCloser, error)) {
 	f, err := os.Create(path)
 	if err != nil {
 		panic("createTestTar: " + err.Error())
 	}
 	defer f.Close()
-
-	tw := tar.NewWriter(f)
+	var w io.Writer = f
+	if compress != nil {
+		cw, err := compress(f)
+		if err != nil {
+			panic("createTestTar: " + err.Error())
+		}
+		defer func() {
+			if err := cw.Close(); err != nil {
+				panic("createTestTar: " + err.Error())
+			}
+		}()
+		w = cw
+	}
+	tw := tar.NewWriter(w)
 	for _, file := range files {
 		body := []byte(file[1])
 		hdr := &tar.Header{Name: file[0], Mode: 0644, Size: int64(len(body))}
@@ -152,6 +104,8 @@ func createTestTar(path string, files [][2]string) {
 		panic("createTestTar: " + err.Error())
 	}
 }
+
+func gzipWriter(w io.Writer) (io.WriteCloser, error) { return gzip.NewWriter(w), nil }
 
 func createTestGz(path, content string) {
 	f, err := os.Create(path)

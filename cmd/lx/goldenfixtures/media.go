@@ -1,8 +1,6 @@
 package goldenfixtures
 
 import (
-	"archive/zip"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -36,22 +34,17 @@ func SetupMediaFixture(t *testing.T) string {
 	dir := t.TempDir()
 
 	for _, name := range mediaFixtures {
-		data, err := os.ReadFile(filepath.Join("testdata", "media", name))
-		if err != nil {
-			t.Fatalf("read fixture %s: %v", name, err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, name), data, 0644); err != nil {
-			t.Fatalf("write fixture %s: %v", name, err)
-		}
+		copyFixture(t, dir, filepath.Join("media", name), name)
 	}
 
 	writeFile(t, dir, "notes.txt", "beside the media\n", 0644)
-	createMediaZip(t, filepath.Join(dir, "media.zip"))
+	// An archive entry is read through a different path than a file on disk.
+	createTestZip(filepath.Join(dir, "media.zip"), [][2]string{{"clip.wav", string(readFixtureFile(t, "media/sample.wav"))}})
 
 	// A copy with the suffix removed, and one with the wrong suffix, so that what
 	// the header says can be told apart from what the name claims.
-	copyFixture(t, dir, "sample.mkv", "suffixless")
-	copyFixture(t, dir, "sample.png", "mislabelled.jpg")
+	copyFixture(t, dir, "media/sample.mkv", "suffixless")
+	copyFixture(t, dir, "media/sample.png", "mislabelled.jpg")
 	writeFile(t, dir, "notes", "suffixless and not media at all\n", 0644)
 
 	return dir
@@ -70,9 +63,9 @@ func SetupMediaLookalikeFixture(t *testing.T) string {
 	writeFile(t, dir, "x.png", "version https://git-lfs.github.com/spec/v1\n"+
 		"oid sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393\n"+
 		"size 12345\n", 0644)
-	copyFixture(t, dir, "sample.tiff", "x.tif")
+	copyFixture(t, dir, "media/sample.tiff", "x.tif")
 	// An image with no name to go on, as a URL or stdin often arrives.
-	copyFixture(t, dir, "sample.png", "avatar")
+	copyFixture(t, dir, "media/sample.png", "avatar")
 	// Binary that starts with a weak magic but is not the format it suggests.
 	writeFile(t, dir, "counts.dat", "BM\xd2\x04"+strings.Repeat("\x00", 60), 0644)
 	writeFile(t, dir, "data.bin", "\x00\x00\x01\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b"+
@@ -81,41 +74,8 @@ func SetupMediaLookalikeFixture(t *testing.T) string {
 	return dir
 }
 
+// copyFixture copies from, a file below testdata, to dir/to.
 func copyFixture(t *testing.T, dir, from, to string) {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", "media", from))
-	if err != nil {
-		t.Fatalf("read fixture %s: %v", from, err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, to), data, 0644); err != nil {
-		t.Fatalf("write fixture %s: %v", to, err)
-	}
-}
-
-// createMediaZip covers extraction from an archive entry, which is read through
-// a different path than a file on disk.
-func createMediaZip(t *testing.T, path string) {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", "media", "sample.wav"))
-	if err != nil {
-		t.Fatalf("read fixture: %v", err)
-	}
-
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatalf("create zip: %v", err)
-	}
-	defer f.Close()
-
-	w := zip.NewWriter(f)
-	entry, err := w.Create("clip.wav")
-	if err != nil {
-		t.Fatalf("create zip entry: %v", err)
-	}
-	if _, err := entry.Write(data); err != nil {
-		t.Fatalf("write zip entry: %v", err)
-	}
-	if err := w.Close(); err != nil {
-		t.Fatalf("close zip: %v", err)
-	}
+	writeFile(t, dir, to, string(readFixtureFile(t, from)), 0644)
 }
