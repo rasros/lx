@@ -22,9 +22,9 @@ int globbed(void);
 ...
 /* The tails of trailing field comments document nothing below them. */
 struct irq {
-    int vcpu;       /* The VCPU it is queued on,
+    int vcpu;
 ...
-    int target;     /* The VCPU it should go to,
+    int target;
 ...
     int pending;
 };
