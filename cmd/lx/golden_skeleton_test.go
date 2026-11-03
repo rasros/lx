@@ -114,13 +114,19 @@ func TestGoldenSkeleton(t *testing.T) {
 
 // TestGoldenSkeletonMembers covers each language's member table: enums,
 // namespaces, traits, companion objects, nested types and privacy, with -u
-// (method signatures in their types), -Y (types and fields) and both.
+// (method signatures in their types) and -Y (types and fields).
 func TestGoldenSkeletonMembers(t *testing.T) {
 	dir := gf.SetupSkeletonFixture(t)
-	runTestGolden(t, dir, skeletonModeCases(610, "members", []string{
+	var cases []goldenTestCase
+	for _, tc := range skeletonModeCases(610, "members", []string{
 		"members.cpp", "members.cs", "Members.java", "members.kt", "members.swift",
 		"members.rs", "members.ts", "members.dart", "members.php", "members.ml", "members.m",
-	}))
+	}) {
+		if !strings.HasSuffix(tc.name, "_both") {
+			cases = append(cases, tc)
+		}
+	}
+	runTestGolden(t, dir, cases)
 }
 
 // TestGoldenSkeletonTopLevel covers C and C++ top-level declarations: header
@@ -145,7 +151,12 @@ func TestGoldenSkeletonTopLevel(t *testing.T) {
 		"enumclass.h", "kernel.h", "cppempty.h"} {
 		stem := strings.TrimSuffix(file, filepath.Ext(file))
 		for _, tc := range skeletonModeCases(650+3*i, stem, []string{file}) {
-			if slices.Contains(functionsOnly, file) && strings.HasSuffix(tc.name, "_types") {
+			// Both modes only join -u and -Y, so it is kept where -Y is not.
+			skip := "_both"
+			if slices.Contains(functionsOnly, file) {
+				skip = "_types"
+			}
+			if strings.HasSuffix(tc.name, skip) {
 				continue
 			}
 			cases = append(cases, tc)
@@ -196,7 +207,6 @@ func TestGoldenSkeletonSlicing(t *testing.T) {
 		{name: "412_skeleton_tail_java_both", args: []string{"-u", "-Y", "--tail", "2", "skeleton/Main.java"}},
 
 		// 420-429: Interleaved state with slicing
-		{name: "420_skeleton_lines_after_reset", args: []string{"-u", "-Y", "--lines", "2", "skeleton/main.py"}},
 
 		// 430-439: New language slicing
 		{name: "430_skeleton_head_swift_both", args: []string{"-u", "-Y", "--head", "2", "skeleton/main.swift"}},

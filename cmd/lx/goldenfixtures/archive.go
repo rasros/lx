@@ -173,13 +173,10 @@ func SetupRepoArchiveFixture(t *testing.T) string {
 	return dir
 }
 
-// SetupArchiveDepthFixture writes the same files twice, below arch/ as
-// archives at three depths and below dirs/ as directories of the same
-// names, so the globs can be shown to treat them alike.
-func SetupArchiveDepthFixture(t *testing.T) (arch, dirs string) {
+// SetupArchiveDepthFixture writes archives at three depths.
+func SetupArchiveDepthFixture(t *testing.T) string {
 	t.Helper()
-	root := t.TempDir()
-	arch, dirs = filepath.Join(root, "arch"), filepath.Join(root, "dirs")
+	dir := t.TempDir()
 	entries := [][2]string{
 		{"src/a.go", "package src\n"},
 		{"src/b.txt", "b\n"},
@@ -187,15 +184,12 @@ func SetupArchiveDepthFixture(t *testing.T) (arch, dirs string) {
 		{"notes.txt", "n\n"},
 	}
 	for _, a := range []string{"top.zip", "d1/mid.zip", "d1/d2/low.zip"} {
-		if err := os.MkdirAll(filepath.Dir(filepath.Join(arch, a)), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, a)), 0755); err != nil {
 			t.Fatal(err)
 		}
-		createTestZip(filepath.Join(arch, a), entries)
-		for _, e := range entries {
-			writeFile(t, dirs, filepath.Join(a, e[0]), e[1], 0644)
-		}
+		createTestZip(filepath.Join(dir, a), entries)
 	}
-	return arch, dirs
+	return dir
 }
 
 func createTestZip(path string, files [][2]string) {

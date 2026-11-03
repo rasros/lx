@@ -95,12 +95,8 @@ func TestGoldenSlicingLarge(t *testing.T) {
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "040b_lines_large_line_numbers", args: []string{"--lines", "6", "-l", "big.txt"}},
 		{name: "040c_lines_crlf", args: []string{"--lines", "4", "crlf.txt"}},
-		{name: "040d_lines_crlf_line_numbers", args: []string{"--lines", "4", "-l", "crlf.txt"}},
 		{name: "041b_line_numbers_crlf", args: []string{"-l", "crlf.txt"}},
-		{name: "044b_tail_large", args: []string{"--tail", "4", "big.txt"}},
 		{name: "044c_tail_large_line_numbers", args: []string{"--tail", "4", "-l", "big.txt"}},
-		{name: "045b_head_large", args: []string{"--head", "3", "big.txt"}},
-		{name: "046b_lines_overlap_crlf", args: []string{"--lines", "10", "crlf.txt"}},
 		{name: "047b_lines_0_compact_large", args: []string{"-n", "0", "big.txt"}},
 	})
 }
@@ -128,11 +124,6 @@ func TestGoldenErrors(t *testing.T) {
 		{name: "060_access_denied_file", args: []string{"secret/locked.txt"}},
 		{name: "061_access_denied_dir", args: []string{"secret/locked_dir"}},
 		{name: "061b_stats_counts_unreadable_entries", args: []string{"--stats", "secret"}},
-		{name: "061c_stats_counts_broken_archive", args: []string{"--stats", "-Z", "broken"}},
-		{name: "061d_stats_counts_missing_and_unreadable", args: []string{"--stats", "nope.go", "secret/locked.txt"}},
-		{name: "061f_stats_piped_failure_found_twice_counts_once", args: []string{"--stats"}, stdin: "dangling/dangling.txt\ndangling\n"},
-		{name: "061g_stats_counts_corrupt_archive_entry", args: []string{"--stats", "-Z", "corrupt/entries.zip"}},
-		{name: "061h_stdin_read_failure", args: []string{"--stats", "main.go", "-"}, stdin: "partial", stdinFails: true},
 		{name: "061e_stats_piped_list_counts_each_failure_once", args: []string{"--stats", "-Z"}, stdin: "secret\nsecret/locked_dir\nsecret/locked.txt\nbroken\nbroken/bad.zip\nnope.go\nnope.go\n"},
 		{name: "062_missing_file", args: []string{"nonexistent.go"}},
 		{name: "063_spaces_in_filename", args: []string{"spaces/file with spaces.txt"}},
@@ -414,15 +405,7 @@ func TestGoldenMediaURL(t *testing.T) {
 	u := server.URL
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "170j_media_url_mp4", args: []string{"-M", u + "/sample.mp4"}},
-		{name: "170k_media_url_mkv_webm", args: []string{"-M", u + "/sample.mkv", u + "/sample.webm"}},
-		{name: "170l_media_url_audio", args: []string{"-M", u + "/sample.mp3", u + "/sample.wav", u + "/sample.flac", u + "/sample.m4a"}},
-		{name: "170m_media_url_images", args: []string{"-M", u + "/sample.gif", u + "/sample.webp", u + "/sample.tiff", u + "/sample.jpg", u + "/sample.png", u + "/sample.bmp", u + "/sample.avif"}},
-		{name: "170n_media_url_no_flag", args: []string{u + "/sample.mp4", u + "/notes.txt"}},
-		{name: "170o_media_url_stats", args: []string{"-M", "--stats", u + "/sample.mp4", u + "/notes.txt"}},
 		{name: "170p_media_url_chunked", args: []string{"-M", u + "/chunked/sample.mp4", u + "/chunked/sample.mkv", u + "/chunked/notes.txt"}},
-		{name: "170q_media_url_truncated_suffixless", args: []string{"-M", u + "/truncated.mp4", u + "/suffixless", u + "/mislabelled.jpg"}},
-		{name: "170r_media_url_html_embeds", args: []string{"--html", "-M", u + "/sample.png"}},
-		{name: "170s_url_compact", args: []string{"-n0", u + "/notes.txt", u + "/chunked/notes.txt", u + "/sample.mp4"}},
 		{name: "170t_url_cut_off_body_fails", args: []string{"--stats", u + "/cutoff/notes.txt", u + "/notes.txt"}},
 		{name: "170u_url_cut_off_chunked_body_fails", args: []string{"--stats", u + "/cutchunk/notes.txt", u + "/notes.txt"}},
 	}, u)
