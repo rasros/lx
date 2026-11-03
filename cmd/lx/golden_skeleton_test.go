@@ -33,7 +33,7 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "322_skeleton_c_both", args: []string{"-u", "-Y", "skeleton/main.c"}},
 		{name: "323_skeleton_cpp_both", args: []string{"-u", "-Y", "skeleton/main.cpp"}},
 		{name: "324_skeleton_c_block_doc", args: []string{"-u", "-Y", "skeleton/blockdoc.c"}},
-		{name: "327_skeleton_h_unhinted_cpp", args: []string{"-u", "skeleton/nohint.h"}},
+		{name: "327_skeleton_h_cpp_methods", args: []string{"-u", "skeleton/methods.h"}},
 
 		// 330-339: Java
 		{name: "330_skeleton_java_structs", args: []string{"-Y", "skeleton/Main.java"}},

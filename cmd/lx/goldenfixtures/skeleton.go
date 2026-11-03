@@ -19,7 +19,7 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"main.c",
 		"main.cpp",
 		"blockdoc.c",
-		"nohint.h",
+		"methods.h",
 		"Main.java",
 		"main.rs",
 		"main.ts",

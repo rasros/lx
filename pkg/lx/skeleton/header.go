@@ -14,19 +14,11 @@ import (
 // the C++ grammar fails on stays C, as before: that grammar loses class
 // and namespace headers on some templates and macros, so a C++ tree with
 // errors can show less than the C one.
-//
-// The C++ grammar goes first when the text hints at C++ (see cppHint), so
-// most C++ headers are parsed once, and a C header only when the C grammar
-// fails on it.
 func extractHeader(src []byte, lines [][]byte, functions, structs bool) ([]internal.LineRange, bool) {
-	var cpp parsed
-	if cppHint(src) {
-		if p, ok := parse("cpp", src); ok {
-			cpp = p
-			defer cpp.tree.Release()
-			if cppClean(cpp, src) {
-				return cpp.walk(src, lines, functions, structs), true
-			}
+	if cpp, ok := parse("cpp", src); ok {
+		defer cpp.tree.Release()
+		if cppClean(cpp, src) {
+			return cpp.walk(src, lines, functions, structs), true
 		}
 	}
 	c, ok := parse("c", src)
@@ -34,14 +26,6 @@ func extractHeader(src []byte, lines [][]byte, functions, structs bool) ([]inter
 		return nil, false
 	}
 	defer c.tree.Release()
-	if c.tree.RootNode().HasError() && cpp.tree == nil {
-		if p, ok := parse("cpp", src); ok {
-			defer p.tree.Release()
-			if cppClean(p, src) {
-				return p.walk(src, lines, functions, structs), true
-			}
-		}
-	}
 	return c.walk(src, lines, functions, structs), true
 }
 
@@ -50,21 +34,6 @@ func extractHeader(src []byte, lines [][]byte, functions, structs bool) ([]inter
 func cppClean(p parsed, src []byte) bool {
 	root := p.tree.RootNode()
 	return !root.HasError() && int(root.EndByte()) >= len(bytes.TrimRight(src, " \t\r\n")) && cppEvidence(p, src)
-}
-
-// cppHint reports text C++ source is likely to hold and C source is not.
-// It only orders the parses: either grammar may still read the header.
-func cppHint(src []byte) bool {
-	for _, s := range cppHints {
-		if bytes.Contains(src, s) {
-			return true
-		}
-	}
-	return false
-}
-
-var cppHints = [][]byte{
-	[]byte("::"), []byte("class "), []byte("namespace "), []byte("template"), []byte("public:"), []byte("operator"),
 }
 
 // cppOnly are node types of constructs C does not have.
