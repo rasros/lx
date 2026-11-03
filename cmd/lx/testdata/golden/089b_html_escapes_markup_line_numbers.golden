@@ -56,7 +56,7 @@ article > header {
 2: &lt;p&gt;hi &amp;amp; bye&lt;/p&gt;
 </code></pre>
 </article>
-</section></main>
+</main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
 </body>
