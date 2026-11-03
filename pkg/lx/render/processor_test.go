@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -271,14 +272,14 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "big.txt"), data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	osFile, err := sources.NewInputFileFromPath(os.DirFS(dir), "big.txt")
-	if err != nil {
-		t.Fatal(err)
+	inputFile := func(fsys fs.FS) sources.InputFile {
+		info, err := fs.Stat(fsys, "big.txt")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sources.NewInputFile(fsys, "big.txt", info)
 	}
-	mapFile, err := sources.NewInputFileFromPath(fstest.MapFS{"big.txt": {Data: data}}, "big.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	osFile, mapFile := inputFile(os.DirFS(dir)), inputFile(fstest.MapFS{"big.txt": {Data: data}})
 
 	engine, _ := templatex.Compile(core.NewConfig())
 	proc := NewProcessor(engine, core.Plan{})

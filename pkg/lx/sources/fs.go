@@ -100,14 +100,6 @@ func ReadStream(r io.Reader, limit int64) ([]byte, error) {
 	return data, err
 }
 
-func NewInputFileFromPath(fsys fs.FS, path string) (InputFile, error) {
-	info, err := fs.Stat(fsys, path)
-	if err != nil {
-		return InputFile{}, err
-	}
-	return NewInputFile(fsys, path, info), nil
-}
-
 func NewBufferInputFile(name string, data []byte) InputFile {
 	return InputFile{
 		Path:    name,

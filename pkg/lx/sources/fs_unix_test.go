@@ -63,10 +63,11 @@ func TestStreamLimit(t *testing.T) {
 		{"12345", true},
 	} {
 		dir, name := newFIFO(t)
-		f, err := NewInputFileFromPath(os.DirFS(dir), name)
+		info, err := os.Stat(filepath.Join(dir, name))
 		if err != nil {
 			t.Fatal(err)
 		}
+		f := NewInputFile(os.DirFS(dir), name, info)
 		go func() {
 			if w, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY, 0); err == nil {
 				_, _ = w.Write([]byte(tc.body))
