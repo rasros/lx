@@ -78,3 +78,12 @@ func XDGConfigHome(env Lookup) string {
 	}
 	return ""
 }
+
+// Abs returns p as an absolute path, resolved against the working directory
+// cwd.
+func Abs(cwd, p string) string {
+	if filepath.IsAbs(p) {
+		return filepath.Clean(p)
+	}
+	return filepath.Join(cwd, p)
+}
