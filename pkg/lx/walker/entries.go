@@ -5,13 +5,9 @@ import (
 	"strings"
 )
 
-// Entries judges the paths of a tree that is read as a sequence of entries
-// instead of walked, such as an archive, as Walk judges them in an fs.FS
-// holding the tree: the overrides match them after Options.OverridePrefix,
-// and the base rules and hidden-file skipping apply, but there are no
-// ignore files to read. A path below a directory the walk would skip is
-// skipped with it, whether or not the directory has an entry of its own.
-// It is not safe for concurrent use.
+// Entries judges the paths of a tree read as a sequence of entries, such as
+// an archive, as Walk would judge them, without ignore files. A path below a
+// skipped directory is skipped too. It is not safe for concurrent use.
 type Entries struct {
 	w  *Walker
 	rt *ruleTree
@@ -33,9 +29,7 @@ func (w *Walker) Entries() *Entries {
 }
 
 // Keep reports whether a walk of the tree keeps the entry at p, a clean
-// slash-separated path from the tree's root that is a directory when isDir.
-// As in a walk, Options.OnIgnore is told about a skipped path once, and not
-// about the paths below a skipped directory.
+// slash-separated path from the tree's root.
 func (e *Entries) Keep(p string, isDir bool) bool {
 	if isDir {
 		return e.keepDir(p)
@@ -52,9 +46,7 @@ func (e *Entries) Keep(p string, isDir bool) bool {
 	return true
 }
 
-// KeepShown reports whether a walk keeps the file at p as Keep does, but
-// never skips it as hidden: it stands for a file that was named, such as
-// the content of a named compressed file.
+// KeepShown is Keep without hidden-file skipping, for a named file.
 func (e *Entries) KeepShown(p string, isDir bool) bool {
 	if !e.w.opts.SkipHidden {
 		return e.Keep(p, isDir)

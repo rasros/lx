@@ -47,33 +47,22 @@ type ArchiveOptions struct {
 	// Origin names the archive in each entry's InputFile.Archive: its
 	// absolute path, or its URL when it was downloaded.
 	Origin string
-	// Walker picks the entries, as its Walk would pick them in an fs.FS of
-	// the archive; nil keeps them all.
+	// Walker picks the entries; nil keeps them all.
 	Walker *walker.Walker
-	// MaxSize, when positive, is the size over which an entry is not read.
-	// Such an entry is returned with its size alone, for the stream to drop
-	// as it drops any file over its RenderOptions.MaxSize, which MaxSize
-	// should be.
+	// MaxSize, when positive, leaves larger entries unread so the stream
+	// drops them. It should match RenderOptions.MaxSize.
 	MaxSize int64
-	// Log is told about entries that cannot be read, and skipped ones;
-	// nil logs to slog.Default().
+	// Log is nil for slog.Default().
 	Log *slog.Logger
-	// Named marks an archive that was named, as a path or URL, rather than
-	// found in a walk. The one entry of a named compressed file is the named
-	// file's content, so, as a named file, it is not skipped as hidden.
+	// Named marks an archive named rather than walked. A named compressed
+	// file's one entry is then never skipped as hidden.
 	Named bool
 }
 
 // ExpandArchive returns the files in the archive at absPath that opts.Walker
-// keeps, in the order a walk would find them. The archive is read once, from
-// start to end, and only the entries kept and no larger than opts.MaxSize
-// are read, into memory, so the archive is not needed once it returns. An
-// entry whose path leaves the archive, through "..", is skipped. An archive
-// that cannot be read to its end fails with the entries read before it
-// failed. The entries that cannot be read, or end before the size the
-// archive claims for them, are returned as failures. An archive holding a file and a directory of the same name, as
-// no filesystem can, has both returned, but a tree of them shows only the
-// directory.
+// keeps, in walk order. The archive is read once and the kept entries are
+// read into memory, so it is not needed once this returns. Entries escaping
+// through ".." are skipped, and unreadable ones are returned as failures.
 func ExpandArchive(ctx context.Context, absPath string, opts ArchiveOptions) ([]InputFile, []core.Failure, error) {
 	if !IsArchivePath(absPath) {
 		return nil, nil, nil
@@ -108,8 +97,7 @@ func ExpandArchive(ctx context.Context, absPath string, opts ArchiveOptions) ([]
 		return nil, nil, ctxErr
 	}
 	if n := len(x.failures); err != nil && n > 0 && errors.Is(err, x.failures[n-1].Err) {
-		// The entry that failed ended the archive, as a tar entry cut short
-		// does: one failure, counted once.
+		// A truncated entry ended the archive; count it once.
 		err = nil
 	}
 	if err != nil {
@@ -125,11 +113,8 @@ func ExpandArchive(ctx context.Context, absPath string, opts ArchiveOptions) ([]
 	return files, x.failures, err
 }
 
-// identifyArchive identifies the format of the archive file, named name,
-// by its content, as a .zip named .tar.gz is a zip archive, or by its name
-// when the content does not say, as for a brotli stream, which has no
-// header. It leaves file at its start. Its error is the same for every
-// file no format fits.
+// identifyArchive identifies the archive format by content, falling back to
+// name for headerless formats such as brotli. It leaves file at its start.
 func identifyArchive(ctx context.Context, file *os.File, name string) (archives.Format, error) {
 	format, _, err := archives.Identify(ctx, "", file)
 	if errors.Is(err, archives.NoMatch) {
@@ -139,8 +124,7 @@ func identifyArchive(ctx context.Context, file *os.File, name string) (archives.
 		format, _, err = archives.Identify(ctx, name, file)
 	}
 	if err != nil {
-		// Identify tries the formats in no fixed order and names the one
-		// it failed on, so the error says no more than that none fit.
+		// Identify's error names an arbitrary format it tried.
 		return nil, errors.New("no format lx can read")
 	}
 	// Identify reads the head of a seekable stream and rewinds it, but the
@@ -172,9 +156,7 @@ type expansion struct {
 	failures []core.Failure
 }
 
-// fail records that the entry at key, which is entry in the archive, could
-// not be read. It is named below the archive's origin, as the inputs it
-// would have been are keyed.
+// fail records that the entry at key could not be read.
 func (x *expansion) fail(key, entry string, err error) {
 	x.failures = append(x.failures, core.Failure{
 		Kind:    core.FailedArchiveEntry,
@@ -189,9 +171,7 @@ type entryFile struct {
 	file InputFile
 }
 
-// handle decides on one entry of an archive being extracted: a directory
-// the walker skips is skipped whole, and a file is read only when it is
-// kept and no larger than MaxSize.
+// handle decides on one entry of an archive being extracted.
 func (x *expansion) handle(ctx context.Context, info archives.FileInfo) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -242,8 +222,7 @@ func (x *expansion) handle(ctx context.Context, info archives.FileInfo) error {
 	return nil
 }
 
-// decompress reads the one entry of a compressed file, named after it
-// without the compression suffix, so the entry of notes.txt.gz is
+// decompress reads the one entry of a compressed file, so notes.txt.gz holds
 // notes.txt.gz/notes.txt.
 func (x *expansion) decompress(d archives.Decompressor, file *os.File) error {
 	name := singleEntryName(x.opts.Origin)
@@ -259,9 +238,7 @@ func (x *expansion) decompress(d archives.Decompressor, file *os.File) error {
 		return err
 	}
 	defer rc.Close()
-	// The size of the decompressed content is known only once it is read.
-	// Unlike a Stream it is not capped at DefaultStreamLimit without -m: it
-	// ends, as the entries of any archive do, which are not capped either.
+	// Decompressed content ends, so unlike a Stream it has no default cap.
 	data, n, err := readEntry(rc, -1, x.opts.MaxSize)
 	if err != nil {
 		name := singleEntryName(x.opts.Origin)
@@ -276,18 +253,16 @@ func (x *expansion) decompress(d archives.Decompressor, file *os.File) error {
 	return nil
 }
 
-// compressionSuffixes are the suffixes of single-file compression, and what
-// each leaves of a name: ".tgz" is a compressed ".tar", which is a plain
-// file when the content is not a tar archive.
+// compressionSuffixes map single-file compression suffixes to what each
+// leaves of a name.
 var compressionSuffixes = [][2]string{
 	{".tgz", ".tar"}, {".tbz2", ".tar"}, {".txz", ".tar"},
 	{".gz", ""}, {".bz2", ""}, {".xz", ""}, {".zst", ""}, {".br", ""},
 	{".lz4", ""}, {".sz", ""}, {".s2", ""}, {".lz", ""},
 }
 
-// singleEntryName names the content of the compressed file at origin, a
-// path or URL: its name without the compression suffix, so foo.tar.gz that
-// is no tar archive holds foo.tar, or its name when that is all there is.
+// singleEntryName names the content of the compressed file at origin: its
+// name without the compression suffix.
 func singleEntryName(origin string) string {
 	name := filepath.Base(origin)
 	if u, err := parseHTTPURL(origin); err == nil {
@@ -312,8 +287,7 @@ func (x *expansion) over(size int64) bool {
 	return x.opts.MaxSize > 0 && size > x.opts.MaxSize
 }
 
-// add adds the entry displayed at key, which is entry in the archive, of
-// size bytes. Its content is data, or, when it is over MaxSize, unread.
+// add adds the entry displayed at key, left unread when over MaxSize.
 func (x *expansion) add(key, entry string, size int64, info fs.FileInfo, data *content) {
 	f := InputFile{
 		Path:    x.base + "/" + key,

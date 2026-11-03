@@ -20,14 +20,12 @@ type Plan struct {
 	SkippedBySize int
 }
 
-// Report is what rendering a Stream turned out to be: its Plan and what
-// only rendering finds out.
+// Report is a Stream's Plan plus what only rendering finds out.
 type Report struct {
 	Plan
 	TotalWrittenBytes int64
 	TotalRows         int64
-	// WrittenTokenEstimate is estimated from the written output, where the
-	// Plan's TokenEstimate is estimated from file sizes alone.
+	// WrittenTokenEstimate is estimated from the written output.
 	WrittenTokenEstimate int64
 	BinaryFiles          int
 	// FailedFiles counts every Failure: the ones added to the Stream and the
@@ -163,9 +161,8 @@ func (f FileContext) TokenEstimate() int64 {
 	return tc(f.Size, f.Content)
 }
 
-// SetTokenCounter sets the estimator behind f's TokenEstimate. Only the
-// renderer sets it, so it is a function rather than a method: a method would
-// be part of FileContext, which lx exports as the template contract.
+// SetTokenCounter sets the estimator behind f's TokenEstimate. It is a
+// function so templates, which see FileContext's methods, cannot call it.
 func SetTokenCounter(f *FileContext, tc TokenCounter) {
 	f.tokenCounter = tc
 }
@@ -223,9 +220,7 @@ type Tokenizer interface {
 }
 
 // Failure is an input that could not be read, so it is missing from the
-// output. Discovery returns the failures it meets and a Stream reports the
-// ones added to it, or met rendering, in output order, so each failure is
-// counted once, in the Stream's FailedFiles.
+// output. Each is reported and counted once, in output order.
 type Failure struct {
 	Kind FailureKind
 	// Path names the input the same way however it was reached: its

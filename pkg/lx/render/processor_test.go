@@ -546,8 +546,8 @@ func TestClassifyVerifiesBeforeTreatingAsImage(t *testing.T) {
 	}
 }
 
-// bigLines is a text file well past the 32 KB that row counts were once
-// estimated from, with every line distinct so its position can be checked.
+// bigLines is a large text file with every line distinct so its position can
+// be checked.
 func bigLines(n int) []byte {
 	var b bytes.Buffer
 	for i := 1; i <= n; i++ {

@@ -10,8 +10,7 @@ import (
 )
 
 // infoExclude reads the info/exclude rules shared by the worktrees of gitDir,
-// scoped to basePath.
-// An empty gitDir, one the walk cannot reach, has none.
+// scoped to basePath. An unreachable, empty gitDir has none.
 func infoExclude(g gitFS, gitDir, basePath string) []Rule {
 	if gitDir == "" {
 		return nil
@@ -35,8 +34,7 @@ func parseRuleFile(data []byte, basePath, source string) []Rule {
 	return parseRules(strings.Split(string(data), "\n"), basePath, source)
 }
 
-// logReadError records why a rule file that exists could not be read, so a
-// silently missing set of rules shows up in --debug output.
+// logReadError logs why an existing rule file could not be read.
 func logReadError(log *slog.Logger, path string, err error) {
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		log.Debug("Failed to read ignore rules", "path", path, "error", err)
@@ -94,14 +92,10 @@ func (subGitFS) Resolve(base, target string) (string, bool) {
 	return p, fs.ValidPath(p)
 }
 
-// findGitDir returns the git directory of the repository rooted at repo. Like
-// git, it accepts a .git directory only when it looks like a git directory,
-// and a .git file only when its "gitdir:" line, as used by linked worktrees
-// and submodules, points at one. Anything else named .git is not a repository.
-//
-// A gitdir the walked filesystem cannot reach, absolute or outside it, cannot
-// be checked. The .git file still marks a repository boundary, as it did in
-// the repository the walk came from, and the git directory is returned empty.
+// findGitDir returns the git directory of the repository rooted at repo.
+// Like git, it accepts a .git directory that looks like one, or a .git file
+// whose "gitdir:" line points at one. A gitdir the walked filesystem cannot
+// reach still marks a repository, with an empty git directory.
 func findGitDir(g gitFS, repo string) (string, bool) {
 	dotGit := g.Join(repo, ".git")
 	info, err := g.Stat(dotGit)
@@ -136,9 +130,7 @@ func findGitDir(g gitFS, repo string) (string, bool) {
 }
 
 // isGitDir reports whether dir looks like a git directory, following git's
-// is_git_directory: a valid HEAD, and objects and refs directories in the
-// directory shared by all worktrees. A shared directory the walked filesystem
-// cannot reach is taken on trust.
+// is_git_directory. An unreachable shared directory is taken on trust.
 func isGitDir(g gitFS, dir string) bool {
 	if !validHead(g, g.Join(dir, "HEAD")) {
 		return false
@@ -157,9 +149,7 @@ func isGitDir(g gitFS, dir string) bool {
 }
 
 // validHead reports whether the file at p is a HEAD git accepts, following
-// git's validate_headref: a symlink into refs/, which need not exist on an
-// unborn branch or after the refs are packed, or a file holding a symbolic
-// ref into refs/ or starting with an object id.
+// git's validate_headref.
 func validHead(g gitFS, p string) bool {
 	info, err := g.Lstat(p)
 	if err != nil {
@@ -212,9 +202,8 @@ func commonDir(g gitFS, gitDir string) (string, bool) {
 	return g.Resolve(gitDir, common)
 }
 
-// resolveRelative resolves target against base the way the filesystem does.
-// filepath.Join would collapse ".." textually, which goes wrong when base is
-// reached through a symlink, so base is made real first.
+// resolveRelative resolves target against base the way the filesystem does:
+// base is made real first, since filepath.Join collapses ".." textually.
 func resolveRelative(base, target string) string {
 	if filepath.IsAbs(target) {
 		return filepath.Clean(target)

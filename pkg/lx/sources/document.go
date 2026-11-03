@@ -27,10 +27,8 @@ func isHTMLPath(path string) bool {
 		strings.HasSuffix(lower, ".xhtml")
 }
 
-// IsHTMLInput reports whether an input should be treated as HTML. A suffix
-// settles it for files; URLs frequently have none, so the media type their
-// source reported decides those. A local file with neither — no HTML suffix and
-// no declared type — is left as-is, since nothing here inspects content.
+// IsHTMLInput reports whether an input should be treated as HTML, by suffix
+// or, for URLs that often have none, by reported media type.
 func IsHTMLInput(f InputFile) bool {
 	if isHTMLPath(f.Path) {
 		return true

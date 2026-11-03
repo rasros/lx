@@ -35,26 +35,23 @@ type signature struct {
 	match    func(header []byte) bool
 }
 
-// Format is one entry of the registry: everything lx knows about a file format,
-// so that the extension table, the MIME table, the sniffer and the parser
-// cannot disagree about it.
+// Format is everything lx knows about a file format, in one registry entry
+// so the extension, MIME, sniffer and parser tables cannot disagree.
 type Format struct {
 	Name string
 	Kind Kind
 	MIME string
 	Exts []string
 
-	// family groups formats that share a container layout and differ only in
-	// what they declare inside it, such as the ISO brands. Within a family the
-	// extension is the better guide to intent, since the declarations overlap.
+	// family groups formats sharing a container layout, such as the ISO
+	// brands. Within a family the extension is the better guide.
 	family     string
 	signatures []signature
 	parse      func(*byteReader) *MediaInfo
 }
 
-// Verify reports whether the header plausibly is this format: either a strong
-// signature matches, or the parser makes sense of it. A weak signature or an
-// extension alone proves nothing about the bytes.
+// Verify reports whether the header plausibly is this format: a strong
+// signature matches, or the parser makes sense of it.
 func (f *Format) Verify(header []byte) bool {
 	if f == nil {
 		return false
@@ -85,9 +82,7 @@ func magicAt(off int, want string) func([]byte) bool {
 func strong(match func([]byte) bool) signature { return signature{Strong, match} }
 func weak(match func([]byte) bool) signature   { return signature{Weak, match} }
 
-// isoBrands lists the brands an ftyp box declares: the major brand, then the
-// compatible brands that follow the minor version, up to the end of the box or
-// of the header, whichever comes first.
+// isoBrands lists the major and compatible brands an ftyp box declares.
 func isoBrands(h []byte) []string {
 	if len(h) < 12 {
 		return nil
@@ -103,11 +98,9 @@ func isoBrands(h []byte) []string {
 	return brands
 }
 
-// isoBrand matches an ISO base media file that declares one of the brands,
-// major or compatible, which are the only thing telling apart formats that
-// share the box layout entirely. With no brands given, any ftyp box matches.
-// Formats that share brands (an AVIF also lists the generic HEIF mif1) are
-// told apart by registry order, the specific one first.
+// isoBrand matches an ISO base media file declaring one of the brands, or any
+// ftyp box when none are given. Formats sharing brands are told apart by
+// registry order, the specific one first.
 func isoBrand(brands ...string) func([]byte) bool {
 	return func(h []byte) bool {
 		if !magicAt(4, "ftyp")(h) {
@@ -178,8 +171,7 @@ var formats = []*Format{
 	// tag is not.
 	{Name: "mp3", Kind: KindAudio, MIME: "audio/mpeg", Exts: []string{".mp3"},
 		signatures: []signature{strong(magicAt(0, "ID3")), weak(looksLikeMP3)}, parse: parseMP3},
-	// SVG is XML, and reads better as text than as an embedded blob. It is here
-	// for its MIME type, for templates that pass an svg path to dataURI on purpose.
+	// SVG reads better as text; it is here for its MIME type, for dataURI.
 	{Name: "svg", Kind: KindMarkup, MIME: "image/svg+xml", Exts: []string{".svg"}},
 }
 
@@ -210,10 +202,9 @@ func FormatByName(name string) *Format {
 // SniffLen is how much of a file's start Classify needs to see.
 const SniffLen = 1024
 
-// sniffFormat identifies a format from the header alone. Strong signatures are
-// tried before weak ones so that a short magic cannot shadow a specific one,
-// and weak signatures count only for binary content that the format's parser
-// makes sense of: two bytes of "BM" are not a bitmap on their own.
+// sniffFormat identifies a format from the header alone. Strong signatures
+// are tried first, and weak ones count only for binary content the format's
+// parser accepts.
 func sniffFormat(header []byte) (*Format, Strength) {
 	if len(header) == 0 {
 		return nil, 0
@@ -240,20 +231,11 @@ func sniffWith(header []byte, strength Strength) *Format {
 	return nil
 }
 
-// Classify decides what format a file is from its name and the first bytes of
-// its content (up to SniffLen), and returns nil for anything that is not a
-// registered format. The content decides wherever it can:
-//
-//   - content that looks like text is never a registered format, whatever the
-//     extension says, since a mislabelled text file (such as a Git LFS pointer)
-//     is still text;
-//   - a strong signature overrides the extension, except between formats of
-//     one family (an .m4a declaring only the generic isom brand), where the
-//     extension is the better guide;
-//   - otherwise the extension decides, and failing that a weak signature the
-//     format's parser accepts.
-//
-// An empty header carries no evidence, so the extension alone decides.
+// Classify decides a file's format from its name and first SniffLen bytes,
+// or returns nil. Text content is never a registered format; a strong
+// signature overrides the extension except within a family; otherwise the
+// extension decides, then a weak signature. An empty header leaves it to the
+// extension.
 func Classify(p string, header []byte) *Format {
 	byExt := FormatByExt(p)
 	if len(header) == 0 {

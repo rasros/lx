@@ -101,8 +101,6 @@ func (p *Processor) RenderPrepared(ctx context.Context, w io.Writer, item Prepar
 	switch v := item.Raw.(type) {
 	case FileItem:
 		fCtx, issues := p.prepareFileContext(ctx, v.File, v.Opts, item.FileIndexGlobal, scratchBuf)
-		// What a cancelled file made of its failed reads is no description
-		// of it.
 		if err := ctx.Err(); err != nil {
 			return RenderStats{}, err
 		}
@@ -182,10 +180,8 @@ type contentLengther interface {
 	ContentLength() int64
 }
 
-// readerFor adapts an opened file to random access. Cases are ordered most to
-// least specific. A stream that offers neither is read lazily, as far as the
-// consumers ask: a converter that needs only headers leaves the rest unread.
-// Its size is the length it declares, or else what reading it to the end finds.
+// readerFor adapts an opened file to random access. A plain stream is read
+// lazily, so a converter that needs only headers leaves the rest unread.
 func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 	switch v := rc.(type) {
 	case *os.File:
@@ -209,10 +205,8 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 }
 
 // converter replaces a file's bytes with a text rendering of them. Converters
-// run before binary and language detection, so detection describes what will
-// actually be rendered. They select on the path and on the format the file was
-// classified as, which is decided from its content before any converter runs.
-// Order matters only if two ever match the same file; the first match wins.
+// run before binary and language detection, so detection describes what is
+// rendered. The first match wins.
 type converter struct {
 	name    string
 	applies func(f sources.InputFile, opts core.RenderOptions, format *internal.Format) bool
@@ -244,10 +238,8 @@ var converters = []converter{
 		applies: func(_ sources.InputFile, opts core.RenderOptions, format *internal.Format) bool {
 			return opts.ExtractMedia && format.IsMedia()
 		},
-		// Media is described from its headers, read through the opened
-		// source: one that can block stops its reads once ctx is done, and
-		// any other is read from memory or disk, which a cancel need not
-		// wait out.
+		// Media is described from its headers; a blocking source stops its
+		// reads once ctx is done.
 		convert: func(_ context.Context, f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error) {
 			return sources.ExtractMediaMetadata(f, r, size)
 		},
@@ -255,11 +247,8 @@ var converters = []converter{
 }
 
 // applyConverters reports whether a converter replaced the content, and the
-// format it converted from. A converter that fails leaves the content untouched
-// and is returned.
-//
-// An image that is about to be embedded is left alone: the picture itself says
-// more than a description of it would.
+// format it converted from. A failing converter leaves the content untouched
+// and is returned. An image about to be embedded is left alone.
 func applyConverters(ctx context.Context, file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool, *ConvertFailure) {
 	if embedImages && format.IsImage() {
 		return reader, size, "", "", false, nil
@@ -285,10 +274,9 @@ func applyConverters(ctx context.Context, file sources.InputFile, opts core.Rend
 	return reader, size, "", "", false, nil
 }
 
-// classify reads the start of the file and decides its format before any
-// converter sees it, so that the content rather than the name has the last word.
-// It also reports whether the bytes bear the format out, which a name or a weak
-// signature alone does not; only such a file is rendered as a picture.
+// classify decides the file's format from its content before any converter
+// sees it. It also reports whether the bytes verify the format; only a
+// verified image renders as a picture.
 func classify(path string, reader io.ReaderAt, scratch []byte) (*internal.Format, bool) {
 	n, _ := reader.ReadAt(scratch[:min(len(scratch), internal.SniffLen)], 0)
 	format := internal.Classify(path, scratch[:n])
@@ -314,8 +302,8 @@ type skeletonView struct {
 }
 
 // applySkeleton reduces source to signatures and definitions, or returns nil
-// when the file is not reduced. Unlike a converter it runs after detection,
-// because it needs the detected language. A header (.h) may be C or C++.
+// when the file is not reduced. It runs after detection, which picks the
+// language.
 func applySkeleton(cfg core.RenderOptions, lang string, header bool, reader io.ReaderAt, size int64, isBinary, isImage bool) *skeletonView {
 	if isBinary || isImage || (!cfg.SkeletonFunctions && !cfg.SkeletonTypes) || !skeleton.Supported(lang) {
 		return nil
@@ -334,9 +322,7 @@ func applySkeleton(cfg core.RenderOptions, lang string, header bool, reader io.R
 }
 
 // skeletonSlices cuts what cfg asks for from a skeleton. Head and tail count
-// skeleton lines, as they count the lines of any other content, but each line
-// keeps its source row, and the gap between them counts the source rows it
-// leaves out, the same rows the header and line numbers count.
+// skeleton lines, while line numbers and the gap count source rows.
 func skeletonSlices(sk *skeletonView, cfg core.RenderOptions) excerpt {
 	n := sk.lines.Len()
 	sl := excerpt{rows: sk.rows, exact: true}
@@ -354,9 +340,8 @@ func skeletonSlices(sk *skeletonView, cfg core.RenderOptions) excerpt {
 	return sl
 }
 
-// imageDataURI encodes the image from the bytes already open here. Reading them
-// back by path in a template would fail for archive entries and URLs, which
-// have no readable AbsPath.
+// imageDataURI encodes the image from the open bytes, since archive entries
+// and URLs have no AbsPath a template could read.
 func imageDataURI(format *internal.Format, reader io.ReaderAt, size int64) string {
 	if size <= 0 {
 		return ""
@@ -384,9 +369,7 @@ func skeletonModeLabel(functions, types bool) string {
 }
 
 // prepareFileContext describes file for its template. A file that cannot be
-// read becomes an error row; that and a failed converter are returned for
-// the caller to report. Once ctx is done the result describes nothing and is
-// to be discarded.
+// read becomes an error row. Once ctx is done the result is to be discarded.
 func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFile, cfg core.RenderOptions, index int, scratch []byte) (core.FileContext, FileIssues) {
 	var issues FileIssues
 	rc, err := file.Open(ctx)
@@ -403,8 +386,7 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 		}
 	}
 
-	// A stream that may never end reads up to the size limit, which for
-	// files that state their size is applied before they are opened.
+	// A stream may never end, so it reads only up to the size limit.
 	stream, isStream := rc.(*sources.Stream)
 	if isStream && cfg.MaxSize > 0 {
 		stream.SetLimit(cfg.MaxSize)
@@ -431,12 +413,10 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 	if convertedLang != "" {
 		lang = convertedLang
 	}
-	// A converted image is no longer an image but the text describing it, which
-	// the content templates render and the image template would discard.
+	// A converted image renders as text.
 	isImage := format.IsImage() && verified && !converted
 
-	// A skeleton is parsed from bytes already read, which ctx cannot
-	// interrupt, so a cancelled file stops before it.
+	// Skeleton parsing cannot be interrupted, so check ctx before it.
 	if ctx.Err() != nil {
 		return core.FileContext{}, issues
 	}
@@ -461,8 +441,6 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 	)
 	switch {
 	case skel != nil:
-		// The header reports the whole source's rows, which line numbers and
-		// gaps count too.
 		totalRows = skel.rows
 		if !isCompact {
 			content = formatContent(skeletonSlices(skel, cfg), cfg.LineNumbers)
@@ -522,9 +500,8 @@ type excerpt struct {
 	headRows, tailRows []int
 }
 
-// readSlices reads what cfg asks for from lines. A head and tail that meet or
-// overlap cover the whole file, which then renders whole, and any read that
-// covers the whole file yields an exact row count.
+// readSlices reads what cfg asks for from lines. A head and tail that meet
+// render the whole file, with an exact row count.
 func readSlices(lines *internal.LineSource, cfg core.RenderOptions) (excerpt, error) {
 	if cfg.Head < 0 {
 		all, err := lines.All()
@@ -540,8 +517,6 @@ func readSlices(lines *internal.LineSource, cfg core.RenderOptions) (excerpt, er
 		return excerpt{}, err
 	}
 
-	// Head and tail are prefix and suffix of the content, so their byte
-	// lengths alone tell whether anything lies between them.
 	if overlap := int64(len(head)+len(tail)) - lines.Size(); overlap >= 0 {
 		all := append(head[:len(head):len(head)], tail[overlap:]...)
 		return excerpt{head: terminate(all), rows: internal.CountLines(all), exact: true}, nil
@@ -551,8 +526,7 @@ func readSlices(lines *internal.LineSource, cfg core.RenderOptions) (excerpt, er
 	if err != nil {
 		return excerpt{}, err
 	}
-	// Bytes lie between head and tail, so at least one line does too. An
-	// estimate from the start of the file can fall short of that.
+	// Something lies between head and tail, even if the estimate says not.
 	shown := internal.CountLines(head) + internal.CountLines(tail)
 	rows = max(rows, shown+1)
 	sl := excerpt{head: head, tail: tail, rows: rows, exact: exact}
@@ -566,9 +540,7 @@ func readSlices(lines *internal.LineSource, cfg core.RenderOptions) (excerpt, er
 	return sl, nil
 }
 
-// terminate ends a head with a newline when its last line has none, as the
-// head always has been, so templates that print Content as-is keep their
-// output.
+// terminate ends a head with a newline when its last line has none.
 func terminate(head []byte) []byte {
 	if len(head) == 0 || head[len(head)-1] == '\n' {
 		return head
@@ -577,8 +549,7 @@ func terminate(head []byte) []byte {
 }
 
 // formatContent joins the slices into the text the templates render, numbering
-// the lines when asked. The text is built once here, so templates and the token
-// estimate all read the same string.
+// the lines when asked.
 func formatContent(sl excerpt, lineNumbers bool) string {
 	if lineNumbers {
 		return internal.LineNumberFormatter{

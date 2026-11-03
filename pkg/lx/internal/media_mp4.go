@@ -210,9 +210,8 @@ func (b *byteReader) sampleDescription(start, stop int64) (codec string, width, 
 
 	base := start + 8
 	if body, ok := b.at(base+16, 20); ok && base+36 <= stop {
-		// The two entry layouts overlap: audio stores its channel count and rate
-		// where video stores dimensions, so which one is meaningful depends on the
-		// codec, not on the bytes.
+		// Audio stores channels and rate where video stores dimensions; the
+		// codec decides which is meaningful.
 		channels = int(binary.BigEndian.Uint16(body[8:10]))
 		bitDepth = int(binary.BigEndian.Uint16(body[10:12]))
 		sampleRate = int(binary.BigEndian.Uint32(body[16:20]) >> 16)

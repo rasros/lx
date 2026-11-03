@@ -249,10 +249,8 @@ func parseBMP(b *byteReader) *MediaInfo {
 	if !b.magic(0, "BM") {
 		return nil
 	}
-	// A BITMAPCOREHEADER is 12 bytes and stores 16-bit dimensions; everything
-	// later is at least 40 and stores them as signed 32-bit, height negative when
-	// the rows run top down. The two are read separately because a core-header
-	// file is too short to hold the longer one.
+	// A 12-byte BITMAPCOREHEADER stores 16-bit dimensions; later headers
+	// store signed 32-bit ones, height negative for top-down rows.
 	sizeField, ok := b.at(14, 4)
 	if !ok {
 		return nil

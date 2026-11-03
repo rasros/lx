@@ -63,9 +63,8 @@ func NewURLInputFile(raw string) (InputFile, error) {
 	}, nil
 }
 
-// urlBody is a response body that declares its length, so it can be read only
-// as far as it is needed. The length is -1 when the response did not state it,
-// or when the transport decompressed the body.
+// urlBody is a response body that declares its length, so it can be read
+// only as far as needed. The length is -1 when unknown.
 type urlBody struct {
 	io.ReadCloser
 	length int64

@@ -24,10 +24,8 @@ func KotlinPrivate(c *Ctx, _, n *gotreesitter.Node) bool {
 	return false
 }
 
-// KotlinEmitter wraps the generic walker for Kotlin's one irregular shape:
-// a top-level `object : Base { ... }` parses as an infix_expression whose
-// members are the statements of a lambda_literal. Other infix expressions are
-// not declarations and keep nothing.
+// KotlinEmitter wraps the generic walker for a top-level
+// `object : Base { ... }`, which parses as an infix_expression.
 func KotlinEmitter(m *Members) Emitter {
 	return func(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 		if c.Type(n) != "infix_expression" {

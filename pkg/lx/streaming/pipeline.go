@@ -40,9 +40,8 @@ func reorderWindow(workers int) int {
 }
 
 // executePipeline renders the prepared items on s.workers() workers and
-// writes them to dest in order. The feeder hands each job a one-slot result
-// channel and enqueues that channel in a bounded FIFO, so the consumer reads
-// results in order and the feeder stalls once the window is full.
+// writes them to dest in order. Each job gets a one-slot result channel,
+// queued in a bounded FIFO the consumer reads in order.
 func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global core.Plan) (pipelineTotals, error) {
 	var totals pipelineTotals
 	numWorkers := s.workers()
@@ -62,7 +61,6 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		go func() {
 			defer wg.Done()
 
-			// One processor per worker: it no longer carries per-item state.
 			proc := render.NewProcessor(s.engine, global)
 			proc.SetTokenCounter(s.tokenizer.Estimate)
 
@@ -81,8 +79,8 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				itemStats, err := proc.RenderPrepared(ctx, buf, j.item, readBuf)
 				readPool.Put(readBufPtr)
 
-				// One estimate over the whole rendered item, so how the template
-				// happened to split its writes cannot change the count.
+				// Estimate over the whole item, independent of how the
+				// template split its writes.
 				var tokens int64
 				if buf.Len() > 0 {
 					tokens = s.tokenizer.Estimate(int64(buf.Len()), buf.Bytes())
@@ -130,8 +128,8 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				return
 			}
 			if f, ok := item.Raw.(core.Failure); ok {
-				// A failure added to the stream renders nothing; it only
-				// takes its place in the order failures are reported in.
+				// An added failure renders nothing; it only holds its place
+				// in report order.
 				out <- render.Result{Index: item.StreamIndex, Failure: &f}
 				continue
 			}
@@ -215,9 +213,7 @@ func fileOf(item render.PreparedItem) sources.InputFile {
 	return fi.File
 }
 
-// report tells about the failure of an item and the problems its file met
-// while rendering, from the goroutine writing the output, so they come in
-// output order.
+// report reports an item's failure and file issues, in output order.
 func (s *Stream) report(res render.Result) {
 	if f := res.Failure; f != nil {
 		if s.onFailure != nil {

@@ -22,18 +22,9 @@ const (
 	Nested
 )
 
-// Members describes the members of a language's type declarations (classes,
-// interfaces, structs, traits, impls) so that one walker can emit them:
-//
-//   - the header: the rows from the declaration's start to its body's start
-//   - each visible member: fields when types are kept, method signatures when
-//     functions are kept, nested types recursively, each with its doc block
-//     and any annotation siblings right before it
-//   - the body's closing row
-//
-// With functions alone, a type that keeps no method (directly or in a nested
-// type) is left out entirely; one that does keeps its header and closing row
-// for context, but no fields.
+// Members describes a language's type declarations so one walker can emit
+// their header, visible members with docs, and closing row. With functions
+// alone, a type that keeps no method is left out.
 type Members struct {
 	// BodyField is the field name of the body node, tried first.
 	BodyField string
@@ -43,8 +34,7 @@ type Members struct {
 	Bodies       []string
 	SkipBodiless bool
 	// BodyIsNode is for grammars whose members are children of the
-	// declaration itself (Objective-C @interface ... @end): the header is the
-	// declaration's first row and the closing row its last.
+	// declaration itself (Objective-C @interface ... @end).
 	BodyIsNode bool
 
 	Fields  []string
@@ -56,26 +46,17 @@ type Members struct {
 	Kind func(c *Ctx, n *gotreesitter.Node) MemberKind
 
 	// Unwrap, when set, returns the declaration a member wraps (a C++
-	// template_declaration's function or class, the struct specifier of a
-	// C++ `struct Inner { ... };` member, what an Objective-C instance_variable
-	// holds), or the member itself. Section labels and groups are recognized
-	// after unwrapping. The wrapper's rows before the declaration are kept
-	// with it like annotations.
+	// template_declaration's function or class), or the member itself. The
+	// wrapper's rows before the declaration are kept like annotations.
 	Unwrap func(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node
 	// Groups are member node types whose children are members of the same
-	// body: Java's enum_body_declarations after the enum constants,
-	// Objective-C's instance variable block and @optional sections, and
-	// preprocessor conditionals (#if ... #endif).
+	// body, such as preprocessor conditionals.
 	Groups []string
-	// Frames are groups whose delimiter rows are kept around the members
-	// kept inside them, so the output stays well-formed: the first row (#if,
-	// #else, @optional, "{") and, when the group ends in a token, the last
-	// (#endif, "}"). A frame that opens on the header's row is always kept
-	// whole.
+	// Frames are groups whose delimiter rows (#if, "{", #endif, "}") are kept
+	// around the members kept inside them.
 	Frames []string
 	// SectionScopes are groups that end the access sections opened inside
-	// them (Objective-C's instance variable block: @private there says
-	// nothing about the methods after it).
+	// them.
 	SectionScopes []string
 
 	// MethodBodies are the child types of a method's body when the grammar
@@ -88,10 +69,9 @@ type Members struct {
 
 	// Private reports a member of parent hidden from the skeleton.
 	Private func(c *Ctx, parent, n *gotreesitter.Node) bool
-	// Section is the node type of an access section label (C++
-	// "public:"): it sets the visibility of the members after it, as
-	// SectionPrivate reports, and its row is kept when a member after it is.
-	// Members of a type in PrivateByDefault start out private.
+	// Section is the node type of an access section label (C++ "public:"),
+	// which sets the visibility of the members after it. Members of a type
+	// in PrivateByDefault start out private.
 	Section          string
 	SectionPrivate   func(c *Ctx, label *gotreesitter.Node) bool
 	PrivateByDefault []string

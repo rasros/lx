@@ -15,8 +15,8 @@ import (
 //   - -Y alone keeps types and their fields;
 //   - both keep the full skeleton.
 //
-// A type declaration is emitted by emitStruct if set, else by the generic
-// member walker configured in members, else kept whole with -Y.
+// A type declaration is emitted by emitStruct, else by members, else kept
+// whole with -Y.
 type langDef struct {
 	newLang     func() *gotreesitter.Language
 	funcTypes   []string
@@ -37,8 +37,7 @@ type langDef struct {
 	// conditionals keeps the directive rows of the preprocessor
 	// conditionals around kept rows (see langs.BalanceConditionals).
 	conditionals bool
-	// recoverErrors walks the declarations inside error nodes, and inside
-	// nodes the grammar hides, which error recovery leaves in a tree.
+	// recoverErrors walks the declarations inside error and hidden nodes.
 	recoverErrors bool
 	// unwrap returns the declaration a top-level node wraps (a C++
 	// template_declaration's class or function), or the node itself. Rows
@@ -175,10 +174,8 @@ var (
 	objcGroups = append([]string{"instance_variables", "qualified_protocol_interface_declaration"}, preprocGroups...)
 
 	// objcMembers walks an @interface or @protocol, whose members are its
-	// own children between the header row and @end. Instance variables in
-	// the `{ ... }` block are fields (a struct_declaration, or a declaration
-	// inside #if), hidden after @private or @package. A protocol's
-	// @required and @optional sections are groups.
+	// own children up to @end. Instance variables are hidden after @private
+	// or @package.
 	objcMembers = &langs.Members{
 		BodyIsNode:     true,
 		Groups:         objcGroups,

@@ -8,15 +8,13 @@ import (
 	"strings"
 )
 
-// IsImage reports whether the path's extension names an image format. It
-// judges the name alone; Classify is what decides once the content is at hand.
+// IsImage reports whether the path's extension names an image format.
 func IsImage(p string) bool {
 	return FormatByExt(p).IsImage()
 }
 
-// MIMEType guesses a content type from the path's extension. The registry
-// answers first, so the result does not depend on the host's MIME table; the
-// system table covers everything else.
+// MIMEType guesses a content type from the path's extension, preferring the
+// registry over the host's MIME table.
 func MIMEType(p string) string {
 	if f := FormatByExt(p); f != nil {
 		return f.MIME
@@ -27,10 +25,8 @@ func MIMEType(p string) string {
 	return "application/octet-stream"
 }
 
-// DataURI encodes already-read bytes. Callers pass content from the source that
-// produced the file, so archive entries and URLs work the same as local paths.
-// The type comes from the bytes where they identify a format, and from the
-// name otherwise.
+// DataURI encodes already-read bytes, typed by their content or else by the
+// name.
 func DataURI(p string, data []byte) string {
 	mimeType := MIMEType(p)
 	header := data

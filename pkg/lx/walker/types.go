@@ -22,43 +22,36 @@ type Rule struct {
 
 // Options configures a Walker.
 type Options struct {
-	// Base patterns apply everywhere, below every ignore file. GitExcludes
-	// are git's global excludes, which apply the same way but only inside a
-	// repository. Both match relative to the repository root, or outside one
-	// to the root of the filesystem.
+	// Base patterns apply everywhere, below every ignore file; GitExcludes
+	// only inside a repository. Both match relative to the repository root,
+	// or else the filesystem root.
 	Base        []string
 	GitExcludes []string
-	// Overrides decide what they match ahead of every ignore file and
-	// hidden-file skipping, whether or not IgnoreEnabled is set: the last
-	// one to match a path wins, as with ripgrep's -g globs. WalkPath matches
-	// them against the path from the working directory, as the root was
-	// named; Walk against the path within the walked fs.FS, with
-	// OverridePrefix, if any, before it.
+	// Overrides decide what they match ahead of ignore files and hidden-file
+	// skipping; the last match wins, as with ripgrep's -g globs.
 	Overrides      []Override
 	OverridePrefix string
-	// MatchAsDir, when set, picks the files, by name, that ignore rules and
-	// overrides match as directories, such as archives that are expanded
-	// like directories.
+	// MatchAsDir picks the files matched as directories, such as archives
+	// that are expanded.
 	MatchAsDir func(name string) bool
 	// IgnoreEnabled reads .ignore and .lxignore files and, inside a git
 	// repository, .gitignore files and the repository's info/exclude.
 	IgnoreEnabled bool
-	// RepoRoot has Walk treat the root of the walked fs.FS as the root of
-	// a git repository without its .git, such as a repository host's
-	// archive of one: .gitignore files and GitExcludes apply below it.
+	// RepoRoot has Walk treat the fs.FS root as a git repository root
+	// without its .git, as in a repository host's archive.
 	RepoRoot   bool
 	SkipHidden bool
 	// FollowDirSymlinks descends into symlinks that resolve to directories.
 	// SkipFileSymlinks drops symlinks that resolve to files.
 	FollowDirSymlinks bool
 	SkipFileSymlinks  bool
-	// Cache shares loaded ignore rules between the walkers of one run. Nil
-	// gives the walker a cache of its own, on the host filesystem.
+	// Cache shares loaded ignore rules between walkers. Nil gives the walker
+	// its own.
 	Cache *Cache
 	// OnIgnore, when set, is told about every path the walk skips and why.
 	OnIgnore func(path, reason string)
-	// Log is where the walk reports files it cannot read. Nil means the
-	// Cache's logger, or slog.Default() without a Cache.
+	// Log reports unreadable files. Nil means the Cache's logger or
+	// slog.Default().
 	Log *slog.Logger
 }
 
@@ -94,10 +87,8 @@ func New(opts Options) *Walker {
 	}
 }
 
-// Accepts reports whether the path, named from the working directory or
-// absolutely, is kept by the overrides as it would be in a walk from the
-// working directory: neither it nor a directory above it is excluded, and in
-// whitelist mode a file must be included. Ignore files are not consulted.
+// Accepts reports whether the overrides keep path as a walk from the
+// working directory would. Ignore files are not consulted.
 func (w *Walker) Accepts(path string, isDir bool) bool {
 	if w.overrides == nil {
 		return true

@@ -36,10 +36,8 @@ func matroskaFlavour(b *byteReader) string {
 	return flavour
 }
 
-// looksLikeMP3 checks for a frame header at the very start of the file. A sync
-// word is only eleven set bits, common enough in arbitrary binary that it is
-// worth trusting nowhere but offset zero, and only when the fields behind it
-// hold values that exist.
+// looksLikeMP3 checks for a valid frame header at offset zero, the only
+// place a bare sync word is trusted.
 func looksLikeMP3(header []byte) bool {
 	if len(header) < 4 || header[0] != 0xff || header[1]&0xe0 != 0xe0 {
 		return false

@@ -35,9 +35,8 @@ func (OSHost) EvalSymlinks(path string) (string, error) {
 }
 
 // Cache holds the ignore rules found on the host, keyed by absolute
-// directory, so the walkers of one run read each ignore file and look each
-// repository up once. It is safe for concurrent use. The working directory
-// only shapes how paths are named in reasons, never which rules apply.
+// directory, so the walkers of one run read each ignore file once. It is
+// safe for concurrent use.
 type Cache struct {
 	host Host
 	log  *slog.Logger
@@ -47,9 +46,8 @@ type Cache struct {
 	tree *ruleTree
 }
 
-// NewCache returns an empty cache over host, or the OS when host is nil, that
-// logs to log, or slog.Default() when log is nil. The host's working
-// directory is read once, on first use.
+// NewCache returns an empty cache over host, or the OS when host is nil. A
+// nil log means slog.Default().
 func NewCache(host Host, log *slog.Logger) *Cache {
 	if host == nil {
 		host = OSHost{}
@@ -57,8 +55,7 @@ func NewCache(host Host, log *slog.Logger) *Cache {
 	return &Cache{host: host, log: orDefault(log)}
 }
 
-// orDefault returns log, or slog.Default() when log is nil. The exported
-// constructors default the logger once; everything below them is given one.
+// orDefault returns log, or slog.Default() when log is nil.
 func orDefault(log *slog.Logger) *slog.Logger {
 	if log == nil {
 		return slog.Default()
@@ -86,8 +83,8 @@ func (c *Cache) hostTree() *ruleTree {
 }
 
 // Anchor names the paths below a root as ripgrep matches its -g globs
-// against them: as the root was named, relative or absolute, with the
-// working directory stripped from the front of an absolute path below it.
+// against them: as the root was named, with the working directory stripped
+// from an absolute path.
 type Anchor struct {
 	// prefix is the root's own path and a slash, or empty at the working
 	// directory.
@@ -97,13 +94,10 @@ type Anchor struct {
 	strip []string
 }
 
-// Anchor returns the anchor of root, a path named from the working
-// directory or absolutely. As in ripgrep, the root keeps its path as
-// written, without cleaning but for a leading "./" and trailing slashes, so
-// the paths below "../x" start with "../x/" and those below "src/../x" with
-// "src/../x/". The working directory may be named through a symlink and
-// root by its real path, or the other way round, so either name of it is
-// stripped.
+// Anchor returns the anchor of root. As in ripgrep, root keeps its path as
+// written but for a leading "./" and trailing slashes, so the paths below
+// "src/../x" start with "src/../x/". Both the symlinked and the real name of
+// the working directory are stripped.
 func (c *Cache) Anchor(root string) Anchor {
 	c.hostTree()
 	p := filepath.ToSlash(root)
@@ -158,8 +152,8 @@ func (a Anchor) Path(rel string) string {
 	return p
 }
 
-// leadsToWD reports whether p, an absolute path from Path, is a directory
-// above the working directory, below which paths are matched relative to it.
+// leadsToWD reports whether p, an absolute path, is a directory above the
+// working directory.
 func (a Anchor) leadsToWD(p string) bool {
 	for _, wd := range a.strip {
 		if strings.HasPrefix(wd, p+"/") {
@@ -186,9 +180,8 @@ type tree interface {
 	display(p string) string
 }
 
-// hostTree is the host filesystem, seen from the working directory cwd, with
-// symlinks resolved. Directories in the tree are real paths, as ripgrep
-// resolves the paths it searches.
+// hostTree is the host filesystem seen from cwd. Its directories are real
+// paths, as ripgrep resolves them.
 type hostTree struct {
 	h   Host
 	cwd string
@@ -300,19 +293,18 @@ func newRuleTree(t tree, ignoreFiles bool) *ruleTree {
 	return &ruleTree{t: t, ignoreFiles: ignoreFiles, nodes: map[string]*node{}, sets: map[string]*frameSet{}}
 }
 
-// node is what a directory contributes to the rules, whatever the base rules:
-// where it stands relative to repositories and its own ignore files.
+// node is what a directory contributes to the rules: where it stands
+// relative to repositories and its own ignore files.
 type node struct {
 	dir string
-	// parent is nil only at the root of the tree. Like ripgrep, the rules of
-	// every directory above a path apply to it, wherever the walk starts.
+	// parent is nil only at the root of the tree. As in ripgrep, the rules
+	// of every directory above a path apply to it.
 	parent *node
 	repo   bool // a repository root: its rules start over
 	inRepo bool // in a repository, where git's own ignore rules apply
 	g      gitFS
 	gitDir string
-	// rel is the directory's path from the root of the tree, which every
-	// rule is matched against.
+	// rel is the directory's path from the root of the tree.
 	rel string
 
 	loaded bool
@@ -338,9 +330,8 @@ func (rt *ruleTree) node(dir string) *node {
 }
 
 // ownRules returns the rules dir itself adds. Git ranks info/exclude below
-// every ignore file, so it comes first. As in ripgrep, git's own rules,
-// info/exclude and .gitignore, apply only inside a repository, while .ignore
-// and .lxignore apply everywhere.
+// every ignore file, so it comes first. As in ripgrep, git's rules apply
+// only inside a repository, while .ignore and .lxignore apply everywhere.
 func (rt *ruleTree) ownRules(n *node) []Rule {
 	if n.loaded || !rt.ignoreFiles {
 		return n.own
@@ -366,9 +357,8 @@ func (rt *ruleTree) ownRules(n *node) []Rule {
 	return n.own
 }
 
-// frameSet holds the frames built for one set of base rules: base, which
-// apply everywhere, and git, git's global excludes, which apply only inside a
-// repository.
+// frameSet holds the frames built for one set of base rules and git global
+// excludes.
 type frameSet struct {
 	base, git []Rule
 	frames    map[string]*frame
@@ -411,10 +401,9 @@ func (rt *ruleTree) frameOf(set *frameSet, dir string) *frame {
 		}
 		f.rules = append(f.rules, own...)
 	case n.repo:
-		// The one place the rules start over: at a repository root, git
-		// never applies one repository's rules inside another, submodules
-		// included. The base rules move to the new root, while .ignore and
-		// .lxignore rules from above keep applying, as in ripgrep.
+		// Git rules start over at a repository root, submodules included.
+		// The base rules move to the new root, while .ignore and .lxignore
+		// rules from above keep applying, as in ripgrep.
 		f.rules = append(rebase(set.base, n.rel), rebase(set.git, n.rel)...)
 		for _, r := range parentRules {
 			if r.scope == scopeIgnore {
@@ -445,8 +434,8 @@ func withScope(rules []Rule, scope ruleScope) []Rule {
 	return rules
 }
 
-// rebase returns a copy of rules, which were parsed relative to the root of
-// a tree, matched relative to its directory at rel instead.
+// rebase returns a copy of rules matched relative to rel instead of the
+// tree's root.
 func rebase(rules []Rule, rel string) []Rule {
 	out := make([]Rule, len(rules))
 	for i, r := range rules {

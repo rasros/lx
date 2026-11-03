@@ -19,16 +19,11 @@ import (
 // Options decide what Collect finds for a target.
 type Options struct {
 	// Globs filter what is found below a target, as ripgrep's -g globs do:
-	// the last one to match a path decides it, ahead of ignore files and
-	// hidden-file skipping. They match the path from the working directory
-	// as the target was named, with the working directory stripped from
-	// the front of an absolute one. An archive being expanded is matched as
-	// a directory, and its entries as the paths below it, so
-	// "pkg/a.zip/src/*.go" names entries of pkg/a.zip; the entries of a URL
-	// archive are below the URL. The files of a repository URL are matched
-	// from the repository's root, as in a checkout of it, without the
-	// directory its host's archive wraps them in. A named target is never
-	// filtered by them, nor by anything but OutPath.
+	// the last match decides, ahead of ignore files and hidden-file
+	// skipping. They match the path as named from the working directory.
+	// An expanded archive matches as a directory, so "pkg/a.zip/src/*.go"
+	// names its entries, and a repository URL's files match from the
+	// repository root. A named target is never filtered.
 	Globs []walker.Override
 
 	// IgnoreRules apply everywhere, below every ignore file, and GitExcludes,
@@ -45,10 +40,8 @@ type Options struct {
 	// ExpandArchives collects the files inside archives instead of the
 	// archives themselves.
 	ExpandArchives bool
-	// MaxSize, when positive, is the size over which the entries of an
-	// expanded archive are not read: they are collected with their size
-	// alone, for the stream to drop as it drops any file over its
-	// RenderOptions.MaxSize, which MaxSize should be.
+	// MaxSize, when positive, leaves larger archive entries unread so the
+	// stream drops them. It should match RenderOptions.MaxSize.
 	MaxSize int64
 	// TempDir is where URL archives are downloaded to be expanded, or the
 	// default directory for temporary files when empty.
@@ -57,11 +50,8 @@ type Options struct {
 	// OutPath is an absolute path never collected, such as the file output
 	// is written to.
 	OutPath string
-	// Piped marks a target taken from a list of paths, as piped to lx. Unlike
-	// a named target it is cleaned, as a path a walk finds, and itself
-	// filtered by Globs, as a walk from the working directory would filter
-	// it: dropped when it or a directory above it is excluded, or, when some
-	// -i glob must keep a file, it is a file none keeps.
+	// Piped marks a target read from a piped path list. Unlike a named
+	// target it is cleaned and filtered by Globs, as a walk would filter it.
 	Piped bool
 }
 
@@ -109,11 +99,9 @@ func (c *Collector) abs(p string) string {
 
 // Collect returns the inputs target refers to: a file, every file below a
 // directory, the entries of an archive, or a URL. As in ripgrep, a named
-// target is never filtered itself, while the files below it are filtered by
-// the ignore rules of the directories above and below it, and by opts.
-// It returns the inputs that could not be read, target itself or what is
-// below it, as failures rather than logging them; the Err of a URL that
-// cannot be downloaded or parsed is a *URLError. Its only error is ctx's.
+// target is never filtered itself, only the files below it. Unreadable
+// inputs are returned as failures; a bad URL's Err is a *URLError. The only
+// error is ctx's.
 func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([]sources.InputFile, []core.Failure, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
@@ -127,9 +115,7 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 	}
 
 	if opts.Piped {
-		// A named root is matched as written, as ripgrep matches it, but a
-		// piped path stands for a path a walk finds, which has no "//",
-		// "./" or "..".
+		// A piped path stands for a walked path, which is always clean.
 		target = filepath.Clean(target)
 	}
 	absPath := c.abs(target)
@@ -155,10 +141,9 @@ func expands(opts Options, path string) bool {
 	return opts.ExpandArchives && sources.IsArchivePath(path)
 }
 
-// UserIgnoreRules reads the ignore files lx applies everywhere: lx's own,
-// in the user config directory, and git's global excludes. It finds them
-// through env, which looks variables up as os.LookupEnv does, and logs to
-// log, or slog.Default() when log is nil.
+// UserIgnoreRules reads lx's user ignore file and git's global excludes,
+// looking up variables through env as os.LookupEnv does. A nil log means
+// slog.Default().
 func UserIgnoreRules(env func(key string) (string, bool), log *slog.Logger) (ignoreRules, gitExcludes []string) {
 	if log == nil {
 		log = slog.Default()
@@ -209,14 +194,9 @@ func urlFailure(err *URLError) []core.Failure {
 	return []core.Failure{{Kind: core.FailedURL, Path: err.URL, Display: err.URL, Err: err}}
 }
 
-// collectRepo collects the files of the repository a repository URL, repo,
-// names, from its host's archive at archiveURL, as from a checkout of it.
-// They are displayed below repo as written. The globs match them from the
-// repository's root: the host's archive and the directory it wraps the
-// files in are how the files are fetched, not paths anyone names, and repo
-// has no place below the working directory that globs could name it by.
-// The repository's ignore files apply at every depth, with opts' ignore
-// rules and, the root being a repository's, its global git excludes.
+// collectRepo collects a repository URL's files from its host's archive at
+// archiveURL as from a checkout: shown below repo, matched by the globs from
+// the repository root, with its ignore files and git excludes applied.
 func (c *Collector) collectRepo(ctx context.Context, repo, archiveURL string, opts Options) ([]sources.InputFile, []core.Failure, error) {
 	return c.downloadArchive(ctx, archiveURL, archiveSource{display: strings.TrimSuffix(repo, "/"), repo: true, named: true}, opts)
 }
@@ -247,8 +227,6 @@ type root struct {
 	isDir         bool
 }
 
-// newRoot decides which filesystem a target's files are opened in and how
-// their paths are displayed. A file is opened as walkRoot within fsys.
 func newRoot(cwd, rawPath, absPath string, isDir bool) root {
 	r := root{rawPath: rawPath, absPath: absPath, isDir: isDir}
 	switch rawPathClean := filepath.Clean(rawPath); {
@@ -345,8 +323,6 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 
 		display := r.display(path)
 		if expands(opts, path) {
-			// The entries of an archive are matched as the paths below it,
-			// whether it was found in the walk or named.
 			rel := "."
 			if r.isDir {
 				rel = path
@@ -365,17 +341,14 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 			fail(path, err)
 			return nil
 		}
-		// A walked symlink reports the link's own size (its target path
-		// length); the content reader is bounded by Size, so use the target's.
-		// Broken links keep the link info and fail later when opened.
+		// A symlink's own size is its target path's length; use the target's.
 		if info.Mode()&fs.ModeSymlink != 0 {
 			if target, statErr := fs.Stat(r.fsys, path); statErr == nil {
 				info = target
 			}
 		}
-		// A FIFO, socket or device found in a walk is skipped, as rg skips
-		// them: a FIFO with no writer would hold the run up. One named, or
-		// piped in as a path, is read as a stream.
+		// Skip walked FIFOs, sockets and devices, as rg does: a FIFO with no
+		// writer would block. A named one is read as a stream.
 		if r.isDir && sources.IsIrregular(info.Mode()) {
 			c.log.Debug("Skipped irregular file", "path", display, "mode", info.Mode().String())
 			return nil
@@ -399,19 +372,16 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 	return files, failures, nil
 }
 
-// archiveSource is an archive to expand: its origin, an absolute path or
-// URL, the path its entries are displayed below, and what the globs match
-// before each entry's path. named marks an archive named rather than found
-// in a walk, and repo a repository host's archive of a repository, which
-// is expanded as a checkout.
+// archiveSource is an archive to expand. ovPrefix is what the globs match
+// before each entry's path, named marks an archive named rather than walked,
+// and repo a repository host's archive, expanded as a checkout.
 type archiveSource struct {
 	origin, display, ovPrefix string
 	named, repo               bool
 }
 
-// expandArchive returns the entries of the archive at absPath, from src,
-// that opts keep, and the failures of the archive or its entries. Its only
-// error is ctx's.
+// expandArchive returns the entries of the archive at absPath that opts
+// keep. Its only error is ctx's.
 func (c *Collector) expandArchive(ctx context.Context, absPath string, src archiveSource, opts Options, ignoreMsg string) ([]sources.InputFile, []core.Failure, error) {
 	displayPath := src.display
 	wopts := walker.Options{
@@ -455,9 +425,8 @@ func (c *Collector) expandArchive(ctx context.Context, absPath string, src archi
 	return files, failures, nil
 }
 
-// isOutput reports whether path, relative to the working directory, is the
-// file output is written to, outPath, which is never collected, even when
-// named.
+// isOutput reports whether path, relative to the working directory, is
+// outPath.
 func (c *Collector) isOutput(path, outPath string) bool {
 	if outPath == "" {
 		return false
