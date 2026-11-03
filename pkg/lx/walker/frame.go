@@ -245,6 +245,9 @@ func (t hostTree) display(p string) string {
 type fsTree struct {
 	fsys fs.FS
 	log  *slog.Logger
+	// repoRoot makes the root a repository root, whose .git the fs.FS
+	// does not hold.
+	repoRoot bool
 }
 
 func newFSTree(fsys fs.FS, log *slog.Logger) fsTree { return fsTree{fsys: fsys, log: log} }
@@ -261,6 +264,9 @@ func (fsTree) display(p string) string       { return p }
 
 func (t fsTree) gitDir(dir string) (gitFS, string, bool) {
 	g := subGitFS{t.fsys, t.log}
+	if t.repoRoot && dir == "." {
+		return g, "", true
+	}
 	gitDir, ok := findGitDir(g, dir)
 	return g, gitDir, ok
 }

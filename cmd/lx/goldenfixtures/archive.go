@@ -166,6 +166,87 @@ func createTestGz(path, content string) {
 	zw.Close()
 }
 
+// SetupRepoArchiveFixture writes repo.zip, laid out as a repository host
+// serves a repository: every file below one "repo-main/" directory, with
+// ignore files at the root and below it. Beside it are single compressed
+// files: notes.txt.gz, the hidden .bashrc.gz and plain.tar.gz, which holds
+// no tar archive. nowrap.zip has no one directory its files are all below,
+// and malformed.zip, wrapped in "repo-main/", has entries no checkout could
+// hold beside names a checkout keeps as they are. configs/ holds the
+// configs of SetupArchiveOriginFixture.
+func SetupRepoArchiveFixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	createTestZip(filepath.Join(dir, "repo.zip"), [][2]string{
+		{"repo-main/", ""},
+		{"repo-main/.gitignore", "build/\n*.log\n"},
+		{"repo-main/.lxignore", "LICENSE\n"},
+		{"repo-main/LICENSE", "MIT\n"},
+		{"repo-main/README.md", "# repo\n"},
+		{"repo-main/app.log", "log\n"},
+		{"repo-main/build/out.txt", "built\n"},
+		{"repo-main/docs/.ignore", "drafts/\n"},
+		{"repo-main/docs/drafts/wip.md", "wip\n"},
+		{"repo-main/docs/guide.md", "guide\n"},
+		{"repo-main/docs/deep/.gitignore", "*.tmp\n"},
+		{"repo-main/docs/deep/more.md", "more\n"},
+		{"repo-main/docs/deep/scratch.tmp", "tmp\n"},
+		{"repo-main/internal/cli/app.go", "package cli\n"},
+		{"repo-main/internal/cli/app_test.go", "package cli\n"},
+		{"repo-main/internal/other/o.go", "package other\n"},
+		{"repo-main/.github/ci.yml", "on: push\n"},
+	})
+	createTestZip(filepath.Join(dir, "nowrap.zip"), [][2]string{
+		{"a/x.txt", "a x\n"},
+		{"b/x.txt", "b x\n"},
+		{"b/y.txt", "b y\n"},
+		{"TOP.txt", "top\n"},
+	})
+	createTestZip(filepath.Join(dir, "malformed.zip"), [][2]string{
+		{"repo-main/", ""},
+		{"repo-main/../up.txt", "up\n"},
+		{"repo-main/.", ""},
+		{"repo-main/..", ""},
+		{"repo-main/ok.txt", "ok\n"},
+		{`repo-main/back\slash.txt`, "backslash\n"},
+		{`repo-main/x\y.txt`, "backslashed x y\n"},
+		{"repo-main/x/y.txt", "x y\n"},
+		{"repo-main/x/y.txt", "second x y\n"},
+		{"repo-main/f", "a file\n"},
+		{"repo-main/f/below.txt", "below a file\n"},
+	})
+	writeOriginConfigs(t, dir)
+	createTestGz(filepath.Join(dir, "notes.txt.gz"), "compressed on its own\n")
+	createTestGz(filepath.Join(dir, ".bashrc.gz"), "export EDITOR=vi\n")
+	createTestGz(filepath.Join(dir, "plain.tar.gz"), "not a tar archive\n")
+	return dir
+}
+
+// SetupArchiveDepthFixture writes the same files twice, below arch/ as
+// archives at three depths and below dirs/ as directories of the same
+// names, so the globs can be shown to treat them alike.
+func SetupArchiveDepthFixture(t *testing.T) (arch, dirs string) {
+	t.Helper()
+	root := t.TempDir()
+	arch, dirs = filepath.Join(root, "arch"), filepath.Join(root, "dirs")
+	entries := [][2]string{
+		{"src/a.go", "package src\n"},
+		{"src/b.txt", "b\n"},
+		{"deep/src/a.go", "package deep\n"},
+		{"notes.txt", "n\n"},
+	}
+	for _, a := range []string{"top.zip", "d1/mid.zip", "d1/d2/low.zip"} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(arch, a)), 0755); err != nil {
+			t.Fatal(err)
+		}
+		createTestZip(filepath.Join(arch, a), entries)
+		for _, e := range entries {
+			writeFile(t, dirs, filepath.Join(a, e[0]), e[1], 0644)
+		}
+	}
+	return arch, dirs
+}
+
 func createTestZip(path string, files [][2]string) {
 	f, err := os.Create(path)
 	if err != nil {

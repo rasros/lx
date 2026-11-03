@@ -20,6 +20,10 @@ type InputFile struct {
 	AbsPath string
 	// Archive and Entry name an archive entry: the archive's absolute path,
 	// or its URL when it was downloaded, and the entry's path inside it.
+	// That is the path an entry is stored at, with the directory a
+	// repository host wraps a repository's files in, which its Path leaves
+	// out; the content of a single compressed file, which has no stored
+	// path, has the name its Path gives it, notes.txt for notes.txt.gz.
 	Archive string
 	Entry   string
 	Size    int64

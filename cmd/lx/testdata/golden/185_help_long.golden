@@ -60,6 +60,14 @@ Arguments:
             5. "-" to read file paths from stdin.
 
           Archive URLs (.zip, .tar.gz, etc.) are expanded when -Z is active.
+          Repository URLs (github.com/owner/repo and the like on GitHub,
+          GitLab, Bitbucket and Codeberg) are always fetched as an archive
+          and read as a checkout: the files are shown below the URL, the
+          repository's ignore files apply, and -i/-e match the files from
+          the repository's root: -e "docs/**" github.com/owner/repo. The
+          globs of a section apply to every path in it, so to give two
+          repositories globs of their own, put them in sections of their
+          own with -s. Unlike a checkout, symbolic links are left out.
 
           As in rg, a path you name is never filtered itself: ignore files,
           hidden-file skipping and -i/-e do not apply to it. They filter what
@@ -352,7 +360,14 @@ Interleaved option:
           a directory and its entries as the paths below it, whether it is found
           in a walk or named: -i "pkg/a.zip/src/**" keeps the entries of
           pkg/a.zip below src/. The entries of an archive URL are below the URL.
-          Hidden entry filtering (leading dot) is also respected.
+          Hidden entries (leading dot) are skipped as hidden files are, unless
+          -H. Ignore files inside an archive are not read.
+          
+          A repository URL (github.com/owner/repo, expanded without -Z) is read
+          as a checkout instead: its files are shown below the URL without the
+          directory the host wraps them in, its ignore files apply, and the
+          globs match the files from the repository's root, so -e "docs/**"
+          drops its docs/. Unlike a checkout, it leaves out symbolic links.
           
           Supported formats:
             ZIP-based:
@@ -363,7 +378,10 @@ Interleaved option:
               .tgz, .tbz2, .txz
             Other multi-file archives:
               .rar, .7z
-            Single-file compression (exposed as one virtual entry):
+            Single-file compression (one entry, named without the suffix, so
+            notes.txt.gz holds notes.txt.gz/notes.txt, which -i "*.txt" keeps
+            and
+            -i "*.gz" does not; -i "**/*.gz/*" keeps the content of every .gz):
               .gz, .bz2, .xz, .zst, .br, .lz4, .sz, .s2, .lz
   -H, --hidden
           Include hidden files and directories (starting with '.') for
@@ -556,6 +574,9 @@ Examples:
   6. URL Input
      Fetch a remote file directly (no download step needed):
        $ lx https://example.com/config.yaml src/
+
+     Bundle a repository's internal/cli/ Go files without cloning it:
+       $ lx -i "internal/cli/*.go" github.com/owner/repo
 
      Expand a GitHub archive and filter to Go files only:
        $ lx -Z -i "*.go" https://github.com/owner/repo/archive/refs/heads/main.zip

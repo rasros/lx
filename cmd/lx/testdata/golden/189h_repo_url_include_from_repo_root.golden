@@ -1,0 +1,6 @@
+--- STDOUT ---
+[1/2] HOST/owner/repo/internal/cli/app.go (1 rows)
+[2/2] HOST/owner/repo/internal/cli/app_test.go (1 rows)
+
+
+--- STDERR ---

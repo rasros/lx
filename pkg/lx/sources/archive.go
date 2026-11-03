@@ -58,6 +58,10 @@ type ArchiveOptions struct {
 	// Log is told about entries that cannot be read, and skipped ones;
 	// nil logs to slog.Default().
 	Log *slog.Logger
+	// Named marks an archive that was named, as a path or URL, rather than
+	// found in a walk. The one entry of a named compressed file is the named
+	// file's content, so, as a named file, it is not skipped as hidden.
+	Named bool
 }
 
 // ExpandArchive returns the files in the archive at absPath that opts.Walker
@@ -88,13 +92,12 @@ func ExpandArchive(ctx context.Context, absPath string, opts ArchiveOptions) ([]
 		return nil, nil, err
 	}
 
-	x := expansion{opts: opts, log: opts.Log, base: archiveBase(opts.Display), seen: map[string]bool{}}
+	x := expansion{opts: opts, log: opts.Log, base: archiveBase(opts.Display), entries: opts.Walker.Entries(), seen: map[string]bool{}}
 	if x.log == nil {
 		x.log = slog.Default()
 	}
 	switch f := format.(type) {
 	case archives.Extractor:
-		x.entries = opts.Walker.Entries()
 		err = f.Extract(ctx, file, x.handle)
 	case archives.Decompressor:
 		err = x.decompress(f, file)
@@ -221,7 +224,7 @@ func (x *expansion) handle(ctx context.Context, info archives.FileInfo) error {
 	x.seen[key] = true
 
 	if x.over(info.Size()) {
-		x.add(key, info.Size(), info, nil)
+		x.add(key, key, info.Size(), info, nil)
 		return nil
 	}
 	rc, err := info.Open()
@@ -235,13 +238,22 @@ func (x *expansion) handle(ctx context.Context, info archives.FileInfo) error {
 		x.fail(key, key, err)
 		return nil
 	}
-	x.add(key, n, info, data)
+	x.add(key, key, n, info, data)
 	return nil
 }
 
-// decompress reads the one entry of a compressed file, which is named after
-// it and kept whatever the walker says, as the root of a walk is.
+// decompress reads the one entry of a compressed file, named after it
+// without the compression suffix, so the entry of notes.txt.gz is
+// notes.txt.gz/notes.txt.
 func (x *expansion) decompress(d archives.Decompressor, file *os.File) error {
+	name := singleEntryName(x.opts.Origin)
+	keep := x.entries.Keep
+	if x.opts.Named {
+		keep = x.entries.KeepShown
+	}
+	if !keep(name, false) {
+		return nil
+	}
 	rc, err := d.OpenReader(file)
 	if err != nil {
 		return err
@@ -260,18 +272,39 @@ func (x *expansion) decompress(d archives.Decompressor, file *os.File) error {
 	if st, err := file.Stat(); err == nil {
 		info = st
 	}
-	x.add(singleEntryName(x.opts.Origin), n, info, data)
+	x.add(name, name, n, info, data)
 	return nil
 }
 
+// compressionSuffixes are the suffixes of single-file compression, and what
+// each leaves of a name: ".tgz" is a compressed ".tar", which is a plain
+// file when the content is not a tar archive.
+var compressionSuffixes = [][2]string{
+	{".tgz", ".tar"}, {".tbz2", ".tar"}, {".txz", ".tar"},
+	{".gz", ""}, {".bz2", ""}, {".xz", ""}, {".zst", ""}, {".br", ""},
+	{".lz4", ""}, {".sz", ""}, {".s2", ""}, {".lz", ""},
+}
+
 // singleEntryName names the content of the compressed file at origin, a
-// path or URL, after it: the name of the file or of the URL's path, never
-// that of the file a URL was downloaded to.
+// path or URL: its name without the compression suffix, so foo.tar.gz that
+// is no tar archive holds foo.tar, or its name when that is all there is.
 func singleEntryName(origin string) string {
+	name := filepath.Base(origin)
 	if u, err := parseHTTPURL(origin); err == nil {
-		return path.Base(u.Path)
+		name = path.Base(u.Path)
 	}
-	return filepath.Base(origin)
+	lower := strings.ToLower(name)
+	for _, s := range compressionSuffixes {
+		if strings.HasSuffix(lower, s[0]) && len(name) > len(s[0]) {
+			stem, suffix := name[:len(name)-len(s[0])], s[1]
+			if written := name[len(stem):]; written == strings.ToUpper(written) {
+				// NOTAR.TGZ holds NOTAR.TAR, in the case it was named in.
+				suffix = strings.ToUpper(suffix)
+			}
+			return stem + suffix
+		}
+	}
+	return name
 }
 
 // over reports whether an entry of size bytes is too large to read.
@@ -279,13 +312,13 @@ func (x *expansion) over(size int64) bool {
 	return x.opts.MaxSize > 0 && size > x.opts.MaxSize
 }
 
-// add adds the entry at key, of size bytes. Its content is data, or, when
-// it is over MaxSize, unread.
-func (x *expansion) add(key string, size int64, info fs.FileInfo, data *content) {
+// add adds the entry displayed at key, which is entry in the archive, of
+// size bytes. Its content is data, or, when it is over MaxSize, unread.
+func (x *expansion) add(key, entry string, size int64, info fs.FileInfo, data *content) {
 	f := InputFile{
 		Path:    x.base + "/" + key,
 		Archive: x.opts.Origin,
-		Entry:   key,
+		Entry:   entry,
 		Size:    size,
 	}
 	if info != nil {

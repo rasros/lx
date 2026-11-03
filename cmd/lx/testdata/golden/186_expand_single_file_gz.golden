@@ -1,7 +1,7 @@
 --- STDOUT ---
-notes.txt.gz/notes.txt.gz (2 rows)
+notes.txt.gz/notes.txt (2 rows)
 ---
-```
+```text
 compressed on its own
 second line
 ```

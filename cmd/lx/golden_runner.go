@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -203,7 +204,12 @@ func hermeticEnv(t *testing.T, extra map[string]string) osenv.Lookup {
 	if err := os.MkdirAll(filepath.Join(configDir, "lx"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(configDir, "lx", "ignore"), nil, 0644); err != nil {
+	// An lx/ignore the test wrote in a config directory of its own is kept.
+	f, err := os.OpenFile(filepath.Join(configDir, "lx", "ignore"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	switch {
+	case err == nil:
+		f.Close()
+	case !errors.Is(err, fs.ErrExist):
 		t.Fatal(err)
 	}
 	return lookup

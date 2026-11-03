@@ -76,3 +76,35 @@ func TestEntries_ReportsSkippedDirOnce(t *testing.T) {
 		t.Errorf("reported %v, want %v", reported, want)
 	}
 }
+
+// RepoRoot makes the root of a walked fs.FS without a .git a repository
+// root, so its .gitignore files and the git excludes apply.
+func TestWalk_RepoRoot(t *testing.T) {
+	fsys := fstest.MapFS{
+		".gitignore":     {Data: []byte("*.log\n")},
+		"a.log":          {Data: []byte("x")},
+		"a.tmp":          {Data: []byte("x")},
+		"keep.go":        {Data: []byte("x")},
+		"sub/.gitignore": {Data: []byte("*.go\n")},
+		"sub/b.go":       {Data: []byte("x")},
+	}
+	walk := func(opts Options) []string {
+		var got []string
+		err := New(opts).Walk(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				got = append(got, p)
+			}
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if got, want := walk(Options{SkipHidden: true, IgnoreEnabled: true, GitExcludes: []string{"*.tmp"}}), []string{"a.log", "a.tmp", "keep.go", "sub/b.go"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("without RepoRoot: %v, want %v", got, want)
+	}
+	if got, want := walk(Options{SkipHidden: true, IgnoreEnabled: true, RepoRoot: true, GitExcludes: []string{"*.tmp"}}), []string{"keep.go"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("with RepoRoot: %v, want %v", got, want)
+	}
+}

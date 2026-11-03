@@ -1,0 +1,8 @@
+--- STDOUT ---
+[1/4] HOST/owner/nowrap/TOP.txt (1 rows)
+[2/4] HOST/owner/nowrap/a/x.txt (1 rows)
+[3/4] HOST/owner/nowrap/b/x.txt (1 rows)
+[4/4] HOST/owner/nowrap/b/y.txt (1 rows)
+
+
+--- STDERR ---

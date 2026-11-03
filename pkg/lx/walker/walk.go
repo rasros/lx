@@ -23,7 +23,9 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	if !info.IsDir() {
 		return walkFn(root, dirEntryAdapter{info}, nil)
 	}
-	rt := newRuleTree(newFSTree(fsys, w.log), w.opts.IgnoreEnabled)
+	t := newFSTree(fsys, w.log)
+	t.repoRoot = w.opts.RepoRoot
+	rt := newRuleTree(t, w.opts.IgnoreEnabled)
 	return w.walkDir(rt, fsys, rt.frame(w, root), root, Anchor{prefix: w.opts.OverridePrefix}, walkFn, []fs.FileInfo{info})
 }
 
