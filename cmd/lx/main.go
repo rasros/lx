@@ -10,6 +10,7 @@ import (
 
 	"github.com/rasros/lx/internal/ansi"
 	"github.com/rasros/lx/internal/cli"
+	"github.com/rasros/lx/pkg/lx"
 )
 
 // cleanupGrace is how long a run cancelled by a signal may take to clean up,
@@ -57,10 +58,13 @@ func run() int {
 		// A second signal kills at once.
 		signal.Reset(caught...)
 		cancel()
+		deadline := time.Now().Add(cleanupGrace)
 		select {
 		case <-done:
 		case <-time.After(cleanupGrace):
 		}
+		// Work Run abandoned may still be removing its temporary files.
+		lx.WaitCleanups(time.Until(deadline))
 		return dieOf(sig)
 	}
 }

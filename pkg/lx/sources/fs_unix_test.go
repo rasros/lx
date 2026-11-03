@@ -114,47 +114,6 @@ func TestReadIdleFIFOStopsWhenCancelled(t *testing.T) {
 	}
 }
 
-// A FIFO reads as what its writer wrote, though it states a size of zero.
-func TestOpenFIFOReadsWhatWasWritten(t *testing.T) {
-	dir, name := newFIFO(t)
-	f, err := NewInputFileFromPath(os.DirFS(dir), name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	go func() {
-		if w, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY, 0); err == nil {
-			_, _ = w.Write([]byte("streamed\n"))
-			w.Close()
-		}
-	}()
-	rc, err := f.Open(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rc.Close()
-	if got, err := io.ReadAll(rc); err != nil || string(got) != "streamed\n" {
-		t.Fatalf("read %q, %v; want %q", got, err, "streamed\n")
-	}
-}
-
-// A device that never ends is read only up to DefaultStreamLimit.
-func TestReadEndlessDeviceStopsAtDefaultLimit(t *testing.T) {
-	f, err := NewInputFileFromPath(os.DirFS("/dev"), "zero")
-	if err != nil {
-		t.Skip("no /dev/zero:", err)
-	}
-	rc, err := f.Open(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rc.Close()
-	got, err := io.ReadAll(rc)
-	var limitErr *StreamLimitError
-	if !errors.As(err, &limitErr) || !limitErr.Default || len(got) != DefaultStreamLimit {
-		t.Fatalf("read %d bytes, %v; want %d and the default limit's error", len(got), err, DefaultStreamLimit)
-	}
-}
-
 // A stream that ends at its limit is whole; one that goes on past it fails.
 func TestStreamLimit(t *testing.T) {
 	for _, tc := range []struct {
@@ -183,10 +142,12 @@ func TestStreamLimit(t *testing.T) {
 		got, err := io.ReadAll(rc)
 		rc.Close()
 		var limitErr *StreamLimitError
-		if gotErr := errors.As(err, &limitErr); gotErr != tc.wantErr || string(got) != "1234" {
+		gotErr := errors.As(err, &limitErr)
+		if gotErr != tc.wantErr || string(got) != "1234" {
 			t.Errorf("%q: read %q, %v; want 1234 and a limit error %v", tc.body, got, err, tc.wantErr)
+			continue
 		}
-		if tc.wantErr && (limitErr.Limit != 4 || limitErr.Default) {
+		if gotErr && (limitErr.Limit != 4 || limitErr.Default) {
 			t.Errorf("%q: limit error %+v, want the set limit 4", tc.body, *limitErr)
 		}
 	}

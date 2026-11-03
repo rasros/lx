@@ -250,10 +250,16 @@ Examples:
 		Usage:     "Skip files larger than the given size for subsequent paths",
 		Long: `Skip files larger than the given size for subsequent paths.
 
-Oversized files are dropped during discovery, before any content is read or
-converted, so a stray multi-gigabyte log or disk image cannot inflate the
-output. Skipped files are also omitted from the tree (-T/-t), so the tree keeps
-matching the actual output.
+Files whose size is known are checked during discovery, before any content is
+read or converted, so a stray multi-gigabyte log or disk image cannot inflate
+the output. Skipped files are also omitted from the tree (-T/-t), so the tree
+keeps matching the actual output. The limit applies to every input, including
+paths named directly.
+
+Streams have no size to check ahead: FIFOs, devices, process substitutions
+such as <(cmd), and stdin read with -. They are read up to the limit instead,
+or up to 64 MB when -m is omitted, and one that goes on past it counts as a
+failed input. Remote URLs, whose size may also be unknown, are never skipped.
 
 The value is a byte count with an optional unit suffix. Suffixes are decimal
 and case-insensitive, matching how lx reports sizes elsewhere:
@@ -262,11 +268,8 @@ and case-insensitive, matching how lx reports sizes elsewhere:
   -m 2MB      (2 MB)
   -m 1G       (1 GB)
 
-The value must be greater than zero; there is no "unlimited" spelling, simply
-omit the flag.
-
-The limit applies to every input, including paths named directly. Inputs whose
-size is not known ahead of time, such as remote URLs, are never skipped.`,
+The value must be greater than zero. Omit the flag for no limit on files of
+known size; streams keep the 64 MB default.`,
 	},
 	{
 		Category:  CatInterleaved,

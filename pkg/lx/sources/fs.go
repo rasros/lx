@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -43,39 +46,45 @@ func newByteReaderReadCloser(data []byte) io.ReadCloser {
 // stated size, zero, says nothing of their content.
 const irregular = fs.ModeNamedPipe | fs.ModeSocket | fs.ModeDevice
 
-// DefaultStreamLimit is how much of a Stream is read when nothing sets its
-// limit: a device such as /dev/zero never ends.
-const DefaultStreamLimit = 64 << 20
+// IsIrregular reports whether mode is a FIFO, a socket or a device: a file
+// whose content is a stream, read as a Stream, with no size known ahead.
+func IsIrregular(mode fs.FileMode) bool { return mode&irregular != 0 }
+
+// DefaultStreamLimit is how much of a stream is read when nothing sets its
+// limit: a device such as /dev/zero never ends. It is decimal, as -m is.
+const DefaultStreamLimit = 64_000_000
 
 // NewInputFile returns the file at path in fsys. An irregular file, such as a
-// FIFO, a device or a process substitution's /dev/fd entry, opens as a Stream,
-// and both its open and its reads stop when ctx is done. An open of a FIFO that
-// no writer ever opens cannot itself be stopped: its goroutine and OS thread
-// stay blocked for the life of the process.
+// FIFO, a device or a process substitution's /dev/fd entry, has an unknown
+// size (-1) and opens as a Stream, and both its open and its reads stop when
+// ctx is done. An open of a FIFO that no writer ever opens cannot itself be
+// stopped: its goroutine and OS thread stay blocked for the life of the
+// process.
 func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
-	open := func(context.Context) (io.ReadCloser, error) { return fsys.Open(path) }
-	if info.Mode()&irregular != 0 {
-		open = func(ctx context.Context) (io.ReadCloser, error) { return openStream(ctx, fsys, path) }
-	}
-	return InputFile{
+	f := InputFile{
 		Path:    path,
 		AbsPath: path,
 		Size:    info.Size(),
 		ModTime: info.ModTime(),
-		Open:    open,
+		Open:    func(context.Context) (io.ReadCloser, error) { return fsys.Open(path) },
 	}
+	if IsIrregular(info.Mode()) {
+		f.Size = -1
+		f.Open = func(ctx context.Context) (io.ReadCloser, error) { return openStream(ctx, fsys, path) }
+	}
+	return f
 }
 
 func openStream(ctx context.Context, fsys fs.FS, path string) (*Stream, error) {
-	f, err := openUntilDone(ctx, func() (fs.File, error) { return fsys.Open(path) })
+	f, err := openUntilDone(ctx, nil, func() (fs.File, error) { return fsys.Open(path) })
 	if err != nil {
 		return nil, err
 	}
 	return &Stream{
-		ctx:   ctx,
-		f:     f,
-		stop:  context.AfterFunc(ctx, func() { _ = f.Close() }),
-		limit: DefaultStreamLimit,
+		ctx:  ctx,
+		f:    f,
+		stop: context.AfterFunc(ctx, func() { _ = f.Close() }),
+		r:    newLimited(f, 0),
 	}, nil
 }
 
@@ -85,54 +94,28 @@ func openStream(ctx context.Context, fsys fs.FS, path string) (*Stream, error) {
 // its read, which for an OS pipe or device ends a read in progress, and the
 // read fails with ctx's error.
 type Stream struct {
-	ctx      context.Context
-	f        fs.File
-	stop     func() bool
-	limit    int64
-	limitSet bool
-	n        int64
-	err      error
+	ctx  context.Context
+	f    fs.File
+	stop func() bool
+	r    *limited
 }
 
 // SetLimit sets how many bytes the stream reads, in place of
-// DefaultStreamLimit, before any is read.
-func (s *Stream) SetLimit(n int64) {
-	s.limit, s.limitSet = n, true
-}
+// DefaultStreamLimit, before any is read. A limit that is not positive keeps
+// the default.
+func (s *Stream) SetLimit(n int64) { s.r = newLimited(s.f, n) }
 
 // Err returns the *StreamLimitError of a stream that went past its limit.
-func (s *Stream) Err() error { return s.err }
+func (s *Stream) Err() error { return s.r.err }
 
 func (s *Stream) Read(p []byte) (int, error) {
-	if s.err != nil {
-		return 0, s.err
-	}
-	if s.n >= s.limit {
-		// One byte more tells a stream that ended at the limit from one
-		// that goes on past it.
-		var one [1]byte
-		n, err := s.f.Read(one[:])
-		if n > 0 {
-			s.err = &StreamLimitError{Limit: s.limit, Default: !s.limitSet}
-			return 0, s.err
-		}
-		return 0, s.cause(err)
-	}
-	if rest := s.limit - s.n; int64(len(p)) > rest {
-		p = p[:rest]
-	}
-	n, err := s.f.Read(p)
-	s.n += int64(n)
-	return n, s.cause(err)
-}
-
-func (s *Stream) cause(err error) error {
+	n, err := s.r.Read(p)
 	if err != nil {
 		if ctxErr := s.ctx.Err(); ctxErr != nil {
-			return ctxErr
+			return n, ctxErr
 		}
 	}
-	return err
+	return n, err
 }
 
 func (s *Stream) Close() error {
@@ -143,7 +126,54 @@ func (s *Stream) Close() error {
 	return s.f.Close()
 }
 
-// StreamLimitError is a Stream that went on past its limit.
+// ReadStream reads r to its end as a Stream is read: up to limit, or
+// DefaultStreamLimit when limit is not positive, failing with a
+// *StreamLimitError past it.
+func ReadStream(r io.Reader, limit int64) ([]byte, error) {
+	return io.ReadAll(newLimited(r, limit))
+}
+
+// limited reads r up to a limit, and fails with a *StreamLimitError once r
+// goes on past it.
+type limited struct {
+	r     io.Reader
+	limit int64
+	set   bool
+	n     int64
+	err   error
+}
+
+func newLimited(r io.Reader, limit int64) *limited {
+	if limit <= 0 {
+		return &limited{r: r, limit: DefaultStreamLimit}
+	}
+	return &limited{r: r, limit: limit, set: true}
+}
+
+func (l *limited) Read(p []byte) (int, error) {
+	if l.err != nil {
+		return 0, l.err
+	}
+	if l.n >= l.limit {
+		// One byte more tells a stream that ended at the limit from one
+		// that goes on past it.
+		var one [1]byte
+		n, err := l.r.Read(one[:])
+		if n > 0 {
+			l.err = &StreamLimitError{Limit: l.limit, Default: !l.set}
+			return 0, l.err
+		}
+		return 0, err
+	}
+	if rest := l.limit - l.n; int64(len(p)) > rest {
+		p = p[:rest]
+	}
+	n, err := l.r.Read(p)
+	l.n += int64(n)
+	return n, err
+}
+
+// StreamLimitError is a stream that went on past its limit.
 type StreamLimitError struct {
 	Limit int64
 	// Default is whether the limit is DefaultStreamLimit, which nothing set.
@@ -152,16 +182,55 @@ type StreamLimitError struct {
 
 func (e *StreamLimitError) Error() string {
 	if e.Default {
-		return fmt.Sprintf("stopped reading after %d bytes, the default limit for a stream (-m sets another)", e.Limit)
+		return fmt.Sprintf("stopped reading after %s, the default limit for a stream (-m sets another)", formatSize(e.Limit))
 	}
-	return fmt.Sprintf("stopped reading after %d bytes, the size limit (-m)", e.Limit)
+	return fmt.Sprintf("stopped reading after %s, the size limit (-m)", formatSize(e.Limit))
+}
+
+// formatSize writes n bytes with a decimal unit, as -m reads them and as lx
+// reports sizes elsewhere.
+func formatSize(n int64) string {
+	units := []string{"B", "kB", "MB", "GB", "TB"}
+	v, i := float64(n), 0
+	for v >= 1000 && i < len(units)-1 {
+		v /= 1000
+		i++
+	}
+	return strings.TrimSuffix(strconv.FormatFloat(v, 'f', 1, 64), ".0") + " " + units[i]
+}
+
+// cleanups counts the abandoned opens that clean up after themselves once
+// they finish, which WaitCleanups waits for.
+var cleanups sync.WaitGroup
+
+// WaitCleanups waits up to d for work that a cancel abandoned and that
+// removes temporary files once it finishes, such as the open of a large
+// workbook, and reports whether all of it finished. A process about to exit
+// after a cancel calls it so as not to leave those files behind.
+func WaitCleanups(d time.Duration) bool {
+	done := make(chan struct{})
+	go func() {
+		cleanups.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return true
+	case <-time.After(d):
+		return false
+	}
 }
 
 // openUntilDone returns what open returns, or ctx's error once ctx is done.
 // An open that ctx abandons keeps running in its goroutine, which closes what
 // it opens should it ever return. One that never returns, such as a FIFO's
-// open waiting on a writer that never comes, cannot be reclaimed.
-func openUntilDone[T io.Closer](ctx context.Context, open func() (T, error)) (T, error) {
+// open waiting on a writer that never comes, cannot be reclaimed. An open
+// counted in wg, when it is not nil, is done once its goroutine is.
+func openUntilDone[T io.Closer](ctx context.Context, wg *sync.WaitGroup, open func() (T, error)) (T, error) {
+	var zero T
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
 	type opened struct {
 		v   T
 		err error
@@ -169,7 +238,13 @@ func openUntilDone[T io.Closer](ctx context.Context, open func() (T, error)) (T,
 	// Unbuffered: a send succeeds only while the caller still waits, so
 	// exactly one side ends up owning what was opened.
 	ch := make(chan opened)
+	if wg != nil {
+		wg.Add(1)
+	}
 	go func() {
+		if wg != nil {
+			defer wg.Done()
+		}
 		v, err := open()
 		select {
 		case ch <- opened{v, err}:
@@ -183,7 +258,6 @@ func openUntilDone[T io.Closer](ctx context.Context, open func() (T, error)) (T,
 	case o := <-ch:
 		return o.v, o.err
 	case <-ctx.Done():
-		var zero T
 		return zero, ctx.Err()
 	}
 }

@@ -1,0 +1,6 @@
+--- STDOUT ---
+
+
+
+--- STDERR ---
+Error: Failed to read from stdin: stopped reading after 10 B, the size limit (-m)

@@ -242,9 +242,11 @@ func xmlToText(ctx context.Context, r io.Reader) string {
 // Opening the workbook unzips every sheet, which for a large one takes most of
 // a second and cannot be interrupted. An open that ctx abandons finishes in
 // the background and then closes the workbook, which removes the temporary
-// files it unzipped large sheets to.
+// files it unzipped large sheets to, unless the process exits first. lx
+// waits for it with WaitCleanups within its grace period after a signal, so
+// only an open that outlasts that period leaves its files behind.
 func extractXLSXText(ctx context.Context, r io.ReaderAt, size int64) ([]byte, error) {
-	f, err := openUntilDone(ctx, func() (*excelize.File, error) {
+	f, err := openUntilDone(ctx, &cleanups, func() (*excelize.File, error) {
 		return excelize.OpenReader(io.NewSectionReader(r, 0, size))
 	})
 	if err != nil {

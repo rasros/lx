@@ -21,6 +21,9 @@ func TestGoldenMaxSize(t *testing.T) {
 		{name: "149_max_size_attached_short_form", args: []string{"-m1k", "."}},
 		{name: "152_max_size_zero_rejected", args: []string{"-m", "0", "."}},
 		{name: "153_max_size_skips_everything_warns", args: []string{"-m", "1", "src/large.txt"}},
+		// stdin is a stream: read up to -m, and a failure past it.
+		{name: "980_stdin_over_max_size_fails", args: []string{"-m", "10", "-"}, stdin: "0123456789abcdef\n"},
+		{name: "981_stdin_at_max_size_renders", args: []string{"-m", "10", "-"}, stdin: "012345678\n"},
 	})
 }
 

@@ -260,7 +260,8 @@ func addSections(ctx context.Context, log *slog.Logger, env Env, stream *lx.Stre
 					continue
 				}
 				log.Info("Reading content from stdin")
-				data, err := untilDone(ctx, func() ([]byte, error) { return io.ReadAll(env.Stdin) })
+				// stdin is a stream, read up to -m as a FIFO is.
+				data, err := untilDone(ctx, func() ([]byte, error) { return lx.ReadStream(env.Stdin, section.Render.MaxSize) })
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					return ctxErr
 				}
