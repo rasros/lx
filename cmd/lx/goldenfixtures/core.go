@@ -1,6 +1,8 @@
 package goldenfixtures
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -115,6 +117,33 @@ func SetupSymlinksFixture(t *testing.T) string {
 	return dir
 }
 
+// writeCorruptEntryZip writes a zip at path holding good.txt and bad.txt,
+// whose stored bytes no longer match their checksum.
+func writeCorruptEntryZip(t *testing.T, path string) {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, name := range []string{"bad.txt", "good.txt"} {
+		fw, err := zw.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Store})
+		if err != nil {
+			t.Fatal(err)
+		}
+		fw.Write([]byte("intact " + name + "\n"))
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	data := buf.Bytes()
+	// bad.txt comes first: its data follows the 30-byte local header and name.
+	data[30+len("bad.txt")] ^= 0x20
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func SetupErrorsFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -124,6 +153,13 @@ func SetupErrorsFixture(t *testing.T) string {
 	writeFile(t, dir, "spaces/file with spaces.txt", "content with spaces", 0644)
 	writeFile(t, dir, "broken/ok.txt", "readable", 0644)
 	writeFile(t, dir, "broken/bad.zip", "not a zip archive", 0644)
+	writeCorruptEntryZip(t, filepath.Join(dir, "corrupt", "entries.zip"))
+	if err := os.MkdirAll(filepath.Join(dir, "dangling"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("nowhere.txt", filepath.Join(dir, "dangling", "dangling.txt")); err != nil {
+		t.Fatal(err)
+	}
 
 	writeFile(t, dir, "secret/locked.txt", "TOP SECRET", 0600)
 	secretDir := filepath.Join(dir, "secret", "locked_dir")

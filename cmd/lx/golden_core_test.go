@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -125,6 +126,9 @@ func TestGoldenErrors(t *testing.T) {
 		{name: "061b_stats_counts_unreadable_entries", args: []string{"--stats", "secret"}},
 		{name: "061c_stats_counts_broken_archive", args: []string{"--stats", "-Z", "broken"}},
 		{name: "061d_stats_counts_missing_and_unreadable", args: []string{"--stats", "nope.go", "secret/locked.txt"}},
+		{name: "061f_stats_piped_failure_found_twice_counts_once", args: []string{"--stats"}, stdin: "dangling/dangling.txt\ndangling\n"},
+		{name: "061g_stats_counts_corrupt_archive_entry", args: []string{"--stats", "-Z", "corrupt/entries.zip"}},
+		{name: "061h_stdin_read_failure", args: []string{"--stats", "main.go", "-"}, stdin: "partial", stdinFails: true},
 		{name: "061e_stats_piped_list_counts_each_failure_once", args: []string{"--stats", "-Z"}, stdin: "secret\nsecret/locked_dir\nsecret/locked.txt\nbroken\nbroken/bad.zip\nnope.go\nnope.go\n"},
 		{name: "062_missing_file", args: []string{"nonexistent.go"}},
 		{name: "063_spaces_in_filename", args: []string{"spaces/file with spaces.txt"}},
@@ -323,6 +327,23 @@ func TestGoldenMediaURL(t *testing.T) {
 			w.Write(data)
 			return
 		}
+		if name, cut := strings.CutPrefix(r.URL.Path, "/cutchunk"); cut {
+			// A chunked body whose connection drops mid-chunk.
+			data, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			conn, buf, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+			fmt.Fprintf(buf, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n%x\r\n", len(data)+100)
+			buf.Write(data)
+			buf.Flush()
+			return
+		}
 		name, chunked := strings.CutPrefix(r.URL.Path, "/chunked")
 		if !chunked {
 			files.ServeHTTP(w, r)
@@ -353,6 +374,7 @@ func TestGoldenMediaURL(t *testing.T) {
 		{name: "170r_media_url_html_embeds", args: []string{"--html", "-M", u + "/sample.png"}},
 		{name: "170s_url_compact", args: []string{"-n0", u + "/notes.txt", u + "/chunked/notes.txt", u + "/sample.mp4"}},
 		{name: "170t_url_cut_off_body_fails", args: []string{"--stats", u + "/cutoff/notes.txt", u + "/notes.txt"}},
+		{name: "170u_url_cut_off_chunked_body_fails", args: []string{"--stats", u + "/cutchunk/notes.txt", u + "/notes.txt"}},
 	}, u)
 }
 

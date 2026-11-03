@@ -18,13 +18,19 @@ import (
 // Stdin ("-") resolves to nothing: it is a buffer, not a discoverable path, and
 // it can only be read once. The content pass handles it directly.
 //
-// A piped list names a set of paths, so a file it reaches twice, named and
-// through its directory, is collected once.
+// A piped list names a set of paths, so an input it reaches twice, named and
+// through its directory, is collected once: a file once, a failure once, and
+// a file it already failed on, or that a failure names, not again. Inputs
+// and failures share one key, the absolute path, URL or archive entry path.
 //
 // It stops at the first target that finds ctx done and returns ctx's error.
 func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) error {
 	piped := map[string]bool{}
-	pipedFailures := map[string]bool{}
+	seen := func(key string) bool {
+		s := piped[key]
+		piped[key] = true
+		return s
+	}
 	for si := range sections {
 		s := &sections[si]
 		for oi, op := range s.Ops {
@@ -38,11 +44,7 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) e
 				return err
 			}
 			if op.Piped {
-				failures = slices.DeleteFunc(failures, func(f lx.Failure) bool {
-					seen := pipedFailures[f.Path]
-					pipedFailures[f.Path] = true
-					return seen
-				})
+				failures = slices.DeleteFunc(failures, func(f lx.Failure) bool { return seen(f.Path) })
 			}
 			if len(failures) > 0 {
 				if s.failures == nil {
@@ -51,11 +53,7 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) e
 				s.failures[oi] = failures
 			}
 			if op.Piped {
-				files = slices.DeleteFunc(files, func(f lx.InputFile) bool {
-					seen := piped[f.AbsPath]
-					piped[f.AbsPath] = true
-					return seen
-				})
+				files = slices.DeleteFunc(files, func(f lx.InputFile) bool { return seen(f.AbsPath) })
 			}
 			if len(files) == 0 {
 				continue
@@ -79,9 +77,11 @@ func logFailure(log *slog.Logger, f lx.Failure) {
 	case lx.FailedStat:
 		log.Error("Failed to stat path", "path", f.Display, "error", f.Err)
 	case lx.FailedURL:
-		// Collect's URL failures are *URLErrors.
 		var ue *lx.URLError
-		errors.As(f.Err, &ue)
+		if !errors.As(f.Err, &ue) {
+			log.Error("Failed to read URL", "url", f.Display, "error", f.Err)
+			return
+		}
 		msg := "Failed to create URL input"
 		if ue.Download {
 			msg = "Failed to download URL archive"

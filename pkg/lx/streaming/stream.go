@@ -23,6 +23,8 @@ func (defaultTokenizer) Estimate(size int64, content interface{}) int64 {
 }
 
 // Stream manages a collection of files, sections, and prompts for rendering.
+// It is not safe for concurrent use: build it and execute it from one
+// goroutine.
 type Stream struct {
 	items       []interface{}
 	tokenizer   core.Tokenizer
