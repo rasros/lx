@@ -10,10 +10,8 @@ import (
 	"github.com/rasros/lx/pkg/lx/core"
 )
 
-// CheckFields renders t with data, a zero context of the kind t is given,
-// and returns the error of a field the context does not have. It only finds
-// fields on the path the zero context takes. Other errors are left to
-// rendering, which real data may avoid.
+// CheckFields renders t with data, a zero context, and returns the error of
+// a field the context does not have. Other errors are left to rendering.
 func CheckFields(t *template.Template, data interface{}) error {
 	err := t.Execute(io.Discard, data)
 	var ee template.ExecError
@@ -23,10 +21,9 @@ func CheckFields(t *template.Template, data interface{}) error {
 	return nil
 }
 
-// Compile parses configuration templates into an engine. The format's
-// profile supplies every template and layout property the config leaves
-// unset; an unknown format is an error. A template that names a field its
-// context lacks is an error too.
+// Compile parses configuration templates into an engine, filling what cfg
+// leaves unset from the format's profile. An unknown format or a template
+// naming a missing field is an error.
 func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 	prof, err := profileFor(cfg.OutputFormat)
 	if err != nil {
@@ -53,9 +50,7 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 	fileContentStr := pick(cfg.FileContentTemplate, prof.FileContent)
 	fileBinaryStr := pick(cfg.FileBinaryTemplate, prof.FileBinary)
 
-	// parseFile parses a file template with the partials it may call:
-	// file_header, and for the image template file_content and file_binary
-	// too, as which the built-in ones render images.
+	// parseFile parses a file template with the partials it may call.
 	parseFile := func(name, tmpl string, partials map[string]string) (*template.Template, error) {
 		t := template.New(name).Funcs(funcs)
 		if _, err := t.Parse(tmpl); err != nil {
@@ -139,8 +134,7 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		return nil, fmt.Errorf("output_footer template: %w", err)
 	}
 
-	// A field a context lacks, such as one only the stats know, would fail
-	// once output is under way; fail before any is written.
+	// Fail on a missing field before any output is written.
 	for _, c := range []struct {
 		name string
 		t    *template.Template

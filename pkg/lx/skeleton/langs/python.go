@@ -12,11 +12,8 @@ func PyFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
 	return name != nil && !isPrivateName(c.Text(name))
 }
 
-// PyEmitClass emits a Python class. It stays custom because the body is
-// indentation, not braces: there is no closing row, the header ends the row
-// before the body, the docstring belongs with the header, members can be
-// wrapped in decorated_definition, class variables are bare assignment
-// statements kept by their first line, and visibility is a "_" name prefix.
+// PyEmitClass emits a Python class. It is custom because the body is
+// indentation, with no closing row, and visibility is a "_" name prefix.
 func PyEmitClass(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	nameNode := n.ChildByFieldName("name", c.Lang)
 	if nameNode == nil || isPrivateName(c.Text(nameNode)) {

@@ -2,12 +2,8 @@ package internal
 
 import "slices"
 
-// ElisionMarker is the line that stands in for source left out between two
-// kept lines: rows between them, or the rest of a line cut short, such as a
-// one-line function's body. It echoes the "... (N rows skipped)" gap of a head and tail
-// excerpt, without the count: the cut rows are mostly function bodies, a
-// count on every one of them would cost more than it tells, and line numbers
-// (-l) give the exact positions.
+// ElisionMarker stands in for source left out between two kept lines. Unlike
+// a head/tail gap it has no count; line numbers (-l) give positions.
 const ElisionMarker = "...\n"
 
 // LineRange keeps the source rows Start to End-1: 0-based indexes into
@@ -47,20 +43,16 @@ func KeepPrefix(out []LineRange, lines [][]byte, row, cut int) []LineRange {
 }
 
 // KeptLines is the text of the source rows a set of LineRanges keeps, in
-// source order, each row once. It is what skeleton output is rendered from:
-// the rows remember where they came from, so slicing and numbering them can
-// show real source positions.
+// source order, each with its source row for numbering.
 type KeptLines struct {
 	Lines [][]byte // the kept text of each row, without its newline
 	Rows  []int    // the 1-based source row each line came from, ascending
 	Cut   []bool   // whether the line ends early, its rest left out
 }
 
-// MergeRanges returns ranges sorted by Start, with the ones that overlap or
-// touch joined, so no row is kept twice. A row kept whole by any range stays
-// whole; one cut by every range that keeps it keeps the longest cut. A range
-// that ends in a cut is not joined to one that starts on the next row: the
-// cut row ends early, so the two are not one stretch of source.
+// MergeRanges returns ranges sorted by Start, joining overlapping or touching
+// ones. A row kept whole by any range stays whole, else the longest cut wins.
+// A range ending in a cut is not joined to the next row's.
 func MergeRanges(ranges []LineRange) []LineRange {
 	sorted := slices.Clone(ranges)
 	slices.SortStableFunc(sorted, func(a, b LineRange) int { return a.Start - b.Start })
@@ -88,9 +80,8 @@ func MergeRanges(ranges []LineRange) []LineRange {
 	return merged
 }
 
-// KeepRanges collects the rows that ranges keep from lines, the source as
-// SplitLines splits it, merged as MergeRanges does, so ranges may come in any
-// order and overlap.
+// KeepRanges collects the rows that ranges keep from lines, merged as
+// MergeRanges does.
 func KeepRanges(lines [][]byte, ranges []LineRange) KeptLines {
 	var k KeptLines
 	for _, r := range MergeRanges(ranges) {
@@ -118,12 +109,9 @@ func (k KeptLines) elidedBefore(i int) bool {
 	return k.Rows[i] != k.Rows[i-1]+1 || (k.Cut != nil && k.Cut[i-1])
 }
 
-// Render returns the kept lines from..to-1 as text, each ending in a newline,
-// with one ElisionMarker between two neighbouring lines wherever source was
-// left out between them (see elidedBefore). Markers never open or close the
-// text: what lies beyond its first and last line is not shown either way.
-// rows gives the source row of each output line, 0 for a marker, in the form
-// LineNumberFormatter takes.
+// Render returns the kept lines from..to-1 as text, with an ElisionMarker
+// between neighbours wherever source was left out. rows gives the source
+// row of each output line, 0 for a marker.
 func (k KeptLines) Render(from, to int) (text []byte, rows []int) {
 	from = max(from, 0)
 	to = min(to, len(k.Lines))

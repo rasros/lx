@@ -10,10 +10,8 @@ func RustFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
 	return rustIsPublic(n, c.Src, c.Lang)
 }
 
-// RustPrivate reports a struct field or inherent impl item without a pub
-// visibility. Enum variants, trait items and the items of a trait impl
-// (`impl Trait for X`) have no visibility of their own: they are as visible
-// as the enum or trait.
+// RustPrivate reports a struct field or inherent impl item without pub.
+// Enum variants and trait items share their parent's visibility.
 func RustPrivate(c *Ctx, parent, n *gotreesitter.Node) bool {
 	switch c.Type(parent) {
 	case "enum_item", "trait_item":

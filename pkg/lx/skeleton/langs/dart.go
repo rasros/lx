@@ -35,10 +35,7 @@ var dartSignatures = []string{
 	"factory_constructor_signature", "redirecting_factory_constructor_signature",
 }
 
-// DartMember classifies a Dart class-body member. A method with a body is a
-// method_signature (its function_body is the next sibling); one without is a
-// declaration holding a signature. Any other declaration, and an enum
-// constant, is a field.
+// DartMember classifies a Dart class-body member as a method or a field.
 func DartMember(c *Ctx, n *gotreesitter.Node) MemberKind {
 	switch c.Type(n) {
 	case "method_signature":

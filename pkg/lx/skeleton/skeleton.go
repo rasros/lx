@@ -16,11 +16,9 @@ func Supported(lang string) bool {
 	return ok
 }
 
-// Ranges returns the rows of src that make up its skeleton (function
-// signatures and/or struct/class definitions) for lang, sorted and merged as
-// internal.MergeRanges does. A C header (header, a .h file) is read as C or
-// C++, whichever fits it. Source that cannot be parsed, an unsupported
-// lang, or asking for neither part keeps every row.
+// Ranges returns the merged rows of src that make up its skeleton for lang.
+// A .h header is read as C or C++, whichever fits. Unparseable source, an
+// unsupported lang, or asking for neither part keeps every row.
 func Ranges(lang string, header bool, src []byte, functions, structs bool) []Range {
 	ranges, _ := ranges(lang, header, src, internal.SplitLines(src), functions, structs)
 	return ranges
@@ -48,9 +46,8 @@ func Keep(lang string, header bool, src []byte, functions, structs bool) Lines {
 	return internal.KeepRanges(lines, r)
 }
 
-// Extract returns the skeleton of src as text, with an elision marker line
-// wherever source was left out between two kept lines. Source it does not
-// reduce (see Ranges) comes back unchanged.
+// Extract returns the skeleton of src as text, with an elision marker
+// wherever source was left out.
 func Extract(lang string, header bool, src []byte, functions, structs bool) []byte {
 	lines := internal.SplitLines(src)
 	r, reduced := ranges(lang, header, src, lines, functions, structs)

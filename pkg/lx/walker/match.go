@@ -46,8 +46,7 @@ func parseRules(lines []string, basePath, source string) []Rule {
 			// An escaped leading ! or # is part of the pattern.
 			p = p[1:]
 		}
-		// Backslashes escape the next character, as in git, so they are
-		// kept for the matcher rather than read as separators.
+		// Backslashes escape, as in git, so the matcher keeps them.
 		rules = append(rules, newRule(cleanPattern(p), negate, basePath, source))
 	}
 	return rules
@@ -61,9 +60,8 @@ func newRule(p string, negate bool, basePath, source string) Rule {
 		basePathPrefix = basePath + "/"
 	}
 	spec := compileNormalizedSpec(p)
-	// A trailing "/**" matches everything inside a directory but not the
-	// directory itself, as in git and ripgrep, so "*" and "!src/**" leave
-	// src/ ignored: at least one component must follow.
+	// A trailing "/**" matches inside a directory but not the directory
+	// itself, as in git and ripgrep.
 	if dir, ok := strings.CutSuffix(spec.Pattern.Pattern, "/**"); ok {
 		spec.Pattern = compilePattern(dir + "/*/**")
 	}
@@ -91,10 +89,8 @@ func trimTrailingSpaces(p string) string {
 }
 
 // matchIgnoreSpec matches an ignore rule as git does: a pattern without a
-// slash against the base name only. A walk decides whether each directory
-// above a path is ignored before entering it, so the directories' names are
-// not matched again here, and the contents of a re-included directory, such
-// as tags/ after "tags" and "!tags/", are not ignored by the first rule.
+// slash against the base name only. Parent directories were already judged
+// by the walk, so they are not matched again.
 func matchIgnoreSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 	if spec.Pattern.HasSlash || spec.Anchored {
 		return spec.Pattern.matchCandidate(ctx.relPath)
@@ -102,9 +98,8 @@ func matchIgnoreSpec(spec CompiledSpec, ctx pathMatchInfo) bool {
 	return spec.Pattern.matchCandidate(ctx.baseName)
 }
 
-// pathMatcher matches one path against rules. Rules loaded from the same
-// directory share a base path, so the path relative to it is worked out once
-// per base path rather than once per rule.
+// pathMatcher matches one path against rules, computing the relative path
+// once per base path rather than per rule.
 type pathMatcher struct {
 	ctx pathMatchInfo
 

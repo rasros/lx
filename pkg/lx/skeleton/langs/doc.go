@@ -6,8 +6,7 @@ import (
 )
 
 // CommentSyntax says which lines above a declaration make up its leading
-// doc block in one language: its comments, and attributes written on lines
-// of their own outside the declaration's syntax node.
+// doc block: comments and attribute lines.
 type CommentSyntax struct {
 	// Prefixes are line starts (after indentation) that continue a doc
 	// block: line comments, block comment openers and "*" continuation or
@@ -79,11 +78,8 @@ func (cs *CommentSyntax) LeadingDocStart(lines [][]byte, row int) int {
 		if isBlankLine(line) {
 			break
 		}
-		// A block comment's closing line may look like a continuation
-		// line (`*/`), but the lines above it up to its opener belong to
-		// the block whatever they hold. A comment whose opener follows
-		// code trails that code and documents nothing below it, and a
-		// closer with no opener is no doc.
+		// A block comment's lines up to its opener belong to the block. A
+		// comment opened after code documents nothing below it.
 		if block, ok := cs.closedBlock(line); ok && !cs.lineComment(line) {
 			open := cs.openerAbove(block, lines, r-1)
 			if open < 0 {
@@ -192,11 +188,9 @@ func (cs *CommentSyntax) closedBlock(line []byte) (BlockComment, bool) {
 	return BlockComment{}, false
 }
 
-// openerAbove returns the row at or above row (the one above a closing
-// line) of the nearest line that starts with b's opener, or -1 when the
-// nearest opener follows code on its line (a trailing comment), or a line
-// closes another comment first, or there is none. Lines that read as doc
-// lines (`* see /* here */`) are comment text whatever they hold.
+// openerAbove returns the nearest row at or above row that starts with b's
+// opener, or -1 when that opener follows code, another comment closes
+// first, or there is none.
 func (cs *CommentSyntax) openerAbove(b BlockComment, lines [][]byte, row int) int {
 	for ; row >= 0; row-- {
 		line := lines[row]

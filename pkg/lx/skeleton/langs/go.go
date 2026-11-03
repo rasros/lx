@@ -12,11 +12,9 @@ func GoFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
 	return name != nil && isUppercase(c.Text(name))
 }
 
-// GoEmitTypeDecl emits a Go type declaration. It stays custom because one
-// declaration can group several type specs in `type ( ... )`, each with its
-// own doc, and the group's parentheses are kept only around specs that keep
-// something. The body of a spec is not a child of the spec either but of its
-// struct_type or interface_type, and visibility is the case of the name.
+// GoEmitTypeDecl emits a Go type declaration. It is custom because a
+// `type ( ... )` group holds several specs, each with its own doc, and
+// visibility is the case of the name.
 func GoEmitTypeDecl(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	grouped := goIsGroupedTypeDecl(c, n)
 	var groupMembers []internal.LineRange

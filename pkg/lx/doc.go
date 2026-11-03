@@ -69,27 +69,23 @@
 //   - [Stream.AddTree] enqueues a directory tree of the files Admit keeps.
 //   - [Stream.Plan] reports what the stream would render, as its templates
 //     see it.
-//   - [Stream.Execute] renders output to an io.Writer once and returns a
-//     [Report] of what it rendered: rows, binary and failed files, bytes and
-//     tokens. A Stream renders once: a second Execute returns [ErrExecuted],
-//     and adding to or configuring it once Execute has started panics with
-//     it, from a [FailureHandler] too.
+//   - [Stream.Execute] renders output to an io.Writer and returns a [Report]
+//     of what it rendered. A Stream renders once: a second Execute returns
+//     [ErrExecuted], and changing it once Execute has started panics.
 //   - [Stream.WithConcurrency], [Stream.WithOnFailure], [Stream.WithLogger],
 //     [Stream.WithDir] and [Stream.WithTokenizer] customize processing.
 //     Skeleton rendering caps the workers at two.
 //
 // Every input that could not be read is a [Failure], which reaches the caller
 // once: [Collector.Collect] returns the ones discovery meets, and a Stream
-// hands its handler, in output order, the ones added to it and the files it
-// cannot read, counting each in [Report.FailedFiles]. A Stream with no
-// handler logs them.
+// hands its handler the rest in output order, counting each in
+// [Report.FailedFiles]. A Stream with no handler logs them.
 //
 // The library logs to the *slog.Logger it is given: [NewCollector],
 // [UserIgnoreRules] and [Stream.WithLogger] take one, and nil means
 // slog.Default().
 //
-// Example, rendering a directory as lx <dir> does when no project or user
-// lx config changes the output and stats are off:
+// Example, rendering a directory as lx <dir> does with no config:
 //
 //	package main
 //

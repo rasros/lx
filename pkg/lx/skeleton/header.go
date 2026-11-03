@@ -9,11 +9,9 @@ import (
 )
 
 // extractHeader is extract for a .h file, which may be C or C++. It is read
-// as C++ when the C++ grammar parses it without errors and it holds a
-// construct only C++ has (see cppEvidence), and as C otherwise. A header
-// the C++ grammar fails on stays C, as before: that grammar loses class
-// and namespace headers on some templates and macros, so a C++ tree with
-// errors can show less than the C one.
+// as C++ when the C++ grammar parses it cleanly and it holds C++ (see
+// cppEvidence), and as C otherwise: a C++ tree with errors can show less
+// than the C one.
 func extractHeader(src []byte, lines [][]byte, functions, structs bool) ([]internal.LineRange, bool) {
 	if cpp, ok := parse("cpp", src); ok {
 		defer cpp.tree.Release()
@@ -63,11 +61,8 @@ var cppOnly = map[string]bool{
 	"lambda_expression":             true,
 }
 
-// cppEvidence reports a construct only C++ has that the C++ grammar parsed
-// whole, outside function bodies, in the tree p: a class or namespace, a
-// template, a reference, an access label, a method, a scoped enum, a digit
-// separator and the like. Attributes (`[[gnu::x]]`) and inline asm clobber
-// lists, which look like C++ to a text scan, are C too.
+// cppEvidence reports a construct only C++ has, such as a class, template or
+// reference, parsed whole outside function bodies in p.
 func cppEvidence(p parsed, src []byte) bool {
 	var walk func(n *gotreesitter.Node, inBody bool) bool
 	walk = func(n *gotreesitter.Node, inBody bool) bool {

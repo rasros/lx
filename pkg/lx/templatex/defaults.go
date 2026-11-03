@@ -284,10 +284,8 @@ const defaultBarePrompt = ``
 const defaultBareTree = ``
 const defaultBareMeta = ``
 
-// contentString renders template content as text. The processor hands
-// FileContext.Content over as a string, with any line numbers already in it,
-// but a fmt.Stringer such as LineNumberFormatter is rendered as text too rather
-// than through %v, which would skip escaping.
+// contentString renders template content as text, calling String on a
+// fmt.Stringer so it is escaped like a string.
 func contentString(v interface{}) string {
 	switch s := v.(type) {
 	case nil:
@@ -334,9 +332,8 @@ func templateFuncs(engine *core.TemplateEngine) template.FuncMap {
 			}
 			return str
 		},
-		// dataURI reads a file on disk. An archive entry has none, so its
-		// empty AbsPath fails the template instead of rendering nothing;
-		// its .DataURI holds an image's content.
+		// dataURI reads a file on disk, so an archive entry's empty AbsPath
+		// fails; use .DataURI for those.
 		"dataURI": func(path string) (string, error) {
 			if path == "" {
 				return "", errors.New("dataURI: no file on disk to read; an archive entry has no AbsPath, and .DataURI holds an image's content")

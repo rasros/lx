@@ -12,9 +12,8 @@ import (
 // Result is one rendered item produced by the worker pipeline.
 type Result struct {
 	Index int
-	// Buffer holds what the item rendered; it is nil for an item that writes
-	// nothing, as a failure added to the stream, and for a section title,
-	// which the LayoutWriter renders.
+	// Buffer holds what the item rendered; nil for an added failure and for
+	// a section title, which the LayoutWriter renders.
 	Buffer *bytes.Buffer
 	// Section marks the item that starts an explicit section.
 	Section      bool
@@ -32,9 +31,8 @@ type Result struct {
 	Convert *ConvertFailure
 }
 
-// LayoutWriter acts as a middleman between the pipeline assembler and the
-// output writer. It renders everything of a section that is not one of its
-// items: its header, its title and its footer.
+// LayoutWriter writes pipeline results to the output, adding each section's
+// header, title and footer.
 type LayoutWriter struct {
 	w                io.Writer
 	engine           *core.TemplateEngine

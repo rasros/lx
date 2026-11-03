@@ -1,8 +1,6 @@
-// Package langs holds the per-language skeleton emitters. An emitter does not
-// write text: it appends the source rows it keeps to out as
-// internal.LineRanges, in any order and overlapping freely, and the skeleton
-// package merges them and renders the text, so every kept line still knows
-// its source row.
+// Package langs holds the per-language skeleton emitters. An emitter
+// appends the source rows it keeps as internal.LineRanges, in any order,
+// and the skeleton package merges and renders them.
 package langs
 
 import (
@@ -13,9 +11,7 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-// Ctx is the file being reduced to a skeleton and what to keep of it:
-// function and method signatures (Functions), types and their fields
-// (Structs), or both.
+// Ctx is the file being reduced to a skeleton and what to keep of it.
 type Ctx struct {
 	Src      []byte
 	Lines    [][]byte

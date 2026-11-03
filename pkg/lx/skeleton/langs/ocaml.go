@@ -5,15 +5,9 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-// OCamlEmitDefinition emits an OCaml top-level definition. It stays custom
-// because OCaml has no class bodies to walk: functions are let bindings
-// whose signature runs up to the row before the body expression, and a
-// module's members are definitions again, nested inside a module_binding's
-// structure.
-//
-// A let binding with parameters or a fun/function body is a function, kept
-// with functions. Any other value binding is a field of its module (a file
-// is a module too), kept with types.
+// OCamlEmitDefinition emits an OCaml top-level definition. It is custom
+// because OCaml has no class bodies: functions are let bindings, kept with
+// functions, and other value bindings are module fields, kept with types.
 func OCamlEmitDefinition(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	switch c.Type(n) {
 	case "type_definition", "module_type_definition":

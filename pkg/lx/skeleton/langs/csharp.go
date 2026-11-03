@@ -6,11 +6,9 @@ import (
 	"github.com/odvcencio/gotreesitter"
 )
 
-// CSharpPrivate reports a private member. Interface and enum members are
-// public, as are explicit interface implementations (`void IFoo.Bar()`) and
-// finalizers (`~C()`), which take no access modifier.
-// Other members are private unless declared public, protected or internal:
-// C# makes class, struct and record members private by default.
+// CSharpPrivate reports a private member. Interface and enum members,
+// explicit interface implementations and finalizers are public; others are
+// private unless declared public, protected or internal.
 func CSharpPrivate(c *Ctx, parent, n *gotreesitter.Node) bool {
 	switch c.Type(parent) {
 	case "interface_declaration", "enum_declaration":

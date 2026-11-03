@@ -164,8 +164,7 @@ func TestDefaultTokenCounter_DensityFollowsSymbolShare(t *testing.T) {
 	}
 }
 
-// The two representations shared duplicated scanners before; this pins that one
-// implementation now serves both.
+// Strings and byte slices of the same content estimate alike.
 func TestDefaultTokenCounterAgreesAcrossRepresentations(t *testing.T) {
 	samples := []string{
 		"",

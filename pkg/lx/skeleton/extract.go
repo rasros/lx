@@ -84,10 +84,8 @@ func (p parsed) walk(src []byte, lines [][]byte, functions, structs bool) []inte
 	return out
 }
 
-// cutTrailingComments cuts the last row of each range (merged) where a
-// comment that runs on to later rows starts after code (trailing, by row
-// and column), so a skeleton shows that row's code without an unclosed
-// comment.
+// cutTrailingComments cuts a range's last row before a multi-row comment
+// that starts after code, so the skeleton shows no unclosed comment.
 func cutTrailingComments(ranges []internal.LineRange, trailing map[int]int) []internal.LineRange {
 	for i, r := range ranges {
 		if col, ok := trailing[r.End-1]; ok && r.Cut == 0 {
@@ -97,12 +95,9 @@ func cutTrailingComments(ranges []internal.LineRange, trailing map[int]int) []in
 	return ranges
 }
 
-// comments reports the rows inside comments and raw strings that span
-// several rows (all but their first), where a line that reads like a
-// preprocessor directive is none, and, by row, the column where a comment
-// that spans several rows starts after code on its first row (its code
-// trimmed of trailing space). Ordinary string literals are left alone: a
-// directive between two of them (in inline asm) is a real one.
+// comments reports the continuation rows of multi-row comments and raw
+// strings, where a directive-like line is none, and, by row, the column
+// where a multi-row comment starts after code.
 func (p parsed) comments(lines [][]byte) (hidden []bool, trailing map[int]int) {
 	hidden = make([]bool, len(lines))
 	trailing = make(map[int]int)
@@ -213,8 +208,7 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 		}
 	case slices.Contains(def.structTypes, nodeType):
 		// Types are walked with either flag: with functions alone they keep
-		// the methods they hold. Their doc and decorators go only with a
-		// type that keeps something.
+		// their methods.
 		if typ := def.emitType(c, node); len(typ) > 0 {
 			out = c.EmitLeadingDoc(out, outerStart)
 			out = langs.EmitDecorators(out, c.Lines, outerStart, sigStart)
@@ -224,9 +218,8 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 	return out
 }
 
-// processNamespace walks the declarations in the body of a namespace like
-// top-level ones. The namespace's doc, header and closing row are kept
-// around them for context when any of them keeps something.
+// processNamespace walks a namespace body like top-level declarations,
+// keeping the namespace's header and closing row when anything is kept.
 func (def *langDef) processNamespace(c *langs.Ctx, out []internal.LineRange, n, body *gotreesitter.Node) []internal.LineRange {
 	var inner []internal.LineRange
 	for i := 0; i < body.ChildCount(); i++ {
@@ -245,13 +238,9 @@ func (def *langDef) processNamespace(c *langs.Ctx, out []internal.LineRange, n, 
 	return out
 }
 
-// processError walks the children of an error node like top-level
-// declarations, where the parser could not fit them in the tree: a C header
-// guard around `#ifdef __cplusplus extern "C" { #endif`, whose brace closes
-// in another #ifdef, leaves one. Error recovery also surfaces nodes the
-// grammar hides (its repeat helpers, supertypes, rules named with a leading
-// underscore), inside error nodes or not; their children are walked in their
-// place.
+// processError walks the children of an error node, or of a node the
+// grammar hides, like top-level declarations. A C header's
+// `#ifdef __cplusplus extern "C" { #endif` guard leaves one.
 func (def *langDef) processError(c *langs.Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	for i := 0; i < n.ChildCount(); i++ {
 		out = def.processNode(c, out, n.Child(i))

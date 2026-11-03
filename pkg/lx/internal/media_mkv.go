@@ -59,9 +59,8 @@ func parseMatroska(b *byteReader) *MediaInfo {
 
 		timeScale := uint64(mkvDefaultTimeScale)
 		var scaledDuration float64
-		// A segment holds at most one Info and one Tracks, and everything after
-		// them is clusters, cues and tags, often the whole file. Stopping once
-		// both are seen keeps a stream from being read through to its end.
+		// Stop once Info and Tracks are seen, so a stream is not read through
+		// its clusters.
 		var seenInfo, seenTracks bool
 		b.ebmlChildrenUntil(start, stop, func(id uint64, start, stop int64) bool {
 			switch id {
@@ -174,9 +173,8 @@ func (b *byteReader) mkvTrack(start, stop int64, info *MediaInfo) {
 			// nothing about a compressed stream.
 			bitDepth = 0
 		}
-		// SamplingFrequency is what the track declares. For Opus that is the rate
-		// the audio was encoded from rather than the 48 kHz it always decodes at,
-		// and the header is what is being reported here.
+		// Report the declared SamplingFrequency, even for Opus, which always
+		// decodes at 48 kHz.
 		info.Audio = append(info.Audio, AudioStream{
 			Codec: codec, SampleRate: sampleRate, Channels: channels, BitDepth: bitDepth,
 		})

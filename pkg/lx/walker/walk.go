@@ -9,12 +9,9 @@ import (
 )
 
 // Walk walks root within fsys, which stands alone: ignore files apply from
-// its root down, and a .git file pointing outside it cannot be followed.
-// Paths passed to walkFn are relative to fsys, and so are overrides, after
-// Options.OverridePrefix. Use WalkPath for the host filesystem.
-//
-// As in ripgrep, root itself is never filtered: a file is passed to walkFn
-// and a directory walked, whatever the rules say about it.
+// its root down. Paths passed to walkFn, and matched by overrides after
+// Options.OverridePrefix, are relative to fsys. As in ripgrep, root itself
+// is never filtered. Use WalkPath for the host filesystem.
 func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	info, err := fs.Stat(fsys, root)
 	if err != nil {
@@ -29,17 +26,10 @@ func (w *Walker) Walk(fsys fs.FS, root string, walkFn fs.WalkDirFunc) error {
 	return w.walkDir(rt, fsys, rt.frame(w, root), root, Anchor{prefix: w.opts.OverridePrefix}, walkFn, []fs.FileInfo{info})
 }
 
-// WalkPath walks root, a path on the cache's host named from its working
-// directory or absolutely, with the ignore rules of every directory above
-// it, as ripgrep does: .ignore and .lxignore everywhere, and git's rules
-// inside a repository, which start over at its root. Paths passed to fn are
-// relative to root when it is a directory; a file root is passed as its base
-// name. As ripgrep's -g globs, overrides match the path as root was named,
-// with the working directory stripped from the front of an absolute one.
-//
-// As in ripgrep, root itself is never filtered: a file is passed to fn and a
-// directory walked, whatever the rules say about it or the directories above
-// it. The entries below a directory are filtered as usual.
+// WalkPath walks root on the cache's host with the ignore rules of every
+// directory above it, as ripgrep does. Paths passed to fn are relative to a
+// directory root; a file root is passed as its base name. Overrides match
+// the path as root was named. As in ripgrep, root itself is never filtered.
 func (w *Walker) WalkPath(root string, fn fs.WalkDirFunc) error {
 	h := w.cache.host
 	absRoot := filepath.Clean(root)
@@ -55,8 +45,7 @@ func (w *Walker) WalkPath(root string, fn fs.WalkDirFunc) error {
 		return fn(filepath.Base(absRoot), dirEntryAdapter{info}, nil)
 	}
 	fsys := h.DirFS(absRoot)
-	// The walk needs to search the directory, which stat'ing it alone does
-	// not check.
+	// Stat "." to check the directory can be searched, not just stat'd.
 	if info, err = fs.Stat(fsys, "."); err != nil {
 		return fn(".", nil, err)
 	}
@@ -77,9 +66,8 @@ func (w *Walker) ignore(p, reason string) {
 	}
 }
 
-// resolveEntry reports how an entry should be treated, applying symlink policy.
-// A symlink whose target cannot be stat'd is left as a file so the callback can
-// surface the error.
+// resolveEntry applies symlink policy to an entry. A broken symlink is left
+// as a file so the callback can report it.
 func (w *Walker) resolveEntry(fsys fs.FS, path string, d fs.DirEntry, ancestors []fs.FileInfo) (isDir bool, target fs.FileInfo, skip bool, reason string) {
 	if d.Type()&fs.ModeSymlink == 0 {
 		return d.IsDir(), nil, false, ""
@@ -87,8 +75,7 @@ func (w *Walker) resolveEntry(fsys fs.FS, path string, d fs.DirEntry, ancestors 
 
 	info, err := fs.Stat(fsys, path)
 	if err != nil {
-		// Broken link. It resolves to nothing, so file-symlink policy governs
-		// it; otherwise leave it for the callback to report.
+		// A broken link falls under file-symlink policy.
 		if w.opts.SkipFileSymlinks {
 			return false, nil, true, "file symlink"
 		}
@@ -113,11 +100,9 @@ func (w *Walker) resolveEntry(fsys fs.FS, path string, d fs.DirEntry, ancestors 
 	return true, info, false, ""
 }
 
-// judge decides whether the walk skips the entry name, at childPath within
-// the walked fs.FS, in the directory of frame f, and why. As in ripgrep, the
-// overrides, matched at the path a gives it, come first; then the ignore
-// rules; then hidden-file skipping, which a rule keeping the entry lifts.
-// In whitelist mode a directory no include can match below is skipped too.
+// judge decides whether the walk skips an entry, and why. As in ripgrep,
+// overrides come first, then ignore rules, then hidden-file skipping, which
+// a rule keeping the entry lifts.
 func (w *Walker) judge(f *frame, name, childPath string, a Anchor, isDir bool) (bool, string) {
 	wantReason := w.opts.OnIgnore != nil
 	m := matchNone
@@ -176,9 +161,8 @@ func (w *Walker) walkDir(rt *ruleTree, fsys fs.FS, f *frame, dir string, a Ancho
 			continue
 		}
 
-		// Cycle detection needs every directory on the current path, not just
-		// the followed links. Skipped entirely when not following, so ordinary
-		// walks pay no extra stat.
+		// Cycle detection needs every directory on the current path; walks
+		// that do not follow links skip the extra stat.
 		childAncestors := ancestors
 		if w.opts.FollowDirSymlinks {
 			info := target
@@ -211,9 +195,8 @@ func isHiddenName(name string) bool {
 	return strings.HasPrefix(name, ".") && name != "." && name != ".."
 }
 
-// followedDirEntry presents a followed directory symlink as a directory, so
-// callbacks branch on it the same way they branch on a real one. The embedded
-// entry keeps the link's own name.
+// followedDirEntry presents a followed directory symlink as a directory,
+// keeping the link's own name.
 type followedDirEntry struct {
 	fs.DirEntry
 	info fs.FileInfo

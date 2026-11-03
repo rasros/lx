@@ -6,13 +6,9 @@ import (
 )
 
 // CFuncVisible reports a C or C++ function definition, or a declaration
-// with a declarator that declares a function. A pointer to a function
-// (`int (*handler)(int);`) is a variable, not a function.
-//
-// A declaration that failed to parse but holds a function declarator
-// somewhere (C++ read as C: a class taken for a declaration) is reported
-// too, and kept whole: its declarators say nothing reliable, and the
-// functions in it would otherwise be lost.
+// that declares a function rather than a function pointer. A declaration
+// that failed to parse but holds a function declarator is reported too, so
+// its functions are not lost.
 func CFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
 	if c.Type(n) != "declaration" {
 		return true
@@ -37,13 +33,9 @@ func hasDescendantOfType(c *Ctx, n *gotreesitter.Node, typ string) bool {
 	return false
 }
 
-// declaresFunction reports a C or C++ declarator that declares a function
-// (maybe returning a pointer or reference), not a pointer to or array of
-// them: what decides is the declarator nearest the name. In `void
-// (*callback)(int)` that is the pointer, in `int (*get(void))(int)` the
-// function. An initializer is looked through: the C grammar reads C++
-// default arguments and pure virtuals (`virtual void f() = 0;`) as one, and
-// `int (*fp)(int) = f;` stays a pointer.
+// declaresFunction reports a C or C++ declarator that declares a function,
+// not a pointer to one: the declarator nearest the name decides. An
+// initializer is looked through, as for `virtual void f() = 0;`.
 func declaresFunction(c *Ctx, d *gotreesitter.Node) bool {
 	function := false
 	for d != nil {
@@ -67,11 +59,9 @@ func declaresFunction(c *Ctx, d *gotreesitter.Node) bool {
 	return function
 }
 
-// cEmitTypedef emits a typedef, kept only with types since it has no
-// methods. Of `typedef struct { ... } Name;` (or union, or enum) the members
-// are walked: they belong to the specifier inside the typedef, but the header
-// and closing row are the typedef's own, so the name after the closing brace
-// is kept. Any other typedef is a type alias, kept whole.
+// cEmitTypedef emits a typedef with types. The members of
+// `typedef struct { ... } Name;` are walked, keeping the name after the
+// closing brace; any other typedef is kept whole.
 func cEmitTypedef(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	if !c.Structs {
 		return out

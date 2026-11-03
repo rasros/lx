@@ -14,16 +14,11 @@ import (
 
 type InputFile struct {
 	Path string
-	// AbsPath is the absolute path of the file on disk, or the URL of one
-	// fetched from a URL. It is empty for an archive entry, which is no file
-	// on disk.
+	// AbsPath is the absolute path on disk, or the URL. It is empty for an
+	// archive entry.
 	AbsPath string
-	// Archive and Entry name an archive entry: the archive's absolute path,
-	// or its URL when it was downloaded, and the entry's path inside it.
-	// That is the path an entry is stored at, with the directory a
-	// repository host wraps a repository's files in, which its Path leaves
-	// out; the content of a single compressed file, which has no stored
-	// path, has the name its Path gives it, notes.txt for notes.txt.gz.
+	// Archive and Entry name an archive entry: the archive's absolute path
+	// or URL, and the path the entry is stored at inside it.
 	Archive string
 	Entry   string
 	Size    int64
@@ -35,15 +30,12 @@ type InputFile struct {
 	// memory need not watch ctx: it cannot keep a cancelled run waiting.
 	Open func(ctx context.Context) (io.ReadCloser, error)
 
-	// mediaType is filled in by Open for sources that learn it while fetching,
-	// such as an HTTP response's Content-Type. It is shared by pointer so the
-	// value copies the pipeline makes all observe what Open recorded.
+	// mediaType is set by Open from an HTTP Content-Type. It is a pointer so
+	// copies of the InputFile see it.
 	mediaType *string
 }
 
-// Key names the input uniquely among those of one run, as core.Failure.Path
-// names one that could not be read: its AbsPath, or its archive's and the
-// entry's path in it.
+// Key names the input uniquely within a run, as core.Failure.Path does.
 func (f InputFile) Key() string {
 	if f.Archive != "" {
 		return f.Archive + "/" + f.Entry
@@ -62,13 +54,11 @@ func newByteReaderReadCloser(data []byte) io.ReadCloser {
 	return byteReaderReadCloser{Reader: bytes.NewReader(data)}
 }
 
-// irregular are the file types whose open and reads can block indefinitely,
-// waiting on whatever is at the other end, and that may never end. Their
-// stated size, zero, says nothing of their content.
+// irregular are the file types that can block and may never end.
 const irregular = fs.ModeNamedPipe | fs.ModeSocket | fs.ModeDevice
 
-// IsIrregular reports whether mode is a FIFO, a socket or a device: a file
-// whose content is a stream, read as a Stream, with no size known ahead.
+// IsIrregular reports whether mode is a FIFO, a socket or a device, which is
+// read as a Stream of unknown size.
 func IsIrregular(mode fs.FileMode) bool { return mode&irregular != 0 }
 
 // DefaultStreamLimit is how much of a stream is read when nothing sets its

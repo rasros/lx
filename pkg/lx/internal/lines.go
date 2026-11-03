@@ -9,14 +9,9 @@ import (
 )
 
 // LineNumberFormatter prefixes each line of a head, gap and tail with its row
-// number. By default head rows count up from 1 and tail rows are counted back
-// from TotalRows; when that count is an estimate, Approximate marks each tail
-// number with "~" so it is not mistaken for an exact position.
-//
-// HeadRows and TailRows, when set, give the number of each line of Head and
-// Tail instead, for text whose lines are not consecutive rows, such as a
-// skeleton. A 0 leaves that line unnumbered, as the Gap is. Explicit numbers
-// are exact, so Approximate does not mark them.
+// number. Tail rows count back from TotalRows, marked "~" when Approximate.
+// HeadRows and TailRows, when set, give explicit numbers, as for a skeleton;
+// a 0 leaves a line unnumbered.
 type LineNumberFormatter struct {
 	Head        []byte
 	Gap         []byte

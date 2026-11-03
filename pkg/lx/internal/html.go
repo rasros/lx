@@ -32,12 +32,9 @@ var htmlDropped = map[atom.Atom]bool{
 	atom.Head:     true,
 }
 
-// HTMLToMarkdown converts a document to structural Markdown: headings, rules,
-// lists, blockquotes, fenced code, tables, links and images. Only the body is
-// rendered; the title is page metadata rather than content.
-//
-// Inline emphasis is deliberately dropped: keeping it would mean escaping every
-// literal * and _ in body text, for a signal a model barely uses.
+// HTMLToMarkdown converts a document body to structural Markdown. Inline
+// emphasis is dropped, since keeping it would mean escaping every literal *
+// and _.
 func HTMLToMarkdown(r io.Reader) ([]byte, error) {
 	doc, err := html.Parse(r)
 	if err != nil {

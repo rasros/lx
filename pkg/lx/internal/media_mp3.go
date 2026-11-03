@@ -69,9 +69,8 @@ func parseMP3(b *byteReader) *MediaInfo {
 	if frames, ok := b.vbrFrameCount(offset, version, channels); ok {
 		info.Duration = secondsToDuration(frames*uint64(mp3SamplesPerFrame(version, layer)), uint64(sampleRate))
 	} else if bitrate > 0 {
-		// The nominal bitrate stays as it was read from the header. Deriving one
-		// from the estimate instead would only hand back the number that produced
-		// it, dressed up as a measurement.
+		// Keep the header's nominal bitrate; one derived from the estimate
+		// would be circular.
 		info.Duration = secondsToDuration(uint64((b.size-offset)*8), uint64(bitrate))
 		info.Estimated = true
 	}

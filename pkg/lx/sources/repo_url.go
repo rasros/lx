@@ -5,13 +5,9 @@ import (
 	"sync"
 )
 
-// RewriteRepoURL inspects raw and, if it matches a known repo-host pattern
-// (GitHub, GitLab, Bitbucket, Codeberg), returns the archive-zip URL for that
-// repo and true. Otherwise returns "", false.
-//
-// Accepts input with or without an http(s) scheme. URLs that already point at
-// a host-specific archive segment (e.g. /archive/, /-/archive/, /get/) are
-// left alone.
+// RewriteRepoURL returns the archive zip URL for a repository URL on GitHub,
+// GitLab, Bitbucket or Codeberg, with or without a scheme. URLs that already
+// point at an archive are left alone.
 func RewriteRepoURL(raw string) (string, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -50,11 +46,8 @@ func RewriteRepoURL(raw string) (string, bool) {
 }
 
 type repoRewriter struct {
-	// parse extracts (owner, repo, ref) from path segments. Returns ok=false
-	// when the path doesn't match the host's recognized shape (e.g. a
-	// /blob/, /releases/, or /archive/ path) — the caller leaves such URLs
-	// alone. The host is responsible for rejecting its own archive shape;
-	// the matcher should only accept "/owner/repo[/{tree,src,...}/{ref}]".
+	// parse extracts owner, repo and ref from path segments, accepting only
+	// "/owner/repo[/{tree,src,...}/{ref}]".
 	parse func(parts []string) (owner, repo, ref string, ok bool)
 	// archiveURL composes the archive-zip URL. ref="" means "default branch".
 	archiveURL func(owner, repo, ref string) string
@@ -174,10 +167,9 @@ var (
 	}
 )
 
-// SetRepoHostForTest registers a host rewriter so tests can route short URLs
-// at an httptest.Server. Use only from tests; the returned function restores
-// the previous registration. The test parser accepts the simple
-// "/owner/repo" shape (no ref segment).
+// SetRepoHostForTest registers a host rewriter accepting "/owner/repo" so
+// tests can route URLs at an httptest.Server. The returned function restores
+// the previous registration.
 func SetRepoHostForTest(host string, archiveURL func(owner, repo, ref string) string) func() {
 	host = strings.ToLower(host)
 	repoHostsMu.Lock()

@@ -48,12 +48,9 @@ func CppUnwrap(c *Ctx, n *gotreesitter.Node) *gotreesitter.Node {
 	return n
 }
 
-// CppMember classifies a C++ class member (after CppUnwrap): a
-// function_definition, or a declaration whose declarator declares a
-// function (a friend function too), is a method; a class, struct, union or
-// enum is a nested type; other declarations, including function pointers,
-// friend classes and enumerators, are fields, and so are member type aliases
-// (typedef, using X = ...), kept whole like top-level ones.
+// CppMember classifies a C++ class member (after CppUnwrap): functions are
+// methods, classes, structs, unions and enums nested types, and anything
+// else a field.
 func CppMember(c *Ctx, n *gotreesitter.Node) MemberKind {
 	switch t := c.Type(n); {
 	case t == "function_definition":
@@ -77,11 +74,9 @@ func CppSectionPrivate(c *Ctx, label *gotreesitter.Node) bool {
 	return strings.TrimSuffix(strings.TrimSpace(c.Text(label)), ":") == "private"
 }
 
-// CppEmitter emits top-level C and C++ type declarations: typedefs with
-// cEmitTypedef, `using X = ...;` aliases and forward declarations
-// (`struct fwd;`) whole with types, the type a variable declares with its
-// body (`struct s { ... } inst;`), and the rest with the generic member
-// walker.
+// CppEmitter emits top-level C and C++ type declarations: typedefs, aliases
+// and forward declarations whole with types, and the rest with the generic
+// member walker.
 func CppEmitter(m *Members) Emitter {
 	return func(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 		switch t := c.Type(n); {

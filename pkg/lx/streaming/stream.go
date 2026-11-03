@@ -13,16 +13,14 @@ import (
 	"github.com/rasros/lx/pkg/lx/templatex"
 )
 
-// FailureHandler is told about each input that could not be read. It is
-// called from the goroutine running Execute, in output order. It may read the
-// stream's Plan, but changing the stream from it panics, as it does after
-// Execute.
+// FailureHandler is told about each input that could not be read, in output
+// order, from the goroutine running Execute. Changing the stream from it
+// panics.
 type FailureHandler func(core.Failure)
 
 // Stream manages a collection of files, sections, and prompts for rendering.
-// It is not safe for concurrent use: build it and execute it from one
-// goroutine. It renders once: once Execute has started, the methods that
-// change the stream panic with ErrExecuted, and Execute returns it.
+// It is not safe for concurrent use. It renders once: after Execute starts,
+// changing it panics with ErrExecuted.
 type Stream struct {
 	items       []interface{}
 	tokenizer   core.Tokenizer
@@ -93,9 +91,8 @@ func (s *Stream) WithTokenizer(t core.Tokenizer) *Stream {
 	return s
 }
 
-// WithOnFailure sets h to be told about every failure: the ones added with
-// AddFailure and the files that cannot be read as they render, each counted
-// once in the Report's FailedFiles. Without one, the stream logs them.
+// WithOnFailure sets h to be told about every failure. Without one, the
+// stream logs them.
 func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
 	s.mustChange()
 	s.onFailure = h
@@ -121,9 +118,8 @@ func (s *Stream) WithLogger(log *slog.Logger) *Stream {
 }
 
 // Admit reports whether the stream keeps f when added with opts: a file over
-// opts.MaxSize is dropped. Inputs with an unknown size (negative, as for
-// remote URLs and streams such as FIFOs) are always kept; a stream is read
-// only up to opts.MaxSize instead. AddFile and AddTree both decide by it.
+// opts.MaxSize is dropped. Inputs of unknown size are kept and read only up
+// to opts.MaxSize.
 func (s *Stream) Admit(f sources.InputFile, opts core.RenderOptions) bool {
 	return opts.MaxSize <= 0 || f.Size <= opts.MaxSize
 }
@@ -143,9 +139,8 @@ func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
 	return s
 }
 
-// AddFailure adds an input that could not be read, such as one discovery
-// failed on. It renders nothing, but is reported where it stands in the
-// output and counted in the Report's FailedFiles.
+// AddFailure adds an input that could not be read. It renders nothing but is
+// reported in output order and counted in the Report's FailedFiles.
 func (s *Stream) AddFailure(f core.Failure) *Stream {
 	s.mustChange()
 	s.items = append(s.items, f)
@@ -164,10 +159,9 @@ func (s *Stream) AddPrompt(text string) *Stream {
 	return s
 }
 
-// AddTree enqueues a directory tree of the files Admit keeps under opts; only
-// opts.MaxSize applies. The files need not be added with AddFile, so a tree can
-// stand in for content. A tree with no admitted files is left out. Repeated
-// calls with the same files slice and MaxSize share one built tree.
+// AddTree enqueues a directory tree of the files Admit keeps under opts. The
+// files need not be added with AddFile. A tree with no admitted files is left
+// out.
 func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *Stream {
 	s.mustChange()
 	if t := s.lastTree; len(files) > 0 && len(files) == len(t.files) &&
@@ -198,16 +192,14 @@ func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
 	return s
 }
 
-// mustChange panics once Execute has started: a stream renders once, and
-// nothing may change it while it renders.
+// mustChange panics once Execute has started.
 func (s *Stream) mustChange() {
 	if s.executed {
 		panic(ErrExecuted)
 	}
 }
 
-// prepare plans the items queued so far, organizing them into sections. It
-// only reads the stream.
+// prepare plans the items queued so far, organizing them into sections.
 func (s *Stream) prepare() (core.Plan, []*core.SectionContext, []render.PreparedItem) {
 	global := core.Plan{
 		WorkDir:       s.workDir,
@@ -254,8 +246,7 @@ func (s *Stream) prepare() (core.Plan, []*core.SectionContext, []render.Prepared
 				currentSection.TotalSize += f.Size
 				global.TotalSize += f.Size
 			}
-			// Size-only: no content read yet. The Report adds WrittenTokenEstimate,
-			// over the written output, beside it.
+			// Size-only: no content read yet.
 			global.TokenEstimate += s.tokenizer.Estimate(f.Size, nil)
 
 			prepared = append(prepared, render.PreparedItem{
@@ -286,8 +277,8 @@ func (s *Stream) Plan() core.Plan {
 	return plan
 }
 
-// ErrExecuted is returned by Execute on a stream that already ran, and the
-// panic of a change to the stream once Execute has started.
+// ErrExecuted is returned by a second Execute, and panicked with by changes
+// after Execute starts.
 var ErrExecuted = errors.New("stream already executed")
 
 // Execute renders the stream to w and reports what was rendered. A stream

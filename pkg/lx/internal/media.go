@@ -7,9 +7,8 @@ import (
 	"time"
 )
 
-// MediaInfo is what a media container reveals about itself without decoding any
-// of it. Every field is optional: containers disagree about what they store in
-// their headers, and a truncated file may yield only some of it.
+// MediaInfo is what a media container reveals without decoding. Every field
+// is optional.
 type MediaInfo struct {
 	Container string
 	Duration  time.Duration
@@ -43,20 +42,10 @@ type ImageInfo struct {
 	Frames int
 }
 
-// MediaMetadata describes a media file as a block of text, so that files which
-// would otherwise be skipped as binary contribute their existence and shape to
-// the bundle.
-//
-// The container may be empty, for an input whose name gives nothing away; the
-// header is then what identifies it. The result reports whether the file turned
-// out to be media at all, which is false only when neither the name nor the
-// bytes said so. A named container that will not parse still describes itself,
-// since the name is evidence enough that the file was meant to be one.
-//
-// A stream (LazyReader) is read only as far as the parser walks, and the gaps
-// it steps over are discarded rather than kept: a parser that must find a
-// header at the end, as MP4 must find a trailing moov, reads the stream through
-// without holding it.
+// MediaMetadata describes a media file as a block of text. An empty container
+// is sniffed from the header. It reports false only when neither the name nor
+// the bytes say media. A stream is read only as far as the parser walks,
+// discarding the gaps.
 func MediaMetadata(container string, r io.ReaderAt, size int64) ([]byte, bool) {
 	b := &byteReader{r: r, size: size}
 
@@ -84,10 +73,8 @@ func MediaMetadata(container string, r io.ReaderAt, size int64) ([]byte, bool) {
 	return []byte(info.render()), true
 }
 
-// mediaSeeksBack names the containers whose parsers read at offsets the file
-// itself points to, which may lie before what was read last: a TIFF directory
-// can sit at the end and point back at its values. Every other parser walks
-// forward, so a stream it reads can discard what it steps over.
+// mediaSeeksBack names the containers whose parsers may seek backwards, as a
+// TIFF directory points back at its values. Other parsers walk forward.
 var mediaSeeksBack = map[string]bool{"tiff": true}
 
 func parseMedia(container string, b *byteReader) *MediaInfo {
@@ -101,14 +88,12 @@ func parseMedia(container string, b *byteReader) *MediaInfo {
 	return f.parse(b)
 }
 
-// mediaReadAhead is how much byteReader reads at once. Parsers read a few
-// bytes at a time, walking blocks and elements in order, so one read serves
-// many of them.
+// mediaReadAhead is how much byteReader reads at once, so many small parser
+// reads share one source read.
 const mediaReadAhead = 64 << 10
 
-// byteReader bounds every read to the file, so a truncated or lying header can
-// only cut a parse short rather than run off the end. It reads ahead, so that a
-// walk over many small blocks does not make a read of the source for each.
+// byteReader bounds every read to the file, so a lying header only cuts a
+// parse short. It reads ahead.
 type byteReader struct {
 	r    io.ReaderAt
 	size int64
@@ -247,8 +232,7 @@ func formatChannels(n int) string {
 	return fmt.Sprintf("%d channels", n)
 }
 
-// secondsToDuration converts a count of units and the units per second they are
-// measured in, which is how every container here stores its timings.
+// secondsToDuration converts units at perSecond units per second.
 func secondsToDuration(units uint64, perSecond uint64) time.Duration {
 	if perSecond == 0 {
 		return 0

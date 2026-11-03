@@ -19,11 +19,9 @@ func DefaultTokenizer() Tokenizer {
 	return TokenCounter(DefaultTokenCounter)
 }
 
-// DefaultTokenCounter estimates BPE tokens from content using a character-class
-// scanner, with no language hint or embedded vocabulary. Density follows the
-// share of symbols rather than the file format: measured bytes/token runs ~3.8
-// for prose, ~3.2 for source, and 2.0 for symbol-dense JSON, but JSON built
-// from long string values lands near 3.0 because it is mostly words.
+// DefaultTokenCounter estimates BPE tokens from content with a
+// character-class scanner and no vocabulary. Density follows the share of
+// symbols: about 3.8 bytes/token for prose, 3.2 for source, 2.0 for JSON.
 func DefaultTokenCounter(size int64, content interface{}) int64 {
 	switch v := content.(type) {
 	case string:
@@ -36,8 +34,6 @@ func DefaultTokenCounter(size int64, content interface{}) int64 {
 	return size / 4
 }
 
-// byteseq is the pair of representations content arrives in. Scanning them with
-// one implementation keeps the two from drifting apart.
 type byteseq interface {
 	~string | ~[]byte
 }

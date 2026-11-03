@@ -7,13 +7,9 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-// RubyEmitClassOrModule emits a Ruby class or module. It stays custom because
-// the body has no delimiters of its own: body_statement starts on the first
-// member's row, so the header is the declaration's first row and the closing
-// row is the declaration's `end`. Visibility is a bare `private` or
-// `protected` call that hides every member after it, method signatures run
-// to the end of their parameters rather than to a body opener, and class
-// macros (attr_reader, constants) are kept by their first row.
+// RubyEmitClassOrModule emits a Ruby class or module. It is custom because
+// the body has no delimiters and visibility is a bare `private` or
+// `protected` call that hides every member after it.
 func RubyEmitClassOrModule(c *Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	body := n.ChildByFieldName("body", c.Lang)
 	if body == nil {
