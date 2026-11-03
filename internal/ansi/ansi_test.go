@@ -86,7 +86,7 @@ func TestNoEscapesOutsidePackage(t *testing.T) {
 	// Walk with lx's own walker so gitignored files, such as local checkouts
 	// of other repositories, are skipped like hidden and testdata dirs.
 	w := walker.New(walker.Options{IgnoreEnabled: true, SkipHidden: true})
-	err = w.Walk(os.DirFS(root), ".", func(rel string, d fs.DirEntry, err error) error {
+	err = w.WalkPath(root, func(rel string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
