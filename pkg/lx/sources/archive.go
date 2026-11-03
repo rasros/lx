@@ -171,7 +171,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 			AbsPath: absPath + "/" + candidates[i].entryPath,
 			Size:    int64(len(cached)),
 			ModTime: candidates[i].modTime,
-			Open: func() (io.ReadCloser, error) {
+			Open: func(context.Context) (io.ReadCloser, error) {
 				return newByteReaderReadCloser(cached), nil
 			},
 		}

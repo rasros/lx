@@ -14,8 +14,8 @@ import (
 
 // cleanupGrace is how long a run cancelled by a signal may take to clean up,
 // such as dropping its -o buffer and stopping profiling, before the process
-// dies of the signal anyway: a run blocked on input that cannot be
-// cancelled, such as stdin, must not outlive the signal.
+// dies of the signal anyway: a run stuck in work that does not check for
+// cancellation must not outlive the signal.
 const cleanupGrace = 500 * time.Millisecond
 
 func main() {

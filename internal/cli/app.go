@@ -35,7 +35,10 @@ func Run(ctx context.Context, args []string, env Env) error {
 		return err
 	}
 
-	if err := gatherInputs(parsed, env); err != nil {
+	if err := gatherInputs(ctx, parsed, env); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		if len(args) == 0 {
 			printShortHelp(env)
 			return nil
@@ -77,7 +80,7 @@ func handleGlobals(parsed *ParsedArgs, env Env) (bool, error) {
 
 // gatherInputs adds the paths piped to stdin when no file is named, and "."
 // when there is still nothing to render.
-func gatherInputs(parsed *ParsedArgs, env Env) error {
+func gatherInputs(ctx context.Context, parsed *ParsedArgs, env Env) error {
 	// Stdin depends only on explicit file arguments; the "." fallback also
 	// depends on generators, which already give the run something to emit.
 	hasFiles := false
@@ -93,7 +96,7 @@ func gatherInputs(parsed *ParsedArgs, env Env) error {
 
 	if !hasFiles {
 		_, useNull := parsed.Globals["null"]
-		stdinFiles, isPipe, err := readFilenamesFromStdin(env.Stdin, useNull)
+		stdinFiles, isPipe, err := readFilenamesFromStdin(ctx, env.Stdin, useNull)
 		if err != nil {
 			return fmt.Errorf("read stdin: %w", err)
 		}
@@ -184,7 +187,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 			log.Warn("Tree options cover no files", "flags", flags)
 		}
 	}
-	if err := addSections(log, env, stream, sections, rawArgs); err != nil {
+	if err := addSections(ctx, log, env, stream, sections, rawArgs); err != nil {
 		return err
 	}
 
@@ -227,8 +230,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 }
 
 // addSections adds the items of sections to stream, in order, failing on a
-// prompt file it cannot read.
-func addSections(log *slog.Logger, env Env, stream *lx.Stream, sections []Section, rawArgs []string) error {
+// prompt file it cannot read, or with ctx's error once ctx is done while it
+// waits on stdin.
+func addSections(ctx context.Context, log *slog.Logger, env Env, stream *lx.Stream, sections []Section, rawArgs []string) error {
 	var metaFields map[string]string
 	var metaBody string
 	for si, section := range sections {
@@ -256,7 +260,10 @@ func addSections(log *slog.Logger, env Env, stream *lx.Stream, sections []Sectio
 					continue
 				}
 				log.Info("Reading content from stdin")
-				data, err := io.ReadAll(env.Stdin)
+				data, err := untilDone(ctx, func() ([]byte, error) { return io.ReadAll(env.Stdin) })
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr
+				}
 				if err != nil {
 					stream.AddFailure(lx.Failure{Kind: lx.FailedRead, Path: stdinPath, Display: "stdin", Err: err})
 					continue

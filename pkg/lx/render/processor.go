@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -89,15 +90,22 @@ func (p *Processor) SetTokenCounter(tc core.TokenCounter) {
 	}
 }
 
-// RenderPrepared processes one item containing pre-calculated section and indices.
-func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []byte) (RenderStats, error) {
+// RenderPrepared processes one item containing pre-calculated section and
+// indices. Once ctx is done it stops reading and converting the file, writes
+// nothing and returns ctx's error.
+func (p *Processor) RenderPrepared(ctx context.Context, w io.Writer, item PreparedItem, scratchBuf []byte) (RenderStats, error) {
 	var stats RenderStats
-	var ctx interface{}
+	var data interface{}
 	var templateToUse *template.Template
 
 	switch v := item.Raw.(type) {
 	case FileItem:
-		fCtx, issues := p.prepareFileContext(v.File, v.Opts, item.FileIndexGlobal, scratchBuf)
+		fCtx, issues := p.prepareFileContext(ctx, v.File, v.Opts, item.FileIndexGlobal, scratchBuf)
+		// What a cancelled file made of its failed reads is no description
+		// of it.
+		if err := ctx.Err(); err != nil {
+			return RenderStats{}, err
+		}
 		fCtx.Section = *item.Section
 		fCtx.SectionFileIndex = item.FileIndexSection
 
@@ -107,7 +115,7 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 			IsBinary:  fCtx.IsBinary,
 			Issues:    issues,
 		}
-		ctx = &fCtx
+		data = &fCtx
 
 		if fCtx.IsError {
 			templateToUse = p.engine.FileError
@@ -124,26 +132,26 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 	case core.PromptContext:
 		v.Global = p.global
 		v.Section = *item.Section
-		ctx = &v
+		data = &v
 		templateToUse = p.engine.Prompt
 
 	case core.TreeContext:
 		v.Global = p.global
 		v.Section = *item.Section
-		ctx = &v
+		data = &v
 		templateToUse = p.engine.Tree
 
 	case core.MetaContext:
 		v.Global = p.global
 		v.Section = *item.Section
-		ctx = &v
+		data = &v
 		templateToUse = p.engine.Meta
 
 	default:
 		return stats, nil
 	}
 
-	if err := templateToUse.Execute(w, ctx); err != nil {
+	if err := templateToUse.Execute(w, data); err != nil {
 		return stats, err
 	}
 	return stats, nil
@@ -206,7 +214,7 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 type converter struct {
 	name    string
 	applies func(f sources.InputFile, opts core.RenderOptions, format *internal.Format) bool
-	convert func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error)
+	convert func(ctx context.Context, f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error)
 	// language of the produced content; empty means detect as usual.
 	language func(f sources.InputFile) string
 }
@@ -234,7 +242,11 @@ var converters = []converter{
 		applies: func(_ sources.InputFile, opts core.RenderOptions, format *internal.Format) bool {
 			return opts.ExtractMedia && format.IsMedia()
 		},
-		convert: sources.ExtractMediaMetadata,
+		// Media is described from its headers, read through the opened
+		// source, whose reads already stop with ctx.
+		convert: func(_ context.Context, f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error) {
+			return sources.ExtractMediaMetadata(f, r, size)
+		},
 	},
 }
 
@@ -244,7 +256,7 @@ var converters = []converter{
 //
 // An image that is about to be embedded is left alone: the picture itself says
 // more than a description of it would.
-func applyConverters(file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool, *ConvertFailure) {
+func applyConverters(ctx context.Context, file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool, *ConvertFailure) {
 	if embedImages && format.IsImage() {
 		return reader, size, "", "", false, nil
 	}
@@ -252,7 +264,7 @@ func applyConverters(file sources.InputFile, opts core.RenderOptions, format *in
 		if !c.applies(file, opts, format) {
 			continue
 		}
-		text, err := c.convert(file, reader, size)
+		text, err := c.convert(ctx, file, reader, size)
 		if err != nil {
 			return reader, size, "", "", false, &ConvertFailure{Converter: c.name, Err: err}
 		}
@@ -369,10 +381,11 @@ func skeletonModeLabel(functions, types bool) string {
 
 // prepareFileContext describes file for its template. A file that cannot be
 // read becomes an error row; that and a failed converter are returned for
-// the caller to report.
-func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOptions, index int, scratch []byte) (core.FileContext, FileIssues) {
+// the caller to report. Once ctx is done the result describes nothing and is
+// to be discarded.
+func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFile, cfg core.RenderOptions, index int, scratch []byte) (core.FileContext, FileIssues) {
 	var issues FileIssues
-	rc, err := file.Open()
+	rc, err := file.Open(ctx)
 	if err != nil {
 		issues.ReadErr = err
 		return p.errorContext(file, index, err.Error()), issues
@@ -394,7 +407,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 
 	format, verified := classify(file.Path, reader, scratch)
 	reader, size, convertedFrom, convertedLang, converted, convertFailure := applyConverters(
-		file, cfg, format, reader, size, p.engine.EmbedImages && verified)
+		ctx, file, cfg, format, reader, size, p.engine.EmbedImages && verified)
 	issues.Convert = convertFailure
 
 	isBinary, lang := detectContent(file.Path, reader, scratch)
@@ -405,6 +418,11 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 	// the content templates render and the image template would discard.
 	isImage := format.IsImage() && verified && !converted
 
+	// A skeleton is parsed from bytes already read, which ctx cannot
+	// interrupt, so a cancelled file stops before it.
+	if ctx.Err() != nil {
+		return core.FileContext{}, issues
+	}
 	skel := applySkeleton(cfg, lang, reader, size, isBinary, isImage)
 	var skeletonMode string
 	if skel != nil {

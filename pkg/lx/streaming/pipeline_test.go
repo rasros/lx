@@ -8,6 +8,7 @@ import (
 	"io"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -36,12 +37,16 @@ func newFooterStream(t *testing.T, workers int) *Stream {
 func gatedFile(name, body string, gate <-chan struct{}, started chan<- struct{}) sources.InputFile {
 	f := sources.NewBufferInputFile(name, []byte(body))
 	open := f.Open
-	f.Open = func() (io.ReadCloser, error) {
+	f.Open = func(ctx context.Context) (io.ReadCloser, error) {
 		if started != nil {
 			close(started)
 		}
-		<-gate
-		return open()
+		select {
+		case <-gate:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		return open(ctx)
 	}
 	return f
 }
@@ -50,11 +55,35 @@ func gatedFile(name, body string, gate <-chan struct{}, started chan<- struct{})
 func countingFile(name, body string, started *atomic.Int64) sources.InputFile {
 	f := sources.NewBufferInputFile(name, []byte(body))
 	open := f.Open
-	f.Open = func() (io.ReadCloser, error) {
+	f.Open = func(ctx context.Context) (io.ReadCloser, error) {
 		started.Add(1)
-		return open()
+		return open(ctx)
 	}
 	return f
+}
+
+// stalledFile opens at once but sends prefix and then nothing more until ctx
+// is done, when its read fails, as an HTTP body that stalls mid-download does.
+func stalledFile(name, prefix string, started chan<- struct{}) sources.InputFile {
+	stall := sync.OnceFunc(func() { close(started) })
+	return sources.InputFile{
+		Path: name,
+		Size: -1,
+		Open: func(ctx context.Context) (io.ReadCloser, error) {
+			return io.NopCloser(io.MultiReader(strings.NewReader(prefix), stalledReader{ctx, stall})), nil
+		},
+	}
+}
+
+type stalledReader struct {
+	ctx   context.Context
+	stall func()
+}
+
+func (r stalledReader) Read([]byte) (int, error) {
+	r.stall()
+	<-r.ctx.Done()
+	return 0, r.ctx.Err()
 }
 
 // waitGoroutines waits for the goroutine count to settle at or below base.
@@ -119,6 +148,38 @@ func TestPipeline_CancelMidRunFailsWithoutFooter(t *testing.T) {
 	if strings.Contains(buf.String(), testFooter) {
 		t.Errorf("output footer written after cancellation:\n%s", buf.String())
 	}
+}
+
+// A cancel ends a run promptly even while a file is stalled mid-read, and the
+// output holds the items written before it in whole, and nothing of the
+// stalled one.
+func TestPipeline_CancelInterruptsStalledRead(t *testing.T) {
+	base := runtime.NumGoroutine()
+	stream := newFooterStream(t, 2)
+	started := make(chan struct{})
+	stream.AddFile(sources.NewBufferInputFile("first.txt", []byte("first body\n")), wholeFile)
+	stream.AddFile(stalledFile("stalled.txt", "partial", started), wholeFile)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	var buf strings.Builder
+	go func() { _, err := stream.Execute(ctx, &buf); done <- err }()
+
+	<-started
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Execute error = %v, want context.Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Execute did not return after cancel while a read was stalled")
+	}
+	out := buf.String()
+	if strings.Contains(out, "partial") || strings.Contains(out, "stalled.txt") || strings.Contains(out, testFooter) {
+		t.Errorf("output has the stalled file or the footer:\n%s", out)
+	}
+	waitGoroutines(t, base)
 }
 
 func TestPipeline_SlowHeadBoundsBufferedResults(t *testing.T) {

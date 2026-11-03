@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
 	"os"
@@ -56,7 +57,7 @@ func streamInput(name string, body *countingBody) sources.InputFile {
 		AbsPath: name,
 		Size:    -1, // as a URL is, until it is fetched
 		ModTime: time.Unix(0, 0),
-		Open:    func() (io.ReadCloser, error) { return body, nil },
+		Open:    func(context.Context) (io.ReadCloser, error) { return body, nil },
 	}
 }
 
@@ -69,7 +70,7 @@ func renderStream(t *testing.T, file sources.InputFile, cfg core.RenderOptions) 
 	proc := NewProcessor(engine, core.Plan{TotalFiles: 1})
 	var buf bytes.Buffer
 	item := PreparedItem{Raw: FileItem{File: file, Opts: cfg}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
-	if _, err := proc.RenderPrepared(&buf, item, nil); err != nil {
+	if _, err := proc.RenderPrepared(context.Background(), &buf, item, nil); err != nil {
 		t.Fatal(err)
 	}
 	return buf.String()
