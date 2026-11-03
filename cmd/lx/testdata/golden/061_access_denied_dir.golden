@@ -3,4 +3,4 @@
 
 
 --- STDERR ---
-Warning: Error accessing path during walk: stat .: PERMISSION_DENIED (path=.)
+Error: Failed to access path during walk: stat .: PERMISSION_DENIED (path=secret/locked_dir)

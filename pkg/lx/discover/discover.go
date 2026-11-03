@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/rasros/lx/internal/osenv"
+	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/sources"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
@@ -100,12 +101,12 @@ func (c *Collector) abs(p string) string {
 // directory, the entries of an archive, or a URL. As in ripgrep, a named
 // target is never filtered itself, while the files below it are filtered by
 // the ignore rules of the directories above and below it, and by opts.
-// Problems with single entries are logged and the entries skipped; an error
-// means target itself could not be resolved, or ctx was done. A URL that
-// cannot be downloaded or parsed fails with a *URLError.
-func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([]sources.InputFile, error) {
+// It returns the inputs that could not be read, target itself or what is
+// below it, as failures rather than logging them; the Err of a URL that
+// cannot be downloaded or parsed is a *URLError. Its only error is ctx's.
+func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([]sources.InputFile, []core.Failure, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	forceExpand := false
 	if rewritten, ok := sources.RewriteRepoURL(target); ok {
@@ -128,14 +129,14 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 	w := c.walker(ctx, opts)
 	if opts.Piped && !w.Accepts(target, err == nil && (stat.IsDir() || expands(opts, target))) {
 		c.log.Debug("Skipping piped path due to filters", "path", target)
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
 		// The output file is never collected, even named before it exists.
 		if c.isOutput(target, opts.OutPath) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, err
+		return nil, []core.Failure{{Kind: core.FailedStat, Path: absPath, Err: err}}, nil
 	}
 	return c.walk(ctx, w, newRoot(c.cwd, target, absPath, stat.IsDir()), opts)
 }
@@ -183,14 +184,14 @@ func readIgnorePatterns(log *slog.Logger, p string) []string {
 
 // collectURL fetches a named URL. Like a named path it is never filtered
 // itself; an archive's entries are.
-func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options, forceExpand bool) ([]sources.InputFile, error) {
+func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options, forceExpand bool) ([]sources.InputFile, []core.Failure, error) {
 	if (opts.ExpandArchives || forceExpand) && sources.IsHTTPArchiveURL(rawURL) {
 		tempPath, cleanup, err := sources.DownloadURLToTempFile(ctx, rawURL)
 		if err != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return nil, ctxErr
+				return nil, nil, ctxErr
 			}
-			return nil, &URLError{URL: rawURL, Download: true, Err: err}
+			return nil, urlFailure(&URLError{URL: rawURL, Download: true, Err: err}), nil
 		}
 		// Expansion reads the entries into memory.
 		defer cleanup()
@@ -199,10 +200,14 @@ func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options,
 
 	urlFile, err := sources.NewURLInputFile(rawURL)
 	if err != nil {
-		return nil, &URLError{URL: rawURL, Err: err}
+		return nil, urlFailure(&URLError{URL: rawURL, Err: err}), nil
 	}
 	c.log.Debug("URL accepted", "url", urlFile.Path)
-	return []sources.InputFile{urlFile}, nil
+	return []sources.InputFile{urlFile}, nil, nil
+}
+
+func urlFailure(err *URLError) []core.Failure {
+	return []core.Failure{{Kind: core.FailedURL, Path: err.URL, Err: err}}
 }
 
 // root is a local target: the filesystem its files are opened in and how
@@ -286,11 +291,15 @@ func (c *Collector) walker(ctx context.Context, opts Options) *walker.Walker {
 	return walker.New(wopts)
 }
 
-func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Options) ([]sources.InputFile, error) {
+func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Options) ([]sources.InputFile, []core.Failure, error) {
 	c.log.Debug("Walking target", "root", r.rawPath, "globs", len(opts.Globs))
 	anchor := c.cache.Anchor(r.rawPath)
 
 	var files []sources.InputFile
+	var failures []core.Failure
+	fail := func(path string, err error) {
+		failures = append(failures, core.Failure{Kind: core.FailedWalk, Path: r.display(path), Err: err})
+	}
 	err := w.WalkPath(r.rawPath, func(path string, d fs.DirEntry, err error) error {
 		if !r.isDir {
 			// The walker names a file root by its base name; r.fsys opens it
@@ -301,7 +310,7 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 			return ctxErr
 		}
 		if err != nil {
-			c.log.Warn("Error accessing path during walk", "path", path, "error", err)
+			fail(path, err)
 			return nil
 		}
 		if d.IsDir() {
@@ -316,8 +325,9 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 			if r.isDir {
 				rel = path
 			}
-			entries, err := c.expandArchive(ctx, r.abs(path), display, opts, anchor.Path(rel)+"/", "Ignored in archive")
+			entries, entryFailures, err := c.expandArchive(ctx, r.abs(path), display, opts, anchor.Path(rel)+"/", "Ignored in archive")
 			files = append(files, entries...)
+			failures = append(failures, entryFailures...)
 			return err
 		}
 		if c.isOutput(display, opts.OutPath) {
@@ -326,7 +336,7 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 
 		info, err := d.Info()
 		if err != nil {
-			c.log.Error("Failed to stat file in walk", "path", path, "error", err)
+			fail(path, err)
 			return nil
 		}
 		// A walked symlink reports the link's own size (its target path
@@ -347,19 +357,20 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 		return nil
 	})
 	if ctxErr := ctx.Err(); ctxErr != nil {
-		return nil, ctxErr
+		return nil, nil, ctxErr
 	}
 	if err != nil {
-		c.log.Error("Walker traversal failed", "error", err)
+		failures = append(failures, core.Failure{Kind: core.FailedWalk, Path: r.rawPath, Err: err})
 	}
 	c.log.Debug("Walker finished", "root", r.walkRoot, "files_matched", len(files))
-	return files, nil
+	return files, failures, nil
 }
 
 // expandArchive returns the entries of the archive at absPath, displayed
-// below displayPath, that opts keep. The globs match ovPrefix before each
-// entry's path in the archive. Its only error is ctx's.
-func (c *Collector) expandArchive(ctx context.Context, absPath, displayPath string, opts Options, ovPrefix, ignoreMsg string) ([]sources.InputFile, error) {
+// below displayPath, that opts keep, and the failures of the archive or its
+// entries. The globs match ovPrefix before each entry's path in the archive.
+// Its only error is ctx's.
+func (c *Collector) expandArchive(ctx context.Context, absPath, displayPath string, opts Options, ovPrefix, ignoreMsg string) ([]sources.InputFile, []core.Failure, error) {
 	wopts := walker.Options{
 		Overrides:      opts.Globs,
 		OverridePrefix: ovPrefix,
@@ -371,14 +382,14 @@ func (c *Collector) expandArchive(ctx context.Context, absPath, displayPath stri
 			c.log.Debug(ignoreMsg, "path", displayPath+"/"+p, "reason", reason)
 		}
 	}
-	files, err := sources.ExpandArchive(ctx, absPath, displayPath, walker.New(wopts), c.log)
+	files, failures, err := sources.ExpandArchive(ctx, absPath, displayPath, walker.New(wopts), c.log)
 	if ctxErr := ctx.Err(); ctxErr != nil {
-		return nil, ctxErr
+		return nil, nil, ctxErr
 	}
 	if err != nil {
-		c.log.Error("Failed to expand archive", "path", displayPath, "error", err)
+		failures = append(failures, core.Failure{Kind: core.FailedArchive, Path: displayPath, Err: err})
 	}
-	return files, nil
+	return files, failures, nil
 }
 
 // isOutput reports whether path, relative to the working directory, is the

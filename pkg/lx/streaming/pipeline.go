@@ -88,6 +88,11 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					tokens = s.tokenizer.Estimate(int64(buf.Len()), buf.Bytes())
 				}
 
+				var failure *core.Failure
+				if itemStats.Issues.ReadErr != nil {
+					failure = &core.Failure{Kind: core.FailedRead, Path: fileOf(j.item).Path, Err: itemStats.Issues.ReadErr}
+				}
+
 				// j.out has one slot reserved for this job, so this never blocks.
 				j.out <- render.Result{
 					Index:        j.seqID,
@@ -99,6 +104,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					IsBinary:     itemStats.IsBinary,
 					IsError:      itemStats.IsError,
 					Issues:       itemStats.Issues,
+					Failure:      failure,
 					File:         fileOf(j.item),
 					Err:          err,
 					SectionIndex: j.item.Section.Index,
@@ -118,6 +124,12 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 			case pending <- out:
 			case <-ctx.Done():
 				return
+			}
+			if f, ok := item.Raw.(core.Failure); ok {
+				// A failure added to the stream renders nothing; it only
+				// takes its place in the order failures are reported in.
+				out <- render.Result{Index: item.StreamIndex, Failure: &f, Omit: true}
+				continue
 			}
 			select {
 			case jobsCh <- seqJob{seqID: item.StreamIndex, item: item, out: out}:
@@ -146,9 +158,13 @@ Loop:
 		if res.IsBinary {
 			totals.binary++
 		}
-		s.report(res.File, res.Issues)
-		if res.IsError {
+		s.report(res)
+		if res.Failure != nil {
 			totals.failed++
+		}
+		if res.Omit {
+			written++
+			continue
 		}
 		if err := layout.WriteItem(res); err != nil {
 			return totals, err
@@ -188,14 +204,19 @@ func fileOf(item render.PreparedItem) sources.InputFile {
 	return fi.File
 }
 
-// report tells about the problems f met while rendering, from the goroutine
-// writing the output, so they come in output order.
-func (s *Stream) report(f sources.InputFile, issues render.FileIssues) {
-	if issues.ReadErr != nil && s.onFileError != nil {
-		s.onFileError(f, issues.ReadErr)
+// report tells about the failure of an item and the problems its file met
+// while rendering, from the goroutine writing the output, so they come in
+// output order.
+func (s *Stream) report(res render.Result) {
+	if f := res.Failure; f != nil {
+		if s.onFailure != nil {
+			s.onFailure(*f)
+		} else {
+			s.log.Error("Failed to read input", "path", f.Path, "error", f.Err)
+		}
 	}
-	if ce := issues.Convert; ce != nil {
+	if ce := res.Issues.Convert; ce != nil {
 		s.log.Debug("Converter failed, keeping raw content",
-			"converter", ce.Converter, "path", f.Path, "error", ce.Err)
+			"converter", ce.Converter, "path", res.File.Path, "error", ce.Err)
 	}
 }

@@ -137,7 +137,7 @@ func (w *Walker) judge(f *frame, name, childPath string, a Anchor, isDir bool) (
 		}
 	}
 	if isDir && w.overrides != nil && !w.overrides.reachBelow(ovPath) && !a.leadsToWD(ovPath) {
-		return true, "no -i glob can match below it"
+		return true, "no include glob can match below it"
 	}
 	return false, ""
 }

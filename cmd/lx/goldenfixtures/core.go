@@ -122,6 +122,8 @@ func SetupErrorsFixture(t *testing.T) string {
 	writeFile(t, dir, "main.go", "package main\nfunc main() {}", 0644)
 	writeFile(t, dir, "README.md", "# Project\nDocumentation here.", 0644)
 	writeFile(t, dir, "spaces/file with spaces.txt", "content with spaces", 0644)
+	writeFile(t, dir, "broken/ok.txt", "readable", 0644)
+	writeFile(t, dir, "broken/bad.zip", "not a zip archive", 0644)
 
 	writeFile(t, dir, "secret/locked.txt", "TOP SECRET", 0600)
 	secretDir := filepath.Join(dir, "secret", "locked_dir")
@@ -201,6 +203,8 @@ func SetupComplexFixture(t *testing.T) string {
 	writeFile(t, dir, "configs/custom_template.yaml", "file_content_template: \"File: {{ .Path }}\\nContent:\\n{{ .Content }}\"\n", 0644)
 	writeFile(t, dir, "configs/custom_sections.yaml", "section_header_template: \"*** {{ .Body }} ***\\n\"\n", 0644)
 	writeFile(t, dir, "spaces/file with spaces.txt", "content with spaces", 0644)
+	writeFile(t, dir, "broken/ok.txt", "readable", 0644)
+	writeFile(t, dir, "broken/bad.zip", "not a zip archive", 0644)
 	writeFile(t, dir, "parent_ignore_test/level1/level2/ignore_me.tmp", "ignore", 0644)
 	writeFile(t, dir, "parent_ignore_test/level1/level2/keep_me.go", "package level2", 0644)
 

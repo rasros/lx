@@ -12,9 +12,9 @@ import (
 	"github.com/rasros/lx/pkg/lx/templatex"
 )
 
-// FileErrorHandler handles a file that could not be opened during render. It
-// is called from the goroutine running Execute, in output order.
-type FileErrorHandler func(f sources.InputFile, err error)
+// FailureHandler is told about each input that could not be read. It is
+// called from the goroutine running Execute, in output order.
+type FailureHandler func(core.Failure)
 
 type defaultTokenizer struct{}
 
@@ -30,7 +30,7 @@ type Stream struct {
 	workDir     string
 	finalStats  *core.GlobalContext
 	sections    []*core.SectionContext
-	onFileError FileErrorHandler
+	onFailure   FailureHandler
 	log         *slog.Logger
 	concurrency int
 	prepared    []render.PreparedItem
@@ -91,8 +91,11 @@ func (s *Stream) WithTokenizer(t core.Tokenizer) *Stream {
 	return s
 }
 
-func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
-	s.onFileError = h
+// WithOnFailure sets h to be told about every failure: the ones added with
+// AddFailure and the files that cannot be read as they render, each counted
+// once in FailedFiles. Without one, the stream logs them.
+func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
+	s.onFailure = h
 	return s
 }
 
@@ -122,7 +125,7 @@ func (s *Stream) Admit(f sources.InputFile, opts core.RenderOptions) bool {
 // AddFile enqueues a file to render with opts, unless Admit drops it.
 func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
 	if !s.Admit(f, opts) {
-		s.log.Debug("Skipped by size limit (-m)", "path", f.Path, "size", f.Size, "max_size", opts.MaxSize)
+		s.log.Debug("Skipped by size limit", "path", f.Path, "size", f.Size, "max_size", opts.MaxSize)
 		s.skippedBySize++
 		return s
 	}
@@ -130,6 +133,14 @@ func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
 		s.skeletons = true
 	}
 	s.items = append(s.items, render.FileItem{File: f, Opts: opts})
+	return s
+}
+
+// AddFailure adds an input that could not be read, such as one discovery
+// failed on. It renders nothing, but is reported where it stands in the
+// output and counted in FailedFiles.
+func (s *Stream) AddFailure(f core.Failure) *Stream {
+	s.items = append(s.items, f)
 	return s
 }
 

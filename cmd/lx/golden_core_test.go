@@ -121,6 +121,9 @@ func TestGoldenErrors(t *testing.T) {
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "060_access_denied_file", args: []string{"secret/locked.txt"}},
 		{name: "061_access_denied_dir", args: []string{"secret/locked_dir"}},
+		{name: "061b_stats_counts_unreadable_entries", args: []string{"--stats", "secret"}},
+		{name: "061c_stats_counts_broken_archive", args: []string{"--stats", "-Z", "broken"}},
+		{name: "061d_stats_counts_missing_and_unreadable", args: []string{"--stats", "nope.go", "secret/locked.txt"}},
 		{name: "062_missing_file", args: []string{"nonexistent.go"}},
 		{name: "063_spaces_in_filename", args: []string{"spaces/file with spaces.txt"}},
 		{name: "064_spaces_in_dirname", args: []string{"spaces"}},

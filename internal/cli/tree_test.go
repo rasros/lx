@@ -8,19 +8,22 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-// Stdin is left to the content pass, and a missing path is counted so the
-// stats summary can report it.
+// Stdin is left to the content pass, and a missing path is kept with its op
+// for the content pass to add to the stream.
 func TestResolveSections_StdinAndMissingPaths(t *testing.T) {
 	log := slog.New(slog.DiscardHandler)
 	sections := []Section{{Ops: []Op{
 		{Action: "FILE", Value: "-", Type: CmdAction},
 		{Action: "FILE", Value: "nope.go", Type: CmdAction},
 	}}}
-	if got, err := resolveSections(context.Background(), log, sections, lx.NewCollector(t.TempDir(), log)); got != 1 || err != nil {
-		t.Errorf("unresolved = %d, %v; want 1, nil", got, err)
+	if err := resolveSections(context.Background(), sections, lx.NewCollector(t.TempDir(), log)); err != nil {
+		t.Fatal(err)
 	}
 	if len(sections[0].resolved) != 0 {
 		t.Errorf("resolved %v, want nothing", sections[0].resolved)
+	}
+	if f := sections[0].failures; len(f) != 1 || len(f[1]) != 1 || f[1][0].Kind != lx.FailedStat {
+		t.Errorf("failures %v, want the stat failure of op 1", f)
 	}
 }
 

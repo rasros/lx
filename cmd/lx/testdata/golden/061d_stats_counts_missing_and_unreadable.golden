@@ -1,0 +1,10 @@
+--- STDOUT ---
+secret/locked.txt - error: open secret/locked.txt: PERMISSION_DENIED
+
+
+--- STDERR ---
+Error: Failed to stat path: stat /ROOT/nope.go: FILE_NOT_FOUND (path=/ROOT/nope.go)
+Error: Failed to read file: open secret/locked.txt: PERMISSION_DENIED (path=secret/locked.txt)
+▎ 1 file · 0 rows · 1 section · 10 B
+  ~21 tokens
+  2 failed

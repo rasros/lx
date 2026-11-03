@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -48,7 +49,7 @@ type ConvertFailure struct {
 // back for the caller to report in output order.
 type FileIssues struct {
 	// ReadErr is why a file that rendered as an error row could not be
-	// opened.
+	// read; it is set exactly when the row is an error.
 	ReadErr error
 	// Convert is a converter that failed, leaving the raw content.
 	Convert *ConvertFailure
@@ -154,6 +155,8 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 	}
 	return stats, nil
 }
+
+var errIsDir = errors.New("is a directory")
 
 // errorContext describes a file that could not be read.
 func (p *Processor) errorContext(file sources.InputFile, index int, msg string) core.FileContext {
@@ -372,8 +375,8 @@ func skeletonModeLabel(functions, types bool) string {
 }
 
 // prepareFileContext describes file for its template. A file that cannot be
-// opened becomes an error row; that and a failed converter are returned for
-// the caller to report. Every other problem is only shown in the row.
+// read becomes an error row; that and a failed converter are returned for
+// the caller to report.
 func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOptions, index int, scratch []byte) (core.FileContext, FileIssues) {
 	var issues FileIssues
 	rc, err := file.Open()
@@ -385,7 +388,8 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 
 	if f, ok := rc.(*os.File); ok {
 		if stat, err := f.Stat(); err == nil && stat.IsDir() {
-			return p.errorContext(file, index, "is a directory"), issues
+			issues.ReadErr = errIsDir
+			return p.errorContext(file, index, errIsDir.Error()), issues
 		}
 	}
 
@@ -444,6 +448,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 			sl, err = readSlices(lines, cfg)
 		}
 		if err != nil {
+			issues.ReadErr = err
 			return p.errorContext(file, index, err.Error()), issues
 		}
 		size = lines.Size()

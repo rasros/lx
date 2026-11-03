@@ -1,0 +1,10 @@
+--- STDOUT ---
+secret/locked.txt - error: open locked.txt: PERMISSION_DENIED
+
+
+--- STDERR ---
+Error: Failed to access path during walk: open locked_dir: PERMISSION_DENIED (path=secret/locked_dir)
+Error: Failed to read file: open locked.txt: PERMISSION_DENIED (path=secret/locked.txt)
+▎ 1 file · 0 rows · 1 section · 10 B
+  ~19 tokens
+  2 failed
