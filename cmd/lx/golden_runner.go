@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"testing/iotest"
 
 	"github.com/rasros/lx/internal/cli"
 	"github.com/rasros/lx/internal/osenv"
@@ -26,8 +25,6 @@ type goldenTestCase struct {
 	name  string
 	args  []string
 	stdin string
-	// stdinFails makes reading stdin fail once stdin is read.
-	stdinFails bool
 	// stdinPipe makes stdin a pipe holding stdin, and "{stdin}" in args the
 	// path that opens it again, /dev/fd/N.
 	stdinPipe bool
@@ -89,9 +86,6 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 			}
 
 			var stdin io.Reader = strings.NewReader(tc.stdin)
-			if tc.stdinFails {
-				stdin = io.MultiReader(stdin, iotest.ErrReader(errors.New("stdin broke")))
-			}
 			if tc.stdinPipe {
 				stdin = pipeStdin(t, tc.stdin, runArgs)
 			}

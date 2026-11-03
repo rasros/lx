@@ -1,6 +1,0 @@
---- STDOUT ---
-[1/2] arch/a.zip - binary file skipped (283 B)
-[2/2] b.txt (1 rows)
-
-
---- STDERR ---

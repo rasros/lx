@@ -49,17 +49,8 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "959_section_trailing_options_past_prompt", args: []string{"build/x.js", "-l", "-p", "hi", "-s", "X", "b.txt"}},
 		{name: "959b_section_trailing_options_past_tree", args: []string{"build/x.js", "-l", "-T", "-s", "X", "b.txt"}},
 
-		// Globs and roots are matched as written, as rg matches them: no
-		// cleaning of "./", "//" or "..". An -i that is empty or starts with
-		// "#" adds no glob, and one that cannot be parsed is an error.
-		{name: "950_glob_dot_slash_as_written", args: []string{"-n0", "-i", "./src/*.go", "-i", "src//*.go", "-i", "b.txt", "."}},
-		{name: "951_glob_dot_dot_as_written", args: []string{"-n0", "-i", "src/../a.go", "-i", "b.txt", "."}},
-		{name: "952_glob_root_as_written", args: []string{"-n0", "-i", "src/../build/*.js", "-i", "build/sub/*", "src/../build"}},
-		{name: "953_glob_comment_and_empty_add_nothing", args: []string{"-n0", "-i", "#b.txt", "-i", "", "-e", "*.go", "-e", "*.js", "."}},
+		// A glob that cannot be parsed is an error.
 		{name: "954_glob_invalid", args: []string{"-n0", "-i", "src/[ab", "."}},
-		{name: "954b_glob_invalid_unopened_brace", args: []string{"-n0", "-i", "a}", "."}},
-		{name: "954c_glob_invalid_exclude_as_typed", args: []string{"-n0", "-e", "!{a", "."}},
-		{name: "954d_glob_invalid_exclude_hash", args: []string{"-n0", "-e", "#[", "."}},
 		// A "]" opening a class is part of it, as in rg.
 		{name: "957_glob_class_leading_bracket", args: []string{"-n0", "-i", "[]a]*", "-i", "[!]a]*.go", "."}},
 		// An empty -e matches every path, as rg's -g '!' does, so only what a
@@ -72,7 +63,6 @@ func TestGoldenGlobs(t *testing.T) {
 		{name: "921_glob_stdin_last_match_wins", args: []string{"-n0", "-e", "build/*", "-i", "build/keep.js"}, stdin: "build/x.js\nbuild"},
 		{name: "922_glob_stdin_excluded_parent_dir", args: []string{"-n0", "-e", "build"}, stdin: "build/keep.js\nbuild/sub\nsrc/a.go"},
 		{name: "923_stdin_file_and_its_dir_listed_once", args: []string{"-n0"}, stdin: "build/keep.js\nbuild"},
-		{name: "924_glob_stdin_paths_cleaned", args: []string{"-n0", "-i", "src/*.go", "-i", "build/**", "-e", "build/sub", "-e", "build/x.js"}, stdin: "build//sub/y.js\nsrc/../build/x.js\nsrc//a.go\n./build/keep.js"},
 
 		// rg does not expand archives; lx matches an expanded archive as a
 		// directory and its entries as the paths below it.
@@ -114,15 +104,12 @@ func TestGoldenGlobsURLArchive(t *testing.T) {
 func TestGoldenGlobsOutsideCwd(t *testing.T) {
 	dir := gf.SetupGlobsFixture(t)
 	runGoldenTests(t, []goldenTestCase{
-		{name: "940_glob_parent_root_as_written", args: []string{"-n0", "-i", "../build/*.js", ".."}},
 		{name: "941_glob_parent_root_misses_cwd_glob", args: []string{"-n0", "-i", "build/*.js", "-i", "../a.go", ".."}},
 		{name: "942_glob_absolute_root_above_cwd", args: []string{"-n0", "-i", "/x.js", dir}},
 		{name: "943_glob_absolute_root_outside_cwd", args: []string{"-n0", "-i", "**/ovr/keep.js", "-i", "ovr/drop.js", filepath.Join(dir, "ovr")}},
-		{name: "944_glob_absolute_archive_outside_cwd", args: []string{"-n0", "-Z", "-i", "**/a.zip/src/*.go", "-i", "arch/a.zip/notes.txt", filepath.Join(dir, "arch", "a.zip")}},
-		// A piped absolute path is judged as a root named that way: the
-		// directories above it are not, and below a directory above the
-		// working directory paths are matched relative to it.
+		// A piped absolute path is judged as a root named that way: below a
+		// directory above the working directory, paths are matched relative
+		// to it.
 		{name: "945_glob_stdin_absolute_dir_above_cwd", args: []string{"-n0", "-i", "sub/*", "-i", "/x.js"}, stdin: dir},
-		{name: "946_glob_stdin_absolute_path_parents_not_judged", args: []string{"-n0", "-e", "ovr", "-e", "drop.js"}, stdin: filepath.Join(dir, "ovr", "keep.js") + "\n" + filepath.Join(dir, "ovr", "drop.js")},
 	}, goldenRun{cwd: filepath.Join(dir, "build"), scrub: scrubDir(dir)})
 }

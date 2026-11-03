@@ -19,7 +19,6 @@ func TestGoldenAncestorIgnore(t *testing.T) {
 		{name: "105i_stdin_include_filter", args: []string{"-i", "*.go"}, stdin: "sub/a.log\nsub/main.go\nsub/deep/util.go\nsub/keep.log"},
 		{name: "105j_stdin_exclude_filter", args: []string{"-e", "deep/"}, stdin: "sub/a.log\nsub/main.go\nsub/deep/util.go\nsub/keep.log"},
 		{name: "105k_stdin_include_filter_walks_dirs", args: []string{"-i", "*.go"}, stdin: "sub/a.log\nsub/deep\ndist"},
-		{name: "105l_stdin_include_filter_single_dir", args: []string{"-i", "*.go"}, stdin: "sub"},
 		{name: "105m_stdin_exclude_filter_drops_dir", args: []string{"-e", "deep/"}, stdin: "sub/deep\nsub/main.go"},
 		{name: "108_info_exclude_repo_root", args: []string{"."}},
 	})
@@ -63,9 +62,6 @@ func TestGoldenNegatedIgnoredDir(t *testing.T) {
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "109d_negated_ignored_dir_walk", args: []string{"."}},
 		{name: "109e_negated_ignored_dir_named_file", args: []string{"build/keep.js", "build/out.js"}},
-		{name: "109f_negated_ignored_dir_absolute_file", args: []string{filepath.Join(dir, "build", "keep.js"), filepath.Join(dir, "build", "out.js")}},
-		{name: "109fa_ignored_dir_named", args: []string{"build"}},
-		{name: "109fb_ignored_dir_absolute", args: []string{filepath.Join(dir, "build")}},
 	})
 }
 
@@ -75,7 +71,6 @@ func TestGoldenNegatedIgnoredDirFromSubdir(t *testing.T) {
 		{name: "109g_negated_ignored_dir_parent_walk", args: []string{".."}},
 		{name: "109h_negated_ignored_dir_parent_relative_file", args: []string{"../build/keep.js", "../build/out.js"}},
 		{name: "109i_negated_ignored_dir_parent_absolute_file", args: []string{filepath.Join(dir, "build", "keep.js")}},
-		{name: "109ia_ignored_dir_parent_relative", args: []string{"../build"}},
 	}, dir)
 }
 

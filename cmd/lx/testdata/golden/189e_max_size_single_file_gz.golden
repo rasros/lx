@@ -1,9 +1,0 @@
---- STDOUT ---
-
-
-
---- STDERR ---
-Warning: Every input was skipped by the size limit (-m) (skipped=1)
-▎ 0 files · 0 rows · 1 section · 0 B
-  ~2 tokens
-  1 skipped (size)

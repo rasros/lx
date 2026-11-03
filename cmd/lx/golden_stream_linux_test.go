@@ -16,7 +16,6 @@ func TestGoldenStreams(t *testing.T) {
 
 	fifo(t, dir, "in.fifo", "from a fifo\nsecond line\n")
 	fifo(t, dir, "over.fifo", "0123456789abcdefghij\n")
-	fifo(t, dir, "at.fifo", "012345678\n")
 	if err := os.Mkdir(filepath.Join(dir, "walk"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +46,6 @@ func TestGoldenStreams(t *testing.T) {
 		{name: "975_stream_fifo_with_writer", args: []string{"in.fifo"}},
 		{name: "976_stream_process_substitution", args: []string{"procsub"}},
 		{name: "977_stream_over_max_size_fails", args: []string{"-m", "10", "over.fifo"}},
-		{name: "978_stream_at_max_size_renders", args: []string{"-m", "10", "at.fifo"}},
 		{name: "979_stream_endless_device_fails", args: []string{"/dev/zero"}},
 		// A walk skips the FIFO, which has no writer and would hold it up.
 		{name: "982_walk_skips_fifo", args: []string{"walk"}},

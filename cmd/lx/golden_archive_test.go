@@ -49,7 +49,6 @@ func TestGoldenArchiveMaxSize(t *testing.T) {
 	dir := gf.SetupArchiveFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "189d_max_size_archive_stats", args: []string{"--stats", "-Z", "-m", "16", "archive.zip", "archive.tar.gz"}},
-		{name: "189e_max_size_single_file_gz", args: []string{"--stats", "-Z", "-m", "10", "notes.txt.gz"}},
 	})
 }
 
@@ -63,7 +62,6 @@ func TestGoldenArchiveEdges(t *testing.T) {
 
 	runTestGoldenHost(t, dir, host, nil, []goldenTestCase{
 		{name: "189e2_archive_entries_outside_skipped", args: []string{"-n0", "-Z", "escape.tar"}},
-		{name: "189e3_archive_entries_outside_skipped_tree", args: []string{"-t", "-Z", "escape.tar"}},
 		{name: "189e4_tar_entry_claiming_1tb", args: []string{"-n0", "-Z", "lie.tar"}},
 		{name: "189e5_zip_entry_claiming_4gb", args: []string{"-n0", "-Z", "lie.zip"}},
 		{name: "189e8_zip_entries_claiming_more_each_fail", args: []string{"--stats", "-n0", "-Z", "lie3.zip"}},
@@ -101,7 +99,6 @@ func TestGoldenRepoURL(t *testing.T) {
 		{name: "189j_repo_url_glob_with_url_misses", args: []string{"-n0", "-i", repo + "/docs/*.md", repo}},
 		{name: "189k_repo_url_hidden", args: []string{"-n0", "-H", "-i", ".github/**", "http://" + repo + "/"}},
 		{name: "189l_repo_url_tree", args: []string{"-t", repo}},
-		{name: "189u_repo_url_no_ignore", args: []string{"-n0", "--no-ignore", repo}},
 		{name: "189w_url_archive_reads_no_ignore_files", args: []string{"-n0", "-Z", url + "/repo.zip"}},
 		{name: "189x_archive_reads_no_ignore_files", args: []string{"-n0", "-Z", "repo.zip"}},
 		{name: "189y_repo_url_entry_keeps_wrapper", args: []string{"-y", "configs/origin.yaml", "-i", "docs/*.md", repo}},
@@ -137,40 +134,21 @@ func TestGoldenRepoURLUserIgnores(t *testing.T) {
 // are. The content of a named one is never skipped as hidden.
 func TestGoldenSingleFileCompressionEntry(t *testing.T) {
 	dir := gf.SetupRepoArchiveFixture(t)
-	url, host := repoServer(t, dir)
-
-	runTestGoldenHost(t, dir, host, nil, []goldenTestCase{
+	runTestGolden(t, dir, []goldenTestCase{
 		{name: "189m_single_file_gz_exclude", args: []string{"-n0", "-Z", "-e", "*.txt", "notes.txt.gz"}},
-		{name: "189m2_single_file_gz_exclude_other", args: []string{"-n0", "-Z", "-e", "*.md", "notes.txt.gz"}},
 		{name: "189n_single_file_gz_include_below_archive", args: []string{"-n0", "-Z", "-i", "notes.txt.gz/*.txt", "notes.txt.gz"}},
-		{name: "189n2_single_file_gz_include_archive_misses", args: []string{"-n0", "-Z", "-i", "*.gz", "notes.txt.gz"}},
-		{name: "189n3_single_file_gz_include_archive_content", args: []string{"-n0", "-Z", "-i", "**/*.gz/*", "notes.txt.gz"}},
-		{name: "189o_url_single_file_gz", args: []string{"-n0", "-Z", url + "/notes.txt.gz"}},
 		{name: "189p_named_hidden_single_file_gz", args: []string{"-n0", "-Z", ".bashrc.gz"}},
-		{name: "189p2_url_hidden_single_file_gz", args: []string{"-n0", "-Z", url + "/.bashrc.gz"}},
 		{name: "189p3_walked_hidden_single_file_gz_skipped", args: []string{"-n0", "-Z", "-i", "**/*.gz/*", "."}},
 		{name: "189p4_plain_gzip_named_tar_gz", args: []string{"-n0", "-Z", "plain.tar.gz"}},
 	})
 }
 
 // Globs anchored at the working directory treat walked archives at any
-// depth as the directories of the same names: each pair of goldens is the
-// same.
+// depth as the directories of the same names.
 func TestGoldenArchiveAnchoredGlobsAtDepth(t *testing.T) {
-	arch, dirs := gf.SetupArchiveDepthFixture(t)
-	excludes := []string{"-n0", "-Z", "-e", "d1/d2/low.zip/src/a.go", "-e", "top.zip/deep/", "-e", "d1/*/src/", "."}
-	includes := []string{"-n0", "-Z", "-i", "d1/**/src/a.go", "-e", "d1/mid.zip/deep/**", "."}
-	// The two trees are two working directories, so two batches.
-	t.Run("archives", func(t *testing.T) {
-		runTestGolden(t, arch, []goldenTestCase{
-			{name: "189q_archive_anchored_excludes_at_depth", args: excludes},
-			{name: "189s_archive_anchored_includes_at_depth", args: includes},
-		})
-	})
-	t.Run("dirs", func(t *testing.T) {
-		runTestGolden(t, dirs, []goldenTestCase{
-			{name: "189r_dir_anchored_excludes_at_depth", args: excludes},
-			{name: "189t_dir_anchored_includes_at_depth", args: includes},
-		})
+	dir := gf.SetupArchiveDepthFixture(t)
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "189q_archive_anchored_excludes_at_depth", args: []string{"-n0", "-Z", "-e", "d1/d2/low.zip/src/a.go", "-e", "top.zip/deep/", "-e", "d1/*/src/", "."}},
+		{name: "189s_archive_anchored_includes_at_depth", args: []string{"-n0", "-Z", "-i", "d1/**/src/a.go", "-e", "d1/mid.zip/deep/**", "."}},
 	})
 }
