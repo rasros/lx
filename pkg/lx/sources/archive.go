@@ -29,9 +29,13 @@ var archiveSuffixes = []string{
 	".gz", ".bz2", ".xz", ".zst", ".br", ".lz4", ".sz", ".s2", ".lz",
 }
 
-func IsArchivePath(path string) bool {
+func IsArchivePath(path string) bool { return hasSuffixFold(path, archiveSuffixes...) }
+
+// hasSuffixFold reports whether path ends in one of suffixes, which are
+// lower case, ignoring the case of path.
+func hasSuffixFold(path string, suffixes ...string) bool {
 	lower := strings.ToLower(path)
-	for _, suffix := range archiveSuffixes {
+	for _, suffix := range suffixes {
 		if strings.HasSuffix(lower, suffix) {
 			return true
 		}
