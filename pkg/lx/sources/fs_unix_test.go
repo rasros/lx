@@ -4,13 +4,10 @@ package sources
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"syscall"
 	"testing"
-	"time"
 )
 
 func newFIFO(t *testing.T) (dir, name string) {
@@ -20,37 +17,6 @@ func newFIFO(t *testing.T) (dir, name string) {
 		t.Skip("fifos unsupported:", err)
 	}
 	return dir, "in.fifo"
-}
-
-// waitCancelled runs op, cancels it after a moment and fails unless it then
-// returns ctx's error promptly.
-func waitCancelled(t *testing.T, op func(ctx context.Context) error) {
-	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	time.AfterFunc(20*time.Millisecond, cancel)
-	done := make(chan error, 1)
-	go func() { done <- op(ctx) }()
-	select {
-	case err := <-done:
-		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("err = %v, want context.Canceled", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("did not stop when cancelled")
-	}
-}
-
-// waitGoroutines waits for the goroutine count to settle at or below n.
-func waitGoroutines(t *testing.T, n int) {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for runtime.NumGoroutine() > n {
-		if time.Now().After(deadline) {
-			t.Fatalf("%d goroutines running, want at most %d", runtime.NumGoroutine(), n)
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
 }
 
 // A stream that ends at its limit is whole; one that goes on past it fails.
