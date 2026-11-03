@@ -16,7 +16,7 @@ func TestParseSections_NoSplitBeforeFiles(t *testing.T) {
 		{Action: "FILE", Value: "main.go", Type: CmdAction},
 	}
 
-	sections := parseSections(slog.Default(), ops, defaultRender)
+	sections := compile(slog.Default(), ops, defaultRender)
 	if len(sections) != 1 {
 		t.Fatalf("len(sections) = %d, want 1", len(sections))
 	}
@@ -24,8 +24,8 @@ func TestParseSections_NoSplitBeforeFiles(t *testing.T) {
 	if want := []lx.Glob{lx.IncludeGlob("*.go"), lx.ExcludeGlob("*_test.go")}; !reflect.DeepEqual(sections[0].Discover.Globs, want) {
 		t.Fatalf("Globs = %v, want %v", sections[0].Discover.Globs, want)
 	}
-	if len(sections[0].Ops) != 1 || sections[0].Ops[0].Action != "FILE" {
-		t.Fatalf("Ops = %+v, want one FILE op", sections[0].Ops)
+	if !isFiles(sections[0].Items, "main.go") {
+		t.Fatalf("Items = %+v, want main.go", sections[0].Items)
 	}
 }
 
@@ -38,7 +38,7 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 		{Action: "FILE", Value: "next.txt", Type: CmdAction},
 	}
 
-	sections := parseSections(slog.Default(), ops, defaultRender)
+	sections := compile(slog.Default(), ops, defaultRender)
 	if len(sections) != 2 {
 		t.Fatalf("len(sections) = %d, want 2", len(sections))
 	}
@@ -49,8 +49,8 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 	if len(sections[0].Discover.Globs) != 0 {
 		t.Fatalf("first Globs = %v, want empty", sections[0].Discover.Globs)
 	}
-	if len(sections[0].Ops) != 1 || sections[0].Ops[0].Action != "FILE" {
-		t.Fatalf("first Ops = %+v, want one file op", sections[0].Ops)
+	if !isFiles(sections[0].Items, "first.txt") {
+		t.Fatalf("first Items = %+v, want first.txt", sections[0].Items)
 	}
 
 	if sections[1].Render.Head != -1 || sections[1].Render.Tail != 0 {
@@ -59,8 +59,51 @@ func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
 	if want := []lx.Glob{lx.ExcludeGlob("vendor/**")}; !reflect.DeepEqual(sections[1].Discover.Globs, want) {
 		t.Fatalf("second Globs = %v, want %v", sections[1].Discover.Globs, want)
 	}
-	if len(sections[1].Ops) != 1 || sections[1].Ops[0].Action != "FILE" {
-		t.Fatalf("second Ops = %+v, want one FILE op", sections[1].Ops)
+	if !isFiles(sections[1].Items, "next.txt") {
+		t.Fatalf("second Items = %+v, want next.txt", sections[1].Items)
+	}
+}
+
+// isFiles reports whether items are file items naming args, in order.
+func isFiles(items []item, args ...string) bool {
+	if len(items) != len(args) {
+		return false
+	}
+	for i, it := range items {
+		f, ok := it.(*fileItem)
+		if !ok || f.arg != args[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// A --tree-only covers the files after it, up to the next --tree-only, and
+// leaves their content out; the files before it keep theirs, and each group
+// of trees with no files beside it is kept for a warning.
+func TestCompile_TreeGroups(t *testing.T) {
+	parsed, err := Parse([]string{"a", "-t", "b", "-", "-t", "-t", "-s", "S", "-T"}, definitions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sections := compile(slog.New(slog.DiscardHandler), parsed.Ops, lx.RenderOptions{Head: -1})
+	if len(sections) != 2 {
+		t.Fatalf("len(sections) = %d, want 2", len(sections))
+	}
+	items := sections[0].Items
+	a, tree, b, in := items[0].(*fileItem), items[1].(*treeItem), items[2].(*fileItem), items[3].(*stdinItem)
+	if a.treeOnly || !b.treeOnly || !in.treeOnly {
+		t.Errorf("treeOnly a=%v b=%v stdin=%v, want false true true", a.treeOnly, b.treeOnly, in.treeOnly)
+	}
+	if len(tree.inputs) != 1 || tree.inputs[0] != b {
+		t.Errorf("tree inputs = %v, want b", tree.inputs)
+	}
+	want := []string{"--tree-only", "--tree-only"}
+	if got := sections[0].bareTrees; !reflect.DeepEqual(got, want) {
+		t.Errorf("first bareTrees = %q, want %q", got, want)
+	}
+	if got, want := sections[1].bareTrees, []string{"--tree"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("second bareTrees = %q, want %q", got, want)
 	}
 }
 

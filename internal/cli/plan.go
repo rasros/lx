@@ -8,18 +8,96 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
+// Section is a run of items rendered with one set of options.
 type Section struct {
 	Render   lx.RenderOptions
 	Discover lx.DiscoverOptions
-	Ops      []Op
+	Items    []item
 
-	treeFiles   map[int][]lx.InputFile
-	skipFileOps map[int]bool
-	resolved    map[int][]lx.InputFile
-	failures    map[int][]lx.Failure
+	// bareTrees names, a group per entry, the tree options that cover no
+	// files, for a warning once the inputs are collected.
+	bareTrees []string
 }
 
-// parseSections splits ops into sections, each with its own interleaved
+// item is one thing a section renders, in command-line order.
+type item interface {
+	// source is the op the item was compiled from.
+	source() Op
+}
+
+// from is the op an item was compiled from.
+type from struct{ op Op }
+
+func (f from) source() Op { return f.op }
+
+// fileItem is a path, URL or archive named as input, or piped on stdin.
+type fileItem struct {
+	from
+	arg string
+	// piped marks a path read from a file list on stdin.
+	piped bool
+	// treeOnly leaves its content out: a --tree-only stands in for it.
+	treeOnly bool
+	// files and failures are what collecting arg found.
+	files    []lx.InputFile
+	failures []lx.Failure
+}
+
+// stdinItem is "-": the content of stdin, read as one file.
+type stdinItem struct {
+	from
+	treeOnly bool
+}
+
+// treeItem is a -t or --tree-only, over the file items beside it up to the
+// next --tree-only or the end of the section.
+type treeItem struct {
+	from
+	// only says it is a --tree-only.
+	only   bool
+	inputs []*fileItem
+}
+
+// headingItem is a -s title.
+type headingItem struct {
+	from
+	title string
+}
+
+// promptItem is a -p prompt, or a -P one, named by ref, whose text
+// resolvePrompts reads from path.
+type promptItem struct {
+	from
+	text, ref, path string
+}
+
+// metaItem is a --system-context block.
+type metaItem struct{ from }
+
+// newItem returns the item of an action op.
+func newItem(op Op) item {
+	src := from{op}
+	switch op.Action {
+	case "FILE":
+		if op.Value == "-" {
+			return &stdinItem{from: src}
+		}
+		return &fileItem{from: src, arg: op.Value, piped: op.Piped}
+	case "tree", "tree-only":
+		return &treeItem{from: src, only: op.Action == "tree-only"}
+	case "section":
+		return &headingItem{from: src, title: op.Value}
+	case "prompt":
+		return &promptItem{from: src, text: op.Value}
+	case "prompt-file":
+		return &promptItem{from: src, ref: op.Value}
+	case "system-context":
+		return &metaItem{from: src}
+	}
+	panic("cli: unknown action " + op.Action)
+}
+
+// compile splits ops into sections of items, each with its own interleaved
 // options. An interleaved option after files, or a -s after files, starts a
 // new section with the options reset. Options after files that no file
 // follows before the next -s or the end apply back to those files, with a
@@ -27,7 +105,7 @@ type Section struct {
 // before them in their section carry on into the section a -s starts, so
 // options before the first file belong to it however many prompts or -s
 // come first; options no file follows at all are reported.
-func parseSections(log *slog.Logger, ops []Op, defaultRender lx.RenderOptions) []Section {
+func compile(log *slog.Logger, ops []Op, defaultRender lx.RenderOptions) []Section {
 	var sections []Section
 	current := Section{Render: defaultRender}
 	hasFiles := false
@@ -48,11 +126,12 @@ func parseSections(log *slog.Logger, ops []Op, defaultRender lx.RenderOptions) [
 			applyInterleaved(log, op, &current)
 			pending = append(pending, op)
 		case CmdAction:
-			switch op.Action {
-			case "FILE":
+			it := newItem(op)
+			switch it.(type) {
+			case *fileItem, *stdinItem:
 				hasFiles, afterFiles = true, false
 				pending = nil
-			case "section":
+			case *headingItem:
 				next := Section{Render: defaultRender}
 				switch {
 				case afterFiles:
@@ -63,12 +142,12 @@ func parseSections(log *slog.Logger, ops []Op, defaultRender lx.RenderOptions) [
 				default:
 					pending = nil
 				}
-				if len(current.Ops) > 0 {
+				if len(current.Items) > 0 {
 					sections = append(sections, current)
 				}
 				current, hasFiles, afterFiles = next, false, false
 			}
-			current.Ops = append(current.Ops, op)
+			current.Items = append(current.Items, it)
 		}
 	}
 	switch {
@@ -77,10 +156,61 @@ func parseSections(log *slog.Logger, ops []Op, defaultRender lx.RenderOptions) [
 	case !hasFiles && len(pending) > 0:
 		log.Warn("Interleaved options apply to no files", "flags", flagNames(pending))
 	}
-	if len(current.Ops) > 0 {
+	if len(current.Items) > 0 {
 		sections = append(sections, current)
 	}
+	for i := range sections {
+		sections[i].groupTrees()
+	}
 	return sections
+}
+
+// groupTrees gives each tree the file items it covers: those beside it up to
+// the next --tree-only or the end of s. A --tree-only also leaves the content
+// of the items it covers out; the items before it keep theirs.
+func (s *Section) groupTrees() {
+	var files []*fileItem
+	var stdins []*stdinItem
+	var trees []*treeItem
+	treeOnly := false
+
+	flush := func() {
+		if len(trees) > 0 && len(files)+len(stdins) == 0 {
+			ops := make([]Op, len(trees))
+			for i, t := range trees {
+				ops[i] = t.op
+			}
+			s.bareTrees = append(s.bareTrees, flagNames(ops))
+		}
+		for _, t := range trees {
+			t.inputs = files
+		}
+		if treeOnly {
+			for _, f := range files {
+				f.treeOnly = true
+			}
+			for _, f := range stdins {
+				f.treeOnly = true
+			}
+		}
+		files, stdins, trees, treeOnly = nil, nil, nil, false
+	}
+
+	for _, it := range s.Items {
+		switch it := it.(type) {
+		case *treeItem:
+			if it.only {
+				flush()
+				treeOnly = true
+			}
+			trees = append(trees, it)
+		case *fileItem:
+			files = append(files, it)
+		case *stdinItem:
+			stdins = append(stdins, it)
+		}
+	}
+	flush()
 }
 
 // flagNames names ops as they could be written on the command line.

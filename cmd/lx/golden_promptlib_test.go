@@ -19,5 +19,8 @@ func TestGoldenPromptLib(t *testing.T) {
 		{name: "808_promptlib_shallower_wins", args: []string{"-P", "test", "main.go"}},
 		{name: "809_promptlib_ambiguous_same_level", args: []string{"-P", "dup", "main.go"}},
 		{name: "810_promptlib_shallower_nested_wins", args: []string{"-P", "note", "main.go"}},
+		// A bad prompt fails before any input is collected, so the warning
+		// collecting bundle.md would give is never reached.
+		{name: "811_promptlib_not_found_before_inputs", args: []string{"-o", "bundle.md", "bundle.md", "main.go", "-P", "missing"}, outFile: "bundle.md"},
 	})
 }

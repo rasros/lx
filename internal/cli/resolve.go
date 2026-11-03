@@ -3,20 +3,45 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 
 	"github.com/rasros/lx/pkg/lx"
 )
 
-// resolveSections collects every file op once, before rendering, so the tree
-// builder and the content pass share one view of what each path refers to.
-// What an op fails on is kept with it, for the content pass to add to the
-// stream ahead of the op's files: the stream reports and counts every failure
-// of the run, in output order.
+// resolvePrompts reads the text of every -P prompt, failing on the first it
+// cannot find or read. It runs before any input is collected, so a bad prompt
+// fails before the downloads and walks of the run.
+func resolvePrompts(sections []Section, r *promptResolver, env Env) error {
+	for _, s := range sections {
+		for _, it := range s.Items {
+			p, ok := it.(*promptItem)
+			if !ok || p.ref == "" {
+				continue
+			}
+			path, err := r.resolve(p.ref)
+			if err != nil {
+				return err
+			}
+			data, err := env.readFile(path)
+			if err != nil {
+				return fmt.Errorf("read prompt file %s: %w", path, err)
+			}
+			p.text, p.path = string(data), path
+		}
+	}
+	return nil
+}
+
+// resolveSections collects every file item once, before rendering, so trees
+// and content share one view of what each path refers to. What an item fails
+// on is kept with it, for the render pass to add to the stream ahead of its
+// files: the stream reports and counts every failure of the run, in output
+// order.
 //
-// Stdin ("-") resolves to nothing: it is a buffer, not a discoverable path, and
-// it can only be read once. The content pass handles it directly.
+// Stdin is not collected: it is a buffer, not a discoverable path, and it can
+// only be read once. The render pass reads it.
 //
 // A piped list names a set of paths, so an input it reaches twice, named and
 // through its directory, is collected once: a file once, a failure once, and
@@ -31,37 +56,23 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) e
 		piped[key] = true
 		return s
 	}
-	for si := range sections {
-		s := &sections[si]
-		for oi, op := range s.Ops {
-			if op.Action != "FILE" || op.Value == "-" {
+	for _, s := range sections {
+		for _, it := range s.Items {
+			f, ok := it.(*fileItem)
+			if !ok {
 				continue
 			}
 			opts := s.Discover
-			opts.Piped = op.Piped
-			files, failures, err := c.Collect(ctx, op.Value, opts)
+			opts.Piped = f.piped
+			files, failures, err := c.Collect(ctx, f.arg, opts)
 			if err != nil {
 				return err
 			}
-			if op.Piped {
+			if f.piped {
 				failures = slices.DeleteFunc(failures, func(f lx.Failure) bool { return seen(f.Path) })
-			}
-			if len(failures) > 0 {
-				if s.failures == nil {
-					s.failures = make(map[int][]lx.Failure)
-				}
-				s.failures[oi] = failures
-			}
-			if op.Piped {
 				files = slices.DeleteFunc(files, func(f lx.InputFile) bool { return seen(f.AbsPath) })
 			}
-			if len(files) == 0 {
-				continue
-			}
-			if s.resolved == nil {
-				s.resolved = make(map[int][]lx.InputFile)
-			}
-			s.resolved[oi] = files
+			f.files, f.failures = files, failures
 		}
 	}
 	return nil
