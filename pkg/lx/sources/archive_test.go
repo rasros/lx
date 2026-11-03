@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/rasros/lx/pkg/lx/core"
 	"io"
 	"io/fs"
 	"math"
@@ -20,31 +19,18 @@ import (
 	"testing"
 	"testing/iotest"
 
+	"github.com/rasros/lx/internal/testzip"
+	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
 
 func makeTestZip(t *testing.T, entries [][2]string) string {
 	t.Helper()
-	f, err := os.CreateTemp(t.TempDir(), "archive_test_*.zip")
-	if err != nil {
+	path := filepath.Join(t.TempDir(), "archive_test.zip")
+	if err := os.WriteFile(path, testzip.Bytes(t, entries...), 0644); err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
-
-	w := zip.NewWriter(f)
-	for _, e := range entries {
-		fw, err := w.Create(e[0])
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := fw.Write([]byte(e[1])); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return f.Name()
+	return path
 }
 
 func makeTestTarGz(t *testing.T, entries [][2]string) string {

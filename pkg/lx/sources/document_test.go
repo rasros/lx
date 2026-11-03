@@ -9,84 +9,27 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rasros/lx/internal/testzip"
 	"github.com/xuri/excelize/v2"
 )
 
 func makeTestPPTX(t *testing.T, slides ...string) []byte {
 	t.Helper()
-	var buf bytes.Buffer
-	w := zip.NewWriter(&buf)
-
-	writeEntry := func(name, content string) {
-		t.Helper()
-		fw, err := w.Create(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := fw.Write([]byte(content)); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	writeEntry("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
-		`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">`+
-		`<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>`+
-		`<Default Extension="xml" ContentType="application/xml"/>`+
-		`</Types>`)
-
+	entries := [][2]string{{"[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+		`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+		`<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+		`<Default Extension="xml" ContentType="application/xml"/>` +
+		`</Types>`}}
 	for i, text := range slides {
-		name := fmt.Sprintf("ppt/slides/slide%d.xml", i+1)
-		content := fmt.Sprintf(
+		entries = append(entries, [2]string{fmt.Sprintf("ppt/slides/slide%d.xml", i+1), fmt.Sprintf(
 			`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
 				`<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"`+
 				` xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">`+
 				`<p:cSld><p:spTree><p:sp><p:txBody>`+
 				`<a:p><a:r><a:t>%s</a:t></a:r></a:p>`+
-				`</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`, text)
-		writeEntry(name, content)
+				`</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`, text)})
 	}
-
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return buf.Bytes()
-}
-
-const docxRelsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
-	`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`
-
-func makeTestDOCX(t *testing.T, paragraphs ...string) []byte {
-	t.Helper()
-	var xmlBuf strings.Builder
-	xmlBuf.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
-	xmlBuf.WriteString(`<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">`)
-	xmlBuf.WriteString(`<w:body>`)
-	for _, p := range paragraphs {
-		fmt.Fprintf(&xmlBuf, `<w:p><w:r><w:t>%s</w:t></w:r></w:p>`, p)
-	}
-	xmlBuf.WriteString(`</w:body></w:document>`)
-
-	var buf bytes.Buffer
-	w := zip.NewWriter(&buf)
-
-	writeEntry := func(name, content string) {
-		t.Helper()
-		fw, err := w.Create(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := fw.Write([]byte(content)); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	writeEntry("word/document.xml", xmlBuf.String())
-	writeEntry("word/_rels/document.xml.rels", docxRelsXML)
-
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return buf.Bytes()
+	return testzip.Bytes(t, entries...)
 }
 
 func makeTestXLSX(t *testing.T, sheet string, cells map[string]interface{}) []byte {
@@ -259,7 +202,7 @@ func TestDocxXMLToText_NoText(t *testing.T) {
 }
 
 func TestExtractDOCXText_SingleParagraph(t *testing.T) {
-	data := makeTestDOCX(t, "Hello DOCX")
+	data := testzip.DOCX(t, "Hello DOCX")
 	r := bytes.NewReader(data)
 	text, err := extractDOCXText(context.Background(), r, int64(len(data)))
 	if err != nil {
@@ -271,7 +214,7 @@ func TestExtractDOCXText_SingleParagraph(t *testing.T) {
 }
 
 func TestExtractDOCXText_MultipleParagraphs(t *testing.T) {
-	data := makeTestDOCX(t, "First paragraph", "Second paragraph", "Third paragraph")
+	data := testzip.DOCX(t, "First paragraph", "Second paragraph", "Third paragraph")
 	r := bytes.NewReader(data)
 	text, err := extractDOCXText(context.Background(), r, int64(len(data)))
 	if err != nil {
@@ -438,7 +381,7 @@ func TestExtractDocumentText_DispatchToPDF(t *testing.T) {
 }
 
 func TestExtractDocumentText_DispatchToDOCX(t *testing.T) {
-	data := makeTestDOCX(t, "DOCX dispatch content")
+	data := testzip.DOCX(t, "DOCX dispatch content")
 	r := bytes.NewReader(data)
 	text, err := ExtractDocumentText(context.Background(), "file.docx", r, int64(len(data)))
 	if err != nil {
@@ -511,7 +454,7 @@ func TestExtractPPTXText_Corrupted(t *testing.T) {
 }
 
 func TestExtractDocumentText_CaseInsensitiveExtension(t *testing.T) {
-	data := makeTestDOCX(t, "case test")
+	data := testzip.DOCX(t, "case test")
 	r := bytes.NewReader(data)
 	text, err := ExtractDocumentText(context.Background(), "LETTER.DOCX", r, int64(len(data)))
 	if err != nil {
@@ -574,7 +517,7 @@ func (c cancellingReader) ReadAt(p []byte, off int64) (int, error) {
 func TestExtractDocumentTextStopsWhenCancelled(t *testing.T) {
 	docs := map[string][]byte{
 		"a.pdf":  makeTestPDF(t, "pdf text"),
-		"a.docx": makeTestDOCX(t, "docx text"),
+		"a.docx": testzip.DOCX(t, "docx text"),
 		"a.xlsx": makeTestXLSX(t, "Sheet1", map[string]interface{}{"A1": "xlsx text"}),
 		"a.pptx": makeTestPPTX(t, "pptx text"),
 		"a.html": []byte("<p>html text</p>"),

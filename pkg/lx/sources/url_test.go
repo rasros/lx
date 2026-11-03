@@ -1,8 +1,6 @@
 package sources
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -12,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rasros/lx/internal/testzip"
 )
 
 func TestIsHTTPURL(t *testing.T) {
@@ -203,7 +203,7 @@ func TestDownloadURLToTempFile_StatusError(t *testing.T) {
 }
 
 func TestDownloadURLToTempFile_DownloadedArchiveDetectable(t *testing.T) {
-	zipBody := makeArchiveBytes(t, map[string]string{"a.txt": "A"})
+	zipBody := testzip.Bytes(t, [2]string{"a.txt", "A"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")
 		_, _ = w.Write(zipBody)
@@ -219,26 +219,6 @@ func TestDownloadURLToTempFile_DownloadedArchiveDetectable(t *testing.T) {
 	if !IsArchivePath(path) {
 		t.Fatalf("downloaded temp path %q is not recognized as archive", path)
 	}
-}
-
-func makeArchiveBytes(t *testing.T, files map[string]string) []byte {
-	t.Helper()
-
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for name, body := range files {
-		w, err := zw.Create(name)
-		if err != nil {
-			t.Fatalf("Create(%q): %v", name, err)
-		}
-		if _, err := io.WriteString(w, body); err != nil {
-			t.Fatalf("WriteString(%q): %v", name, err)
-		}
-	}
-	if err := zw.Close(); err != nil {
-		t.Fatalf("zip close: %v", err)
-	}
-	return buf.Bytes()
 }
 
 func TestNewURLInputFileRecordsMediaType(t *testing.T) {

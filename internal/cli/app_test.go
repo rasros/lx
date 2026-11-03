@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
 	"log/slog"
@@ -13,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rasros/lx/internal/testzip"
 	"github.com/rasros/lx/pkg/lx"
 	"github.com/rasros/lx/pkg/lx/sources"
 )
@@ -124,25 +124,14 @@ func TestRun_HTTPURLInput(t *testing.T) {
 }
 
 func TestRun_HTTPURLArchiveInput_Expand(t *testing.T) {
-	var zipBuf bytes.Buffer
-	zw := zip.NewWriter(&zipBuf)
-	w, err := zw.Create("repo-main/README.md")
-	if err != nil {
-		t.Fatalf("Create zip entry: %v", err)
-	}
-	if _, err := w.Write([]byte("hello archive")); err != nil {
-		t.Fatalf("Write zip entry: %v", err)
-	}
-	if err := zw.Close(); err != nil {
-		t.Fatalf("Close zip writer: %v", err)
-	}
+	zipBody := testzip.Bytes(t, [2]string{"repo-main/README.md", "hello archive"})
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s, want GET", r.Method)
 		}
 		w.Header().Set("Content-Type", "application/zip")
-		_, _ = w.Write(zipBuf.Bytes())
+		_, _ = w.Write(zipBody)
 	}))
 	defer server.Close()
 
@@ -160,24 +149,13 @@ func TestRun_HTTPURLArchiveInput_Expand(t *testing.T) {
 }
 
 func TestRun_ShortRepoURL_AutoExpand(t *testing.T) {
-	var zipBuf bytes.Buffer
-	zw := zip.NewWriter(&zipBuf)
-	w, err := zw.Create("repo-main/README.md")
-	if err != nil {
-		t.Fatalf("Create zip entry: %v", err)
-	}
-	if _, err := w.Write([]byte("hello archive")); err != nil {
-		t.Fatalf("Write zip entry: %v", err)
-	}
-	if err := zw.Close(); err != nil {
-		t.Fatalf("Close zip writer: %v", err)
-	}
+	zipBody := testzip.Bytes(t, [2]string{"repo-main/README.md", "hello archive"})
 
 	var gotPath string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		w.Header().Set("Content-Type", "application/zip")
-		_, _ = w.Write(zipBuf.Bytes())
+		_, _ = w.Write(zipBody)
 	}))
 	defer server.Close()
 
