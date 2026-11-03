@@ -3,13 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"flag"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/rasros/lx/internal/cli"
 	"github.com/rasros/lx/internal/osenv"
@@ -18,10 +21,12 @@ import (
 var update = flag.Bool("update", false, "update .golden files")
 
 type goldenTestCase struct {
-	name     string
-	args     []string
-	stdin    string
-	autoStat bool
+	name  string
+	args  []string
+	stdin string
+	// stdinFails makes reading stdin fail once stdin is read.
+	stdinFails bool
+	autoStat   bool
 	// outFile, when set, is a file in the working directory whose content
 	// follows the output, or "(missing)".
 	outFile string
@@ -77,9 +82,13 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 				runArgs = append(runArgs, "--no-stats")
 			}
 
+			var stdin io.Reader = strings.NewReader(tc.stdin)
+			if tc.stdinFails {
+				stdin = io.MultiReader(stdin, iotest.ErrReader(errors.New("stdin broke")))
+			}
 			var stdoutBuf, stderrBuf bytes.Buffer
 			err := cli.Run(context.Background(), runArgs, cli.Env{
-				Stdin:     strings.NewReader(tc.stdin),
+				Stdin:     stdin,
 				Stdout:    &stdoutBuf,
 				Stderr:    &stderrBuf,
 				LookupEnv: lookupEnv,

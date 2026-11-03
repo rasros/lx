@@ -216,7 +216,11 @@ func (s *Stream) report(res render.Result) {
 		if s.onFailure != nil {
 			s.onFailure(*f)
 		} else {
-			s.log.Error("Failed to read input", "path", f.Path, "error", f.Err)
+			path := f.Display
+			if path == "" {
+				path = f.Path
+			}
+			s.log.Error("Failed to read input", "path", path, "kind", f.Kind, "error", f.Err)
 		}
 	}
 	if ce := res.Convert; ce != nil {
