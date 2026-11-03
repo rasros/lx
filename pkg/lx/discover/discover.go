@@ -347,6 +347,13 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 				info = target
 			}
 		}
+		// A FIFO, socket or device found in a walk is skipped, as rg skips
+		// them: a FIFO with no writer would hold the run up. One named, or
+		// piped in as a path, is read as a stream.
+		if r.isDir && sources.IsIrregular(info.Mode()) {
+			c.log.Debug("Skipped irregular file", "path", display, "mode", info.Mode().String())
+			return nil
+		}
 
 		f := sources.NewInputFile(r.fsys, path, info)
 		f.Path = display
