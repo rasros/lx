@@ -212,7 +212,7 @@ func tokenEstimateFor(t *testing.T, content string) int64 {
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
-	return report.TokenEstimate
+	return report.WrittenTokenEstimate
 }
 
 func TestStream_TokenEstimateReflectsContentShape(t *testing.T) {
@@ -256,9 +256,9 @@ func TestStream_TokenEstimateCoversAllEmittedBytes(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if global.TokenEstimate != global.TotalWrittenBytes {
-		t.Errorf("TokenEstimate = %d, TotalWrittenBytes = %d; want equal with a one-token-per-byte tokenizer",
-			global.TokenEstimate, global.TotalWrittenBytes)
+	if global.WrittenTokenEstimate != global.TotalWrittenBytes {
+		t.Errorf("WrittenTokenEstimate = %d, TotalWrittenBytes = %d; want equal with a one-token-per-byte tokenizer",
+			global.WrittenTokenEstimate, global.TotalWrittenBytes)
 	}
 	if global.TotalWrittenBytes != int64(buf.Len()) {
 		t.Errorf("TotalWrittenBytes = %d, want %d", global.TotalWrittenBytes, buf.Len())
@@ -319,6 +319,12 @@ func TestStream_ExecutesOnce(t *testing.T) {
 	if _, err := stream.Execute(context.Background(), io.Discard); !errors.Is(err, ErrExecuted) {
 		t.Errorf("second Execute = %v, want ErrExecuted", err)
 	}
+	defer func() {
+		if r := recover(); r != ErrExecuted {
+			t.Errorf("AddSection after Execute recovered %v, want ErrExecuted", r)
+		}
+	}()
+	stream.AddSection("late")
 }
 
 func TestStream_SkippedBySizeIsCounted(t *testing.T) {
@@ -401,7 +407,7 @@ func TestStream_TokenEstimateIgnoresWriteChunking(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
-		return report.TokenEstimate, buf.String()
+		return report.WrittenTokenEstimate, buf.String()
 	}
 
 	chunked, chunkedOut := estimate(templates{

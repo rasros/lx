@@ -5,13 +5,11 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
-	"text/template"
 
 	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/discover"
 	"github.com/rasros/lx/pkg/lx/sources"
 	streamingpkg "github.com/rasros/lx/pkg/lx/streaming"
-	"github.com/rasros/lx/pkg/lx/templatex"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
 
@@ -185,7 +183,8 @@ func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
 // it.
 func (s *Stream) Plan() Plan { return s.inner.Plan() }
 
-// ErrExecuted is returned by Execute on a stream that already ran.
+// ErrExecuted is returned by Execute on a stream that already ran, and the
+// panic of a method that changes a stream once Execute has started.
 var ErrExecuted = streamingpkg.ErrExecuted
 
 // Execute renders the stream to w and reports what was rendered. A stream
@@ -193,8 +192,3 @@ var ErrExecuted = streamingpkg.ErrExecuted
 func (s *Stream) Execute(ctx context.Context, w io.Writer) (Report, error) {
 	return s.inner.Execute(ctx, w)
 }
-
-// TemplateFuncs returns the functions every lx template can call, with
-// dataURI resolving relative paths against dir, or the process's working
-// directory when it is empty.
-func TemplateFuncs(dir string) template.FuncMap { return templatex.Funcs(dir) }

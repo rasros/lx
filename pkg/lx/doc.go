@@ -49,6 +49,9 @@
 //   - Plan reports what the stream would render, as its templates see it.
 //   - Execute renders output to an io.Writer once and returns a Report of
 //     what it rendered: rows, binary and failed files, bytes and tokens.
+//     A Stream renders once: a second Execute returns ErrExecuted, and
+//     adding to or configuring it once Execute has started panics with it,
+//     from a FailureHandler too.
 //   - WithConcurrency / WithOnFailure / WithLogger customize processing.
 //     Skeleton rendering caps the workers at two.
 //

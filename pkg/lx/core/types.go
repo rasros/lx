@@ -16,7 +16,6 @@ type Plan struct {
 	TokenEstimate int64
 	TotalSections int
 	WorkDir       string
-	Metadata      map[string]string
 
 	SkippedBySize int
 }
@@ -27,10 +26,10 @@ type Report struct {
 	Plan
 	TotalWrittenBytes int64
 	TotalRows         int64
-	// TokenEstimate is estimated from the written output, in place of the
-	// Plan's estimate from sizes.
-	TokenEstimate int64
-	BinaryFiles   int
+	// WrittenTokenEstimate is estimated from the written output, where the
+	// Plan's TokenEstimate is estimated from file sizes alone.
+	WrittenTokenEstimate int64
+	BinaryFiles          int
 	// FailedFiles counts every Failure: the ones added to the Stream and the
 	// files it could not read.
 	FailedFiles int

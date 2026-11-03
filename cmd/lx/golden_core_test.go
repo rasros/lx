@@ -181,6 +181,17 @@ func TestGoldenConfig(t *testing.T) {
 	if err := os.WriteFile(copyCfgPath, []byte("output_mode: copy\n"), 0644); err != nil {
 		t.Fatalf("write copy config: %v", err)
 	}
+	// Outside the fixture, so the walks of the other cases do not see them.
+	cfgs := map[string]string{
+		"footer_post_render.yaml": "output_footer_template: \"rows={{ .Global.TotalRows }}\\n\"\n",
+		"stats_custom.yaml":       "stats_template: \"{{ .Global.TotalFiles }} files, {{ .Global.TotalRows }} rows, ~{{ .Global.TokenEstimate }} planned and ~{{ .Global.WrittenTokenEstimate }} written tokens\\n\"\n",
+		"stats_broken.yaml":       "stats_template: \"{{ .Global.TotalLines }} lines\\n\"\n",
+	}
+	for name, data := range cfgs {
+		if err := os.WriteFile(filepath.Join(copyCfgDir, name), []byte(data), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "090_config_hidden", args: []string{"-H", "."}},
 		{name: "091_config_follow", args: []string{"--follow", "links"}},
@@ -190,6 +201,9 @@ func TestGoldenConfig(t *testing.T) {
 		{name: "095_config_custom_sections", args: []string{"-y", "configs/custom_sections.yaml", "-s", "Head", "main.go"}},
 		{name: "096_direct_file_parent_ignore", args: []string{"direct_ignore_test/test.ignored", "direct_ignore_test/test.kept"}},
 		{name: "097_stdout_overrides_copy_mode", args: []string{"--stdout", "-y", copyCfgPath, "main.go"}},
+		{name: "098_template_post_render_field_fails_up_front", args: []string{"-y", filepath.Join(copyCfgDir, "footer_post_render.yaml"), "main.go"}},
+		{name: "099_stats_template_custom", args: []string{"--stats", "-y", filepath.Join(copyCfgDir, "stats_custom.yaml"), "main.go"}},
+		{name: "099b_stats_template_unknown_field_fails_up_front", args: []string{"--stats", "-y", filepath.Join(copyCfgDir, "stats_broken.yaml"), "main.go"}},
 	})
 }
 

@@ -1,0 +1,5 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: stats template: template: stats:1:10: executing "stats" at <.Global.TotalLines>: can't evaluate field TotalLines in type core.Report
