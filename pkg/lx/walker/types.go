@@ -44,12 +44,12 @@ type Options struct {
 	FollowDirSymlinks bool
 	SkipFileSymlinks  bool
 	// Cache shares loaded ignore rules between walkers. Nil gives the walker
-	// its own.
+	// its own, which resolves relative roots against the process's working
+	// directory.
 	Cache *Cache
 	// OnIgnore, when set, is told about every path the walk skips and why.
 	OnIgnore func(path, reason string)
-	// Log reports unreadable files. Nil means the Cache's logger or
-	// slog.Default().
+	// Log reports unreadable files. Nil means the Cache's logger.
 	Log *slog.Logger
 }
 
@@ -66,12 +66,10 @@ type Walker struct {
 
 // New returns a Walker configured by opts.
 func New(opts Options) *Walker {
-	cache := opts.Cache
+	log, cache := opts.Log, opts.Cache
 	if cache == nil {
-		cache = NewCache(nil, opts.Log)
-	}
-	log := opts.Log
-	if log == nil {
+		cache = NewCache("", log)
+	} else if log == nil {
 		log = cache.log
 	}
 	return &Walker{

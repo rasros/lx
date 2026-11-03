@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"math"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"testing/iotest"
 
 	"github.com/rasros/lx/pkg/lx/core"
+	"github.com/rasros/lx/pkg/lx/walker"
 )
 
 func filePaths(files []InputFile) []string {
@@ -145,7 +147,7 @@ func TestExpandArchive_CorruptEntriesFail(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		files, failures, err := ExpandArchive(context.Background(), path, ArchiveOptions{Display: "corrupt.zip", Origin: path})
+		files, failures, err := ExpandArchive(context.Background(), path, ArchiveOptions{Display: "corrupt.zip", Origin: path, Walker: walker.New(walker.Options{Log: slog.Default()}), Log: slog.Default()})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -25,17 +26,17 @@ func logReadError(log *slog.Logger, path string, err error) {
 // root, and returns its git directory: a .git directory holding a HEAD, or
 // the directory a .git file names on its "gitdir:" line, as linked worktrees
 // and submodules have it. Anything else named .git is no repository.
-func findGitDir(h Host, repo string) (string, bool) {
+func findGitDir(repo string) (string, bool) {
 	dotGit := filepath.Join(repo, ".git")
-	info, err := h.Stat(dotGit)
+	info, err := os.Stat(dotGit)
 	if err != nil {
 		return "", false
 	}
 	if info.IsDir() {
-		_, err := h.Stat(filepath.Join(dotGit, "HEAD"))
+		_, err := os.Stat(filepath.Join(dotGit, "HEAD"))
 		return dotGit, err == nil
 	}
-	data, err := h.ReadFile(dotGit)
+	data, err := os.ReadFile(dotGit)
 	if err != nil {
 		return "", false
 	}

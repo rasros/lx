@@ -6,17 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"strings"
 
 	"github.com/rasros/lx/pkg/lx/core"
-	"github.com/rasros/lx/pkg/lx/walker"
 )
 
 // ExpandRepoArchive returns the files of the repository archived in the zip
-// at absPath, as a repository host serves one, that opts.Walker, or a
-// walker keeping every file when nil, keeps when it walks the archive as it
-// would a checkout. Hosts wrap the files in one directory, such as
+// at absPath, as a repository host serves one, that opts.Walker keeps when
+// it walks the archive as it would a checkout. Hosts wrap the files in one directory, such as
 // "repo-main/", which is left out of their displayed and matched paths but
 // kept in InputFile.Entry; an archive with anything but one directory at
 // the top is walked from its root. A walker with walker.Options.RepoRoot
@@ -27,9 +24,6 @@ import (
 // skipped. Each file kept and no larger than opts.MaxSize is read once, into
 // memory, so the archive is not needed once it returns.
 func ExpandRepoArchive(ctx context.Context, absPath string, opts ArchiveOptions) ([]InputFile, []core.Failure, error) {
-	if opts.Walker == nil {
-		opts.Walker = walker.New(walker.Options{})
-	}
 	zr, err := zip.OpenReader(absPath)
 	if err != nil && !(errors.Is(err, zip.ErrInsecurePath) && zr != nil) {
 		return nil, nil, fmt.Errorf("open: %w", err)
@@ -37,9 +31,6 @@ func ExpandRepoArchive(ctx context.Context, absPath string, opts ArchiveOptions)
 	defer zr.Close()
 
 	x := expansion{opts: opts, log: opts.Log, base: archiveBase(opts.Display)}
-	if x.log == nil {
-		x.log = slog.Default()
-	}
 	var fsys fs.FS = &zr.Reader
 	entryPrefix := ""
 	if wrapper := zipWrapper(zr.File); wrapper != "" {

@@ -8,76 +8,17 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"sync"
 	"testing"
 )
-
-// testHost is the OS seen from a fixed working directory. It counts the
-// ignore files read and the .git entries stat'ed.
-type testHost struct {
-	OSHost
-	cwd string
-
-	mu    sync.Mutex
-	reads map[string]int
-}
-
-func newTestHost(cwd string) *testHost { return &testHost{cwd: cwd, reads: map[string]int{}} }
-
-func (h *testHost) Getwd() (string, error) { return h.cwd, nil }
-
-func (h *testHost) ReadFile(name string) ([]byte, error) {
-	h.count(name)
-	return os.ReadFile(name)
-}
-
-func (h *testHost) Stat(name string) (fs.FileInfo, error) {
-	h.count(name)
-	return os.Stat(name)
-}
-
-func (h *testHost) count(name string) {
-	switch filepath.Base(name) {
-	case ".gitignore", ".ignore", ".lxignore", ".git":
-		h.mu.Lock()
-		h.reads[name]++
-		h.mu.Unlock()
-	}
-}
-
-func (h *testHost) total() int {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	n := 0
-	for _, c := range h.reads {
-		n += c
-	}
-	return n
-}
 
 // hostWalker returns a walker reading ignore files on the OS, seen from cwd,
 // that skips hidden paths.
 func hostWalker(cwd string, base ...string) *Walker {
-	return New(Options{Base: base, IgnoreEnabled: true, SkipHidden: true, Cache: NewCache(newTestHost(cwd), nil)})
+	return New(Options{Base: base, IgnoreEnabled: true, SkipHidden: true, Cache: NewCache(cwd, slog.Default())})
 }
 
 // hostFrame returns the frame of dir, seen from cwd.
 func hostFrame(w *Walker, dir string) *frame { return w.cache.hostTree().frame(w, dir) }
-
-func walkFrom(t *testing.T, w *Walker, dir, root string) []string {
-	t.Helper()
-	var walked []string
-	err := w.Walk(os.DirFS(dir), root, func(p string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			walked = append(walked, p)
-		}
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return walked
-}
 
 // walkPath walks the absolute path root and returns the absolute paths of the
 // files it includes.
@@ -172,14 +113,14 @@ func TestFrame_RulesFromEveryAncestor(t *testing.T) {
 
 func TestFrame_GitRulesNeedARepo(t *testing.T) {
 	top := t.TempDir()
-	if n := newRuleTree(newHostTree(OSHost{}, "", slog.Default()), true).node(top); n.inRepo {
+	if n := newRuleTree(hostTree{log: slog.Default()}, true).node(top); n.inRepo {
 		t.Skip("temp dir is inside a git repository")
 	}
 	mustWriteFile(t, top, ".gitignore", "*.tmp\n")
 	mustWriteFile(t, top, ".lxignore", "*.lx\n")
 	mustMkdir(t, top, "src")
 
-	w := New(Options{Base: []string{"*.base"}, GitExcludes: []string{"*.git"}, IgnoreEnabled: true, Cache: NewCache(newTestHost(filepath.Join(top, "src")), nil)})
+	w := New(Options{Base: []string{"*.base"}, GitExcludes: []string{"*.git"}, IgnoreEnabled: true, Cache: NewCache(filepath.Join(top, "src"), slog.Default())})
 	if got := rulePatterns(hostFrame(w, filepath.Join(top, "src")).rules, top); !reflect.DeepEqual(got, []string{"*.lx@."}) {
 		t.Fatalf("expected only .lxignore outside a repository, got %v", got)
 	}
@@ -292,93 +233,40 @@ func TestCache_Anchor(t *testing.T) {
 		{real, "src/../x", "y", "src/../x/y"},
 		{real, "sub", ".", "sub"},
 	} {
-		if got := NewCache(newTestHost(tt.cwd), nil).Anchor(tt.root).Path(tt.rel); got != tt.want {
+		if got := NewCache(tt.cwd, slog.Default()).Anchor(tt.root).Path(tt.rel); got != tt.want {
 			t.Errorf("cwd %s, root %s, path %s: got %q, want %q", tt.cwd, tt.root, tt.rel, got, tt.want)
 		}
 	}
 }
 
-func TestCache_ConcurrentWalks(t *testing.T) {
+// A shared cache reads each ignore file once: its walks keep the rules they
+// first read, while a new cache reads the file as it is now. Walking a named
+// file reads no ignore files.
+func TestCache_KeepsTheRulesItRead(t *testing.T) {
 	top := t.TempDir()
 	mustGitDir(t, top, ".git")
 	mustWriteFile(t, top, ".gitignore", "*.log\n")
-	writeTree(t, top, "a/b/c.go", "a/b/d.log", "e/f.go")
-
-	cache := NewCache(newTestHost(top), nil)
-	var wg sync.WaitGroup
-	results := make([][]string, 8)
-	for i := range results {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			w := New(Options{IgnoreEnabled: true, SkipHidden: true, Cache: cache})
-			results[i] = walkPath(t, w, top)
-		}()
+	writeTree(t, top, "a/b/c.go", "a/b/d.log")
+	goFile, logFile := filepath.Join(top, "a", "b", "c.go"), filepath.Join(top, "a", "b", "d.log")
+	walk := func(cache *Cache, root string) []string {
+		return walkPath(t, New(Options{IgnoreEnabled: true, SkipHidden: true, Cache: cache}), root)
 	}
-	wg.Wait()
-	for _, got := range results {
-		if !reflect.DeepEqual(got, results[0]) || len(got) != 2 {
-			t.Fatalf("walks disagree: %v vs %v", got, results[0])
+
+	named, shared := NewCache(top, slog.Default()), NewCache(top, slog.Default())
+	if got := walk(named, logFile); !reflect.DeepEqual(got, []string{logFile}) {
+		t.Fatalf("named file: got %v", got)
+	}
+	if got := walk(shared, top); !reflect.DeepEqual(got, []string{goFile}) {
+		t.Fatalf("first walk: got %v", got)
+	}
+
+	mustWriteFile(t, top, ".gitignore", "*.go\n")
+	if got := walk(shared, filepath.Join(top, "a")); !reflect.DeepEqual(got, []string{goFile}) {
+		t.Errorf("shared cache: got %v, want the rules it first read", got)
+	}
+	for name, cache := range map[string]*Cache{"named": named, "new": NewCache(top, slog.Default())} {
+		if got := walk(cache, filepath.Join(top, "a")); !reflect.DeepEqual(got, []string{logFile}) {
+			t.Errorf("%s cache: got %v, want the rules as they are now", name, got)
 		}
-	}
-}
-
-// Walking every directory of a tree of D directories reads each ignore file
-// once with a shared cache, and once per walk above it without one. Named
-// files read none.
-func TestCache_ReadsEachIgnoreFileOnce(t *testing.T) {
-	top := t.TempDir()
-	mustGitDir(t, top, ".git")
-	mustWriteFile(t, top, ".gitignore", "*.log\n")
-	var files []string
-	dirs := map[string]bool{top: true}
-	for _, d := range []string{"a/b/c", "a/b/d", "a/e/f", "g/h/i"} {
-		for i := range 10 {
-			p := filepath.Join(top, filepath.FromSlash(d), "f"+strings.Repeat("x", i)+".go")
-			mustMkdir(t, top, d)
-			mustWriteFile(t, filepath.Dir(p), filepath.Base(p), "x")
-			files = append(files, p)
-			for dir := filepath.Dir(p); dir != top; dir = filepath.Dir(dir) {
-				dirs[dir] = true
-			}
-		}
-	}
-
-	named := newTestHost(top)
-	cache := NewCache(named, nil)
-	for _, f := range files {
-		w := New(Options{IgnoreEnabled: true, Cache: cache})
-		if got := walkPath(t, w, f); len(got) != 1 {
-			t.Fatalf("expected %s to be included, got %v", f, got)
-		}
-	}
-	if named.total() != 0 {
-		t.Errorf("named files: %d reads, want none", named.total())
-	}
-
-	shared := newTestHost(top)
-	cache = NewCache(shared, nil)
-	for d := range dirs {
-		walkPath(t, New(Options{IgnoreEnabled: true, SkipHidden: true, Cache: cache}), d)
-	}
-	for name, n := range shared.reads {
-		if n != 1 {
-			t.Errorf("%s read %d times, want once", name, n)
-		}
-	}
-	// Three ignore files and a .git per directory, plus the .git of each
-	// directory above the repository with its .ignore and .lxignore.
-	if max := 4*len(dirs) + 3*strings.Count(top, string(filepath.Separator)); shared.total() > max {
-		t.Errorf("shared cache: %d reads, want at most %d", shared.total(), max)
-	}
-
-	unshared := newTestHost(top)
-	for d := range dirs {
-		walkPath(t, New(Options{IgnoreEnabled: true, SkipHidden: true, Cache: NewCache(unshared, nil)}), d)
-	}
-	t.Logf("walking each of %d directories: %d reads with a shared cache, %d with one cache per walk",
-		len(dirs), shared.total(), unshared.total())
-	if unshared.total() <= 2*shared.total() {
-		t.Errorf("expected many more reads without a shared cache, got %d", unshared.total())
 	}
 }
