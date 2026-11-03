@@ -22,5 +22,8 @@ func TestGoldenPromptLib(t *testing.T) {
 		// A bad prompt fails before any input is collected, so the warning
 		// collecting bundle.md would give is never reached.
 		{name: "811_promptlib_not_found_before_inputs", args: []string{"-o", "bundle.md", "bundle.md", "main.go", "-P", "missing"}, outFile: "bundle.md"},
+		// An empty name is a prompt to find, not an empty prompt.
+		{name: "812_promptlib_empty_name", args: []string{"-P", "", "main.go"}},
+		{name: "813_promptlib_empty_name_long_form", args: []string{"--prompt-file=", "main.go"}},
 	})
 }

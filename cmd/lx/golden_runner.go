@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/iotest"
@@ -26,7 +27,10 @@ type goldenTestCase struct {
 	stdin string
 	// stdinFails makes reading stdin fail once stdin is read.
 	stdinFails bool
-	autoStat   bool
+	// stdinPipe makes stdin a pipe holding stdin, and "{stdin}" in args the
+	// path that opens it again, /dev/fd/N.
+	stdinPipe bool
+	autoStat  bool
 	// outFile, when set, is a file in the working directory whose content
 	// follows the output, or "(missing)".
 	outFile string
@@ -86,6 +90,9 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 			if tc.stdinFails {
 				stdin = io.MultiReader(stdin, iotest.ErrReader(errors.New("stdin broke")))
 			}
+			if tc.stdinPipe {
+				stdin = pipeStdin(t, tc.stdin, runArgs)
+			}
 			var stdoutBuf, stderrBuf bytes.Buffer
 			err := cli.Run(context.Background(), runArgs, cli.Env{
 				Stdin:     stdin,
@@ -140,6 +147,25 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 			}
 		})
 	}
+}
+
+// pipeStdin returns a pipe holding content, replacing "{stdin}" in args with
+// the path that opens it again.
+func pipeStdin(t *testing.T, content string, args []string) *os.File {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { r.Close() })
+	if _, err := w.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+	for i, a := range args {
+		args[i] = strings.ReplaceAll(a, "{stdin}", "/dev/fd/"+strconv.Itoa(int(r.Fd())))
+	}
+	return r
 }
 
 // hermeticEnv returns an environment of its own for a test: plain output and

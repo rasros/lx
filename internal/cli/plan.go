@@ -21,18 +21,13 @@ type Section struct {
 
 // item is one thing a section renders, in command-line order.
 type item interface {
-	// source is the op the item was compiled from.
-	source() Op
+	// opAttrs returns the action and value of the option the item came
+	// from, for the debug log.
+	opAttrs() (action, value string)
 }
-
-// from is the op an item was compiled from.
-type from struct{ op Op }
-
-func (f from) source() Op { return f.op }
 
 // fileItem is a path, URL or archive named as input, or piped on stdin.
 type fileItem struct {
-	from
 	arg string
 	// piped marks a path read from a file list on stdin.
 	piped bool
@@ -44,55 +39,59 @@ type fileItem struct {
 }
 
 // stdinItem is "-": the content of stdin, read as one file.
-type stdinItem struct {
-	from
-	treeOnly bool
-}
+type stdinItem struct{ treeOnly bool }
 
-// treeItem is a -t or --tree-only, over the file items beside it up to the
-// next --tree-only or the end of the section.
+// treeItem is a -T or -t, over the file items beside it up to the next -t
+// or the end of the section.
 type treeItem struct {
-	from
-	// only says it is a --tree-only.
-	only   bool
+	// op is the option, for warnings.
+	op     Op
 	inputs []*fileItem
 }
 
 // headingItem is a -s title.
-type headingItem struct {
-	from
-	title string
-}
+type headingItem struct{ title string }
 
-// promptItem is a -p prompt, or a -P one, named by ref, whose text
-// resolvePrompts reads from path.
-type promptItem struct {
-	from
-	text, ref, path string
+// promptItem is a -p prompt.
+type promptItem struct{ text string }
+
+// promptFileItem is a -P prompt, named by ref and found at path. A regular
+// file is read before inputs are collected, so it fails first; other files,
+// such as /dev/stdin, are read in turn while rendering.
+type promptFileItem struct {
+	ref, path, text string
+	read            bool
 }
 
 // metaItem is a --system-context block.
-type metaItem struct{ from }
+type metaItem struct{}
+
+func (f *fileItem) opAttrs() (string, string)       { return "FILE", f.arg }
+func (*stdinItem) opAttrs() (string, string)        { return "FILE", "-" }
+func (t *treeItem) opAttrs() (string, string)       { return t.op.Action, t.op.Value }
+func (h *headingItem) opAttrs() (string, string)    { return "section", h.title }
+func (p *promptItem) opAttrs() (string, string)     { return "prompt", p.text }
+func (p *promptFileItem) opAttrs() (string, string) { return "prompt-file", p.ref }
+func (*metaItem) opAttrs() (string, string)         { return "system-context", "true" }
 
 // newItem returns the item of an action op.
 func newItem(op Op) item {
-	src := from{op}
 	switch op.Action {
 	case "FILE":
 		if op.Value == "-" {
-			return &stdinItem{from: src}
+			return &stdinItem{}
 		}
-		return &fileItem{from: src, arg: op.Value, piped: op.Piped}
+		return &fileItem{arg: op.Value, piped: op.Piped}
 	case "tree", "tree-only":
-		return &treeItem{from: src, only: op.Action == "tree-only"}
+		return &treeItem{op: op}
 	case "section":
-		return &headingItem{from: src, title: op.Value}
+		return &headingItem{title: op.Value}
 	case "prompt":
-		return &promptItem{from: src, text: op.Value}
+		return &promptItem{text: op.Value}
 	case "prompt-file":
-		return &promptItem{from: src, ref: op.Value}
+		return &promptFileItem{ref: op.Value}
 	case "system-context":
-		return &metaItem{from: src}
+		return &metaItem{}
 	}
 	panic("cli: unknown action " + op.Action)
 }
@@ -199,7 +198,7 @@ func (s *Section) groupTrees() {
 	for _, it := range s.Items {
 		switch it := it.(type) {
 		case *treeItem:
-			if it.only {
+			if it.op.Action == "tree-only" {
 				flush()
 				treeOnly = true
 			}
