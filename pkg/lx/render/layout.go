@@ -13,8 +13,11 @@ import (
 type Result struct {
 	Index int
 	// Buffer holds what the item rendered; it is nil for an item that writes
-	// nothing, as a failure added to the stream.
-	Buffer       *bytes.Buffer
+	// nothing, as a failure added to the stream, and for a section title,
+	// which the LayoutWriter renders.
+	Buffer *bytes.Buffer
+	// Section marks the item that starts an explicit section.
+	Section      bool
 	Stats        int64
 	Tokens       int64
 	Rows         int
@@ -29,7 +32,9 @@ type Result struct {
 	Convert *ConvertFailure
 }
 
-// LayoutWriter acts as a middleman between the pipeline assembler and the output writer.
+// LayoutWriter acts as a middleman between the pipeline assembler and the
+// output writer. It renders everything of a section that is not one of its
+// items: its header, its title and its footer.
 type LayoutWriter struct {
 	w                io.Writer
 	engine           *core.TemplateEngine
@@ -63,12 +68,16 @@ func (lw *LayoutWriter) Tokens() int64 {
 	return lw.tokens
 }
 
-// WriteItem handles a single rendered item from the pipeline.
+// WriteItem handles a single rendered item from the pipeline. A Section
+// item writes only the start of its section.
 func (lw *LayoutWriter) WriteItem(res Result) error {
 	if res.SectionIndex != lw.currentSecIdx {
 		if err := lw.handleSectionChange(res.SectionIndex); err != nil {
 			return err
 		}
+	}
+	if res.Section {
+		return nil
 	}
 
 	if lw.hasWritten && lw.enableSeparators {
@@ -91,11 +100,12 @@ func (lw *LayoutWriter) WriteItem(res Result) error {
 	return nil
 }
 
+// handleSectionChange closes the current section and opens section newIdx:
+// its header, then the title of an explicit section, which counts as written
+// for the separator before the next item.
 func (lw *LayoutWriter) handleSectionChange(newIdx int) error {
-	if lw.currentSecIdx >= 0 {
-		if err := lw.renderTemplate(lw.engine.SectionFooter, lw.currentSecIdx); err != nil {
-			return err
-		}
+	if err := lw.closeSection(); err != nil {
+		return err
 	}
 
 	if lw.hasWritten && lw.enableSeparators {
@@ -104,38 +114,50 @@ func (lw *LayoutWriter) handleSectionChange(newIdx int) error {
 		}
 	}
 
-	if err := lw.renderTemplate(lw.engine.SectionHeader, newIdx); err != nil {
-		return err
-	}
-
 	lw.currentSecIdx = newIdx
 	lw.hasWritten = false
 	lw.lastIsCompact = false
+	sec := lw.section(newIdx)
+	if sec == nil {
+		return nil
+	}
+	if err := lw.renderTemplate(lw.engine.SectionHeader, sec); err != nil {
+		return err
+	}
+	if !sec.IsImplicit {
+		if err := lw.renderTemplate(lw.engine.Section, sec); err != nil {
+			return err
+		}
+		lw.hasWritten = true
+	}
 	return nil
 }
 
 // Close ensures the final section is properly closed with a footer.
 func (lw *LayoutWriter) Close() error {
-	if lw.currentSecIdx >= 0 {
-		return lw.renderTemplate(lw.engine.SectionFooter, lw.currentSecIdx)
+	return lw.closeSection()
+}
+
+// closeSection writes the footer of the current section, if there is one.
+func (lw *LayoutWriter) closeSection() error {
+	if sec := lw.section(lw.currentSecIdx); sec != nil {
+		return lw.renderTemplate(lw.engine.SectionFooter, sec)
 	}
 	return nil
 }
 
-func (lw *LayoutWriter) renderTemplate(tmpl *template.Template, secIdx int) error {
-	var ctx core.SectionContext
-	found := false
+// section returns the section of index idx, or nil.
+func (lw *LayoutWriter) section(idx int) *core.SectionContext {
 	for _, s := range lw.sections {
-		if s.Index == secIdx {
-			ctx = *s
-			found = true
-			break
+		if s.Index == idx {
+			return s
 		}
 	}
-	if !found {
-		return nil
-	}
-	tokens, err := ExecuteCounted(lw.w, tmpl, ctx, lw.tokenizer)
+	return nil
+}
+
+func (lw *LayoutWriter) renderTemplate(tmpl *template.Template, sec *core.SectionContext) error {
+	tokens, err := ExecuteCounted(lw.w, tmpl, sec, lw.tokenizer)
 	lw.tokens += tokens
 	return err
 }

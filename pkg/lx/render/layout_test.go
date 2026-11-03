@@ -17,7 +17,7 @@ func TestLayoutWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sections := []*core.SectionContext{{Index: 0}, {Index: 1}}
+	sections := []*core.SectionContext{{Index: 0, IsImplicit: true}, {Index: 1, Body: "Two"}, {Index: 2, Body: "Three"}}
 
 	t.Run("Standard Spacing", func(t *testing.T) {
 		var buf bytes.Buffer
@@ -52,11 +52,27 @@ func TestLayoutWriter(t *testing.T) {
 		var buf bytes.Buffer
 		lw := NewLayoutWriter(&buf, engine, sections, true)
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("A"), SectionIndex: 0})
+		_ = lw.WriteItem(Result{Section: true, SectionIndex: 1})
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("B"), SectionIndex: 1})
 		_ = lw.Close()
 
 		got := buf.String()
-		want := "HEAD 0\nAFOOT 0\n\n\nHEAD 1\nBFOOT 1\n"
+		want := "HEAD 0\nAFOOT 0\n\n\nHEAD 1\n## Two\n---\n\nBFOOT 1\n"
+		if got != want {
+			t.Errorf("Got:\n%q\nWant:\n%q", got, want)
+		}
+	})
+
+	// A section with no items still opens and closes, title and all.
+	t.Run("Empty Section", func(t *testing.T) {
+		var buf bytes.Buffer
+		lw := NewLayoutWriter(&buf, engine, sections, true)
+		_ = lw.WriteItem(Result{Section: true, SectionIndex: 1})
+		_ = lw.WriteItem(Result{Section: true, SectionIndex: 2})
+		_ = lw.Close()
+
+		got := buf.String()
+		want := "HEAD 1\n## Two\n---FOOT 1\n\n\nHEAD 2\n## Three\n---FOOT 2\n"
 		if got != want {
 			t.Errorf("Got:\n%q\nWant:\n%q", got, want)
 		}
