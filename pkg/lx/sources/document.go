@@ -21,11 +21,7 @@ import (
 var documentSuffixes = []string{".pdf", ".docx", ".xlsx", ".pptx", ".html", ".htm", ".xhtml"}
 
 // isHTMLPath reports whether the path is an HTML document.
-func isHTMLPath(path string) bool {
-	lower := strings.ToLower(path)
-	return strings.HasSuffix(lower, ".html") || strings.HasSuffix(lower, ".htm") ||
-		strings.HasSuffix(lower, ".xhtml")
-}
+func isHTMLPath(path string) bool { return hasSuffixFold(path, ".html", ".htm", ".xhtml") }
 
 // IsHTMLInput reports whether an input should be treated as HTML, by suffix
 // or, for URLs that often have none, by reported media type.
@@ -61,15 +57,7 @@ func ConvertInput(ctx context.Context, f InputFile, r io.ReaderAt, size int64) (
 }
 
 // IsDocumentPath reports whether the path has a document file extension.
-func IsDocumentPath(path string) bool {
-	lower := strings.ToLower(path)
-	for _, suffix := range documentSuffixes {
-		if strings.HasSuffix(lower, suffix) {
-			return true
-		}
-	}
-	return false
-}
+func IsDocumentPath(path string) bool { return hasSuffixFold(path, documentSuffixes...) }
 
 // documentSuffixForMediaType maps a Content-Type to the suffix ExtractDocumentText dispatches on.
 func documentSuffixForMediaType(value string) string {
