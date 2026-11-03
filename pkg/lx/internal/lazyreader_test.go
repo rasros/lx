@@ -140,21 +140,29 @@ func TestLazyReaderDeclaredSize(t *testing.T) {
 }
 
 func TestLazyReaderStreamShorterThanDeclared(t *testing.T) {
-	// A declared length is a claim. A stream that ends sooner, cleanly or as an
-	// HTTP body does with ErrUnexpectedEOF, shrinks to what arrived.
-	for _, end := range []error{io.EOF, io.ErrUnexpectedEOF} {
-		r := NewLazyReader(&failingReader{data: []byte("short"), err: end}, 100)
-		buf := make([]byte, 10)
-		n, err := r.ReadAt(buf, 0)
-		if n != 5 || err != io.EOF {
-			t.Fatalf("%v: ReadAt = %d, %v; want 5, EOF", end, n, err)
-		}
-		if n, err := r.ReadAt(buf[:5], 0); n != 5 || err != nil || string(buf[:5]) != "short" {
-			t.Fatalf("%v: ReadAt of what arrived = %d %q, %v", end, n, buf[:5], err)
-		}
-		if got := r.Size(); got != 5 {
-			t.Errorf("%v: Size = %d after the stream ended, want 5", end, got)
-		}
+	// A declared length is a claim. A stream that ends sooner cleanly shrinks
+	// to what arrived.
+	r := NewLazyReader(&failingReader{data: []byte("short"), err: io.EOF}, 100)
+	buf := make([]byte, 10)
+	n, err := r.ReadAt(buf, 0)
+	if n != 5 || err != io.EOF {
+		t.Fatalf("ReadAt = %d, %v; want 5, EOF", n, err)
+	}
+	if n, err := r.ReadAt(buf[:5], 0); n != 5 || err != nil || string(buf[:5]) != "short" {
+		t.Fatalf("ReadAt of what arrived = %d %q, %v", n, buf[:5], err)
+	}
+	if got := r.Size(); got != 5 {
+		t.Errorf("Size = %d after the stream ended, want 5", got)
+	}
+}
+
+func TestLazyReaderStreamCutOff(t *testing.T) {
+	// An HTTP body shorter than its Content-Length ends with ErrUnexpectedEOF:
+	// a read past what arrived fails, rather than passing for the end.
+	r := NewLazyReader(&failingReader{data: []byte("short"), err: io.ErrUnexpectedEOF}, 100)
+	buf := make([]byte, 10)
+	if n, err := r.ReadAt(buf, 0); n != 5 || !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("ReadAt = %d, %v; want 5, ErrUnexpectedEOF", n, err)
 	}
 }
 
