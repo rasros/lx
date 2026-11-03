@@ -46,13 +46,6 @@ func TestGoldenWorktreeInfoExclude(t *testing.T) {
 	}, filepath.Dir(dir))
 }
 
-func TestGoldenStrayGitDir(t *testing.T) {
-	dir := gf.SetupStrayGitDirFixture(t)
-	runTestGolden(t, dir, []goldenTestCase{
-		{name: "109b_stray_git_dirs_keep_repo_rules", args: []string{"."}},
-	})
-}
-
 // As in git and ripgrep, a walk prunes an ignored directory, so a negation
 // naming a file below it re-includes nothing. Naming the file or the
 // directory, relative to the root, by an absolute path or by a ../ path from

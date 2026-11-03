@@ -78,10 +78,7 @@ func compileOverrides(globs []Override) *overrides {
 	}
 	o := &overrides{}
 	for _, g := range globs {
-		r, ok := g.rule()
-		if !ok {
-			continue
-		}
+		r := g.rule()
 		o.rules = append(o.rules, r)
 		if g.Kind == Include {
 			o.whitelist = true
@@ -93,108 +90,20 @@ func compileOverrides(globs []Override) *overrides {
 	return o
 }
 
-// rule compiles o as ripgrep compiles a -g glob, a gitignore line: as
-// written, without cleaning "./", "//" or "..", and with trailing spaces
-// trimmed. The line of an Include is its glob, so an empty one or a "#"
-// comment adds nothing; that of an Exclude is "!" and its glob, and an empty
-// glob there matches every path.
-func (o Override) rule() (Rule, bool) {
-	p := trimTrailingSpaces(o.Glob)
-	if o.Kind == Include && (p == "" || strings.HasPrefix(p, "#")) {
-		return Rule{}, false
-	}
-	if p == "" {
-		p = "**"
-	}
-	if strings.HasPrefix(p, `\!`) || strings.HasPrefix(p, `\#`) {
-		// An escaped leading "!" or "#" is part of the glob, before a
-		// backslash can be read as a separator.
-		p = p[1:]
-	}
+// rule compiles o's glob as a gitignore pattern, as written.
+func (o Override) rule() Rule {
+	p := o.Glob
 	if filepath.Separator == '\\' {
 		// As in ripgrep, a backslash is a separator on Windows.
 		p = strings.ReplaceAll(p, `\`, "/")
 	}
-	p, valid := translateClasses(p)
-	r := newRule(p, o.Kind != Exclude, "", "globs")
-	r.invalid = !valid
-	return r, true
+	return newRule(p, o.Kind != Exclude, "", "globs")
 }
 
-// translateClasses rewrites the character classes of p from ripgrep's
-// syntax to the matcher's: a "]" opening a class, as in "[]a]" or "[!]a]", is
-// part of it, and a backslash inside one is a literal character, both of
-// which the matcher would read otherwise. It reports false for a class
-// ripgrep rejects: an inverted range such as "[z-a]".
-func translateClasses(p string) (string, bool) {
-	if !strings.Contains(p, "[") {
-		return p, true
-	}
-	var b strings.Builder
-	valid := true
-	for i := 0; i < len(p); i++ {
-		c := p[i]
-		if c == '\\' {
-			b.WriteByte(c)
-			if i+1 < len(p) {
-				i++
-				b.WriteByte(p[i])
-			}
-			continue
-		}
-		if c != '[' {
-			b.WriteByte(c)
-			continue
-		}
-		// Find the class's closing "]", after an optional negation and a
-		// "]" that is part of the class.
-		start := i + 1
-		if start < len(p) && (p[start] == '!' || p[start] == '^') {
-			start++
-		}
-		end := start
-		if end < len(p) && p[end] == ']' {
-			end++
-		}
-		for end < len(p) && p[end] != ']' {
-			end++
-		}
-		if end >= len(p) {
-			// An unclosed class; the matcher rejects it.
-			b.WriteString(p[i:])
-			break
-		}
-		b.WriteString(p[i:start])
-		chars := p[start:end]
-		for k := 0; k < len(chars); k++ {
-			if k+2 < len(chars) && chars[k+1] == '-' && chars[k+2] < chars[k] {
-				valid = false
-			}
-			switch chars[k] {
-			case '\\', ']':
-				b.WriteByte('\\')
-			}
-			b.WriteByte(chars[k])
-			if k+2 < len(chars) && chars[k+1] == '-' {
-				b.WriteByte('-')
-				k += 2
-				if chars[k] == '\\' || chars[k] == ']' {
-					b.WriteByte('\\')
-				}
-				b.WriteByte(chars[k])
-			}
-		}
-		b.WriteByte(']')
-		i = end
-	}
-	return b.String(), valid
-}
-
-// Validate reports an error when o's glob cannot be parsed, as ripgrep does
-// for its -g globs, such as an unclosed "[" or "{", an unopened "}" or a
-// dangling "\".
+// Validate reports an error when o's glob cannot be parsed, such as an
+// unclosed "[" or "{", an unopened "}" or a dangling "\".
 func (o Override) Validate() error {
-	if r, ok := o.rule(); ok && (r.invalid || !doublestar.ValidatePattern(r.Spec.Pattern.Pattern)) {
+	if !doublestar.ValidatePattern(o.rule().Spec.Pattern.Pattern) {
 		return fmt.Errorf("invalid glob %q", o.Glob)
 	}
 	return nil
@@ -228,14 +137,12 @@ func (o *overrides) reachBelow(dir string) bool {
 	return false
 }
 
-// accepts reports whether the path p, named as a gives it, would be found by
-// a walk: neither p nor a directory above it that the walk judges is
-// ignored. A walk judges the directories below its root, so the directories
-// of an absolute path, and the leading ".." of a relative one, are not
-// judged, as those of a root named that way are not. A directory above the
-// working directory is kept, since paths below it are matched relative to
-// the working directory.
-func (o *overrides) accepts(a Anchor, p string, isDir bool) bool {
+// accepts reports whether the path p would be found by a walk: neither p nor
+// a directory above it that the walk judges is ignored. A walk judges the
+// directories below its root, so the directories of an absolute path, and
+// the leading ".." of a relative one, are not judged, as those of a root
+// named that way are not.
+func (o *overrides) accepts(p string, isDir bool) bool {
 	if p == "." {
 		return true
 	}
@@ -254,5 +161,5 @@ func (o *overrides) accepts(a Anchor, p string, isDir bool) bool {
 		}
 	}
 	m, _ := o.match(p, isDir, false)
-	return m != matchIgnore && (!isDir || o.reachBelow(p) || a.leadsToWD(p))
+	return m != matchIgnore && (!isDir || o.reachBelow(p))
 }

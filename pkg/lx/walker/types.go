@@ -16,8 +16,6 @@ type Rule struct {
 	Spec           CompiledSpec
 
 	scope ruleScope
-	// invalid marks a glob the matcher accepts but ripgrep rejects.
-	invalid bool
 }
 
 // Options configures a Walker.
@@ -87,6 +85,13 @@ func New(opts Options) *Walker {
 	}
 }
 
+// ShowHidden returns a copy of w that does not skip hidden paths.
+func (w *Walker) ShowHidden() *Walker {
+	c := *w
+	c.opts.SkipHidden = false
+	return &c
+}
+
 // Accepts reports whether the overrides keep path as a walk from the
 // working directory would. Ignore files are not consulted.
 func (w *Walker) Accepts(path string, isDir bool) bool {
@@ -94,5 +99,5 @@ func (w *Walker) Accepts(path string, isDir bool) bool {
 		return true
 	}
 	a := w.cache.Anchor(path)
-	return w.overrides.accepts(a, a.Path("."), isDir)
+	return w.overrides.accepts(a.Path("."), isDir)
 }

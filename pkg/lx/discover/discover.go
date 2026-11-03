@@ -171,7 +171,7 @@ func readIgnorePatterns(log *slog.Logger, p string) []string {
 // itself; an archive's entries are, as the paths below the URL.
 func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options) ([]sources.InputFile, []core.Failure, error) {
 	if opts.ExpandArchives && sources.IsHTTPArchiveURL(rawURL) {
-		return c.downloadArchive(ctx, rawURL, archiveSource{display: rawURL, ovPrefix: strings.TrimSuffix(rawURL, "/") + "/", named: true}, opts)
+		return c.downloadArchive(ctx, rawURL, archiveSource{display: rawURL, ovPrefix: strings.TrimSuffix(rawURL, "/") + "/"}, opts)
 	}
 
 	urlFile, err := sources.NewURLInputFile(rawURL)
@@ -190,7 +190,7 @@ func urlFailure(err *URLError) []core.Failure {
 // archiveURL as from a checkout: shown below repo, matched by the globs from
 // the repository root, with its ignore files and git excludes applied.
 func (c *Collector) collectRepo(ctx context.Context, repo, archiveURL string, opts Options) ([]sources.InputFile, []core.Failure, error) {
-	return c.downloadArchive(ctx, archiveURL, archiveSource{display: strings.TrimSuffix(repo, "/"), repo: true, named: true}, opts)
+	return c.downloadArchive(ctx, archiveURL, archiveSource{display: strings.TrimSuffix(repo, "/"), repo: true}, opts)
 }
 
 // downloadArchive expands the archive at rawURL as src describes it.
@@ -319,7 +319,7 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 			if r.isDir {
 				rel = path
 			}
-			entries, entryFailures, err := c.expandArchive(ctx, r.abs(path), archiveSource{origin: r.abs(path), display: display, ovPrefix: anchor.Path(rel) + "/", named: !r.isDir}, opts, "Ignored in archive")
+			entries, entryFailures, err := c.expandArchive(ctx, r.abs(path), archiveSource{origin: r.abs(path), display: display, ovPrefix: anchor.Path(rel) + "/"}, opts, "Ignored in archive")
 			files = append(files, entries...)
 			failures = append(failures, entryFailures...)
 			return err
@@ -365,11 +365,11 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 }
 
 // archiveSource is an archive to expand. ovPrefix is what the globs match
-// before each entry's path, named marks an archive named rather than walked,
-// and repo a repository host's archive, expanded as a checkout.
+// before each entry's path, and repo marks a repository host's archive,
+// expanded as a checkout.
 type archiveSource struct {
 	origin, display, ovPrefix string
-	named, repo               bool
+	repo                      bool
 }
 
 // expandArchive returns the entries of the archive at absPath that opts
@@ -400,7 +400,6 @@ func (c *Collector) expandArchive(ctx context.Context, absPath string, src archi
 		Origin:  src.origin,
 		Walker:  walker.New(wopts),
 		MaxSize: opts.MaxSize,
-		Named:   src.named,
 		Log:     c.log,
 	}
 	expand := sources.ExpandArchive

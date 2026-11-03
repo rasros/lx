@@ -89,15 +89,11 @@ type Anchor struct {
 	// prefix is the root's own path and a slash, or empty at the working
 	// directory.
 	prefix string
-	// strip holds the names of the working directory, each with a slash,
-	// that are stripped from the paths below an absolute root above it.
-	strip []string
 }
 
 // Anchor returns the anchor of root. As in ripgrep, root keeps its path as
 // written but for a leading "./" and trailing slashes, so the paths below
-// "src/../x" start with "src/../x/". Both the symlinked and the real name of
-// the working directory are stripped.
+// "src/../x" start with "src/../x/".
 func (c *Cache) Anchor(root string) Anchor {
 	c.hostTree()
 	p := filepath.ToSlash(root)
@@ -112,55 +108,27 @@ func (c *Cache) Anchor(root string) Anchor {
 		return Anchor{prefix: p + "/"}
 	}
 	p += "/"
-	a := Anchor{prefix: p}
-	for _, wd := range []string{c.wd, c.ht.cwd} {
-		if wd == "" {
-			continue
-		}
-		wd = strings.TrimSuffix(filepath.ToSlash(wd), "/") + "/"
-		switch {
-		case strings.HasPrefix(p, wd):
-			return Anchor{prefix: p[len(wd):]}
-		case strings.HasPrefix(wd, p):
-			a.strip = append(a.strip, wd)
+	if c.wd != "" {
+		if rel, ok := strings.CutPrefix(p, strings.TrimSuffix(filepath.ToSlash(c.wd), "/")+"/"); ok {
+			return Anchor{prefix: rel}
 		}
 	}
-	return a
+	return Anchor{prefix: p}
 }
 
 // Path returns the path to match for rel, a slash-separated path below the
 // root, or "." for the root itself.
 func (a Anchor) Path(rel string) string {
-	if rel == "." {
-		switch a.prefix {
-		case "":
-			return "."
-		case "/":
-			return "/"
-		}
-		return strings.TrimSuffix(a.prefix, "/")
+	if rel != "." {
+		return a.prefix + rel
 	}
-	p := a.prefix + rel
-	for _, wd := range a.strip {
-		if strings.HasPrefix(p, wd) {
-			return p[len(wd):]
-		}
-		if len(p)+1 == len(wd) && strings.HasPrefix(wd, p) {
-			return "."
-		}
+	switch a.prefix {
+	case "":
+		return "."
+	case "/":
+		return "/"
 	}
-	return p
-}
-
-// leadsToWD reports whether p, an absolute path, is a directory above the
-// working directory.
-func (a Anchor) leadsToWD(p string) bool {
-	for _, wd := range a.strip {
-		if strings.HasPrefix(wd, p+"/") {
-			return true
-		}
-	}
-	return false
+	return strings.TrimSuffix(a.prefix, "/")
 }
 
 // isOutside reports whether rel, a path from filepath.Rel, leaves the
@@ -174,7 +142,9 @@ func isOutside(rel string) bool {
 type tree interface {
 	parent(dir string) (string, bool)
 	child(dir, name string) string
-	gitDir(dir string) (g gitFS, gitDir string, ok bool)
+	// gitDir reports whether dir is a repository root, and its git
+	// directory, or "" when it has none to read.
+	gitDir(dir string) (gitDir string, ok bool)
 	readFile(dir, name string) (data []byte, source string, err error)
 	// display names a path in an ignore reason.
 	display(p string) string
@@ -207,11 +177,7 @@ func (t hostTree) parent(dir string) (string, bool) {
 
 func (hostTree) child(dir, name string) string { return filepath.Join(dir, name) }
 
-func (t hostTree) gitDir(dir string) (gitFS, string, bool) {
-	g := hostGitFS{t.h, t.log}
-	gitDir, ok := findGitDir(g, dir)
-	return g, gitDir, ok
-}
+func (t hostTree) gitDir(dir string) (string, bool) { return findGitDir(t.h, dir) }
 
 func (t hostTree) readFile(dir, name string) ([]byte, string, error) {
 	p := filepath.Join(dir, name)
@@ -233,8 +199,8 @@ func (t hostTree) display(p string) string {
 	return rel
 }
 
-// fsTree is a walked fs.FS that stands alone: its root is the top, and a
-// .git pointing outside it cannot be followed.
+// fsTree is a walked fs.FS that stands alone: its root is the top, and
+// repositories inside it are not looked for.
 type fsTree struct {
 	fsys fs.FS
 	log  *slog.Logger
@@ -255,14 +221,7 @@ func (fsTree) parent(dir string) (string, bool) {
 func (fsTree) child(dir, name string) string { return joinRel(dir, name) }
 func (fsTree) display(p string) string       { return p }
 
-func (t fsTree) gitDir(dir string) (gitFS, string, bool) {
-	g := subGitFS{t.fsys, t.log}
-	if t.repoRoot && dir == "." {
-		return g, "", true
-	}
-	gitDir, ok := findGitDir(g, dir)
-	return g, gitDir, ok
-}
+func (t fsTree) gitDir(dir string) (string, bool) { return "", t.repoRoot && dir == "." }
 
 func (t fsTree) readFile(dir, name string) ([]byte, string, error) {
 	p := joinRel(dir, name)
@@ -302,7 +261,6 @@ type node struct {
 	parent *node
 	repo   bool // a repository root: its rules start over
 	inRepo bool // in a repository, where git's own ignore rules apply
-	g      gitFS
 	gitDir string
 	// rel is the directory's path from the root of the tree.
 	rel string
@@ -317,7 +275,7 @@ func (rt *ruleTree) node(dir string) *node {
 	}
 	n := &node{dir: dir, rel: "."}
 	if rt.ignoreFiles {
-		n.g, n.gitDir, n.repo = rt.t.gitDir(dir)
+		n.gitDir, n.repo = rt.t.gitDir(dir)
 	}
 	if parentDir, ok := rt.t.parent(dir); ok {
 		p := rt.node(parentDir)
@@ -342,7 +300,7 @@ func (rt *ruleTree) ownRules(n *node) []Rule {
 		names = append([]string{".gitignore"}, names...)
 	}
 	if n.repo {
-		n.own = withScope(infoExclude(n.g, n.gitDir, n.rel), scopeGit)
+		n.own = withScope(rt.infoExclude(n.gitDir, n.rel), scopeGit)
 	}
 	for _, name := range names {
 		data, source, err := rt.t.readFile(n.dir, name)
@@ -355,6 +313,25 @@ func (rt *ruleTree) ownRules(n *node) []Rule {
 		}
 	}
 	return n.own
+}
+
+// infoExclude reads the info/exclude rules shared by the worktrees of
+// gitDir, in the directory its commondir file names, scoped to basePath.
+func (rt *ruleTree) infoExclude(gitDir, basePath string) []Rule {
+	if gitDir == "" {
+		return nil
+	}
+	common := gitDir
+	if data, _, err := rt.t.readFile(gitDir, "commondir"); err == nil {
+		if c := strings.TrimSpace(string(data)); c != "" {
+			common = resolveRelative(gitDir, c)
+		}
+	}
+	data, _, err := rt.t.readFile(common, filepath.Join("info", "exclude"))
+	if err != nil {
+		return nil
+	}
+	return parseRuleFile(data, basePath, filepath.Join(common, "info", "exclude"))
 }
 
 // frameSet holds the frames built for one set of base rules and git global
