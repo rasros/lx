@@ -1,0 +1,9 @@
+--- STDOUT ---
+walk/a.txt (1 rows)
+---
+```text
+a file
+```
+
+
+--- STDERR ---

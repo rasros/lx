@@ -17,6 +17,15 @@ func TestGoldenStreams(t *testing.T) {
 	fifo(t, dir, "in.fifo", "from a fifo\nsecond line\n")
 	fifo(t, dir, "over.fifo", "0123456789abcdefghij\n")
 	fifo(t, dir, "at.fifo", "012345678\n")
+	if err := os.Mkdir(filepath.Join(dir, "walk"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "walk", "a.txt"), []byte("a file\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mkfifo(filepath.Join(dir, "walk", "nowriter.fifo"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	// The pipe is written and closed before the run, as seq would have; its
 	// read end stays open in this process, which is what /dev/fd names.
@@ -40,6 +49,8 @@ func TestGoldenStreams(t *testing.T) {
 		{name: "977_stream_over_max_size_fails", args: []string{"-m", "10", "over.fifo"}},
 		{name: "978_stream_at_max_size_renders", args: []string{"-m", "10", "at.fifo"}},
 		{name: "979_stream_endless_device_fails", args: []string{"/dev/zero"}},
+		// A walk skips the FIFO, which has no writer and would hold it up.
+		{name: "982_walk_skips_fifo", args: []string{"walk"}},
 	})
 }
 
