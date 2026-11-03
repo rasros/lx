@@ -156,8 +156,10 @@ func (f FileContext) TokenEstimate() int64 {
 	return tc(f.Size, f.Content)
 }
 
-// SetTokenCounter sets the estimator behind TokenEstimate.
-func (f *FileContext) SetTokenCounter(tc TokenCounter) {
+// SetTokenCounter sets the estimator behind f's TokenEstimate. It is a
+// function rather than a method so templates, which see FileContext's
+// methods, do not.
+func SetTokenCounter(f *FileContext, tc TokenCounter) {
 	f.tokenCounter = tc
 }
 
@@ -206,7 +208,9 @@ type FooterContext struct {
 // TokenCounter estimates token count from content.
 type TokenCounter func(size int64, content interface{}) int64
 
-// Tokenizer estimates token count from content.
+// Tokenizer estimates the tokens of content of size bytes. content is nil
+// when only the size is known, as when a Stream plans, and otherwise the
+// rendered text, as a string, a []byte or a fmt.Stringer.
 type Tokenizer interface {
 	Estimate(size int64, content interface{}) int64
 }
