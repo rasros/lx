@@ -122,7 +122,8 @@ func (s *Stream) WithLogger(log *slog.Logger) *Stream {
 
 // Admit reports whether the stream keeps f when added with opts: a file over
 // opts.MaxSize is dropped. Inputs with an unknown size (negative, as for
-// remote URLs) are always kept. AddFile and AddTree both decide by it.
+// remote URLs and streams such as FIFOs) are always kept; a stream is read
+// only up to opts.MaxSize instead. AddFile and AddTree both decide by it.
 func (s *Stream) Admit(f sources.InputFile, opts core.RenderOptions) bool {
 	return opts.MaxSize <= 0 || f.Size <= opts.MaxSize
 }

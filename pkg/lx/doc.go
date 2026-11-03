@@ -32,8 +32,9 @@
 //   - [RenderOptions.Head] / [RenderOptions.Tail] choose how many lines to
 //     include from start/end; a negative Head renders the whole file, and
 //     zero for both only its header.
-//   - [RenderOptions.MaxSize] skips files larger than the given byte count;
-//     zero disables it.
+//   - [RenderOptions.MaxSize] skips files larger than the given byte count,
+//     and bounds how much of a stream (a FIFO or device) is read; zero skips
+//     nothing.
 //   - [RenderOptions.LineNumbers] enables numbered output.
 //   - [RenderOptions.SkeletonFunctions] / [RenderOptions.SkeletonTypes]
 //     reduce source files to signatures/defs.

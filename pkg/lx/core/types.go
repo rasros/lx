@@ -42,7 +42,9 @@ type RenderOptions struct {
 	Head        int
 	Tail        int
 	LineNumbers bool
-	// MaxSize skips files larger than this many bytes; zero disables it.
+	// MaxSize skips files larger than this many bytes, and is how much of a
+	// stream such as a FIFO is read. Zero skips nothing and leaves streams at
+	// a 64 MB default.
 	MaxSize int64
 	// SkeletonFunctions and SkeletonTypes reduce source files to signatures
 	// and definitions.

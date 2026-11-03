@@ -1,6 +1,6 @@
 --- STDOUT ---
-over.fifo - error: stopped reading after 10 bytes, the size limit (-m)
+over.fifo - error: stopped reading after 10 B, the size limit (-m)
 
 
 --- STDERR ---
-Error: Failed to read file: stopped reading after 10 bytes, the size limit (-m) (path=over.fifo)
+Error: Failed to read file: stopped reading after 10 B, the size limit (-m) (path=over.fifo)
