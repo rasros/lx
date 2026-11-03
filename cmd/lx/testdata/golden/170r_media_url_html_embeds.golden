@@ -52,7 +52,7 @@ article > header {
 </header>
 <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAACXBIWXMAAAABAAAAAQBPJcTWAAAA6ElEQVR4nO3U8Q3BQBTH8d8GbMAGbMAGbMAGbMAGbMAGbMAGbMAGbPCVyrV9F7R1uTQkvdw/d+/6Pu9yL5XMwEy7wEwbsBG7skOlAN42HpYeCATy6gqB1/uUA36eSkD2YTngDgUBrrgCIL9mKIBPyBeIAthr2OREBDKjLsAtogKu6DqA/EFiA175DdAADfDfQGZEB2r52SVbfTEVa3EUd13QDi3QCHWScFsMxVxsxTlJfEIbNEMD1KIrxmIp9uKahG/ogFZognoN8AOA16xZG4R2ketAM94Dz6P6CvBavCKQllYCuCI+AA/ePbyKxQRlewAAAABJRU5ErkJggg==" alt="/ROOT/sample.png" />
 </article>
-</section></main>
+</main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
 </body>

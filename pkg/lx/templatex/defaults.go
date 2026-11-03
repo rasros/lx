@@ -148,10 +148,9 @@ const defaultXMLCompact = `  <document index="{{ .FileIndex }}">
     <source>{{ .Path }}</source>
     <description>Compact view</description>
   </document>`
-const defaultXMLSectionHeader = `{{ if .IsImplicit }}<content>
-{{ end }}`
-const defaultXMLSection = `{{- if not .IsImplicit }}<section>
-  <section_name>{{ .Body }}</section_name>{{ end }}`
+const defaultXMLSectionHeader = `{{ if .IsImplicit }}<content>{{ else }}<section>{{ end }}
+`
+const defaultXMLSection = `  <section_name>{{ .Body }}</section_name>`
 const defaultXMLSectionFooter = `
 {{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}`
 const defaultXMLPrompt = `  <instruction>` + "\n" +
@@ -262,9 +261,9 @@ const defaultHTMLCompact = `<article id="file-{{ .FileIndex }}">
 </article>
 `
 
-const defaultHTMLSectionHeader = ``
-const defaultHTMLSection = `<section id="section-{{ .Index }}"><h2><a href="#section-{{ .Index }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>`
-const defaultHTMLSectionFooter = `</section>`
+const defaultHTMLSectionHeader = `{{ if not .IsImplicit }}<section id="section-{{ .Index }}">{{ end }}`
+const defaultHTMLSection = `<h2><a href="#section-{{ .Index }}" style="text-decoration:none; color:inherit;">{{ .Body | endNewline }}</a></h2>`
+const defaultHTMLSectionFooter = `{{ if not .IsImplicit }}</section>{{ end }}`
 const defaultHTMLPrompt = `<blockquote>{{ .Body | endNewline }}</blockquote>`
 const defaultHTMLTree = `<pre class="file-tree">{{ .Body | escape | endNewline }}</pre>`
 const defaultHTMLMeta = `<pre class="system-context">{{ .Body | escape | endNewline }}</pre>`

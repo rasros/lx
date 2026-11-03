@@ -51,10 +51,9 @@ file_image_template: |-
 # Item Templates
 # -----------------------------------------------------------------------------
 
-# Separator between files/groups (XML wraps groups in <section>)
-section_template: |-
-  {{- if not .IsImplicit }}<section>
-    <section_name>{{ .Body }}</section_name>{{ end }}
+# The title of a section (-s), inside the <section> its header opens
+section_template: |2-
+    <section_name>{{ .Body }}</section_name>
 
 # Custom prompts (-p / -P)
 prompt_template: |2-
@@ -71,7 +70,7 @@ tree_template: |2-
 # -----------------------------------------------------------------------------
 
 # XML wraps everything either in <content> (no -s) or <section> (with -s).
-section_header_template: "{{ if .IsImplicit }}<content>\n{{ end }}"
+section_header_template: "{{ if .IsImplicit }}<content>{{ else }}<section>{{ end }}\n"
 section_footer_template: "\n{{ if .IsImplicit }}</content>{{ else }}</section>{{ end }}"
 
 output_header_template: ""
