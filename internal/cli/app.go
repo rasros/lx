@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/rasros/lx/internal/ansi"
@@ -154,6 +155,10 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 	if err != nil {
 		return err
 	}
+	stats, err := compileStats(cliOpts.StatsTemplate, env.Cwd)
+	if err != nil {
+		return err
+	}
 
 	stream.WithLogger(log).WithDir(env.Cwd).WithOnFailure(func(f lx.Failure) {
 		logFailure(log, f)
@@ -244,7 +249,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 	}
 
 	log.Info("Executing stream pipeline...")
-	err = stream.Execute(ctx, w)
+	report, err := stream.Execute(ctx, w)
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
@@ -268,13 +273,12 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 		log.Info("Clipboard copy successful")
 	}
 
-	global := stream.GetGlobalContext()
-	if global.TotalFiles == 0 && global.SkippedBySize > 0 {
+	if report.TotalFiles == 0 && report.SkippedBySize > 0 {
 		log.Warn("Every input was skipped by the size limit (-m)",
-			"skipped", global.SkippedBySize)
+			"skipped", report.SkippedBySize)
 	}
 
-	handleStatsDisplay(log, env, parsed, cliOpts, stream, out.debug)
+	handleStatsDisplay(log, env, parsed, cliOpts, stats, report, out.debug)
 	return nil
 }
 
@@ -286,7 +290,7 @@ func newLogger(env Env, level slog.Level) *slog.Logger {
 	return slog.New(slog.NewTextHandler(env.Stderr, &slog.HandlerOptions{Level: level}))
 }
 
-func handleStatsDisplay(log *slog.Logger, env Env, parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer) {
+func handleStatsDisplay(log *slog.Logger, env Env, parsed *ParsedArgs, cliOpts *CliConfig, stats *template.Template, report lx.Report, debugOut io.Writer) {
 	showStatsFlag := cliOpts.ShowStats
 	if _, ok := parsed.Globals["stats"]; ok {
 		showStatsFlag = "always"
@@ -310,9 +314,8 @@ func handleStatsDisplay(log *slog.Logger, env Env, parsed *ParsedArgs, cliOpts *
 	}
 
 	if show {
-		global := stream.GetGlobalContext()
-		err := stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
-			Global:       global,
+		err := stats.Execute(debugOut, StatsContext{
+			Global:       report,
 			ColorEnabled: ansi.Enabled(debugOut, env.LookupEnv),
 		})
 		if err != nil {

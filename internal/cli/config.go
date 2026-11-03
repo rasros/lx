@@ -17,7 +17,9 @@ type CliConfig struct {
 
 	OutputMode string `yaml:"output_mode"`
 	ShowStats  string `yaml:"show_stats"`
-	Verbosity  string `yaml:"verbosity"`
+	// StatsTemplate renders the summary of a run, a StatsContext.
+	StatsTemplate string `yaml:"stats_template"`
+	Verbosity     string `yaml:"verbosity"`
 
 	PromptsDir       string   `yaml:"prompts_dir"`
 	PromptExtensions []string `yaml:"prompt_extensions"`
@@ -65,6 +67,7 @@ func LoadConfigChain(env Env, log *slog.Logger, cliPath string) (*lx.Config, *Cl
 
 		overrideIfSet(&mergedCli.OutputMode, loaded.OutputMode)
 		overrideIfSet(&mergedCli.ShowStats, loaded.ShowStats)
+		overrideIfSet(&mergedCli.StatsTemplate, loaded.StatsTemplate)
 		overrideIfSet(&mergedCli.Verbosity, loaded.Verbosity)
 		overrideIfSet(&mergedCli.PromptsDir, loaded.PromptsDir)
 		if len(loaded.PromptExtensions) > 0 {

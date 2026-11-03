@@ -5,21 +5,26 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"text/template"
 
 	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/discover"
 	"github.com/rasros/lx/pkg/lx/sources"
 	streamingpkg "github.com/rasros/lx/pkg/lx/streaming"
+	"github.com/rasros/lx/pkg/lx/templatex"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
 
-type GlobalContext = core.GlobalContext
+// Plan is what a Stream is about to render, the .Global of its templates.
+type Plan = core.Plan
+
+// Report is what Stream.Execute rendered: its Plan and what only rendering
+// finds out.
+type Report = core.Report
 type RenderOptions = core.RenderOptions
-type TemplateEngine = core.TemplateEngine
 type Config = core.Config
 type SectionContext = core.SectionContext
 type PromptContext = core.PromptContext
-type StatsContext = core.StatsContext
 
 type InputFile = sources.InputFile
 type DiscoverOptions = discover.Options
@@ -115,8 +120,8 @@ func (s *Stream) WithConcurrency(n int) *Stream {
 
 // WithOnFailure sets h to be told about every failure, in output order,
 // from the goroutine running Execute: the ones added with AddFailure and the
-// files that cannot be read as they render, each counted once in FailedFiles.
-// Without one, the stream logs them.
+// files that cannot be read as they render, each counted once in the
+// Report's FailedFiles. Without one, the stream logs them.
 func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
 	s.inner.WithOnFailure(h)
 	return s
@@ -124,7 +129,7 @@ func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
 
 // AddFailure adds an input that could not be read, such as one Collect
 // returned. It renders nothing, but is reported where it stands in the output
-// and counted in FailedFiles.
+// and counted in the Report's FailedFiles.
 func (s *Stream) AddFailure(f Failure) *Stream {
 	s.inner.AddFailure(f)
 	return s
@@ -176,8 +181,20 @@ func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
 	return s
 }
 
-func (s *Stream) GetGlobalContext() GlobalContext { return s.inner.GetGlobalContext() }
+// Plan returns what the stream would render now, as its templates will see
+// it.
+func (s *Stream) Plan() Plan { return s.inner.Plan() }
 
-func (s *Stream) Execute(ctx context.Context, w io.Writer) error { return s.inner.Execute(ctx, w) }
+// ErrExecuted is returned by Execute on a stream that already ran.
+var ErrExecuted = streamingpkg.ErrExecuted
 
-func (s *Stream) GetEngine() *TemplateEngine { return s.inner.GetEngine() }
+// Execute renders the stream to w and reports what was rendered. A stream
+// renders once: every later call returns ErrExecuted.
+func (s *Stream) Execute(ctx context.Context, w io.Writer) (Report, error) {
+	return s.inner.Execute(ctx, w)
+}
+
+// TemplateFuncs returns the functions every lx template can call, with
+// dataURI resolving relative paths against dir, or the process's working
+// directory when it is empty.
+func TemplateFuncs(dir string) template.FuncMap { return templatex.Funcs(dir) }

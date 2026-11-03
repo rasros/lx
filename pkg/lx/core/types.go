@@ -6,21 +6,34 @@ import (
 	"time"
 )
 
-// GlobalContext holds metadata about the entire execution.
-type GlobalContext struct {
-	TotalFiles        int
-	TotalSize         int64
-	SizeUnknown       bool
-	TotalWrittenBytes int64
-	TotalRows         int64
-	TokenEstimate     int64
-	TotalSections     int
-	WorkDir           string
-	Metadata          map[string]string
+// Plan is what a Stream is about to render, known before rendering starts.
+// It is the only view of the whole output templates get, as .Global.
+type Plan struct {
+	TotalFiles  int
+	TotalSize   int64
+	SizeUnknown bool
+	// TokenEstimate is estimated from the sizes of the files alone.
+	TokenEstimate int64
+	TotalSections int
+	WorkDir       string
+	Metadata      map[string]string
 
 	SkippedBySize int
+}
+
+// Report is what rendering a Stream turned out to be: its Plan and what
+// only rendering finds out.
+type Report struct {
+	Plan
+	TotalWrittenBytes int64
+	TotalRows         int64
+	// TokenEstimate is estimated from the written output, in place of the
+	// Plan's estimate from sizes.
+	TokenEstimate int64
 	BinaryFiles   int
-	FailedFiles   int
+	// FailedFiles counts every Failure: the ones added to the Stream and the
+	// files it could not read.
+	FailedFiles int
 }
 
 // RenderOptions decide how a file is rendered. Head and Tail count lines from
@@ -60,7 +73,6 @@ type TemplateEngine struct {
 
 	OutputHeader *template.Template
 	OutputFooter *template.Template
-	Stats        *template.Template
 
 	// Policy the output format implies, resolved once at compile time so
 	// renderers do not branch on the format name.
@@ -92,7 +104,6 @@ type Config struct {
 
 	OutputHeaderTemplate string `yaml:"output_header_template"`
 	OutputFooterTemplate string `yaml:"output_footer_template"`
-	StatsTemplate        string `yaml:"stats_template"`
 
 	OutputFormat string `yaml:"output_format"`
 }
@@ -116,7 +127,7 @@ type FileContext struct {
 	IsCompactView    bool
 	FileIndex        int
 	SectionFileIndex int
-	Global           GlobalContext
+	Global           Plan
 	Section          SectionContext
 	SkeletonMode     string
 	ConvertedFrom    string
@@ -145,21 +156,21 @@ type SectionContext struct {
 	Index      int
 	TotalFiles int
 	TotalSize  int64
-	Global     GlobalContext
+	Global     Plan
 	IsImplicit bool
 }
 
 // PromptContext represents the data provided to custom text prompt templates.
 type PromptContext struct {
 	Body    string
-	Global  GlobalContext
+	Global  Plan
 	Section SectionContext
 }
 
 // TreeContext represents the data provided to tree templates.
 type TreeContext struct {
 	Body    string
-	Global  GlobalContext
+	Global  Plan
 	Section SectionContext
 }
 
@@ -167,24 +178,18 @@ type TreeContext struct {
 type MetaContext struct {
 	Body    string
 	Fields  map[string]string
-	Global  GlobalContext
+	Global  Plan
 	Section SectionContext
 }
 
 // HeaderContext represents the data provided to the overall output header.
 type HeaderContext struct {
-	Global GlobalContext
+	Global Plan
 }
 
 // FooterContext represents the data provided to the overall output footer.
 type FooterContext struct {
-	Global GlobalContext
-}
-
-// StatsContext represents the data provided to the statistics summary template.
-type StatsContext struct {
-	Global       GlobalContext
-	ColorEnabled bool
+	Global Plan
 }
 
 // TokenCounter estimates token count from content.

@@ -71,52 +71,6 @@ func TestMetaTemplateExposesFields(t *testing.T) {
 	}
 }
 
-func renderStats(t *testing.T, g core.GlobalContext) string {
-	t.Helper()
-	engine := compileForFormat(t, "markdown")
-	var sb strings.Builder
-	if err := engine.Stats.Execute(&sb, core.StatsContext{Global: g}); err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-	return sb.String()
-}
-
-func TestStatsOmitsCounterLineWhenNothingLeftOut(t *testing.T) {
-	got := renderStats(t, core.GlobalContext{TotalFiles: 3, TotalRows: 40, TotalSections: 1, TotalSize: 900})
-	for _, unwanted := range []string{"skipped", "binary", "failed"} {
-		if strings.Contains(got, unwanted) {
-			t.Errorf("stats mentions %q with all counters zero:\n%s", unwanted, got)
-		}
-	}
-}
-
-func TestStatsShowsOnlyNonZeroCounters(t *testing.T) {
-	got := renderStats(t, core.GlobalContext{TotalFiles: 3, SkippedBySize: 2})
-	if !strings.Contains(got, "2 skipped (size)") {
-		t.Errorf("stats missing skipped count:\n%s", got)
-	}
-	if strings.Contains(got, "binary") || strings.Contains(got, "failed") {
-		t.Errorf("stats shows zero-valued counters:\n%s", got)
-	}
-}
-
-func TestStatsSeparatesMultipleCounters(t *testing.T) {
-	got := renderStats(t, core.GlobalContext{
-		TotalFiles: 9, SkippedBySize: 2, BinaryFiles: 4, FailedFiles: 1,
-	})
-	want := "2 skipped (size) · 4 binary · 1 failed"
-	if !strings.Contains(got, want) {
-		t.Errorf("stats counter line = %q, want it to contain %q", got, want)
-	}
-}
-
-func TestStatsCounterLineHasNoLeadingSeparator(t *testing.T) {
-	got := renderStats(t, core.GlobalContext{TotalFiles: 5, BinaryFiles: 3})
-	if !strings.Contains(got, "  3 binary\n") {
-		t.Errorf("stats counter line malformed:\n%q", got)
-	}
-}
-
 // Content is either a string or a LineNumberFormatter; helpers must treat both
 // alike. Reaching for %v on the formatter silently skipped escaping.
 func TestEscapeHandlesLineNumberedContent(t *testing.T) {

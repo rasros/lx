@@ -95,10 +95,6 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("output_footer template: %w", err)
 	}
-	tStats, err := parse("stats", pick(cfg.StatsTemplate, defaultStatsTemplate))
-	if err != nil {
-		return nil, fmt.Errorf("stats template: %w", err)
-	}
 
 	// HTML embeds images inline; every other format reports them like binaries.
 	tImage := tBinary
@@ -120,7 +116,6 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		SectionFooter: tSecFooter,
 		OutputHeader:  tHeader,
 		OutputFooter:  tFooter,
-		Stats:         tStats,
 		EmbedImages:   format == "html",
 		UseSeparators: format != "html" && format != "bare",
 	}

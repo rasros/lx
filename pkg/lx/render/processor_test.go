@@ -21,7 +21,7 @@ import (
 func TestProcessor_RenderFile_Slicing(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	global := core.GlobalContext{TotalFiles: 1}
+	global := core.Plan{TotalFiles: 1}
 
 	proc := NewProcessor(engine, global)
 
@@ -65,7 +65,7 @@ func renderSkeleton(t *testing.T, rc core.RenderOptions) string {
 	t.Helper()
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1})
+	proc := NewProcessor(engine, core.Plan{TotalFiles: 1})
 
 	file := sources.NewBufferInputFile("skeleton.go", []byte(skeletonThreeFuncs))
 	item := PreparedItem{Raw: FileItem{File: file, Opts: rc}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
@@ -121,7 +121,7 @@ func TestRender_DataURI(t *testing.T) {
 	cfg.OutputFormat = "html"
 	engine, _ := templatex.Compile(cfg)
 
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 
 	file, err := sources.NewInputFileFromPath(os.DirFS(tmp), imgName)
 	if err != nil {
@@ -146,7 +146,7 @@ func TestRender_ErrorHandling(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
 
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 
 	file := sources.InputFile{Path: "ghost.txt", Open: func() (io.ReadCloser, error) { return nil, os.ErrPermission }}
 	item := PreparedItem{Raw: FileItem{File: file}, Section: &core.SectionContext{}}
@@ -165,7 +165,7 @@ func TestRender_ErrorHandling(t *testing.T) {
 func TestRender_BinaryFile(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 
 	binaryContent := append([]byte("ELF"), 0x00, 0x01, 0x02, 0x03)
 	file := sources.NewBufferInputFile("program", binaryContent)
@@ -187,7 +187,7 @@ func TestRender_BinaryFile(t *testing.T) {
 func TestRender_CompactView(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 
 	file := sources.NewBufferInputFile("data.txt", []byte("lots of content\n"))
 	opts := core.RenderOptions{Head: 0, Tail: 0}
@@ -211,7 +211,7 @@ func TestRender_CompactView(t *testing.T) {
 func TestRender_LineNumbers(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{TotalFiles: 1})
+	proc := NewProcessor(engine, core.Plan{TotalFiles: 1})
 
 	file := sources.NewBufferInputFile("code.go", []byte("package main\nfunc main() {}\n"))
 	opts := core.RenderOptions{Head: -1, Tail: -1, LineNumbers: true}
@@ -390,7 +390,7 @@ func TestApplySkeletonSkipsBinaryAndImages(t *testing.T) {
 func TestRenderPreparedReportsStats(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 
 	file := sources.NewBufferInputFile("a.txt", []byte("one\ntwo\nthree\n"))
 	opts := core.RenderOptions{Head: -1}
@@ -414,7 +414,7 @@ func TestRenderPreparedReportsStats(t *testing.T) {
 func TestRenderPreparedNonFileItemHasZeroStats(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 
 	file := sources.NewBufferInputFile("a.txt", []byte("one\ntwo\n"))
 	opts := core.RenderOptions{Head: -1}
@@ -483,7 +483,7 @@ func TestPrepareFileContextConvertsExtensionlessImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 
 	file := sources.NewBufferInputFile("avatar", src)
 	opts := core.RenderOptions{Head: -1, ExtractMedia: true}
@@ -536,7 +536,7 @@ func TestPrepareFileContextCountsBigFileExactly(t *testing.T) {
 		t.Fatalf("fixture is %d bytes, want more than 32 KB", len(data))
 	}
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 
 	for _, cfg := range []core.RenderOptions{
 		{Head: -1},         // whole file
@@ -576,7 +576,7 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 	}
 
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 	pad := strings.Repeat("-", 20)
 	want := "   1: line 00001 " + pad + "\n" +
 		"   2: line 00002 " + pad + "\n" +
@@ -608,7 +608,7 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 func TestPrepareFileContextOverlapRendersWholeFile(t *testing.T) {
 	data := []byte("a\r\nb\r\nc\r\n")
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 
 	file := sources.NewBufferInputFile("crlf.txt", data)
 	opts := core.RenderOptions{Head: 2, Tail: 2}
@@ -665,7 +665,7 @@ func TestPrepareFileContextClampsEstimatedRows(t *testing.T) {
 	opts := core.RenderOptions{Head: 2, Tail: 2, LineNumbers: true}
 
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.GlobalContext{})
+	proc := NewProcessor(engine, core.Plan{})
 	ctx, issues := proc.prepareFileContext(file, opts, 1, nil)
 	if issues.ReadErr != nil {
 		t.Fatal(issues.ReadErr)

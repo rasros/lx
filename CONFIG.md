@@ -66,7 +66,7 @@ All keys are optional. Templates not listed here aren't recognized.
 | `section_footer_template` | template | format default | Wraps the end of every section.                                                                   |
 | `output_header_template`  | template | format default | Rendered once before the first section.                                                           |
 | `output_footer_template`  | template | format default | Rendered once after the last section.                                                             |
-| `stats_template`          | template | format default | Renders the file/token summary footer.                                                            |
+| `stats_template`          | template | built-in       | Renders the file/token summary footer.                                                            |
 
 ### Precedence for the prompts library
 
@@ -113,7 +113,7 @@ FileContext is bound to the five file templates (`file_content_template`, `file_
 | `FileIndex`        | int            | 1-based index across the whole run.                |
 | `SectionFileIndex` | int            | 1-based index within the current section.          |
 | `Section`          | SectionContext | Outer section info (notably `Section.TotalFiles`). |
-| `Global`           | GlobalContext  | Whole-run info.                                    |
+| `Global`           | Plan           | Whole-run info.                                    |
 
 SectionContext is bound to `section_template`, `section_header_template`, and `section_footer_template`:
 
@@ -124,7 +124,7 @@ SectionContext is bound to `section_template`, `section_header_template`, and `s
 | `TotalFiles` | int           |                                                                |
 | `TotalSize`  | int64         |                                                                |
 | `IsImplicit` | bool          | True for the auto-section before the first `-s`.               |
-| `Global`     | GlobalContext |                                                                |
+| `Global`     | Plan          |                                                                |
 
 PromptContext is bound to `prompt_template`:
 
@@ -132,7 +132,7 @@ PromptContext is bound to `prompt_template`:
 |-----------|----------------|
 | `Body`    | string         |
 | `Section` | SectionContext |
-| `Global`  | GlobalContext  |
+| `Global`  | Plan           |
 
 TreeContext is bound to `tree_template` and has the same shape as PromptContext, except Body holds the rendered tree
 text rather than an injected prompt string.
@@ -145,18 +145,21 @@ individually so a custom template can select and label them:
 | `Body`    | string            | The default rendered block.                                  |
 | `Fields`  | map[string]string | Keys: `os`, `arch`, `time`, `host`, `version`, `command`.     |
 | `Section` | SectionContext    |                                                              |
-| `Global`  | GlobalContext     |                                                              |
+| `Global`  | Plan              |                                                              |
 
 HeaderContext and FooterContext are bound to `output_header_template` and `output_footer_template`, and carry a single
-field, Global (a GlobalContext).
+field, Global (a Plan).
 
-StatsContext is bound to `stats_template` and carries Global plus ColorEnabled (a bool, false when output is piped or
-`NO_COLOR` is set). The default template adds a third line listing SkippedBySize, BinaryFiles, and FailedFiles, showing
-only the counters that are non-zero.
+Plan is reachable from every other context as `.Global`. It is known before anything renders: TotalFiles, TotalSize,
+SizeUnknown, TokenEstimate (estimated from file sizes), TotalSections, WorkDir, Metadata (a map of string to string),
+and SkippedBySize.
 
-GlobalContext is reachable from every other context as `.Global`. Its fields are TotalFiles, TotalSize,
-TotalWrittenBytes, TotalRows, TokenEstimate, TotalSections, WorkDir, Metadata (a map of string to string), and the
-counters SkippedBySize, BinaryFiles, and FailedFiles.
+StatsContext is bound to `stats_template`, which renders after the output is written. It carries Global, a Report, plus
+ColorEnabled (a bool, false when output is piped or `NO_COLOR` is set). A Report has every Plan field and what only
+rendering finds out: TotalWrittenBytes, TotalRows, BinaryFiles, FailedFiles, and a TokenEstimate over the written output
+in place of the Plan's. The default template adds a third line listing SkippedBySize, BinaryFiles, and FailedFiles,
+showing only the counters that are non-zero. Besides the helpers below, `stats_template` can call `accent`, `dim` and
+`tokenLabel`, which color their text when ColorEnabled is set.
 
 ### Helper functions
 

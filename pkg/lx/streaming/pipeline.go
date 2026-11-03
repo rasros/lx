@@ -43,7 +43,7 @@ func reorderWindow(workers int) int {
 // writes them to dest in order. The feeder hands each job a one-slot result
 // channel and enqueues that channel in a bounded FIFO, so the consumer reads
 // results in order and the feeder stalls once the window is full.
-func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global core.GlobalContext) (pipelineTotals, error) {
+func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global core.Plan) (pipelineTotals, error) {
 	var totals pipelineTotals
 	numWorkers := s.workers()
 	jobsCh := make(chan seqJob, numWorkers)

@@ -25,7 +25,7 @@ func TestStream_Integration(t *testing.T) {
 	stream.AddPrompt("Analyze this")
 
 	var buf strings.Builder
-	err := stream.Execute(context.Background(), &buf)
+	_, err := stream.Execute(context.Background(), &buf)
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestStream_ContextCancellation(t *testing.T) {
 	cancel()
 
 	var buf strings.Builder
-	err := stream.Execute(ctx, &buf)
+	_, err := stream.Execute(ctx, &buf)
 	if err != nil && err != context.Canceled {
 		t.Errorf("Expected nil or Canceled, got: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestStream_TokenizerIntegration(t *testing.T) {
 
 	stream.AddFile(sources.NewBufferInputFile("test.txt", []byte("abc")), opts)
 
-	stats := stream.GetGlobalContext()
+	stats := stream.Plan()
 	if stats.TokenEstimate != 999 {
 		t.Errorf("Expected custom token estimate 999, got %d", stats.TokenEstimate)
 	}
@@ -88,7 +88,7 @@ func TestStream_Prepare_Counts(t *testing.T) {
 	stream.AddSection("S2")
 	stream.AddFile(sources.NewBufferInputFile("c.txt", []byte("c")), opts)
 
-	g := stream.GetGlobalContext()
+	g := stream.Plan()
 	if g.TotalFiles != 3 {
 		t.Errorf("TotalFiles = %d, want 3", g.TotalFiles)
 	}
@@ -112,7 +112,7 @@ func TestStream_Prepare_SizeUnknownForNegativeSizeFile(t *testing.T) {
 		Open: func() (io.ReadCloser, error) { return io.NopCloser(strings.NewReader("")), nil },
 	}, opts)
 
-	g := stream.GetGlobalContext()
+	g := stream.Plan()
 	if !g.SizeUnknown {
 		t.Error("SizeUnknown = false, want true when a file's size is unavailable")
 	}
@@ -130,13 +130,13 @@ func TestStream_TotalRows_AfterExecute(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("alpha\nbeta")), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	report, err := stream.Execute(context.Background(), &buf)
+	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	g := stream.GetGlobalContext()
-	if g.TotalRows != 5 {
-		t.Errorf("TotalRows = %d, want 5", g.TotalRows)
+	if report.TotalRows != 5 {
+		t.Errorf("TotalRows = %d, want 5", report.TotalRows)
 	}
 }
 
@@ -149,7 +149,8 @@ func TestStream_MaxSizeSkipsOversizedFiles(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 64))), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	report, err := stream.Execute(context.Background(), &buf)
+	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
@@ -160,7 +161,7 @@ func TestStream_MaxSizeSkipsOversizedFiles(t *testing.T) {
 	if strings.Contains(got, "large.txt") {
 		t.Error("Output contains large.txt, want it skipped by MaxSize")
 	}
-	if n := stream.GetGlobalContext().TotalFiles; n != 1 {
+	if n := report.TotalFiles; n != 1 {
 		t.Errorf("TotalFiles = %d, want 1", n)
 	}
 }
@@ -175,7 +176,7 @@ func TestStream_MaxSizeKeepsUnknownSizeInputs(t *testing.T) {
 	f.Size = -1
 	stream.AddFile(f, opts)
 
-	if n := stream.GetGlobalContext().TotalFiles; n != 1 {
+	if n := stream.Plan().TotalFiles; n != 1 {
 		t.Errorf("TotalFiles = %d, want 1 (unknown size must not be skipped)", n)
 	}
 }
@@ -187,7 +188,7 @@ func TestStream_MaxSizeUnsetKeepsEverything(t *testing.T) {
 
 	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 4096))), opts)
 
-	if n := stream.GetGlobalContext().TotalFiles; n != 1 {
+	if n := stream.Plan().TotalFiles; n != 1 {
 		t.Errorf("TotalFiles = %d, want 1", n)
 	}
 }
@@ -207,10 +208,11 @@ func tokenEstimateFor(t *testing.T, content string) int64 {
 	stream.AddFile(sources.NewBufferInputFile("sample.txt", []byte(content)), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	report, err := stream.Execute(context.Background(), &buf)
+	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
-	return stream.GetGlobalContext().TokenEstimate
+	return report.TokenEstimate
 }
 
 func TestStream_TokenEstimateReflectsContentShape(t *testing.T) {
@@ -249,11 +251,11 @@ func TestStream_TokenEstimateCoversAllEmittedBytes(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("content b")), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	global, err := stream.Execute(context.Background(), &buf)
+	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	global := stream.GetGlobalContext()
 	if global.TokenEstimate != global.TotalWrittenBytes {
 		t.Errorf("TokenEstimate = %d, TotalWrittenBytes = %d; want equal with a one-token-per-byte tokenizer",
 			global.TokenEstimate, global.TotalWrittenBytes)
@@ -276,7 +278,7 @@ func TestStream_PerFileTokenEstimateIsContentDerived(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("dense.json", []byte(content)), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	if _, err := stream.Execute(context.Background(), &buf); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
@@ -294,6 +296,31 @@ func TestStream_PerFileTokenEstimateIsContentDerived(t *testing.T) {
 	}
 }
 
+// A stream renders once, and its plan follows what is added up to then.
+func TestStream_ExecutesOnce(t *testing.T) {
+	stream, err := NewStream(core.NewConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := core.RenderOptions{Head: -1}
+	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("a")), opts)
+	if n := stream.Plan().TotalFiles; n != 1 {
+		t.Fatalf("planned %d files, want 1", n)
+	}
+	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("b")), opts)
+
+	report, err := stream.Execute(context.Background(), io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.TotalFiles != 2 || report.TotalRows != 2 {
+		t.Errorf("report %+v, want 2 files of 1 row each", report)
+	}
+	if _, err := stream.Execute(context.Background(), io.Discard); !errors.Is(err, ErrExecuted) {
+		t.Errorf("second Execute = %v, want ErrExecuted", err)
+	}
+}
+
 func TestStream_SkippedBySizeIsCounted(t *testing.T) {
 	opts := core.RenderOptions{Head: -1, MaxSize: 10}
 	stream, err := NewStream(core.NewConfig())
@@ -305,7 +332,7 @@ func TestStream_SkippedBySizeIsCounted(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("big1.txt", []byte(strings.Repeat("x", 64))), opts)
 	stream.AddFile(sources.NewBufferInputFile("big2.txt", []byte(strings.Repeat("y", 99))), opts)
 
-	g := stream.GetGlobalContext()
+	g := stream.Plan()
 	if g.SkippedBySize != 2 {
 		t.Errorf("SkippedBySize = %d, want 2", g.SkippedBySize)
 	}
@@ -327,7 +354,7 @@ func TestStream_OriginalSizeIsPreConversionSize(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("main.go", []byte(src)), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	if _, err := stream.Execute(context.Background(), &buf); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
@@ -370,10 +397,11 @@ func TestStream_TokenEstimateIgnoresWriteChunking(t *testing.T) {
 		stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("content a")), opts)
 		stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("content b")), opts)
 		var buf strings.Builder
-		if err := stream.Execute(context.Background(), &buf); err != nil {
+		report, err := stream.Execute(context.Background(), &buf)
+		if err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
-		return stream.GetGlobalContext().TokenEstimate, buf.String()
+		return report.TokenEstimate, buf.String()
 	}
 
 	chunked, chunkedOut := estimate(templates{
@@ -449,13 +477,14 @@ func TestStream_FailuresInOutputOrder(t *testing.T) {
 	stream.WithConcurrency(8).WithOnFailure(func(f core.Failure) {
 		got = append(got, f.Path)
 	})
-	if err := stream.Execute(context.Background(), io.Discard); err != nil {
+	report, err := stream.Execute(context.Background(), io.Discard)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("reported %v, want %v", got, want)
 	}
-	if n := stream.GetGlobalContext().FailedFiles; n != len(want) {
+	if n := report.FailedFiles; n != len(want) {
 		t.Errorf("FailedFiles = %d, want %d", n, len(want))
 	}
 }
@@ -476,7 +505,7 @@ func TestStream_ConverterFailuresInOutputOrder(t *testing.T) {
 		stream.AddFile(f, core.RenderOptions{Head: -1, ExtractDocuments: true})
 	}
 	stream.WithConcurrency(8).WithLogger(log)
-	if err := stream.Execute(context.Background(), io.Discard); err != nil {
+	if _, err := stream.Execute(context.Background(), io.Discard); err != nil {
 		t.Fatal(err)
 	}
 

@@ -50,7 +50,7 @@ func TestLibraryMatchesCLI(t *testing.T) {
 		stream.AddFile(f, lx.RenderOptions{Head: -1})
 	}
 	var got bytes.Buffer
-	if err := stream.Execute(ctx, &got); err != nil {
+	if _, err := stream.Execute(ctx, &got); err != nil {
 		t.Fatal(err)
 	}
 

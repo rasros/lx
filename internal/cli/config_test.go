@@ -68,7 +68,7 @@ func TestLoadConfigChainAcceptsEveryKey(t *testing.T) {
 		}
 	}
 
-	if cliCfg.OutputMode != "copy" || cliCfg.ShowStats != "always" ||
+	if cliCfg.OutputMode != "copy" || cliCfg.ShowStats != "always" || cliCfg.StatsTemplate != "x" ||
 		cliCfg.Verbosity != "debug" || cliCfg.PromptsDir != "/tmp/prompts" ||
 		len(cliCfg.PromptExtensions) != 1 {
 		t.Errorf("cli-only keys not applied: %+v", cliCfg)

@@ -2,6 +2,7 @@ package streaming
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"runtime"
@@ -30,7 +31,7 @@ type Stream struct {
 	tokenizer   core.Tokenizer
 	engine      *core.TemplateEngine
 	workDir     string
-	finalStats  *core.GlobalContext
+	executed    bool
 	sections    []*core.SectionContext
 	onFailure   FailureHandler
 	log         *slog.Logger
@@ -95,7 +96,7 @@ func (s *Stream) WithTokenizer(t core.Tokenizer) *Stream {
 
 // WithOnFailure sets h to be told about every failure: the ones added with
 // AddFailure and the files that cannot be read as they render, each counted
-// once in FailedFiles. Without one, the stream logs them.
+// once in the Report's FailedFiles. Without one, the stream logs them.
 func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
 	s.onFailure = h
 	return s
@@ -140,7 +141,7 @@ func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
 
 // AddFailure adds an input that could not be read, such as one discovery
 // failed on. It renders nothing, but is reported where it stands in the
-// output and counted in FailedFiles.
+// output and counted in the Report's FailedFiles.
 func (s *Stream) AddFailure(f core.Failure) *Stream {
 	s.items = append(s.items, f)
 	return s
@@ -188,13 +189,9 @@ func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
 	return s
 }
 
-// Prepare calculates metadata and organizes items into sections before rendering.
-func (s *Stream) Prepare() core.GlobalContext {
-	if s.finalStats != nil {
-		return *s.finalStats
-	}
-
-	global := core.GlobalContext{
+// prepare plans the items queued so far, organizing them into sections.
+func (s *Stream) prepare() core.Plan {
+	global := core.Plan{
 		WorkDir:       s.workDir,
 		Metadata:      make(map[string]string),
 		SkippedBySize: s.skippedBySize,
@@ -240,7 +237,7 @@ func (s *Stream) Prepare() core.GlobalContext {
 				currentSection.TotalSize += f.Size
 				global.TotalSize += f.Size
 			}
-			// Size-only: no content read yet. Execute replaces this.
+			// Size-only: no content read yet. The Report replaces this.
 			global.TokenEstimate += s.tokenizer.Estimate(f.Size, nil)
 
 			s.prepared = append(s.prepared, render.PreparedItem{
@@ -265,32 +262,42 @@ func (s *Stream) Prepare() core.GlobalContext {
 	return global
 }
 
-func (s *Stream) GetGlobalContext() core.GlobalContext { return s.Prepare() }
+// Plan returns what the stream would render now, as templates will see it.
+func (s *Stream) Plan() core.Plan { return s.prepare() }
 
-func (s *Stream) Execute(ctx context.Context, w io.Writer) error {
-	global := s.Prepare()
+// ErrExecuted is returned by Execute on a stream that already ran.
+var ErrExecuted = errors.New("stream already executed")
+
+// Execute renders the stream to w and reports what was rendered. A stream
+// renders once: every later call returns ErrExecuted.
+func (s *Stream) Execute(ctx context.Context, w io.Writer) (core.Report, error) {
+	if s.executed {
+		return core.Report{}, ErrExecuted
+	}
+	s.executed = true
+
+	plan := s.prepare()
 	counter := &byteCounter{w: w}
 
-	headerTokens, err := render.ExecuteCounted(counter, s.engine.OutputHeader, core.HeaderContext{Global: global}, s.tokenizer)
+	headerTokens, err := render.ExecuteCounted(counter, s.engine.OutputHeader, core.HeaderContext{Global: plan}, s.tokenizer)
 	if err != nil {
-		return err
+		return core.Report{}, err
 	}
-	totals, err := s.executePipeline(ctx, counter, global)
+	totals, err := s.executePipeline(ctx, counter, plan)
 	if err != nil {
-		return err
+		return core.Report{}, err
 	}
-	footerTokens, err := render.ExecuteCounted(counter, s.engine.OutputFooter, core.FooterContext{Global: global}, s.tokenizer)
+	footerTokens, err := render.ExecuteCounted(counter, s.engine.OutputFooter, core.FooterContext{Global: plan}, s.tokenizer)
 	if err != nil {
-		return err
+		return core.Report{}, err
 	}
 
-	global.TotalWrittenBytes = counter.count
-	global.TotalRows = totals.rows
-	global.BinaryFiles = totals.binary
-	global.FailedFiles = totals.failed
-	global.TokenEstimate = headerTokens + totals.tokens + footerTokens
-	s.finalStats = &global
-	return nil
+	return core.Report{
+		Plan:              plan,
+		TotalWrittenBytes: counter.count,
+		TotalRows:         totals.rows,
+		TokenEstimate:     headerTokens + totals.tokens + footerTokens,
+		BinaryFiles:       totals.binary,
+		FailedFiles:       totals.failed,
+	}, nil
 }
-
-func (s *Stream) GetEngine() *core.TemplateEngine { return s.engine }

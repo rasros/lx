@@ -83,15 +83,15 @@ func TestPipeline_CancelledContextFailsWithoutFooter(t *testing.T) {
 	cancel()
 
 	var buf strings.Builder
-	err := stream.Execute(ctx, &buf)
+	report, err := stream.Execute(ctx, &buf)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Execute error = %v, want context.Canceled", err)
 	}
 	if strings.Contains(buf.String(), testFooter) {
 		t.Errorf("output footer written after cancellation:\n%s", buf.String())
 	}
-	if stream.finalStats != nil {
-		t.Error("final stats recorded for a cancelled run")
+	if report.TotalFiles != 0 {
+		t.Errorf("report %+v for a cancelled run, want none", report)
 	}
 }
 
@@ -112,7 +112,7 @@ func TestPipeline_CancelMidRunFailsWithoutFooter(t *testing.T) {
 	}()
 
 	var buf strings.Builder
-	err := stream.Execute(ctx, &buf)
+	_, err := stream.Execute(ctx, &buf)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Execute error = %v, want context.Canceled", err)
 	}
@@ -137,7 +137,10 @@ func TestPipeline_SlowHeadBoundsBufferedResults(t *testing.T) {
 
 	done := make(chan error, 1)
 	var buf strings.Builder
-	go func() { done <- stream.Execute(context.Background(), &buf) }()
+	go func() {
+		_, err := stream.Execute(context.Background(), &buf)
+		done <- err
+	}()
 
 	<-headStarted
 	// Give the fast items every chance to run ahead of the blocked head.
@@ -190,7 +193,7 @@ func TestPipeline_WriteErrorReturnedWithoutLeaks(t *testing.T) {
 		stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%d.txt", i), bytes.Repeat([]byte("x"), 256)), wholeFile)
 	}
 
-	err := stream.Execute(context.Background(), &failingWriter{limit: 2048})
+	_, err := stream.Execute(context.Background(), &failingWriter{limit: 2048})
 	if !errors.Is(err, errDestFull) {
 		t.Fatalf("Execute error = %v, want %v", err, errDestFull)
 	}
@@ -208,7 +211,7 @@ func TestPipeline_PreservesOrderWithConcurrency(t *testing.T) {
 			stream.AddFile(sources.NewBufferInputFile(fmt.Sprintf("f%03d.txt", i), []byte(fmt.Sprintf("item-%03d", i))), wholeFile)
 		}
 		var buf strings.Builder
-		if err := stream.Execute(context.Background(), &buf); err != nil {
+		if _, err := stream.Execute(context.Background(), &buf); err != nil {
 			t.Fatalf("Execute(workers=%d): %v", workers, err)
 		}
 		return buf.String()
