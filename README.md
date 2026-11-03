@@ -21,24 +21,17 @@ On Linux the clipboard flag (-c) needs xclip (X11) or wl-clipboard (Wayland).
 
 ## Everyday use
 
-With no arguments lx bundles the current directory to stdout, respecting .ignore and .lxignore, plus .gitignore and
-.git/info/exclude inside git repositories, and skipping hidden files and binaries. Name any paths you like, as with rg a
-path you name is never filtered itself (paths piped on stdin still go through -i and -e), and add -c to copy instead:
+With no arguments lx bundles the current directory to stdout, respecting .gitignore, .git/info/exclude, .ignore, and
+.lxignore, and skipping hidden files and binaries. Name any paths you like, and add -c to copy instead:
 
 ```bash
 lx -c                          # this project, on the clipboard
 lx src/ docs/
 lx -t src/                     # just the tree (-T for tree plus files)
 lx -u -Y src/                  # signatures and type definitions, no bodies
-lx -i "*.py" -e "*test*" src/  # include/exclude globs, as rg -g
+lx -i "*.py" -e "*test*" src/  # include/exclude globs
 lx -n 20 src/                  # first 20 lines of each file
 ```
-
--i and -e work as rg's `-g GLOB` and `-g '!GLOB'`: the last one to match a path wins, ahead of your ignore files, and once
-there is an -i a file has to match one. A glob with a slash matches the path from the working directory as you named
-the root, so `lx -i "src/*.go" src/` works while `lx -i "*.go" -e "src/gen/**" src/` drops a subtree. One addition over
-rg: `-e "!GLOB"` keeps what it matches, over ignore files and hidden-file skipping, without limiting the output to it,
-so `lx -e "vendor/**" -e "!vendor/keep.go"` keeps one file of vendor/ and everything else.
 
 Paths can also come from stdin, so lx composes with whatever you use to pick files:
 
@@ -67,11 +60,6 @@ lx -n 10 github.com/eignex/combo
 lx https://gitlab.com/owner/repo/-/tree/dev
 ```
 
-A repository is read as a checkout of it would be: the files are shown below the URL, its ignore files apply, and -i/-e
-match the files from the repository's root. The one difference is that symbolic links are left out. One set of globs
-applies to every path in a section, so give each repository its own with -s:
-`lx -i 'internal/cli/*.go' -e '*_test.go' github.com/rasros/lx -s Combo -i 'docs/**' github.com/eignex/combo`.
-
 Three flags reach into files that would otherwise be skipped:
 
 ```bash
@@ -85,9 +73,7 @@ lx -M assets/       # codec, duration, and dimensions of audio, video, and image
 ## Stream processing
 
 lx reads its arguments left to right, and an option applies only to the paths after it. An option (or -s) after a path
-starts a new section with the per-section options reset. Options that no path follows before the next -s or the end
-apply back to the paths right before them, with a warning; options before any path carry on into the section a -s
-starts:
+starts a new section with the per-section options reset:
 
 ```bash
 lx --tail 50 app.log \
