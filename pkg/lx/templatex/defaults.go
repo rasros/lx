@@ -204,9 +204,7 @@ article > header {
 <hgroup>
 <h1>lx output</h1>
 <p>
-  Files: {{ .Global.TotalFiles }} &bull; 
-  {{ if not .Global.SizeUnknown }}Size: {{ .Global.TotalSize | humanize }} &bull; {{ end }}
-  Path: {{ .Global.WorkDir }}
+  Files: {{ .Global.TotalFiles }}{{ if not .Global.SizeUnknown }} &bull; Size: {{ .Global.TotalSize | humanize }}{{ end }}
 </p>
 </hgroup>
 </header>
