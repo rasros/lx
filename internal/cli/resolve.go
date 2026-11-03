@@ -24,6 +24,7 @@ import (
 // It stops at the first target that finds ctx done and returns ctx's error.
 func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) error {
 	piped := map[string]bool{}
+	pipedFailures := map[string]bool{}
 	for si := range sections {
 		s := &sections[si]
 		for oi, op := range s.Ops {
@@ -35,6 +36,13 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) e
 			files, failures, err := c.Collect(ctx, op.Value, opts)
 			if err != nil {
 				return err
+			}
+			if op.Piped {
+				failures = slices.DeleteFunc(failures, func(f lx.Failure) bool {
+					seen := pipedFailures[f.Path]
+					pipedFailures[f.Path] = true
+					return seen
+				})
 			}
 			if len(failures) > 0 {
 				if s.failures == nil {
@@ -61,27 +69,35 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) e
 	return nil
 }
 
+// stdinPath is the Failure.Path of stdin.
+const stdinPath = "-"
+
 // logFailure logs an input the run could not read, naming the step it
 // failed at.
 func logFailure(log *slog.Logger, f lx.Failure) {
 	switch f.Kind {
 	case lx.FailedStat:
-		log.Error("Failed to stat path", "path", f.Path, "error", f.Err)
+		log.Error("Failed to stat path", "path", f.Display, "error", f.Err)
 	case lx.FailedURL:
+		// Collect's URL failures are *URLErrors.
 		var ue *lx.URLError
-		switch {
-		case errors.As(f.Err, &ue) && ue.Download:
-			log.Error("Failed to download URL archive", "url", ue.URL, "error", ue.Err)
-		case errors.As(f.Err, &ue):
-			log.Error("Failed to create URL input", "url", ue.URL, "error", ue.Err)
-		default:
-			log.Error("Failed to read URL", "url", f.Path, "error", f.Err)
+		errors.As(f.Err, &ue)
+		msg := "Failed to create URL input"
+		if ue.Download {
+			msg = "Failed to download URL archive"
 		}
+		log.Error(msg, "url", ue.URL, "error", ue.Err)
 	case lx.FailedWalk:
-		log.Error("Failed to access path during walk", "path", f.Path, "error", f.Err)
+		log.Error("Failed to access path during walk", "path", f.Display, "error", f.Err)
 	case lx.FailedArchive:
-		log.Error("Failed to expand archive", "path", f.Path, "error", f.Err)
+		log.Error("Failed to expand archive", "path", f.Display, "error", f.Err)
+	case lx.FailedArchiveEntry:
+		log.Error("Failed to read archive entry", "path", f.Display, "error", f.Err)
 	default:
-		log.Error("Failed to read file", "path", f.Path, "error", f.Err)
+		if f.Path == stdinPath {
+			log.Error("Failed to read from stdin", "error", f.Err)
+			return
+		}
+		log.Error("Failed to read file", "path", f.Display, "error", f.Err)
 	}
 }

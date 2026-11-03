@@ -1,0 +1,18 @@
+--- STDOUT ---
+[1/2] secret/locked.txt - error: open locked.txt: PERMISSION_DENIED
+
+[2/2] broken/ok.txt (1 rows)
+---
+```text
+readable
+```
+
+
+--- STDERR ---
+Error: Failed to access path during walk: open locked_dir: PERMISSION_DENIED (path=secret/locked_dir)
+Error: Failed to read file: open locked.txt: PERMISSION_DENIED (path=secret/locked.txt)
+Error: Failed to expand archive: extract: zip: not a valid zip file (path=broken/bad.zip)
+Error: Failed to stat path: stat /ROOT/nope.go: FILE_NOT_FOUND (path=nope.go)
+▎ 2 files · 1 row · 1 section · 18 B
+  ~45 tokens
+  4 failed

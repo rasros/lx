@@ -3,4 +3,4 @@ package main
 func main() {}
 
 --- STDERR ---
-Error: Failed to stat path: stat /ROOT/missing.go: FILE_NOT_FOUND (path=/ROOT/missing.go)
+Error: Failed to stat path: stat /ROOT/missing.go: FILE_NOT_FOUND (path=missing.go)

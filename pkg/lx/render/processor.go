@@ -61,7 +61,6 @@ type RenderStats struct {
 	Rows      int
 	IsCompact bool
 	IsBinary  bool
-	IsError   bool
 	Issues    FileIssues
 }
 
@@ -106,7 +105,6 @@ func (p *Processor) RenderPrepared(w io.Writer, item PreparedItem, scratchBuf []
 			Rows:      fCtx.TotalRows,
 			IsCompact: fCtx.IsCompactView,
 			IsBinary:  fCtx.IsBinary,
-			IsError:   fCtx.IsError,
 			Issues:    issues,
 		}
 		ctx = &fCtx

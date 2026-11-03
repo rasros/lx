@@ -3,13 +3,18 @@ package sources
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"testing"
+	"testing/iotest"
 
+	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
 
@@ -391,6 +396,55 @@ func TestExpandArchive_TarGz_IncludeFilter(t *testing.T) {
 	paths := filePaths(files)
 	assertContains(t, paths, "arc.tar.gz/main.go")
 	assertNotContains(t, paths, "arc.tar.gz/notes.txt")
+}
+
+// An entry whose stored bytes fail their checksum, or whose compressed
+// stream is corrupt, is a failure rather than content.
+func TestExpandArchive_CorruptEntriesFail(t *testing.T) {
+	for _, method := range []uint16{zip.Store, zip.Deflate} {
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		fw, err := zw.CreateHeader(&zip.FileHeader{Name: "bad.txt", Method: method})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fw.Write(bytes.Repeat([]byte("hello world "), 200)); err != nil {
+			t.Fatal(err)
+		}
+		if err := zw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		data := buf.Bytes()
+		// Past the 30-byte local header and the name, in the entry's data.
+		start := 30 + len("bad.txt")
+		for i := start + 2; i < start+40; i++ {
+			data[i] ^= 0x55
+		}
+		path := filepath.Join(t.TempDir(), "corrupt.zip")
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		files, failures, err := ExpandArchive(context.Background(), path, "corrupt.zip", walker.New(walker.Options{}), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(files) != 0 || len(failures) != 1 || failures[0].Kind != core.FailedArchiveEntry || failures[0].Display != "corrupt.zip/bad.txt" {
+			t.Errorf("method %d: files %v, failures %+v; want one entry failure", method, filePaths(files), failures)
+		}
+	}
+}
+
+// A stream cut off mid-entry, as a truncated deflate stream is, fails; one
+// that ends cleanly short of its size hint is what arrived.
+func TestReadAllWithSizeHint_CutOffFails(t *testing.T) {
+	cut := io.MultiReader(bytes.NewReader([]byte("part")), iotest.ErrReader(io.ErrUnexpectedEOF))
+	if _, err := readAllWithSizeHint(cut, 100); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Errorf("cut off: err = %v, want io.ErrUnexpectedEOF", err)
+	}
+	if got, err := readAllWithSizeHint(bytes.NewReader([]byte("short")), 100); err != nil || string(got) != "short" {
+		t.Errorf("short: got %q, %v", got, err)
+	}
 }
 
 func assertContains(t *testing.T, list []string, item string) {

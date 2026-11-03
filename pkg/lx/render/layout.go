@@ -11,23 +11,22 @@ import (
 
 // Result is one rendered item produced by the worker pipeline.
 type Result struct {
-	Index        int
+	Index int
+	// Buffer holds what the item rendered; it is nil for an item that writes
+	// nothing, as a failure added to the stream.
 	Buffer       *bytes.Buffer
 	Stats        int64
 	Tokens       int64
 	Rows         int
 	IsCompact    bool
 	IsBinary     bool
-	IsError      bool
 	Err          error
 	SectionIndex int
-	Issues       FileIssues // of File, a file item
 	File         sources.InputFile
 	// Failure is the input the item failed on, if any.
 	Failure *core.Failure
-	// Omit marks an item that writes nothing, as a failure added to the
-	// stream.
-	Omit bool
+	// Convert is a converter that failed on File, leaving its raw content.
+	Convert *ConvertFailure
 }
 
 // LayoutWriter acts as a middleman between the pipeline assembler and the output writer.

@@ -88,9 +88,14 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					tokens = s.tokenizer.Estimate(int64(buf.Len()), buf.Bytes())
 				}
 
+				f := fileOf(j.item)
 				var failure *core.Failure
-				if itemStats.Issues.ReadErr != nil {
-					failure = &core.Failure{Kind: core.FailedRead, Path: fileOf(j.item).Path, Err: itemStats.Issues.ReadErr}
+				if err := itemStats.Issues.ReadErr; err != nil {
+					path := f.AbsPath
+					if path == "" {
+						path = f.Path
+					}
+					failure = &core.Failure{Kind: core.FailedRead, Path: path, Display: f.Path, Err: err}
 				}
 
 				// j.out has one slot reserved for this job, so this never blocks.
@@ -102,10 +107,9 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 					Rows:         itemStats.Rows,
 					IsCompact:    itemStats.IsCompact,
 					IsBinary:     itemStats.IsBinary,
-					IsError:      itemStats.IsError,
-					Issues:       itemStats.Issues,
 					Failure:      failure,
-					File:         fileOf(j.item),
+					Convert:      itemStats.Issues.Convert,
+					File:         f,
 					Err:          err,
 					SectionIndex: j.item.Section.Index,
 				}
@@ -128,7 +132,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 			if f, ok := item.Raw.(core.Failure); ok {
 				// A failure added to the stream renders nothing; it only
 				// takes its place in the order failures are reported in.
-				out <- render.Result{Index: item.StreamIndex, Failure: &f, Omit: true}
+				out <- render.Result{Index: item.StreamIndex, Failure: &f}
 				continue
 			}
 			select {
@@ -162,7 +166,7 @@ Loop:
 		if res.Failure != nil {
 			totals.failed++
 		}
-		if res.Omit {
+		if res.Buffer == nil {
 			written++
 			continue
 		}
@@ -215,7 +219,7 @@ func (s *Stream) report(res render.Result) {
 			s.log.Error("Failed to read input", "path", f.Path, "error", f.Err)
 		}
 	}
-	if ce := res.Issues.Convert; ce != nil {
+	if ce := res.Convert; ce != nil {
 		s.log.Debug("Converter failed, keeping raw content",
 			"converter", ce.Converter, "path", res.File.Path, "error", ce.Err)
 	}

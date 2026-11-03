@@ -201,7 +201,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 					log.Info("Reading content from stdin")
 					data, err := io.ReadAll(env.Stdin)
 					if err != nil {
-						stream.AddFailure(lx.Failure{Kind: lx.FailedRead, Path: "stdin", Err: err})
+						stream.AddFailure(lx.Failure{Kind: lx.FailedRead, Path: stdinPath, Display: "stdin", Err: err})
 						continue
 					}
 					stream.AddFile(lx.NewBufferInputFile("stdin", data), section.Render)

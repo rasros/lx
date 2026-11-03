@@ -1,6 +1,7 @@
 package core
 
 import (
+	"strconv"
 	"text/template"
 	"time"
 )
@@ -200,9 +201,13 @@ type Tokenizer interface {
 // counted once, in the Stream's FailedFiles.
 type Failure struct {
 	Kind FailureKind
-	// Path is the path or URL of the input.
+	// Path names the input the same way however it was reached: its
+	// absolute path, an archive's absolute path or URL followed by "/" and
+	// the entry's path in it, a URL, or "-" for stdin.
 	Path string
-	Err  error
+	// Display is the input as output shows it.
+	Display string
+	Err     error
 }
 
 // FailureKind is the step an input failed at.
@@ -216,9 +221,29 @@ const (
 	// FailedWalk is a directory or file below a named one that could not be
 	// read or stat'd.
 	FailedWalk
-	// FailedArchive is an archive, or an entry in one, that could not be
-	// read.
+	// FailedArchive is an archive that could not be expanded.
 	FailedArchive
-	// FailedRead is a file that could not be opened or read, as it rendered.
+	// FailedArchiveEntry is an entry of an archive that could not be read.
+	FailedArchiveEntry
+	// FailedRead is a file that could not be opened or read, as it rendered,
+	// or stdin that could not be read.
 	FailedRead
 )
+
+func (k FailureKind) String() string {
+	switch k {
+	case FailedStat:
+		return "stat"
+	case FailedURL:
+		return "url"
+	case FailedWalk:
+		return "walk"
+	case FailedArchive:
+		return "archive"
+	case FailedArchiveEntry:
+		return "archive entry"
+	case FailedRead:
+		return "read"
+	}
+	return "FailureKind(" + strconv.Itoa(int(k)) + ")"
+}

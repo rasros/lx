@@ -49,11 +49,12 @@ type Failure = core.Failure
 type FailureKind = core.FailureKind
 
 const (
-	FailedStat    = core.FailedStat
-	FailedURL     = core.FailedURL
-	FailedWalk    = core.FailedWalk
-	FailedArchive = core.FailedArchive
-	FailedRead    = core.FailedRead
+	FailedStat         = core.FailedStat
+	FailedURL          = core.FailedURL
+	FailedWalk         = core.FailedWalk
+	FailedArchive      = core.FailedArchive
+	FailedArchiveEntry = core.FailedArchiveEntry
+	FailedRead         = core.FailedRead
 )
 
 type FailureHandler = streamingpkg.FailureHandler

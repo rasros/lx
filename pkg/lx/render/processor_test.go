@@ -405,7 +405,7 @@ func TestRenderPreparedReportsStats(t *testing.T) {
 	if stats.Rows != 3 {
 		t.Errorf("Rows = %d, want 3", stats.Rows)
 	}
-	if stats.IsBinary || stats.IsError || stats.IsCompact {
+	if stats.IsBinary || stats.Issues.ReadErr != nil || stats.IsCompact {
 		t.Errorf("unexpected flags: %+v", stats)
 	}
 }
