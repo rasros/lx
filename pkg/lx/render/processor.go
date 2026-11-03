@@ -33,9 +33,9 @@ type PreparedItem struct {
 
 // Processor renders prepared items into an output writer.
 type Processor struct {
-	engine       *core.TemplateEngine
-	global       core.Plan
-	tokenCounter core.TokenCounter
+	engine    *core.TemplateEngine
+	global    core.Plan
+	tokenizer core.Tokenizer
 }
 
 // ConvertFailure is a converter that failed on a file, which then rendered as
@@ -69,20 +69,11 @@ type readerAtWithSize interface {
 	Size() int64
 }
 
-// NewProcessor returns a Processor. It logs nothing: what goes wrong with a
-// file comes back in RenderStats.Issues.
-func NewProcessor(engine *core.TemplateEngine, global core.Plan) *Processor {
-	return &Processor{
-		engine:       engine,
-		global:       global,
-		tokenCounter: core.DefaultTokenCounter,
-	}
-}
-
-func (p *Processor) SetTokenCounter(tc core.TokenCounter) {
-	if tc != nil {
-		p.tokenCounter = tc
-	}
+// NewProcessor returns a Processor whose file contexts estimate tokens with
+// tokenizer. It logs nothing: what goes wrong with a file comes back in
+// RenderStats.Issues.
+func NewProcessor(engine *core.TemplateEngine, global core.Plan, tokenizer core.Tokenizer) *Processor {
+	return &Processor{engine: engine, global: global, tokenizer: tokenizer}
 }
 
 // RenderPrepared processes one item containing pre-calculated section and
@@ -437,7 +428,7 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 		SkeletonMode:  skeletonMode,
 		ConvertedFrom: convertedFrom,
 	}
-	core.SetTokenCounter(&fCtx, p.tokenCounter)
+	core.SetTokenizer(&fCtx, p.tokenizer)
 	return fCtx, issues
 }
 

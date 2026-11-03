@@ -5,11 +5,7 @@ import (
 	"testing"
 )
 
-type mockStringer string
-
-func (m mockStringer) String() string { return string(m) }
-
-func TestDefaultTokenCounter_Basic(t *testing.T) {
+func TestDefaultTokenizer_Basic(t *testing.T) {
 	tests := []struct {
 		name    string
 		size    int64
@@ -19,27 +15,26 @@ func TestDefaultTokenCounter_Basic(t *testing.T) {
 		{"single word 4 chars", 4, "1234", 1},
 		{"single word 8 chars splits", 8, "12345678", 2},
 		{"short word still costs 1", 3, "abc", 1},
-		{"stringer", 100, mockStringer("1234"), 1},
 		{"nil falls back to size/4", 12, nil, 3},
 		{"empty string falls back to size/4", 16, "", 4},
 		{"unknown type falls back to size/4", 40, 12345, 10},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := DefaultTokenCounter(tt.size, tt.content)
+			got := DefaultTokenizer(tt.size, tt.content)
 			if got != tt.want {
-				t.Errorf("DefaultTokenCounter() = %d, want %d", got, tt.want)
+				t.Errorf("DefaultTokenizer() = %d, want %d", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestDefaultTokenCounter_CodeDenserThanProse(t *testing.T) {
+func TestDefaultTokenizer_CodeDenserThanProse(t *testing.T) {
 	prose := strings.Repeat("the quick brown fox jumps over the lazy dog ", 20)
 	code := strings.Repeat("if (x == y) { return foo(bar, baz); }\n", 20)
 
-	proseTokens := DefaultTokenCounter(int64(len(prose)), prose)
-	codeTokens := DefaultTokenCounter(int64(len(code)), code)
+	proseTokens := DefaultTokenizer(int64(len(prose)), prose)
+	codeTokens := DefaultTokenizer(int64(len(code)), code)
 
 	proseRatio := float64(len(prose)) / float64(proseTokens)
 	codeRatio := float64(len(code)) / float64(codeTokens)
@@ -52,7 +47,7 @@ func TestDefaultTokenCounter_CodeDenserThanProse(t *testing.T) {
 	}
 }
 
-func TestDefaultTokenCounter_LargeContentSampling(t *testing.T) {
+func TestDefaultTokenizer_LargeContentSampling(t *testing.T) {
 	// Build a >256 KiB code-like buffer so the sampling path triggers.
 	unit := "func add(a, b int) int { return a + b }\n"
 	var sb strings.Builder
@@ -61,7 +56,7 @@ func TestDefaultTokenCounter_LargeContentSampling(t *testing.T) {
 	}
 	full := sb.String()
 
-	sampled := DefaultTokenCounter(int64(len(full)), full)
+	sampled := DefaultTokenizer(int64(len(full)), full)
 
 	// Same content scanned without sampling: feed it as a slice that's exactly
 	// the content but invoke the inner scanner directly via a sub-threshold split.
@@ -80,9 +75,9 @@ func TestDefaultTokenCounter_LargeContentSampling(t *testing.T) {
 // Absolute ratios drift with the sample, so this pins the ordering: density is
 // driven by how much of the content is symbols rather than words. Long string
 // values make JSON read almost like prose.
-func TestDefaultTokenCounter_DensityFollowsSymbolShare(t *testing.T) {
+func TestDefaultTokenizer_DensityFollowsSymbolShare(t *testing.T) {
 	ratio := func(text string) float64 {
-		return float64(len(text)) / float64(DefaultTokenCounter(int64(len(text)), text))
+		return float64(len(text)) / float64(DefaultTokenizer(int64(len(text)), text))
 	}
 
 	prose := ratio(strings.Repeat("the quick brown fox jumps over the lazy dog ", 20))
@@ -109,7 +104,7 @@ func TestDefaultTokenCounter_DensityFollowsSymbolShare(t *testing.T) {
 }
 
 // Strings and byte slices of the same content estimate alike.
-func TestDefaultTokenCounterAgreesAcrossRepresentations(t *testing.T) {
+func TestDefaultTokenizerAgreesAcrossRepresentations(t *testing.T) {
 	samples := []string{
 		"",
 		"hello world",
@@ -121,8 +116,8 @@ func TestDefaultTokenCounterAgreesAcrossRepresentations(t *testing.T) {
 
 	for i, s := range samples {
 		size := int64(len(s))
-		fromString := DefaultTokenCounter(size, s)
-		fromBytes := DefaultTokenCounter(size, []byte(s))
+		fromString := DefaultTokenizer(size, s)
+		fromBytes := DefaultTokenizer(size, []byte(s))
 		if fromString != fromBytes {
 			t.Errorf("sample %d: string gave %d, []byte gave %d", i, fromString, fromBytes)
 		}

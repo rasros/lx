@@ -29,10 +29,12 @@ type Report = core.Report
 // Tokenizer estimates the tokens a Stream reports and templates see.
 type Tokenizer = core.Tokenizer
 
-// DefaultTokenizer returns the Tokenizer a Stream uses unless
+// DefaultTokenizer is the Tokenizer a Stream uses unless
 // Stream.WithTokenizer sets another, for one to wrap or fall back to. It
 // scans the text by character class, with no vocabulary.
-func DefaultTokenizer() Tokenizer { return core.DefaultTokenizer() }
+func DefaultTokenizer(size int64, content interface{}) int64 {
+	return core.DefaultTokenizer(size, content)
+}
 
 // The template contexts: what each of a Config's templates renders.
 type (

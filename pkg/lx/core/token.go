@@ -1,35 +1,21 @@
 package core
 
-import "fmt"
-
 const (
 	sampleThreshold = 256 * 1024
 	sampleHead      = 128 * 1024
 	sampleTail      = 64 * 1024
 )
 
-// Estimate makes a TokenCounter a Tokenizer.
-func (tc TokenCounter) Estimate(size int64, content interface{}) int64 {
-	return tc(size, content)
-}
-
-// DefaultTokenizer returns the Tokenizer of DefaultTokenCounter, which a
-// Stream estimates with unless it is given another.
-func DefaultTokenizer() Tokenizer {
-	return TokenCounter(DefaultTokenCounter)
-}
-
-// DefaultTokenCounter estimates BPE tokens from content with a
-// character-class scanner and no vocabulary. Density follows the share of
-// symbols: about 3.8 bytes/token for prose, 3.2 for source, 2.0 for JSON.
-func DefaultTokenCounter(size int64, content interface{}) int64 {
+// DefaultTokenizer is the Tokenizer a Stream estimates with unless it is
+// given another. It estimates BPE tokens from content with a character-class
+// scanner and no vocabulary. Density follows the share of symbols: about 3.8
+// bytes/token for prose, 3.2 for source, 2.0 for JSON.
+func DefaultTokenizer(size int64, content interface{}) int64 {
 	switch v := content.(type) {
 	case string:
 		return estimate(v, size)
 	case []byte:
 		return estimate(v, size)
-	case fmt.Stringer:
-		return estimate(v.String(), size)
 	}
 	return size / 4
 }

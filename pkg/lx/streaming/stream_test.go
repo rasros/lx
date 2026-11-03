@@ -35,10 +35,6 @@ func TestStream_ContextCancellation(t *testing.T) {
 	}
 }
 
-type MockTokenizer struct{}
-
-func (m MockTokenizer) Estimate(size int64, _ interface{}) int64 { return 999 }
-
 func TestStream_Prepare_SizeUnknownForNegativeSizeFile(t *testing.T) {
 	cfg := core.NewConfig()
 	opts := core.RenderOptions{Head: -1}
@@ -74,11 +70,6 @@ func TestStream_MaxSizeKeepsUnknownSizeInputs(t *testing.T) {
 		t.Errorf("TotalFiles = %d, want 1 (unknown size must not be skipped)", n)
 	}
 }
-
-// One token per byte, so totals can be compared against bytes exactly.
-type sizeTokenizer struct{}
-
-func (sizeTokenizer) Estimate(size int64, _ interface{}) int64 { return size }
 
 func tokenEstimateFor(t *testing.T, content string) int64 {
 	t.Helper()
@@ -124,7 +115,8 @@ func TestStream_TokenEstimateCoversAllEmittedBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStream failed: %v", err)
 	}
-	stream.WithTokenizer(sizeTokenizer{})
+	// One token per byte, so totals can be compared against bytes exactly.
+	stream.WithTokenizer(func(size int64, _ interface{}) int64 { return size })
 
 	stream.AddSection("First")
 	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("content a")), opts)
@@ -233,12 +225,6 @@ func TestStream_OriginalSizeIsPreConversionSize(t *testing.T) {
 	}
 }
 
-// callTokenizer counts one token per estimate, so the total shows how many
-// pieces the output was estimated in.
-type callTokenizer struct{}
-
-func (callTokenizer) Estimate(int64, interface{}) int64 { return 1 }
-
 // Each rendered piece is estimated as a whole, so templates that write in
 // several chunks get the same estimate as ones that write once.
 func TestStream_TokenEstimateIgnoresWriteChunking(t *testing.T) {
@@ -254,7 +240,9 @@ func TestStream_TokenEstimateIgnoresWriteChunking(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewStream failed: %v", err)
 		}
-		stream.WithTokenizer(callTokenizer{})
+		// One token per estimate, so the total shows how many pieces the
+		// output was estimated in.
+		stream.WithTokenizer(func(int64, interface{}) int64 { return 1 })
 		stream.AddSection("S")
 		stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("content a")), opts)
 		stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("content b")), opts)

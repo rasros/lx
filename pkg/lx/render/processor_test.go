@@ -26,7 +26,7 @@ import (
 // about the cancel.
 func TestRender_CancelledReadWritesNothing(t *testing.T) {
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.Plan{})
+	proc := NewProcessor(engine, core.Plan{}, core.DefaultTokenizer)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	file := sources.InputFile{Path: "slow.txt", Size: -1, Open: func(ctx context.Context) (io.ReadCloser, error) {
@@ -192,7 +192,7 @@ func TestApplySkeletonSkipsBinaryAndImages(t *testing.T) {
 func TestRenderPreparedNonFileItemHasZeroStats(t *testing.T) {
 	cfg := core.NewConfig()
 	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.Plan{})
+	proc := NewProcessor(engine, core.Plan{}, core.DefaultTokenizer)
 
 	file := sources.NewBufferInputFile("a.txt", []byte("one\ntwo\n"))
 	opts := core.RenderOptions{Head: -1}
@@ -282,7 +282,7 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 	osFile, mapFile := inputFile(os.DirFS(dir)), inputFile(fstest.MapFS{"big.txt": {Data: data}})
 
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.Plan{})
+	proc := NewProcessor(engine, core.Plan{}, core.DefaultTokenizer)
 	pad := strings.Repeat("-", 20)
 	want := "   1: line 00001 " + pad + "\n" +
 		"   2: line 00002 " + pad + "\n" +
@@ -351,7 +351,7 @@ func TestPrepareFileContextClampsEstimatedRows(t *testing.T) {
 	opts := core.RenderOptions{Head: 2, Tail: 2, LineNumbers: true}
 
 	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.Plan{})
+	proc := NewProcessor(engine, core.Plan{}, core.DefaultTokenizer)
 	ctx, issues := proc.prepareFileContext(context.Background(), file, opts, 1, nil)
 	if issues.ReadErr != nil {
 		t.Fatal(issues.ReadErr)
