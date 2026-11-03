@@ -13,18 +13,49 @@ import (
 	"github.com/rasros/lx/pkg/lx/walker"
 )
 
+// Config is a Stream's templates and output format, the library keys of lx's
+// config file.
+type Config = core.Config
+
+// RenderOptions decide how a file added to a Stream renders.
+type RenderOptions = core.RenderOptions
+
 // Plan is what a Stream is about to render, the .Global of its templates.
 type Plan = core.Plan
 
 // Report is what Stream.Execute rendered: its Plan and what only rendering
 // finds out.
 type Report = core.Report
-type RenderOptions = core.RenderOptions
-type Config = core.Config
-type SectionContext = core.SectionContext
-type PromptContext = core.PromptContext
 
+// Tokenizer estimates the tokens a Stream reports and templates see.
+type Tokenizer = core.Tokenizer
+
+// The template contexts: what each of a Config's templates renders.
+type (
+	// FileContext is what the file templates render: FileContentTemplate,
+	// FileErrorTemplate, FileBinaryTemplate, FileCompactTemplate,
+	// FileImageTemplate and FileHeaderTemplate.
+	FileContext = core.FileContext
+	// SectionContext is what SectionTemplate, SectionHeaderTemplate and
+	// SectionFooterTemplate render.
+	SectionContext = core.SectionContext
+	// PromptContext is what PromptTemplate renders.
+	PromptContext = core.PromptContext
+	// TreeContext is what TreeTemplate renders.
+	TreeContext = core.TreeContext
+	// MetaContext is what MetaTemplate renders.
+	MetaContext = core.MetaContext
+	// HeaderContext is what OutputHeaderTemplate renders.
+	HeaderContext = core.HeaderContext
+	// FooterContext is what OutputFooterTemplate renders.
+	FooterContext = core.FooterContext
+)
+
+// InputFile is a file to render, found by a Collector or made with
+// NewInputFile or NewBufferInputFile.
 type InputFile = sources.InputFile
+
+// DiscoverOptions decide what Collector.Collect finds.
 type DiscoverOptions = discover.Options
 
 // Glob is one -i or -e glob in DiscoverOptions.Globs, of a GlobKind.
@@ -41,7 +72,11 @@ const (
 	GlobKeep = walker.Keep
 )
 
+// Collector finds the inputs a path or URL refers to, as lx does.
 type Collector = discover.Collector
+
+// URLError is the Err of a Failure of a URL that could not be parsed or
+// downloaded.
 type URLError = discover.URLError
 
 // Failure is an input that could not be read, so it is missing from the
@@ -60,10 +95,14 @@ const (
 	FailedRead         = core.FailedRead
 )
 
+// FailureHandler is told about each Failure of a Stream, in output order.
 type FailureHandler = streamingpkg.FailureHandler
 
+// NewConfig returns the default Config, which renders Markdown.
 func NewConfig() *Config { return core.NewConfig() }
 
+// Merge sets in dst the fields src sets: its non-empty templates and
+// strings, and its non-nil layout properties.
 func Merge(dst *Config, src *Config) { core.Merge(dst, src) }
 
 // NewCollector returns a Collector, which finds the inputs of the targets of
@@ -88,18 +127,24 @@ func UserIgnoreRules(env func(key string) (string, bool), log *slog.Logger) (ign
 	return discover.UserIgnoreRules(env, log)
 }
 
+// NewInputFile returns the file at path in fsys, described by info.
 func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	return sources.NewInputFile(fsys, path, info)
 }
 
+// NewBufferInputFile returns a file named name holding data.
 func NewBufferInputFile(name string, data []byte) InputFile {
 	return sources.NewBufferInputFile(name, data)
 }
 
+// Stream renders files, sections, prompts, trees and metadata in the order
+// they are added. It is not safe for concurrent use, and renders once.
 type Stream struct {
 	inner *streamingpkg.Stream
 }
 
+// NewStream returns an empty Stream rendering with cfg, or the error of a
+// template in it that does not parse or names a field its context lacks.
 func NewStream(cfg *Config) (*Stream, error) {
 	s, err := streamingpkg.NewStream(cfg)
 	if err != nil {
@@ -113,6 +158,13 @@ func NewStream(cfg *Config) (*Stream, error) {
 // tree-sitter parsing does not scale past two workers.
 func (s *Stream) WithConcurrency(n int) *Stream {
 	s.inner.WithConcurrency(n)
+	return s
+}
+
+// WithTokenizer sets the estimator of the tokens the stream reports and its
+// templates see as FileContext.TokenEstimate. The default scans the text.
+func (s *Stream) WithTokenizer(t Tokenizer) *Stream {
+	s.inner.WithTokenizer(t)
 	return s
 }
 
@@ -156,11 +208,14 @@ func (s *Stream) AddFile(f InputFile, opts RenderOptions) *Stream {
 	return s
 }
 
+// AddSection starts a section titled title; what is added after it belongs
+// to it. What is added before the first section belongs to an implicit one.
 func (s *Stream) AddSection(title string) *Stream {
 	s.inner.AddSection(title)
 	return s
 }
 
+// AddPrompt enqueues text, rendered with the PromptTemplate.
 func (s *Stream) AddPrompt(text string) *Stream {
 	s.inner.AddPrompt(text)
 	return s
@@ -174,6 +229,8 @@ func (s *Stream) AddTree(files []InputFile, opts RenderOptions) *Stream {
 	return s
 }
 
+// AddMeta enqueues a metadata block, rendered with the MetaTemplate: body
+// as rendered by default and fields for a template to pick from.
 func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
 	s.inner.AddMeta(body, fields)
 	return s

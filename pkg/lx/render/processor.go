@@ -469,7 +469,7 @@ func (p *Processor) prepareFileContext(file sources.InputFile, cfg core.RenderOp
 		SkeletonMode:  skeletonMode,
 		ConvertedFrom: convertedFrom,
 	}
-	fCtx.SetTokenCounter(p.tokenCounter)
+	core.SetTokenCounter(&fCtx, p.tokenCounter)
 	return fCtx, issues
 }
 
