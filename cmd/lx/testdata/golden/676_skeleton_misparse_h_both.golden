@@ -1,0 +1,20 @@
+--- STDOUT ---
+skeleton/misparse.h (18 rows, definitions)
+---
+```c
+// C++ in a .h file, read as C.
+struct Solution {
+  bool valid = false;
+  std::vector<double> values;
+  void clear();
+  void print(const std::string& prefix = "",
+             const std::string& message = "") const;
+  bool isValid(int i) const {
+...
+};
+...
+int solve(struct Solution *s);
+```
+
+
+--- STDERR ---

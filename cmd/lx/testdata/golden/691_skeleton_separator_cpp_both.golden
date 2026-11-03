@@ -1,0 +1,14 @@
+--- STDOUT ---
+skeleton/separator.cpp (11 rows, definitions)
+---
+```cpp
+namespace geo {
+...
+// A digit separator opens no character literal.
+int scale(int x) {
+...
+}  // namespace geo
+```
+
+
+--- STDERR ---

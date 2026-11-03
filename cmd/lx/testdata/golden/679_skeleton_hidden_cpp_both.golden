@@ -1,0 +1,9 @@
+--- STDOUT ---
+skeleton/hidden.cpp (7 rows, definitions)
+---
+```cpp
+    set & set::erase() {
+```
+
+
+--- STDERR ---

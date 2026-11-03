@@ -1,0 +1,9 @@
+--- STDOUT ---
+skeleton/stmt.cpp (11 rows, function signatures)
+---
+```cpp
+int after();
+```
+
+
+--- STDERR ---

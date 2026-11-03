@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/openif.c (5 rows, definitions)
+---
+```c
+int feature(void);
+...
+int more(void);
+```
+
+
+--- STDERR ---
