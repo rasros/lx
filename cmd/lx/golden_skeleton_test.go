@@ -32,6 +32,7 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "321_skeleton_c_structs", args: []string{"-Y", "skeleton/main.c"}},
 		{name: "322_skeleton_c_both", args: []string{"-u", "-Y", "skeleton/main.c"}},
 		{name: "323_skeleton_cpp_both", args: []string{"-u", "-Y", "skeleton/main.cpp"}},
+		{name: "324_skeleton_c_block_doc", args: []string{"-u", "-Y", "skeleton/blockdoc.c"}},
 
 		// 330-339: Java
 		{name: "330_skeleton_java_structs", args: []string{"-Y", "skeleton/Main.java"}},
