@@ -21,7 +21,7 @@ func TestLayoutWriter(t *testing.T) {
 
 	t.Run("Standard Spacing", func(t *testing.T) {
 		var buf bytes.Buffer
-		lw := NewLayoutWriter(&buf, engine, sections, true)
+		lw := NewLayoutWriter(&buf, engine, sections, true, core.DefaultTokenizer)
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("Item1"), SectionIndex: 0, IsCompact: false})
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("Item2"), SectionIndex: 0, IsCompact: false})
 		_ = lw.Close()
@@ -35,7 +35,7 @@ func TestLayoutWriter(t *testing.T) {
 
 	t.Run("Compact Spacing", func(t *testing.T) {
 		var buf bytes.Buffer
-		lw := NewLayoutWriter(&buf, engine, sections, true)
+		lw := NewLayoutWriter(&buf, engine, sections, true, core.DefaultTokenizer)
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("Item1"), SectionIndex: 0, IsCompact: true})
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("Item2"), SectionIndex: 0, IsCompact: true})
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("Item3"), SectionIndex: 0, IsCompact: false})
@@ -50,7 +50,7 @@ func TestLayoutWriter(t *testing.T) {
 
 	t.Run("Section Transition", func(t *testing.T) {
 		var buf bytes.Buffer
-		lw := NewLayoutWriter(&buf, engine, sections, true)
+		lw := NewLayoutWriter(&buf, engine, sections, true, core.DefaultTokenizer)
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("A"), SectionIndex: 0})
 		_ = lw.WriteItem(Result{Section: true, SectionIndex: 1})
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("B"), SectionIndex: 1})
@@ -65,7 +65,7 @@ func TestLayoutWriter(t *testing.T) {
 
 	t.Run("HTML No Spacing", func(t *testing.T) {
 		var buf bytes.Buffer
-		lw := NewLayoutWriter(&buf, engine, sections, false)
+		lw := NewLayoutWriter(&buf, engine, sections, false, core.DefaultTokenizer)
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("<div1/>\n"), SectionIndex: 0})
 		_ = lw.WriteItem(Result{Buffer: bytes.NewBufferString("<div2/>\n"), SectionIndex: 0})
 		_ = lw.Close()

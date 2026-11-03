@@ -59,8 +59,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		go func() {
 			defer wg.Done()
 
-			proc := render.NewProcessor(s.engine, global)
-			proc.SetTokenCounter(s.tokenizer.Estimate)
+			proc := render.NewProcessor(s.engine, global, s.tokenizer)
 
 			for j := range jobsCh {
 				if ctx.Err() != nil {
@@ -81,7 +80,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				// template split its writes.
 				var tokens int64
 				if buf.Len() > 0 {
-					tokens = s.tokenizer.Estimate(int64(buf.Len()), buf.Bytes())
+					tokens = s.tokenizer(int64(buf.Len()), buf.Bytes())
 				}
 
 				f := fileOf(j.item)
@@ -142,8 +141,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 		}
 	}()
 
-	layout := render.NewLayoutWriter(dest, s.engine, s.sections, s.engine.UseSeparators)
-	layout.SetTokenizer(s.tokenizer)
+	layout := render.NewLayoutWriter(dest, s.engine, s.sections, s.engine.UseSeparators, s.tokenizer)
 
 Loop:
 	for out := range pending {

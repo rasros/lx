@@ -150,23 +150,22 @@ type FileContext struct {
 	SkeletonMode     string
 	ConvertedFrom    string
 
-	tokenCounter TokenCounter
+	tokenizer Tokenizer
 }
 
 // TokenEstimate estimates the tokens in the rendered content. It is computed
 // when a template asks for it, so templates that never do skip the scan.
 func (f FileContext) TokenEstimate() int64 {
-	tc := f.tokenCounter
-	if tc == nil {
-		tc = DefaultTokenCounter
+	if f.tokenizer == nil {
+		return DefaultTokenizer(f.Size, f.Content)
 	}
-	return tc(f.Size, f.Content)
+	return f.tokenizer(f.Size, f.Content)
 }
 
-// SetTokenCounter sets the estimator behind f's TokenEstimate. It is a
-// function so templates, which see FileContext's methods, cannot call it.
-func SetTokenCounter(f *FileContext, tc TokenCounter) {
-	f.tokenCounter = tc
+// SetTokenizer sets the estimator behind f's TokenEstimate. It is a function
+// so templates, which see FileContext's methods, cannot call it.
+func SetTokenizer(f *FileContext, t Tokenizer) {
+	f.tokenizer = t
 }
 
 // SectionContext represents the data provided to section templates.
@@ -211,15 +210,10 @@ type FooterContext struct {
 	Global Plan
 }
 
-// TokenCounter estimates token count from content.
-type TokenCounter func(size int64, content interface{}) int64
-
 // Tokenizer estimates the tokens of content of size bytes. content is nil
 // when only the size is known, as when a Stream plans, and otherwise the
-// rendered text, as a string, a []byte or a fmt.Stringer.
-type Tokenizer interface {
-	Estimate(size int64, content interface{}) int64
-}
+// rendered text, as a string or a []byte.
+type Tokenizer func(size int64, content interface{}) int64
 
 // Failure is an input that could not be read, so it is missing from the
 // output. Each is reported and counted once, in output order.

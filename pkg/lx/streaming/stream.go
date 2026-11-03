@@ -62,7 +62,7 @@ func NewStream(cfg *core.Config) (*Stream, error) {
 
 	return &Stream{
 		engine:      engine,
-		tokenizer:   core.DefaultTokenizer(),
+		tokenizer:   core.DefaultTokenizer,
 		concurrency: runtime.NumCPU(),
 		log:         slog.Default(),
 	}, nil
@@ -82,6 +82,8 @@ func (s *Stream) WithConcurrency(n int) *Stream {
 	return s
 }
 
+// WithTokenizer sets how the stream estimates tokens; the default is
+// core.DefaultTokenizer.
 func (s *Stream) WithTokenizer(t core.Tokenizer) *Stream {
 	s.tokenizer = t
 	return s
@@ -230,7 +232,7 @@ func (s *Stream) prepare() (core.Plan, []*core.SectionContext, []render.Prepared
 				global.TotalSize += f.Size
 			}
 			// Size-only: no content read yet.
-			global.TokenEstimate += s.tokenizer.Estimate(f.Size, nil)
+			global.TokenEstimate += s.tokenizer(f.Size, nil)
 
 			prepared = append(prepared, render.PreparedItem{
 				Raw:              item,

@@ -43,20 +43,18 @@ type LayoutWriter struct {
 	tokens           int64
 }
 
-func NewLayoutWriter(w io.Writer, engine *core.TemplateEngine, sections []*core.SectionContext, enableSeparators bool) *LayoutWriter {
+// NewLayoutWriter returns a LayoutWriter that estimates with tokenizer the
+// tokens of what it writes besides the items, whose estimates arrive with
+// them in Result.Tokens.
+func NewLayoutWriter(w io.Writer, engine *core.TemplateEngine, sections []*core.SectionContext, enableSeparators bool, tokenizer core.Tokenizer) *LayoutWriter {
 	return &LayoutWriter{
 		w:                w,
 		engine:           engine,
 		sections:         sections,
 		enableSeparators: enableSeparators,
 		currentSecIdx:    -1,
+		tokenizer:        tokenizer,
 	}
-}
-
-// SetTokenizer makes the writer estimate tokens for what it writes besides the
-// items, whose estimates arrive with them in Result.Tokens.
-func (lw *LayoutWriter) SetTokenizer(t core.Tokenizer) {
-	lw.tokenizer = t
 }
 
 // Tokens is the estimate for everything written so far.
@@ -160,24 +158,22 @@ func (lw *LayoutWriter) renderTemplate(tmpl *template.Template, sec *core.Sectio
 
 // writeCounted writes p and adds its token estimate.
 func (lw *LayoutWriter) writeCounted(p []byte) error {
-	if lw.tokenizer != nil {
-		lw.tokens += lw.tokenizer.Estimate(int64(len(p)), p)
-	}
+	lw.tokens += lw.tokenizer(int64(len(p)), p)
 	_, err := lw.w.Write(p)
 	return err
 }
 
 // ExecuteCounted renders tmpl to w in one write and estimates its tokens over
 // the whole output, so the estimate does not depend on how the template splits
-// its writes. A nil tokenizer estimates nothing.
+// its writes.
 func ExecuteCounted(w io.Writer, tmpl *template.Template, data interface{}, tokenizer core.Tokenizer) (int64, error) {
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return 0, err
 	}
 	var tokens int64
-	if tokenizer != nil && buf.Len() > 0 {
-		tokens = tokenizer.Estimate(int64(buf.Len()), buf.Bytes())
+	if buf.Len() > 0 {
+		tokens = tokenizer(int64(buf.Len()), buf.Bytes())
 	}
 	_, err := w.Write(buf.Bytes())
 	return tokens, err

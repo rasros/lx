@@ -67,7 +67,7 @@ func renderStream(t *testing.T, file sources.InputFile, cfg core.RenderOptions) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	proc := NewProcessor(engine, core.Plan{TotalFiles: 1})
+	proc := NewProcessor(engine, core.Plan{TotalFiles: 1}, core.DefaultTokenizer)
 	var buf bytes.Buffer
 	item := PreparedItem{Raw: FileItem{File: file, Opts: cfg}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
 	if _, err := proc.RenderPrepared(context.Background(), &buf, item, nil); err != nil {
