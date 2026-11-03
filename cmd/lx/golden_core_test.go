@@ -31,7 +31,9 @@ func TestGoldenFormatting(t *testing.T) {
 		{name: "011_fmt_html", args: []string{"--html", "main.go", "README.md"}},
 		{name: "012_fmt_markdown_explicit", args: []string{"--md", "main.go"}},
 		{name: "013_fmt_xml_sections", args: []string{"--xml", "-s", "Core", "main.go", "-s", "Docs", "README.md"}},
+		{name: "013b_fmt_xml_empty_section", args: []string{"--xml", "-s", "Empty", "-s", "Core", "main.go"}},
 		{name: "014_fmt_html_sections", args: []string{"--html", "-s", "Core", "main.go"}},
+		{name: "014b_fmt_html_empty_section", args: []string{"--html", "-s", "Empty", "-s", "Core", "main.go"}},
 		{name: "015_fmt_markdown_no_fences", args: []string{"-y", "configs/custom_template.yaml", "main.go"}},
 		{name: "016_fmt_bare", args: []string{"--bare", "main.go", "README.md"}},
 	})
@@ -188,6 +190,7 @@ func TestGoldenProfileOverrides(t *testing.T) {
 		"image_as_binary.yaml":     "embed_images: false\nfile_image_template: \"{{ template \\\"file_binary\\\" . }}\"\n",
 		"image_unknown_field.yaml": "file_image_template: \"{{ .Width }}\"\n",
 		"unknown_format.yaml":      "output_format: htm\n",
+		"content_only.yaml":        "file_content_template: \"{{ .Content }}\"\n",
 	}
 	for name, data := range cfgs {
 		if err := os.WriteFile(filepath.Join(cfgDir, name), []byte(data), 0644); err != nil {
@@ -202,6 +205,7 @@ func TestGoldenProfileOverrides(t *testing.T) {
 		{name: "089f_profile_html_image_as_binary", args: []string{"--html", "-y", cfg("image_as_binary.yaml"), "assets/logo.png"}},
 		{name: "089g_profile_image_template_unknown_field_fails_up_front", args: []string{"-y", cfg("image_unknown_field.yaml"), "langs/main.rs"}},
 		{name: "089h_profile_unknown_format_fails", args: []string{"-y", cfg("unknown_format.yaml"), "langs/main.rs"}},
+		{name: "089i_profile_html_content_override_keeps_images", args: []string{"--html", "-y", cfg("content_only.yaml"), "langs/main.rs", "assets/logo.png"}},
 	})
 }
 
