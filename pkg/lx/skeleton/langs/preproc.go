@@ -96,11 +96,13 @@ func BalanceConditionals(lines [][]byte, kept []internal.LineRange, hidden []boo
 // span is the rows of one directive, inclusive.
 type span struct{ from, to int }
 
+var pragmaOnce = regexp.MustCompile(`^#\s*pragma\s+once\b`)
+
 var guardOpen = regexp.MustCompile(`^\s*#\s*(ifndef\s+\w+|if\s+!\s*defined\s*(\(\s*\w+\s*\)|\s\w+))\s*(//.*|/\*.*)?$`)
 
 // includeGuard reports a conditional from the directive open to the #endif
 // close that opens like an include guard and has only comments and blank
-// lines outside it.
+// lines (and a `#pragma once`) outside it.
 func includeGuard(lines [][]byte, hidden []bool, o, c span) bool {
 	if o.from != o.to || !guardOpen.Match(lines[o.from]) {
 		return false
@@ -110,7 +112,7 @@ func includeGuard(lines [][]byte, hidden []bool, o, c span) bool {
 			continue
 		}
 		line := bytes.TrimSpace(lines[row])
-		if len(line) > 0 && !bytes.HasPrefix(line, []byte("//")) && !bytes.HasPrefix(line, []byte("/*")) {
+		if len(line) > 0 && !bytes.HasPrefix(line, []byte("//")) && !bytes.HasPrefix(line, []byte("/*")) && !pragmaOnce.Match(line) {
 			return false
 		}
 	}

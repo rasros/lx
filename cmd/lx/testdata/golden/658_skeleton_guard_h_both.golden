@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/guard.h (38 rows, definitions)
+skeleton/guard.h (39 rows, definitions)
 ---
 ```c
 /* Declared before its definition. */
