@@ -19,6 +19,7 @@ file_error_template: "x"
 file_binary_template: "x"
 file_compact_template: "x"
 file_header_template: "x"
+file_image_template: "x"
 section_template: "x"
 prompt_template: "x"
 tree_template: "x"
@@ -29,6 +30,8 @@ output_header_template: "x"
 output_footer_template: "x"
 stats_template: "x"
 output_format: "xml"
+separators: false
+embed_images: false
 output_mode: "copy"
 show_stats: "always"
 verbosity: "debug"
@@ -63,8 +66,8 @@ func TestLoadConfigChainAcceptsEveryKey(t *testing.T) {
 
 	v := reflect.ValueOf(lxCfg).Elem()
 	for i := 0; i < v.NumField(); i++ {
-		if v.Field(i).String() == "" {
-			t.Errorf("%s stayed empty; check its yaml tag", v.Type().Field(i).Name)
+		if v.Field(i).IsZero() {
+			t.Errorf("%s stayed unset; check its yaml tag", v.Type().Field(i).Name)
 		}
 	}
 

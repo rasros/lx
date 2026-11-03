@@ -1,0 +1,5 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: file_image template: template: file_image:1:3: executing "file_image" at <.Width>: can't evaluate field Width in type *core.FileContext

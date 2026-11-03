@@ -14,12 +14,15 @@ import (
 	"github.com/rasros/lx/pkg/lx/internal"
 )
 
-type formatDefaults struct {
+// profile is an output format as data: the templates it defaults to and how
+// the output is laid out around them. Config keys override each property.
+type profile struct {
 	FileContent   string
 	FileError     string
 	FileBinary    string
 	FileCompact   string
 	FileHeader    string
+	FileImage     string
 	Section       string
 	Prompt        string
 	Tree          string
@@ -28,65 +31,89 @@ type formatDefaults struct {
 	OutputFooter  string
 	SectionHeader string
 	SectionFooter string
+
+	// Separators puts a blank line between items, or a newline between
+	// compact ones.
+	Separators bool
+	// EmbedImages reads images into FileContext.DataURI instead of
+	// describing them.
+	EmbedImages bool
 }
 
-func getFormatDefaults(fmtType string) formatDefaults {
-	switch fmtType {
-	case "xml":
-		return formatDefaults{
-			FileContent:   defaultXMLContent,
-			FileError:     defaultXMLError,
-			FileBinary:    defaultXMLBinary,
-			FileCompact:   defaultXMLCompact,
-			Section:       defaultXMLSection,
-			SectionHeader: defaultXMLSectionHeader,
-			SectionFooter: defaultXMLSectionFooter,
-			Prompt:        defaultXMLPrompt,
-			Tree:          defaultXMLTree,
-			Meta:          defaultXMLMeta,
-			OutputFooter:  defaultXMLOutputFooter,
-		}
-	case "html":
-		return formatDefaults{
-			FileContent:   defaultHTMLContent,
-			FileError:     defaultHTMLError,
-			FileBinary:    defaultHTMLBinary,
-			FileCompact:   defaultHTMLCompact,
-			Section:       defaultHTMLSection,
-			SectionHeader: defaultHTMLSectionHeader,
-			SectionFooter: defaultHTMLSectionFooter,
-			Prompt:        defaultHTMLPrompt,
-			Tree:          defaultHTMLTree,
-			Meta:          defaultHTMLMeta,
-			OutputHeader:  defaultHTMLOutputHeader,
-			OutputFooter:  defaultHTMLOutputFooter,
-		}
-	case "bare":
-		return formatDefaults{
-			FileContent: defaultBareContent,
-			FileError:   defaultBareError,
-			FileBinary:  defaultBareBinary,
-			FileCompact: defaultBareCompact,
-			FileHeader:  defaultBareFileHeader,
-			Section:     defaultBareSection,
-			Prompt:      defaultBarePrompt,
-			Tree:        defaultBareTree,
-			Meta:        defaultBareMeta,
-		}
-	default: // markdown
-		return formatDefaults{
-			FileContent:  defaultMarkdownContent,
-			FileError:    defaultMarkdownError,
-			FileBinary:   defaultMarkdownBinary,
-			FileCompact:  defaultMarkdownCompact,
-			FileHeader:   defaultMarkdownFileHeader,
-			Section:      defaultMarkdownSection,
-			Prompt:       defaultPrompt,
-			Tree:         defaultMarkdownTree,
-			Meta:         defaultMarkdownMeta,
-			OutputFooter: defaultMarkdownOutputFooter,
-		}
+// Image templates that render an image as one of the other file templates.
+const (
+	imageAsContent = `{{ template "file_content" . }}`
+	imageAsBinary  = `{{ template "file_binary" . }}`
+)
+
+// profiles are the built-in output formats by name.
+var profiles = map[string]profile{
+	"markdown": {
+		FileContent:  defaultMarkdownContent,
+		FileError:    defaultMarkdownError,
+		FileBinary:   defaultMarkdownBinary,
+		FileCompact:  defaultMarkdownCompact,
+		FileHeader:   defaultMarkdownFileHeader,
+		FileImage:    imageAsBinary,
+		Section:      defaultMarkdownSection,
+		Prompt:       defaultPrompt,
+		Tree:         defaultMarkdownTree,
+		Meta:         defaultMarkdownMeta,
+		OutputFooter: defaultMarkdownOutputFooter,
+		Separators:   true,
+	},
+	"xml": {
+		FileContent:   defaultXMLContent,
+		FileError:     defaultXMLError,
+		FileBinary:    defaultXMLBinary,
+		FileCompact:   defaultXMLCompact,
+		FileImage:     imageAsBinary,
+		Section:       defaultXMLSection,
+		SectionHeader: defaultXMLSectionHeader,
+		SectionFooter: defaultXMLSectionFooter,
+		Prompt:        defaultXMLPrompt,
+		Tree:          defaultXMLTree,
+		Meta:          defaultXMLMeta,
+		OutputFooter:  defaultXMLOutputFooter,
+		Separators:    true,
+	},
+	"html": {
+		FileContent:   defaultHTMLContent,
+		FileError:     defaultHTMLError,
+		FileBinary:    defaultHTMLBinary,
+		FileCompact:   defaultHTMLCompact,
+		FileImage:     imageAsContent,
+		Section:       defaultHTMLSection,
+		SectionHeader: defaultHTMLSectionHeader,
+		SectionFooter: defaultHTMLSectionFooter,
+		Prompt:        defaultHTMLPrompt,
+		Tree:          defaultHTMLTree,
+		Meta:          defaultHTMLMeta,
+		OutputHeader:  defaultHTMLOutputHeader,
+		OutputFooter:  defaultHTMLOutputFooter,
+		EmbedImages:   true,
+	},
+	"bare": {
+		FileContent: defaultBareContent,
+		FileError:   defaultBareError,
+		FileBinary:  defaultBareBinary,
+		FileCompact: defaultBareCompact,
+		FileHeader:  defaultBareFileHeader,
+		FileImage:   imageAsBinary,
+		Section:     defaultBareSection,
+		Prompt:      defaultBarePrompt,
+		Tree:        defaultBareTree,
+		Meta:        defaultBareMeta,
+	},
+}
+
+// profileFor returns the profile of format, or Markdown's for a format lx
+// does not know.
+func profileFor(format string) profile {
+	if p, ok := profiles[format]; ok {
+		return p
 	}
+	return profiles["markdown"]
 }
 
 const defaultMarkdownFileHeader = `{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }}`

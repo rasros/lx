@@ -26,6 +26,11 @@ file_binary_template: |-
 file_compact_template: |-
   {{ template "file_header" . }} ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows{{ if .SkeletonMode }}, {{ .SkeletonMode }}{{ end }})
 
+# Renders an image file. It can call file_content and file_binary; Markdown
+# reports images as binary files, since it does not embed them.
+file_image_template: |-
+  {{ template "file_binary" . }}
+
 # -----------------------------------------------------------------------------
 # Item Templates
 # -----------------------------------------------------------------------------
@@ -60,6 +65,16 @@ section_footer_template: ""
 #   Files: {{ .Global.TotalFiles }}
 #   Size: {{ .Global.TotalWrittenBytes | humanize }}
 #   Est. Tokens: {{ .Global.WrittenTokenEstimate }}
+
+# -----------------------------------------------------------------------------
+# Layout
+# -----------------------------------------------------------------------------
+
+# Put a blank line between rendered items, or a newline between compact ones.
+separators: true
+
+# Read images into .DataURI for file_image_template, as HTML does.
+embed_images: false
 
 # -----------------------------------------------------------------------------
 # Options

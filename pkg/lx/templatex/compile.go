@@ -23,15 +23,11 @@ func CheckFields(t *template.Template, data interface{}) error {
 	return nil
 }
 
-// Compile parses configuration templates into an engine. A template that
-// names a field its context lacks is an error too.
+// Compile parses configuration templates into an engine. The format's
+// profile supplies every template and layout property the config leaves
+// unset. A template that names a field its context lacks is an error too.
 func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
-	format := cfg.OutputFormat
-	if format == "" {
-		format = "markdown"
-	}
-
-	defaults := getFormatDefaults(format)
+	prof := profileFor(cfg.OutputFormat)
 
 	pick := func(user, def string) string {
 		if user != "" {
@@ -39,76 +35,102 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		}
 		return def
 	}
+	pickBool := func(user *bool, def bool) bool {
+		if user != nil {
+			return *user
+		}
+		return def
+	}
 
 	engine := &core.TemplateEngine{}
 	funcs := templateFuncs(engine)
 
-	fileHeaderStr := pick(cfg.FileHeaderTemplate, defaults.FileHeader)
+	fileHeaderStr := pick(cfg.FileHeaderTemplate, prof.FileHeader)
+	fileContentStr := pick(cfg.FileContentTemplate, prof.FileContent)
+	fileBinaryStr := pick(cfg.FileBinaryTemplate, prof.FileBinary)
 
-	parseWithPartial := func(name, tmpl string) (*template.Template, error) {
+	// parseFile parses a file template with the partials it may call:
+	// file_header, and for the image template file_content and file_binary
+	// too, as which the built-in ones render images.
+	parseFile := func(name, tmpl string, partials map[string]string) (*template.Template, error) {
 		t := template.New(name).Funcs(funcs)
 		if _, err := t.Parse(tmpl); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s template: %w", name, err)
 		}
-		if _, err := t.New("file_header").Parse(fileHeaderStr); err != nil {
-			return nil, err
+		for _, p := range []string{"file_header", "file_content", "file_binary"} {
+			src, ok := partials[p]
+			if !ok {
+				continue
+			}
+			if _, err := t.New(p).Parse(src); err != nil {
+				return nil, fmt.Errorf("%s template: %w", name, err)
+			}
 		}
 		return t, nil
 	}
+	header := map[string]string{"file_header": fileHeaderStr}
 
 	parse := func(name, tmpl string) (*template.Template, error) {
 		return template.New(name).Funcs(funcs).Parse(tmpl)
 	}
 
-	tContent, err := parseWithPartial("file_content", pick(cfg.FileContentTemplate, defaults.FileContent))
+	tContent, err := parseFile("file_content", fileContentStr, header)
 	if err != nil {
-		return nil, fmt.Errorf("file_content template: %w", err)
+		return nil, err
 	}
-	tError, err := parseWithPartial("file_error", pick(cfg.FileErrorTemplate, defaults.FileError))
+	tError, err := parseFile("file_error", pick(cfg.FileErrorTemplate, prof.FileError), header)
 	if err != nil {
-		return nil, fmt.Errorf("file_error template: %w", err)
+		return nil, err
 	}
-	tBinary, err := parseWithPartial("file_binary", pick(cfg.FileBinaryTemplate, defaults.FileBinary))
+	tBinary, err := parseFile("file_binary", fileBinaryStr, header)
 	if err != nil {
-		return nil, fmt.Errorf("file_binary template: %w", err)
+		return nil, err
 	}
-	tCompact, err := parseWithPartial("file_compact", pick(cfg.FileCompactTemplate, defaults.FileCompact))
+	tCompact, err := parseFile("file_compact", pick(cfg.FileCompactTemplate, prof.FileCompact), header)
 	if err != nil {
-		return nil, fmt.Errorf("file_compact template: %w", err)
+		return nil, err
+	}
+	tImage, err := parseFile("file_image", pick(cfg.FileImageTemplate, prof.FileImage), map[string]string{
+		"file_header":  fileHeaderStr,
+		"file_content": fileContentStr,
+		"file_binary":  fileBinaryStr,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	tSection, err := parse("section", pick(cfg.SectionTemplate, defaults.Section))
+	tSection, err := parse("section", pick(cfg.SectionTemplate, prof.Section))
 	if err != nil {
 		return nil, fmt.Errorf("section template: %w", err)
 	}
-	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, defaults.Prompt))
+	tPrompt, err := parse("prompt", pick(cfg.PromptTemplate, prof.Prompt))
 	if err != nil {
 		return nil, fmt.Errorf("prompt template: %w", err)
 	}
-	tTree, err := parse("tree", pick(cfg.TreeTemplate, defaults.Tree))
+	tTree, err := parse("tree", pick(cfg.TreeTemplate, prof.Tree))
 	if err != nil {
 		return nil, fmt.Errorf("tree template: %w", err)
 	}
 
-	tMeta, err := parse("meta", pick(cfg.MetaTemplate, defaults.Meta))
+	tMeta, err := parse("meta", pick(cfg.MetaTemplate, prof.Meta))
 	if err != nil {
 		return nil, fmt.Errorf("meta template: %w", err)
 	}
 
-	tSecHeader, err := parse("section_header", pick(cfg.SectionHeaderTemplate, defaults.SectionHeader))
+	tSecHeader, err := parse("section_header", pick(cfg.SectionHeaderTemplate, prof.SectionHeader))
 	if err != nil {
 		return nil, fmt.Errorf("section_header template: %w", err)
 	}
-	tSecFooter, err := parse("section_footer", pick(cfg.SectionFooterTemplate, defaults.SectionFooter))
+	tSecFooter, err := parse("section_footer", pick(cfg.SectionFooterTemplate, prof.SectionFooter))
 	if err != nil {
 		return nil, fmt.Errorf("section_footer template: %w", err)
 	}
 
-	tHeader, err := parse("output_header", pick(cfg.OutputHeaderTemplate, defaults.OutputHeader))
+	tHeader, err := parse("output_header", pick(cfg.OutputHeaderTemplate, prof.OutputHeader))
 	if err != nil {
 		return nil, fmt.Errorf("output_header template: %w", err)
 	}
-	tFooter, err := parse("output_footer", pick(cfg.OutputFooterTemplate, defaults.OutputFooter))
+	tFooter, err := parse("output_footer", pick(cfg.OutputFooterTemplate, prof.OutputFooter))
 	if err != nil {
 		return nil, fmt.Errorf("output_footer template: %w", err)
 	}
@@ -124,6 +146,7 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		{"file_error", tError, &core.FileContext{}},
 		{"file_binary", tBinary, &core.FileContext{}},
 		{"file_compact", tCompact, &core.FileContext{}},
+		{"file_image", tImage, &core.FileContext{}},
 		{"section", tSection, &core.SectionContext{}},
 		{"prompt", tPrompt, &core.PromptContext{}},
 		{"tree", tTree, &core.TreeContext{}},
@@ -136,12 +159,6 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		if err := CheckFields(c.t, c.data); err != nil {
 			return nil, fmt.Errorf("%s template: %w", c.name, err)
 		}
-	}
-
-	// HTML embeds images inline; every other format reports them like binaries.
-	tImage := tBinary
-	if format == "html" {
-		tImage = tContent
 	}
 
 	*engine = core.TemplateEngine{
@@ -158,8 +175,8 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 		SectionFooter: tSecFooter,
 		OutputHeader:  tHeader,
 		OutputFooter:  tFooter,
-		EmbedImages:   format == "html",
-		UseSeparators: format != "html" && format != "bare",
+		EmbedImages:   pickBool(cfg.EmbedImages, prof.EmbedImages),
+		UseSeparators: pickBool(cfg.Separators, prof.Separators),
 	}
 	return engine, nil
 }

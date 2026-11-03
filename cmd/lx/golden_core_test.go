@@ -174,6 +174,35 @@ func TestGoldenDetection(t *testing.T) {
 	})
 }
 
+// The layout properties of a format's profile can be overridden from config,
+// as its templates can.
+func TestGoldenProfileOverrides(t *testing.T) {
+	dir := setupDetectionFixture(t)
+	// Outside the fixture, so no case renders them.
+	cfgDir := t.TempDir()
+	cfgs := map[string]string{
+		"no_separators.yaml": "separators: false\n",
+		"separators.yaml":    "separators: true\n",
+		"embed_images.yaml": "embed_images: true\n" +
+			"file_image_template: \"{{ template \\\"file_header\\\" . }}\\n![{{ .Path }}]({{ .DataURI }})\"\n",
+		"image_as_binary.yaml":     "embed_images: false\nfile_image_template: \"{{ template \\\"file_binary\\\" . }}\"\n",
+		"image_unknown_field.yaml": "file_image_template: \"{{ .Width }}\"\n",
+	}
+	for name, data := range cfgs {
+		if err := os.WriteFile(filepath.Join(cfgDir, name), []byte(data), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := func(name string) string { return filepath.Join(cfgDir, name) }
+	runTestGolden(t, dir, []goldenTestCase{
+		{name: "089c_profile_md_no_separators", args: []string{"-y", cfg("no_separators.yaml"), "-s", "Code", "langs/main.rs", "src/script.py", "-s", "Data", "bin/data.bin", "assets/logo.png"}},
+		{name: "089d_profile_bare_separators", args: []string{"--bare", "-y", cfg("separators.yaml"), "langs/main.rs", "src/script.py"}},
+		{name: "089e_profile_md_embed_images", args: []string{"-y", cfg("embed_images.yaml"), "langs/main.rs", "assets/logo.png"}},
+		{name: "089f_profile_html_image_as_binary", args: []string{"--html", "-y", cfg("image_as_binary.yaml"), "assets/logo.png"}},
+		{name: "089g_profile_image_template_unknown_field_fails_up_front", args: []string{"-y", cfg("image_unknown_field.yaml"), "langs/main.rs"}},
+	})
+}
+
 func TestGoldenConfig(t *testing.T) {
 	dir := setupConfigFixture(t)
 	copyCfgDir := t.TempDir()

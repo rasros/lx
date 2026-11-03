@@ -9,9 +9,9 @@ func NewConfig() *Config {
 	}
 }
 
-// Merge applies non-zero fields from src to dst. Every field is a string, so
-// "set" and "non-zero" coincide; a future non-string field whose zero value is
-// meaningful would need explicit handling.
+// Merge applies the fields src sets to dst. A field is set when it is not
+// zero: a template is a non-empty string, and a layout property a non-nil
+// pointer, so false overrides too.
 func Merge(dst *Config, src *Config) {
 	d := reflect.ValueOf(dst).Elem()
 	s := reflect.ValueOf(src).Elem()

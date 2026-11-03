@@ -1,0 +1,15 @@
+--- STDOUT ---
+## Code
+---[1/2] langs/main.rs (1 rows)
+---
+```rust
+fn main() {}
+```[2/2] src/script.py (1 rows)
+---
+```python
+print('hello')
+```## Data
+---[1/2] bin/data.bin - binary file skipped (4 B)[2/2] assets/logo.png - binary file skipped (12 B)
+
+
+--- STDERR ---
