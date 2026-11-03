@@ -7,8 +7,12 @@ import (
 
 // CFuncVisible reports a C or C++ function definition, or a declaration
 // with a declarator that declares a function. A pointer to a function
-// (`int (*handler)(int);`) is a variable, not a function. A declaration
-// that failed to parse never gets here (see Misparsed).
+// (`int (*handler)(int);`) is a variable, not a function.
+//
+// A declaration that failed to parse but holds a function declarator
+// somewhere (C++ read as C: a class taken for a declaration) is reported
+// too, and kept whole: its declarators say nothing reliable, and the
+// functions in it would otherwise be lost.
 func CFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
 	if c.Type(n) != "declaration" {
 		return true
@@ -18,7 +22,7 @@ func CFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
 			return true
 		}
 	}
-	return false
+	return n.HasError() && hasDescendantOfType(c, n, "function_declarator")
 }
 
 func hasDescendantOfType(c *Ctx, n *gotreesitter.Node, typ string) bool {
@@ -37,8 +41,8 @@ func hasDescendantOfType(c *Ctx, n *gotreesitter.Node, typ string) bool {
 // (maybe returning a pointer or reference), not a pointer to or array of
 // them: what decides is the declarator nearest the name. In `void
 // (*callback)(int)` that is the pointer, in `int (*get(void))(int)` the
-// function. An initializer is looked through: C++ read as C makes one of a
-// pure virtual's `= 0` (`char const * name() const = 0;`), and
+// function. An initializer is looked through: the C grammar reads C++
+// default arguments and pure virtuals (`virtual void f() = 0;`) as one, and
 // `int (*fp)(int) = f;` stays a pointer.
 func declaresFunction(c *Ctx, d *gotreesitter.Node) bool {
 	function := false

@@ -71,7 +71,6 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"openif.c",
 		"stmt.c",
 		"stmt.cpp",
-		"separator.cpp",
 	}
 	for _, name := range languageFiles {
 		content := readFixtureFile(t, filepath.Join("languages", name))

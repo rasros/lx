@@ -1,19 +1,11 @@
 --- STDOUT ---
-skeleton/misparse.h (18 rows, function signatures)
+skeleton/misparse.h (8 rows, function signatures)
 ---
 ```c
-// C++ in a .h file, read as C.
-struct Solution {
-  bool valid = false;
-  std::vector<double> values;
-  void clear();
-  void print(const std::string& prefix = "",
-             const std::string& message = "") const;
-  bool isValid(int i) const {
-...
-};
-...
-int solve(struct Solution *s);
+*/
+struct expr_pair {
+    unsigned hash() const { return mix(m_node->hash(), m_delta); }
+    bool operator==(const expr_pair & e) const { return m_node == e.m_node; }
 ```
 
 

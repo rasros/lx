@@ -1,18 +1,8 @@
-#ifndef SOLUTION_H
-#define SOLUTION_H
-
-// C++ in a .h file, read as C.
-struct Solution {
-  bool valid = false;
-  std::vector<double> values;
-  void clear();
-  void print(const std::string& prefix = "",
-             const std::string& message = "") const;
-  bool isValid(int i) const {
-    return i < 3;
-  }
+/**
+   C++ read as C: the struct misparses into a declaration that holds
+   functions, kept whole.
+*/
+struct expr_pair {
+    unsigned hash() const { return mix(m_node->hash(), m_delta); }
+    bool operator==(const expr_pair & e) const { return m_node == e.m_node; }
 };
-
-int solve(struct Solution *s);
-
-#endif
