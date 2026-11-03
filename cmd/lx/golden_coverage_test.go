@@ -23,6 +23,8 @@ func TestGoldenOutputFile(t *testing.T) {
 		// A failed run leaves the earlier bundle as it was.
 		{true, goldenTestCase{name: "172c_output_file_kept_on_failure", args: []string{"-o", "bundle.md", "-P", "./missing.md", "main.go"}, outFile: "bundle.md"}},
 		{true, goldenTestCase{name: "172d_output_file_replaced", args: []string{"-q", "-o", "bundle.md", "main.go"}, outFile: "bundle.md"}},
+		// The output file is skipped when named, even before it exists.
+		{false, goldenTestCase{name: "172e_output_file_named_before_it_exists", args: []string{"--stats", "-o", "bundle.md", "bundle.md", "main.go"}}},
 	} {
 		t.Run(c.tc.name, func(t *testing.T) {
 			dir := setupWalkFixture(t)
