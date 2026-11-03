@@ -3,7 +3,6 @@ package sources
 import (
 	"slices"
 	"strings"
-	"sync"
 )
 
 // RewriteRepoURL returns the archive zip URL for a repository URL on GitHub,
@@ -26,9 +25,13 @@ func RewriteRepoURL(raw string) (string, bool) {
 	}
 
 	host := strings.ToLower(u.Host)
-	repoHostsMu.RLock()
 	rewriter, ok := repoHosts[host]
-	repoHostsMu.RUnlock()
+	if archive, test := TestRepoHosts[host]; test {
+		rewriter, ok = repoRewriter{
+			parse:      parseOwnerRepo(),
+			archiveURL: func(owner, repo, _ string) string { return archive(owner, repo) },
+		}, true
+	}
 	if !ok {
 		return "", false
 	}
@@ -83,92 +86,66 @@ func refOrHead(ref string) string {
 	return ref
 }
 
-var (
-	repoHostsMu sync.RWMutex
-	repoHosts   = map[string]repoRewriter{
-		"github.com": {
-			parse: parseOwnerRepo("tree"),
-			archiveURL: func(owner, repo, ref string) string {
-				if ref == "" {
-					return "https://github.com/" + owner + "/" + repo + "/archive/HEAD.zip"
-				}
-				return "https://github.com/" + owner + "/" + repo + "/archive/refs/heads/" + ref + ".zip"
-			},
+var repoHosts = map[string]repoRewriter{
+	"github.com": {
+		parse: parseOwnerRepo("tree"),
+		archiveURL: func(owner, repo, ref string) string {
+			if ref == "" {
+				return "https://github.com/" + owner + "/" + repo + "/archive/HEAD.zip"
+			}
+			return "https://github.com/" + owner + "/" + repo + "/archive/refs/heads/" + ref + ".zip"
 		},
-		"gitlab.com": {
-			parse: func(parts []string) (owner, repo, ref string, ok bool) {
-				// GitLab supports subgroups: group[/subgroup...]/repo[/-/tree/REF].
-				sep := -1
-				for i, p := range parts {
-					if p == "-" {
-						sep = i
-						break
-					}
+	},
+	"gitlab.com": {
+		parse: func(parts []string) (owner, repo, ref string, ok bool) {
+			// GitLab supports subgroups: group[/subgroup...]/repo[/-/tree/REF].
+			sep := -1
+			for i, p := range parts {
+				if p == "-" {
+					sep = i
+					break
 				}
-				var project, rest []string
-				if sep >= 0 {
-					project = parts[:sep]
-					rest = parts[sep+1:]
-				} else {
-					project = parts
-				}
-				if len(project) < 2 {
-					return "", "", "", false
-				}
-				owner = strings.Join(project[:len(project)-1], "/")
-				repo = trimRepo(project[len(project)-1])
-				if len(rest) == 0 {
-					return owner, repo, "", true
-				}
-				if len(rest) >= 2 && rest[0] == "tree" {
-					return owner, repo, strings.Join(rest[1:], "/"), true
-				}
-				return "", "", "", false
-			},
-			archiveURL: func(owner, repo, ref string) string {
-				r := refOrHead(ref)
-				return "https://gitlab.com/" + owner + "/" + repo + "/-/archive/" + r + "/" + repo + "-" + r + ".zip"
-			},
-		},
-		"bitbucket.org": {
-			parse: parseOwnerRepo("src"),
-			archiveURL: func(owner, repo, ref string) string {
-				return "https://bitbucket.org/" + owner + "/" + repo + "/get/" + refOrHead(ref) + ".zip"
-			},
-		},
-		"codeberg.org": {
-			parse: parseOwnerRepo("src", "branch"),
-			archiveURL: func(owner, repo, ref string) string {
-				return "https://codeberg.org/" + owner + "/" + repo + "/archive/" + refOrHead(ref) + ".zip"
-			},
-		},
-	}
-)
-
-// SetRepoHostForTest registers a host rewriter accepting "/owner/repo" so
-// tests can route URLs at an httptest.Server. The returned function restores
-// the previous registration.
-func SetRepoHostForTest(host string, archiveURL func(owner, repo, ref string) string) func() {
-	host = strings.ToLower(host)
-	repoHostsMu.Lock()
-	prev, existed := repoHosts[host]
-	repoHosts[host] = repoRewriter{
-		parse: func(parts []string) (string, string, string, bool) {
-			if len(parts) < 2 {
+			}
+			var project, rest []string
+			if sep >= 0 {
+				project = parts[:sep]
+				rest = parts[sep+1:]
+			} else {
+				project = parts
+			}
+			if len(project) < 2 {
 				return "", "", "", false
 			}
-			return parts[0], trimRepo(parts[1]), "", true
+			owner = strings.Join(project[:len(project)-1], "/")
+			repo = trimRepo(project[len(project)-1])
+			if len(rest) == 0 {
+				return owner, repo, "", true
+			}
+			if len(rest) >= 2 && rest[0] == "tree" {
+				return owner, repo, strings.Join(rest[1:], "/"), true
+			}
+			return "", "", "", false
 		},
-		archiveURL: archiveURL,
-	}
-	repoHostsMu.Unlock()
-	return func() {
-		repoHostsMu.Lock()
-		defer repoHostsMu.Unlock()
-		if existed {
-			repoHosts[host] = prev
-		} else {
-			delete(repoHosts, host)
-		}
-	}
+		archiveURL: func(owner, repo, ref string) string {
+			r := refOrHead(ref)
+			return "https://gitlab.com/" + owner + "/" + repo + "/-/archive/" + r + "/" + repo + "-" + r + ".zip"
+		},
+	},
+	"bitbucket.org": {
+		parse: parseOwnerRepo("src"),
+		archiveURL: func(owner, repo, ref string) string {
+			return "https://bitbucket.org/" + owner + "/" + repo + "/get/" + refOrHead(ref) + ".zip"
+		},
+	},
+	"codeberg.org": {
+		parse: parseOwnerRepo("src", "branch"),
+		archiveURL: func(owner, repo, ref string) string {
+			return "https://codeberg.org/" + owner + "/" + repo + "/archive/" + refOrHead(ref) + ".zip"
+		},
+	},
 }
+
+// TestRepoHosts maps a host to the archive URL of its "/owner/repo" URLs, so
+// tests can route repository URLs at an httptest.Server. Tests set it before
+// any URL is rewritten.
+var TestRepoHosts = map[string]func(owner, repo string) string{}

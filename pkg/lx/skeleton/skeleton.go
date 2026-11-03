@@ -16,16 +16,10 @@ func Supported(lang string) bool {
 	return ok
 }
 
-// Ranges returns the merged rows of src that make up its skeleton for lang.
-// A .h header is read as C or C++, whichever fits. Unparseable source, an
-// unsupported lang, or asking for neither part keeps every row.
-func Ranges(lang string, header bool, src []byte, functions, structs bool) []Range {
-	ranges, _ := ranges(lang, header, src, internal.SplitLines(src), functions, structs)
-	return ranges
-}
-
-// ranges is Ranges over src already split into lines. It also reports whether
-// src was reduced at all.
+// ranges returns the merged rows of src, already split into lines, that make
+// up its skeleton for lang, and whether src was reduced at all. A .h header
+// is read as C or C++, whichever fits. Unparseable source, an unsupported
+// lang, or asking for neither part keeps every row.
 func ranges(lang string, header bool, src []byte, lines [][]byte, functions, structs bool) ([]Range, bool) {
 	if functions || structs {
 		if kept, ok := extract(lang, header, src, lines, functions, structs); ok {
@@ -44,15 +38,4 @@ func Keep(lang string, header bool, src []byte, functions, structs bool) Lines {
 	lines := internal.SplitLines(src)
 	r, _ := ranges(lang, header, src, lines, functions, structs)
 	return internal.KeepRanges(lines, r)
-}
-
-// Extract returns the skeleton of src as text, with an elision marker
-// wherever source was left out.
-func Extract(lang string, header bool, src []byte, functions, structs bool) []byte {
-	lines := internal.SplitLines(src)
-	r, reduced := ranges(lang, header, src, lines, functions, structs)
-	if !reduced {
-		return src
-	}
-	return internal.KeepRanges(lines, r).Text()
 }
