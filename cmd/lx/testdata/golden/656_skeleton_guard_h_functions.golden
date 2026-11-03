@@ -1,5 +1,5 @@
 --- STDOUT ---
-skeleton/guard.h (38 rows, function signatures)
+skeleton/guard.h (39 rows, function signatures)
 ---
 ```c
 #if defined(USE_THREADS) && \
