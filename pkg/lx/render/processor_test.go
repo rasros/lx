@@ -301,7 +301,7 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 		if issues.ReadErr != nil {
 			t.Fatal(issues.ReadErr)
 		}
-		if got, _ := ctx.Content.(string); got != want {
+		if got := ctx.Content; got != want {
 			t.Errorf("%s: content =\n%s\nwant\n%s", name, got, want)
 		}
 		if ctx.TotalRows != 3000 {
@@ -362,7 +362,7 @@ func TestPrepareFileContextClampsEstimatedRows(t *testing.T) {
 	if ctx.TotalRows < 5 {
 		t.Errorf("rows = %d, want at least the 4 lines shown plus 1 skipped", ctx.TotalRows)
 	}
-	content, _ := ctx.Content.(string)
+	content := ctx.Content
 	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
 	if len(lines) != 5 || !strings.HasPrefix(lines[2], "... (~") {
 		t.Fatalf("want head, gap marker and tail, got %d lines; gap line %q", len(lines), lines[min(2, len(lines)-1)])

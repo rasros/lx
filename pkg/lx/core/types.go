@@ -138,7 +138,7 @@ type FileContext struct {
 	IsError          bool
 	IsEstimate       bool
 	Language         string
-	Content          interface{}
+	Content          string
 	IsBinary         bool
 	IsImage          bool
 	DataURI          string
