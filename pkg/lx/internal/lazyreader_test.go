@@ -164,6 +164,19 @@ func TestLazyReaderStreamCutOff(t *testing.T) {
 	if n, err := r.ReadAt(buf, 0); n != 5 || !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("ReadAt = %d, %v; want 5, ErrUnexpectedEOF", n, err)
 	}
+
+	// Without a declared length, Size reads to the failure, and a read of
+	// all that arrived still fails.
+	r = NewLazyReader(&failingReader{data: []byte("short"), err: io.ErrUnexpectedEOF}, -1)
+	if got := r.Size(); got != 5 {
+		t.Fatalf("Size = %d, want 5", got)
+	}
+	if n, err := r.ReadAt(buf[:5], 0); n != 5 || !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Errorf("ReadAt to the end = %d, %v; want 5, ErrUnexpectedEOF", n, err)
+	}
+	if n, err := r.ReadAt(buf[:2], 0); n != 2 || err != nil {
+		t.Errorf("ReadAt short of the end = %d, %v; want 2, nil", n, err)
+	}
 }
 
 func TestLazyReaderLyingLengthAllocatesWhatArrives(t *testing.T) {

@@ -9,6 +9,31 @@ import (
 	"testing/fstest"
 )
 
+// failAtEnd returns its data and, with the last of it, err.
+type failAtEnd struct {
+	data []byte
+	err  error
+}
+
+func (f failAtEnd) ReadAt(p []byte, off int64) (int, error) {
+	n := copy(p, f.data[off:])
+	if off+int64(n) >= int64(len(f.data)) {
+		return n, f.err
+	}
+	return n, nil
+}
+
+// A failure reported along with the last bytes is still a failure, while EOF
+// there is just the end.
+func TestReadAllAtFailureWithLastBytes(t *testing.T) {
+	if _, err := ReadAllAt(failAtEnd{[]byte("abc"), io.ErrUnexpectedEOF}, 3); err != io.ErrUnexpectedEOF {
+		t.Errorf("err = %v, want io.ErrUnexpectedEOF", err)
+	}
+	if got, err := ReadAllAt(failAtEnd{[]byte("abc"), io.EOF}, 3); err != nil || string(got) != "abc" {
+		t.Errorf("got %q, %v; want abc, nil", got, err)
+	}
+}
+
 // refLines splits data into lines that keep their terminators.
 func refLines(data []byte) [][]byte {
 	var lines [][]byte
