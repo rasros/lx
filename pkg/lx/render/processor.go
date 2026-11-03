@@ -29,7 +29,6 @@ type PreparedItem struct {
 	Section          *core.SectionContext
 	FileIndexGlobal  int
 	FileIndexSection int
-	StreamIndex      int
 }
 
 // Processor renders prepared items into an output writer.

@@ -115,11 +115,6 @@ func parseLong(arg string, args []string, idx int, defs map[string]CommandDef, r
 
 	def, ok := defs[key]
 	if !ok {
-		if key == "help" {
-			res.Globals["help"] = "true"
-			res.Ops = append(res.Ops, Op{Action: "help", Value: "true", Type: CmdGlobal})
-			return 0, nil
-		}
 		return 0, fmt.Errorf("unknown flag: --%s", key)
 	}
 
@@ -216,19 +211,14 @@ func parseShort(arg string, args []string, idx int, defs map[rune]CommandDef, re
 }
 
 func addOp(res *ParsedArgs, def CommandDef, val string, isShort bool) error {
-	prefix := "--"
-	if len(def.Name) == 1 {
-		prefix = "-"
-	}
-
 	switch def.ValueType {
 	case ValueNumber:
 		if _, err := strconv.Atoi(val); err != nil {
-			return fmt.Errorf("flag %s%s expects a number, got %q", prefix, def.Name, val)
+			return fmt.Errorf("flag --%s expects a number, got %q", def.Name, val)
 		}
 	case ValueSize:
 		if _, err := parseSizeLimit(val); err != nil {
-			return fmt.Errorf("flag %s%s: %w", prefix, def.Name, err)
+			return fmt.Errorf("flag --%s: %w", def.Name, err)
 		}
 	case ValueGlob:
 		g := lx.IncludeGlob(val)
@@ -236,7 +226,7 @@ func addOp(res *ParsedArgs, def CommandDef, val string, isShort bool) error {
 			g = lx.ExcludeGlob(val)
 		}
 		if g.Validate() != nil {
-			return fmt.Errorf("flag %s%s: invalid glob %q", prefix, def.Name, val)
+			return fmt.Errorf("flag --%s: invalid glob %q", def.Name, val)
 		}
 	}
 

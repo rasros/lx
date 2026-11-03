@@ -3,7 +3,6 @@ package streaming
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"sync"
 
@@ -13,9 +12,8 @@ import (
 )
 
 type seqJob struct {
-	seqID int
-	item  render.PreparedItem
-	out   chan<- render.Result
+	item render.PreparedItem
+	out  chan<- render.Result
 }
 
 var bufferPool = sync.Pool{New: func() interface{} { return new(bytes.Buffer) }}
@@ -98,9 +96,7 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 
 				// j.out has one slot reserved for this job, so this never blocks.
 				j.out <- render.Result{
-					Index:        j.seqID,
 					Buffer:       buf,
-					Stats:        int64(buf.Len()),
 					Tokens:       tokens,
 					Rows:         itemStats.Rows,
 					IsCompact:    itemStats.IsCompact,
@@ -130,16 +126,16 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 			if f, ok := item.Raw.(core.Failure); ok {
 				// An added failure renders nothing; it only holds its place
 				// in report order.
-				out <- render.Result{Index: item.StreamIndex, Failure: &f}
+				out <- render.Result{Failure: &f}
 				continue
 			}
 			if _, ok := item.Raw.(core.SectionContext); ok {
 				// The layout renders a section's title as it opens it.
-				out <- render.Result{Index: item.StreamIndex, Section: true, SectionIndex: item.Section.Index}
+				out <- render.Result{Section: true, SectionIndex: item.Section.Index}
 				continue
 			}
 			select {
-			case jobsCh <- seqJob{seqID: item.StreamIndex, item: item, out: out}:
+			case jobsCh <- seqJob{item: item, out: out}:
 			case <-ctx.Done():
 				return
 			}
@@ -149,7 +145,6 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 	layout := render.NewLayoutWriter(dest, s.engine, s.sections, s.engine.UseSeparators)
 	layout.SetTokenizer(s.tokenizer)
 
-	written := 0
 Loop:
 	for out := range pending {
 		var res render.Result
@@ -170,7 +165,6 @@ Loop:
 			totals.failed++
 		}
 		if res.Buffer == nil && !res.Section {
-			written++
 			continue
 		}
 		if err := layout.WriteItem(res); err != nil {
@@ -179,14 +173,10 @@ Loop:
 		if res.Buffer != nil {
 			bufferPool.Put(res.Buffer)
 		}
-		written++
 	}
 
 	if err := ctx.Err(); err != nil {
 		return totals, err
-	}
-	if written != len(s.prepared) {
-		return totals, fmt.Errorf("pipeline wrote %d of %d items", written, len(s.prepared))
 	}
 	if err := layout.Close(); err != nil {
 		return totals, err

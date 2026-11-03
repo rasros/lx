@@ -8,11 +8,6 @@ import (
 	"strings"
 )
 
-// IsImage reports whether the path's extension names an image format.
-func IsImage(p string) bool {
-	return FormatByExt(p).IsImage()
-}
-
 // MIMEType guesses a content type from the path's extension, preferring the
 // registry over the host's MIME table.
 func MIMEType(p string) string {

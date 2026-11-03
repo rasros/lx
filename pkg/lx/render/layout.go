@@ -11,13 +11,11 @@ import (
 
 // Result is one rendered item produced by the worker pipeline.
 type Result struct {
-	Index int
 	// Buffer holds what the item rendered; nil for an added failure and for
 	// a section title, which the LayoutWriter renders.
 	Buffer *bytes.Buffer
 	// Section marks the item that starts an explicit section.
 	Section      bool
-	Stats        int64
 	Tokens       int64
 	Rows         int
 	IsCompact    bool

@@ -207,13 +207,13 @@ func (s *Stream) prepare() (core.Plan, []*core.SectionContext, []render.Prepared
 	}
 	globalFileIdx := 1
 
-	for i, item := range s.items {
+	for _, item := range s.items {
 		if sec, ok := item.(core.SectionContext); ok {
 			sectionCounter++
 			newSec := &core.SectionContext{Index: sectionCounter, Body: sec.Body, IsImplicit: false}
 			sections = append(sections, newSec)
 			currentSection = newSec
-			prepared = append(prepared, render.PreparedItem{Raw: item, Section: currentSection, StreamIndex: i})
+			prepared = append(prepared, render.PreparedItem{Raw: item, Section: currentSection})
 			continue
 		}
 
@@ -235,13 +235,12 @@ func (s *Stream) prepare() (core.Plan, []*core.SectionContext, []render.Prepared
 				Section:          currentSection,
 				FileIndexGlobal:  globalFileIdx,
 				FileIndexSection: currentSection.TotalFiles,
-				StreamIndex:      i,
 			})
 			globalFileIdx++
 			continue
 		}
 
-		prepared = append(prepared, render.PreparedItem{Raw: item, Section: currentSection, StreamIndex: i})
+		prepared = append(prepared, render.PreparedItem{Raw: item, Section: currentSection})
 	}
 
 	global.TotalSections = len(sections)
