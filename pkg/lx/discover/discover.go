@@ -150,7 +150,7 @@ func expands(opts Options, path string) bool {
 // in the user config directory, and git's global excludes. It finds them
 // through env, which looks variables up as os.LookupEnv does, and logs to
 // log, or slog.Default() when log is nil.
-func UserIgnoreRules(env osenv.Lookup, log *slog.Logger) (ignoreRules, gitExcludes []string) {
+func UserIgnoreRules(env func(key string) (string, bool), log *slog.Logger) (ignoreRules, gitExcludes []string) {
 	if log == nil {
 		log = slog.Default()
 	}

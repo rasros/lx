@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"log/slog"
 
-	"github.com/rasros/lx/internal/osenv"
 	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/discover"
 	"github.com/rasros/lx/pkg/lx/sources"
@@ -66,7 +65,7 @@ func ExcludeGlob(p string) Glob { return walker.ExcludeOverride(p) }
 // UserIgnoreRules reads the ignore files lx applies everywhere, for
 // DiscoverOptions.IgnoreRules and GitExcludes, finding them through env, as
 // os.LookupEnv looks variables up. It logs to log, or slog.Default() when nil.
-func UserIgnoreRules(env osenv.Lookup, log *slog.Logger) (ignoreRules, gitExcludes []string) {
+func UserIgnoreRules(env func(key string) (string, bool), log *slog.Logger) (ignoreRules, gitExcludes []string) {
 	return discover.UserIgnoreRules(env, log)
 }
 
