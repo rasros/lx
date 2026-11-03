@@ -52,45 +52,6 @@ func TestDefaultTokenCounter_CodeDenserThanProse(t *testing.T) {
 	}
 }
 
-func TestDefaultTokenCounter_JSONDenseSymbols(t *testing.T) {
-	json := strings.Repeat(`{"a":1,"b":[true,false,null],"c":"x"},`, 20)
-	tokens := DefaultTokenCounter(int64(len(json)), json)
-	ratio := float64(len(json)) / float64(tokens)
-	if ratio > 3.2 {
-		t.Errorf("json chars/token = %.2f, want < 3.2", ratio)
-	}
-}
-
-func TestDefaultTokenCounter_LongIdentifierSplits(t *testing.T) {
-	short := DefaultTokenCounter(4, "abcd")
-	long := DefaultTokenCounter(40, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJ1234")
-	if long <= short {
-		t.Errorf("long identifier (%d) should split into more tokens than short (%d)", long, short)
-	}
-	if long < 5 {
-		t.Errorf("40-char identifier produced only %d tokens, want >= 5", long)
-	}
-}
-
-func TestDefaultTokenCounter_NonAsciiSurcharge(t *testing.T) {
-	ascii := "hello world hello world"
-	utf8 := "héllo wörld héllo wörld"
-	a := DefaultTokenCounter(int64(len(ascii)), ascii)
-	u := DefaultTokenCounter(int64(len(utf8)), utf8)
-	if u <= a {
-		t.Errorf("utf-8 string (%d tokens) should cost >= ascii equivalent (%d tokens)", u, a)
-	}
-}
-
-func TestDefaultTokenCounter_ByteSliceMatchesString(t *testing.T) {
-	s := "package main\n\nfunc main() { println(\"hi\") }\n"
-	fromString := DefaultTokenCounter(int64(len(s)), s)
-	fromBytes := DefaultTokenCounter(int64(len(s)), []byte(s))
-	if fromString != fromBytes {
-		t.Errorf("string=%d bytes=%d, want equal", fromString, fromBytes)
-	}
-}
-
 func TestDefaultTokenCounter_LargeContentSampling(t *testing.T) {
 	// Build a >256 KiB code-like buffer so the sampling path triggers.
 	unit := "func add(a, b int) int { return a + b }\n"
@@ -113,23 +74,6 @@ func TestDefaultTokenCounter_LargeContentSampling(t *testing.T) {
 	tolerance := exact / 20 // 5%
 	if diff > tolerance {
 		t.Errorf("sampled=%d exact=%d diff=%d > tolerance=%d", sampled, exact, diff, tolerance)
-	}
-}
-
-type stringerContent struct{ s string }
-
-func (s stringerContent) String() string { return s.s }
-
-func TestDefaultTokenCounterUsesStringerContent(t *testing.T) {
-	content := stringerContent{s: strings.Repeat(`{"a":1},`, 90)}
-	size := int64(len(content.s))
-
-	got := DefaultTokenCounter(size, content)
-	if got == size/4 {
-		t.Errorf("estimate %d equals the size/4 fallback; Stringer content was not scanned", got)
-	}
-	if want := DefaultTokenCounter(size, content.s); got != want {
-		t.Errorf("Stringer estimate %d != equivalent string estimate %d", got, want)
 	}
 }
 

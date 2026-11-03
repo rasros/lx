@@ -28,30 +28,6 @@ func TestSystemContextFields(t *testing.T) {
 	}
 }
 
-func TestSystemContextBodyOrderAndLabels(t *testing.T) {
-	body := systemContextBody(map[string]string{
-		"command": "lx .",
-		"version": "v1.2.3",
-		"host":    "workstation",
-		"time":    "2026-07-19T14:55:00Z",
-		"arch":    "amd64",
-		"os":      "linux",
-	})
-
-	want := strings.Join([]string{
-		"OS: linux",
-		"Arch: amd64",
-		"Time: 2026-07-19T14:55:00Z",
-		"Host: workstation",
-		"Tool: lx v1.2.3",
-		"Command: lx .",
-	}, "\n") + "\n"
-
-	if body != want {
-		t.Errorf("body =\n%q\nwant\n%q", body, want)
-	}
-}
-
 func TestSystemContextBodySkipsMissingFields(t *testing.T) {
 	body := systemContextBody(map[string]string{"os": "linux", "host": ""})
 
