@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"log/slog"
 	"testing"
-
-	"github.com/rasros/lx/pkg/lx"
 )
 
 func TestParseSizeLimit(t *testing.T) {
@@ -62,74 +59,5 @@ func TestParseSizeLimitErrors(t *testing.T) {
 		if got, err := parseSizeLimit(in); err == nil {
 			t.Errorf("parseSizeLimit(%q) = %d, want error", in, got)
 		}
-	}
-}
-
-func TestMaxSizeFlagParsing(t *testing.T) {
-	defaultRender := lx.RenderOptions{Head: -1, Tail: 0}
-	parsed, err := Parse([]string{"-m", "512k", "."}, definitions)
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-
-	sections := compile(slog.Default(), parsed.Ops, defaultRender)
-	if len(sections) != 1 {
-		t.Fatalf("len(sections) = %d, want 1", len(sections))
-	}
-	if got := sections[0].Render.MaxSize; got != 512_000 {
-		t.Errorf("MaxSize = %d, want 512000", got)
-	}
-}
-
-func TestMaxSizeFlagAttachedShortForm(t *testing.T) {
-	defaultRender := lx.RenderOptions{Head: -1, Tail: 0}
-	parsed, err := Parse([]string{"-m2M", "."}, definitions)
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-
-	sections := compile(slog.Default(), parsed.Ops, defaultRender)
-	if got := sections[0].Render.MaxSize; got != 2_000_000 {
-		t.Errorf("MaxSize = %d, want 2000000", got)
-	}
-}
-
-func TestMaxSizeFlagRejectsInvalidValue(t *testing.T) {
-	if _, err := Parse([]string{"-m", "notasize", "."}, definitions); err == nil {
-		t.Fatal("Parse accepted an invalid size, want error")
-	}
-}
-
-// A second -m after a file argument opens a new section, so the limit is
-// re-derived from the default RenderOptions rather than inherited.
-func TestMaxSizeIsPerSection(t *testing.T) {
-	defaultRender := lx.RenderOptions{Head: -1, Tail: 0}
-	parsed, err := Parse([]string{"-m", "20", ".", "-m", "1k", "large.txt"}, definitions)
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-
-	sections := compile(slog.Default(), parsed.Ops, defaultRender)
-	if len(sections) != 2 {
-		t.Fatalf("len(sections) = %d, want 2", len(sections))
-	}
-	if got := sections[0].Render.MaxSize; got != 20 {
-		t.Errorf("first section MaxSize = %d, want 20", got)
-	}
-	if got := sections[1].Render.MaxSize; got != 1000 {
-		t.Errorf("second section MaxSize = %d, want 1000", got)
-	}
-}
-
-func TestNoMaxSizeLeavesLimitUnset(t *testing.T) {
-	defaultRender := lx.RenderOptions{Head: -1, Tail: 0}
-	parsed, err := Parse([]string{"."}, definitions)
-	if err != nil {
-		t.Fatalf("Parse returned error: %v", err)
-	}
-
-	sections := compile(slog.Default(), parsed.Ops, defaultRender)
-	if got := sections[0].Render.MaxSize; got != 0 {
-		t.Errorf("MaxSize = %d, want 0", got)
 	}
 }

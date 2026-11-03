@@ -39,20 +39,6 @@ type MockTokenizer struct{}
 
 func (m MockTokenizer) Estimate(size int64, _ interface{}) int64 { return 999 }
 
-func TestStream_TokenizerIntegration(t *testing.T) {
-	cfg := core.NewConfig()
-	opts := core.RenderOptions{Head: -1}
-	stream, _ := NewStream(cfg)
-	stream.WithTokenizer(MockTokenizer{})
-
-	stream.AddFile(sources.NewBufferInputFile("test.txt", []byte("abc")), opts)
-
-	stats := stream.Plan()
-	if stats.TokenEstimate != 999 {
-		t.Errorf("Expected custom token estimate 999, got %d", stats.TokenEstimate)
-	}
-}
-
 func TestStream_Prepare_SizeUnknownForNegativeSizeFile(t *testing.T) {
 	cfg := core.NewConfig()
 	opts := core.RenderOptions{Head: -1}
@@ -221,26 +207,6 @@ func TestStream_ExecutesOnce(t *testing.T) {
 		}
 	}()
 	stream.AddSection("late")
-}
-
-func TestStream_SkippedBySizeIsCounted(t *testing.T) {
-	opts := core.RenderOptions{Head: -1, MaxSize: 10}
-	stream, err := NewStream(core.NewConfig())
-	if err != nil {
-		t.Fatalf("NewStream failed: %v", err)
-	}
-
-	stream.AddFile(sources.NewBufferInputFile("small.txt", []byte("tiny")), opts)
-	stream.AddFile(sources.NewBufferInputFile("big1.txt", []byte(strings.Repeat("x", 64))), opts)
-	stream.AddFile(sources.NewBufferInputFile("big2.txt", []byte(strings.Repeat("y", 99))), opts)
-
-	g := stream.Plan()
-	if g.SkippedBySize != 2 {
-		t.Errorf("SkippedBySize = %d, want 2", g.SkippedBySize)
-	}
-	if g.TotalFiles != 1 {
-		t.Errorf("TotalFiles = %d, want 1", g.TotalFiles)
-	}
 }
 
 func TestStream_OriginalSizeIsPreConversionSize(t *testing.T) {

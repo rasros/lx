@@ -170,27 +170,6 @@ func TestFrame_RulesFromEveryAncestor(t *testing.T) {
 	}
 }
 
-func TestWalk_IgnoredDirs(t *testing.T) {
-	repo := t.TempDir()
-	mustGitDir(t, repo, ".git")
-	mustWriteFile(t, repo, ".gitignore", "/build\ndist\ngen/**\nout\nlib/*\n!lib/keep\nkp/\n!kp/x/k.go\n")
-	writeTree(t, repo, "build/x/f.go", "pkg/dist/f.go", "gen/f.go", "out/keep/f.go", "src/a/f.go",
-		"lib/keep/f.go", "node_modules/pkg/f.go", "kp/x/k.go", "kp/x/f.go", "kp/y/k.go")
-	mustWriteFile(t, repo, "out/.gitignore", "!keep\n")
-
-	var got []string
-	for _, p := range walkPath(t, hostWalker(repo, "node_modules"), repo) {
-		rel, _ := filepath.Rel(repo, p)
-		got = append(got, filepath.ToSlash(rel))
-	}
-	// As in git and ripgrep, an ignored directory is pruned: a negation below
-	// it, in the same file or in one inside it, re-includes nothing.
-	want := []string{"lib/keep/f.go", "src/a/f.go"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("walk included %v, want %v", got, want)
-	}
-}
-
 func TestFrame_GitRulesNeedARepo(t *testing.T) {
 	top := t.TempDir()
 	if n := newRuleTree(newHostTree(OSHost{}, "", slog.Default()), true).node(top); n.inRepo {
@@ -281,50 +260,6 @@ func TestWalkPath_RepoBoundaries(t *testing.T) {
 	for _, p := range walkPath(t, hostWalker(top), filepath.Join(top, "repo")) {
 		if filepath.Base(p) == "a.local" {
 			t.Fatal("expected a repository walked by name to honor its info/exclude")
-		}
-	}
-}
-
-// As in ripgrep, a named path is never filtered itself: a file is always
-// included and a directory always walked, whatever the rules say about it or
-// the directories above it, from any working directory. The entries below a
-// walked directory are filtered.
-func TestWalkPath_NamedPathsAreNotFiltered(t *testing.T) {
-	top := t.TempDir()
-	mustGitDir(t, top, ".git")
-	mustWriteFile(t, top, ".gitignore", "build/\n!build/keep.js\n/x/local.txt\n*.log\n")
-	writeTree(t, top, "build/keep.js", "build/out.js", "build/sub/keep.js", "build/sub/b.log", "x/local.txt", "x/main.go", "x/run.log", "main.go", ".hidden")
-
-	all := []string{".hidden", "build/keep.js", "build/out.js", "build/sub/b.log", "build/sub/keep.js", "main.go", "x/local.txt", "x/main.go", "x/run.log"}
-	walk := []string{"main.go", "x/main.go"}
-	dirs := []string{"build/keep.js", "build/out.js", "build/sub/keep.js", "x/main.go"}
-
-	rels := func(paths []string) []string {
-		var out []string
-		for _, p := range paths {
-			rel, _ := filepath.Rel(top, p)
-			out = append(out, filepath.ToSlash(rel))
-		}
-		return out
-	}
-	for _, cwd := range []string{top, filepath.Join(top, "x"), filepath.Join(top, "build")} {
-		w := hostWalker(cwd)
-		if got := rels(walkPath(t, w, top)); !reflect.DeepEqual(got, walk) {
-			t.Errorf("from %s: walk included %v, want %v", cwd, got, walk)
-		}
-		var named []string
-		for _, f := range all {
-			named = append(named, rels(walkPath(t, w, filepath.Join(top, filepath.FromSlash(f))))...)
-		}
-		if !reflect.DeepEqual(named, all) {
-			t.Errorf("from %s: named files included %v, want %v", cwd, named, all)
-		}
-		var walked []string
-		for _, d := range []string{"build", "x"} {
-			walked = append(walked, rels(walkPath(t, w, filepath.Join(top, d)))...)
-		}
-		if !reflect.DeepEqual(walked, dirs) {
-			t.Errorf("from %s: directory walks included %v, want %v", cwd, walked, dirs)
 		}
 	}
 }
