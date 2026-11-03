@@ -2,6 +2,7 @@ package internal
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"sync"
@@ -65,9 +66,10 @@ type LazyReader struct {
 // stream declares, such as an HTTP Content-Length: Size reports it without
 // reading anything, and the stream is never read past it. The declared length
 // is only a claim, so nothing is allocated on its strength: a stream that ends
-// sooner (io.EOF or io.ErrUnexpectedEOF) shrinks to what arrived, as a file
-// truncated while it is read does. A negative size leaves the length to be
-// found by reading to the end.
+// sooner with io.EOF shrinks to what arrived, as a file truncated while it is
+// read does, while one cut off with io.ErrUnexpectedEOF, as an HTTP body
+// shorter than its Content-Length is, fails. A negative size leaves the length
+// to be found by reading to the end.
 func NewLazyReader(src io.Reader, size int64) *LazyReader {
 	r := &LazyReader{src: src, size: -1}
 	if c, ok := src.(io.Closer); ok {
@@ -265,9 +267,11 @@ func (r *LazyReader) readable() bool {
 func (r *LazyReader) noteErr(err error) {
 	switch {
 	case err == nil:
-	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
-		// An HTTP body shorter than its Content-Length ends with
-		// ErrUnexpectedEOF. Either way the content is what arrived.
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		// An HTTP body shorter than its Content-Length ends this way: the
+		// content is cut short, not merely shorter than claimed.
+		r.err = fmt.Errorf("truncated after %d bytes: %w", r.pos, err)
+	case errors.Is(err, io.EOF):
 		r.eof = true
 		if r.size > r.pos {
 			r.size = r.pos
