@@ -18,12 +18,9 @@ type Section struct {
 	bareTrees []string
 }
 
-// item is one thing a section renders, in command-line order.
-type item interface {
-	// opAttrs returns the action and value of the option the item came
-	// from, for the debug log.
-	opAttrs() (action, value string)
-}
+// item is one thing a section renders, in command-line order: one of the
+// *Item types below.
+type item any
 
 // fileItem is a path, URL or archive named as input, or piped on stdin.
 type fileItem struct {
@@ -64,14 +61,6 @@ type promptFileItem struct {
 
 // metaItem is a --system-context block.
 type metaItem struct{}
-
-func (f *fileItem) opAttrs() (string, string)       { return "FILE", f.arg }
-func (*stdinItem) opAttrs() (string, string)        { return "FILE", "-" }
-func (t *treeItem) opAttrs() (string, string)       { return t.op.Action, t.op.Value }
-func (h *headingItem) opAttrs() (string, string)    { return "section", h.title }
-func (p *promptItem) opAttrs() (string, string)     { return "prompt", p.text }
-func (p *promptFileItem) opAttrs() (string, string) { return "prompt-file", p.ref }
-func (*metaItem) opAttrs() (string, string)         { return "system-context", "true" }
 
 // newItem returns the item of an action op.
 func newItem(op Op) item {
@@ -228,58 +217,43 @@ func applyTrailing(log *slog.Logger, ops []Op, s *Section) {
 }
 
 func applyInterleaved(log *slog.Logger, op Op, s *Section) {
+	log.Debug("Setting option", "action", op.Action, "value", op.Value)
 	switch op.Action {
 	case "head":
 		val, _ := strconv.Atoi(op.Value)
-		log.Debug("Setting head limit", "value", val)
 		s.Render.Head, s.Render.Tail = val, 0
 	case "tail":
 		val, _ := strconv.Atoi(op.Value)
-		log.Debug("Setting tail limit", "value", val)
 		s.Render.Tail, s.Render.Head = val, 0
 	case "lines":
 		val, _ := strconv.Atoi(op.Value)
-		log.Debug("Setting lines limit", "value", val)
 		s.Render.Head, s.Render.Tail = (val+1)/2, val/2
 	case "max-size":
 		val, _ := parseSizeLimit(op.Value)
-		log.Debug("Setting max file size", "bytes", val)
 		s.Render.MaxSize = val
 	case "line-numbers":
-		log.Debug("Enabling line numbers")
 		s.Render.LineNumbers = true
 	case "functions":
-		log.Debug("Enabling function skeleton")
 		s.Render.SkeletonFunctions = true
 	case "types":
-		log.Debug("Enabling type skeleton")
 		s.Render.SkeletonTypes = true
 	case "documents":
-		log.Debug("Enabling document extraction")
 		s.Render.ExtractDocuments = true
 	case "media":
-		log.Debug("Enabling media metadata extraction")
 		s.Render.ExtractMedia = true
 	case "expand":
-		log.Debug("Enabling archive expansion")
 		s.Discover.ExpandArchives = true
 	case "hidden":
-		log.Debug("Enabling show hidden files")
 		s.Discover.ShowHidden = true
 	case "follow":
-		log.Debug("Enabling follow dir symlinks")
 		s.Discover.FollowDirSymlinks = true
 	case "no-links":
-		log.Debug("Enabling skip file symlinks")
 		s.Discover.SkipFileSymlinks = true
 	case "no-ignore":
-		log.Debug("Disabling gitignore filtering")
 		s.Discover.NoIgnore = true
 	case "include":
-		log.Debug("Adding include filter", "pattern", op.Value)
 		s.Discover.Globs = append(s.Discover.Globs, lx.IncludeGlob(op.Value))
 	case "exclude":
-		log.Debug("Adding exclude filter", "pattern", op.Value)
 		s.Discover.Globs = append(s.Discover.Globs, lx.ExcludeGlob(op.Value))
 	}
 }

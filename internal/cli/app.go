@@ -245,9 +245,6 @@ func addSections(log *slog.Logger, env Env, stream *lx.Stream, sections []Sectio
 		log.Debug("Processing section", "index", si, "ops", len(section.Items))
 
 		for _, it := range section.Items {
-			action, value := it.opAttrs()
-			log.Debug("Processing op", "action", action, "value", value)
-
 			switch it := it.(type) {
 			case *fileItem:
 				for _, f := range it.failures {
