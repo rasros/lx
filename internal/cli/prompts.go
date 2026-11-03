@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -119,33 +120,14 @@ func (r *promptResolver) resolve(value string) (string, error) {
 
 // searchLib returns the prompts in libDir named value, below libDir as given.
 func (r *promptResolver) searchLib(libDir, value string) ([]string, error) {
-	var matches []string
+	entries, err := r.listLib(libDir)
 	target := filepath.ToSlash(value)
-	absLib := r.env.abs(libDir)
-	err := filepath.WalkDir(absLib, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
+	var matches []string
+	for _, rel := range entries {
+		if stripExt(rel) == target || stripExt(path.Base(rel)) == target {
+			matches = append(matches, filepath.Join(libDir, filepath.FromSlash(rel)))
 		}
-		if d.IsDir() {
-			name := d.Name()
-			if path != absLib && (strings.HasPrefix(name, ".") || name == "node_modules") {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if !r.hasAllowedExt(d.Name()) {
-			return nil
-		}
-		rel, err := filepath.Rel(absLib, path)
-		if err != nil {
-			return nil
-		}
-		relSlash := filepath.ToSlash(rel)
-		if stripExt(relSlash) == target || stripExt(filepath.Base(relSlash)) == target {
-			matches = append(matches, filepath.Join(libDir, rel))
-		}
-		return nil
-	})
+	}
 	return matches, err
 }
 
