@@ -25,9 +25,13 @@ func CheckFields(t *template.Template, data interface{}) error {
 
 // Compile parses configuration templates into an engine. The format's
 // profile supplies every template and layout property the config leaves
-// unset. A template that names a field its context lacks is an error too.
+// unset; an unknown format is an error. A template that names a field its
+// context lacks is an error too.
 func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
-	prof := profileFor(cfg.OutputFormat)
+	prof, err := profileFor(cfg.OutputFormat)
+	if err != nil {
+		return nil, err
+	}
 
 	pick := func(user, def string) string {
 		if user != "" {

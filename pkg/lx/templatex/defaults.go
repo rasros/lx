@@ -107,13 +107,16 @@ var profiles = map[string]profile{
 	},
 }
 
-// profileFor returns the profile of format, or Markdown's for a format lx
-// does not know.
-func profileFor(format string) profile {
-	if p, ok := profiles[format]; ok {
-		return p
+// profileFor returns the profile of format, Markdown's when it is empty, or
+// an error naming the formats there are.
+func profileFor(format string) (profile, error) {
+	if format == "" {
+		format = "markdown"
 	}
-	return profiles["markdown"]
+	if p, ok := profiles[format]; ok {
+		return p, nil
+	}
+	return profile{}, fmt.Errorf("unknown output format %q: want markdown, xml, html or bare", format)
 }
 
 const defaultMarkdownFileHeader = `{{ if gt .Section.TotalFiles 1 }}[{{ .SectionFileIndex }}/{{ .Section.TotalFiles }}] {{ end }}{{ .Path }}`
