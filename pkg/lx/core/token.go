@@ -8,6 +8,17 @@ const (
 	sampleTail      = 64 * 1024
 )
 
+// Estimate makes a TokenCounter a Tokenizer.
+func (tc TokenCounter) Estimate(size int64, content interface{}) int64 {
+	return tc(size, content)
+}
+
+// DefaultTokenizer returns the Tokenizer of DefaultTokenCounter, which a
+// Stream estimates with unless it is given another.
+func DefaultTokenizer() Tokenizer {
+	return TokenCounter(DefaultTokenCounter)
+}
+
 // DefaultTokenCounter estimates BPE tokens from content using a character-class
 // scanner, with no language hint or embedded vocabulary. Density follows the
 // share of symbols rather than the file format: measured bytes/token runs ~3.8

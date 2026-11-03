@@ -30,6 +30,11 @@ type Report = core.Report
 // Tokenizer estimates the tokens a Stream reports and templates see.
 type Tokenizer = core.Tokenizer
 
+// DefaultTokenizer returns the Tokenizer a Stream uses unless
+// Stream.WithTokenizer sets another, for one to wrap or fall back to. It
+// scans the text by character class, with no vocabulary.
+func DefaultTokenizer() Tokenizer { return core.DefaultTokenizer() }
+
 // The template contexts: what each of a Config's templates renders.
 type (
 	// FileContext is what the file templates render: FileContentTemplate,
@@ -60,6 +65,9 @@ type DiscoverOptions = discover.Options
 
 // Glob is one -i or -e glob in DiscoverOptions.Globs, of a GlobKind.
 type Glob = walker.Override
+
+// GlobKind is what a Glob does with the paths it matches: GlobInclude,
+// GlobExclude or GlobKeep.
 type GlobKind = walker.OverrideKind
 
 const (
@@ -84,6 +92,9 @@ type URLError = discover.URLError
 // with AddFailure they are reported and counted with the files the Stream
 // cannot read.
 type Failure = core.Failure
+
+// FailureKind is the step an input failed at, from FailedStat to
+// FailedRead.
 type FailureKind = core.FailureKind
 
 const (
@@ -162,7 +173,8 @@ func (s *Stream) WithConcurrency(n int) *Stream {
 }
 
 // WithTokenizer sets the estimator of the tokens the stream reports and its
-// templates see as FileContext.TokenEstimate. The default scans the text.
+// templates see as FileContext.TokenEstimate; the default is
+// DefaultTokenizer.
 func (s *Stream) WithTokenizer(t Tokenizer) *Stream {
 	s.inner.WithTokenizer(t)
 	return s
