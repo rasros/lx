@@ -1,0 +1,7 @@
+--- STDOUT ---
+fn main() {}
+
+
+print('hello')
+
+--- STDERR ---

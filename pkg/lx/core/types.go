@@ -92,6 +92,9 @@ type Config struct {
 	FileBinaryTemplate  string `yaml:"file_binary_template"`
 	FileCompactTemplate string `yaml:"file_compact_template"`
 	FileHeaderTemplate  string `yaml:"file_header_template"`
+	// FileImageTemplate renders an image file. It can call file_content
+	// and file_binary as well as file_header.
+	FileImageTemplate string `yaml:"file_image_template"`
 
 	SectionTemplate string `yaml:"section_template"`
 	PromptTemplate  string `yaml:"prompt_template"`
@@ -104,7 +107,16 @@ type Config struct {
 	OutputHeaderTemplate string `yaml:"output_header_template"`
 	OutputFooterTemplate string `yaml:"output_footer_template"`
 
+	// OutputFormat names the profile that supplies what is left unset:
+	// "markdown", "xml", "html" or "bare".
 	OutputFormat string `yaml:"output_format"`
+
+	// Separators puts a blank line between rendered items, or a newline
+	// between compact ones, when set; nil keeps the format's choice.
+	Separators *bool `yaml:"separators"`
+	// EmbedImages reads images into FileContext.DataURI when set; nil keeps
+	// the format's choice.
+	EmbedImages *bool `yaml:"embed_images"`
 }
 
 // FileContext represents the data provided to file-level templates.

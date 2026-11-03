@@ -14,7 +14,8 @@ import (
 
 // The shipped profiles are complete configs of the built-in formats, so
 // loading one renders, stats included, exactly as the format's flag does:
-// text, binary, unreadable and compact files, sections, prompts and trees.
+// text, binary, image, unreadable and compact files, sections, prompts and
+// trees.
 func TestProfilesMatchBuiltIns(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -22,13 +23,14 @@ func TestProfilesMatchBuiltIns(t *testing.T) {
 		"main.go":    "package main\n\nfunc main() {}\n",
 		"notes.txt":  "first\nsecond\n",
 		"data.bin":   "\x00\x01\xff\xfe",
+		"logo.png":   "\x89PNG\r\n\x1a\n\x00\x00\x00\x0D",
 		"locked.txt": "secret\n",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	files := []string{"main.go", "notes.txt", "data.bin"}
+	files := []string{"main.go", "notes.txt", "data.bin", "logo.png"}
 	if runtime.GOOS != "windows" && os.Getuid() != 0 {
 		if err := os.Chmod(filepath.Join(dir, "locked.txt"), 0); err != nil {
 			t.Fatal(err)

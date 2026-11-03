@@ -58,6 +58,7 @@ All keys are optional. Templates not listed here aren't recognized.
 | `file_binary_template`    | template | format default | Renders when a file is detected as binary.                                                        |
 | `file_compact_template`   | template | format default | Renders in compact mode (`-n 0`).                                                                 |
 | `file_header_template`    | template | format default | Shared partial usable from the four `file_*_templates` as `{{ template "file_header" . }}`.       |
+| `file_image_template`     | template | format default | Renders an image file. Can call `file_content` and `file_binary` as well as `file_header`.        |
 | `section_template`        | template | format default | Renders a logical section break (from `-s`).                                                      |
 | `prompt_template`         | template | format default | Renders text injected via `-p` or `-P`.                                                           |
 | `tree_template`           | template | format default | Renders the tree block from `-t`/`-T`.                                                            |
@@ -67,6 +68,8 @@ All keys are optional. Templates not listed here aren't recognized.
 | `output_header_template`  | template | format default | Rendered once before the first section.                                                           |
 | `output_footer_template`  | template | format default | Rendered once after the last section.                                                             |
 | `stats_template`          | template | built-in       | Renders the file/token summary footer.                                                            |
+| `separators`              | bool     | format default | Blank line between rendered items, a newline between compact ones. See Format profiles.           |
+| `embed_images`            | bool     | format default | Read images into `.DataURI` for `file_image_template`. See Format profiles.                       |
 
 ### Precedence for the prompts library
 
@@ -79,6 +82,35 @@ All keys are optional. Templates not listed here aren't recognized.
 
 The README's [Prompts and sections](README.md#prompts-and-sections) section covers how a name resolves to a file.
 
+## Format profiles
+
+`output_format` picks a profile: the default of every template, and of how output is laid out around them. A key you
+set overrides that one property and leaves the rest of the profile in place, so `--html` with `separators: true` is
+still HTML. The shipped YAML profiles spell out the Markdown and XML ones in full.
+
+| Profile    | `separators` | `embed_images` | `file_image_template` renders an image as |
+|------------|--------------|----------------|-------------------------------------------|
+| `markdown` | `true`       | `false`        | `file_binary`                             |
+| `xml`      | `true`       | `false`        | `file_binary`                             |
+| `html`     | `false`      | `true`         | `file_content`, which shows `.DataURI`    |
+| `bare`     | `false`      | `false`        | `file_binary`                             |
+
+With `separators`, lx writes a blank line between items (files, prompts, trees and section titles), a single newline
+between two compact files, and a blank line before each section after the first. Without them items run together, so
+the templates must end in the newlines they want, as HTML's do.
+
+Every image renders with `file_image_template`. With `embed_images`, the image is read into `.DataURI` for the template
+to inline, and `-M` leaves it an image rather than replacing it with its metadata. Without it `.DataURI` is empty, so
+the profiles that do not embed render images as binaries. Turning it on for Markdown takes an image template that uses
+the URI too:
+
+```yaml
+embed_images: true
+file_image_template: |-
+  {{ template "file_header" . }}
+  ![{{ .Path }}]({{ .DataURI }})
+```
+
 ## Templates
 
 Templates are Go [`text/template`](https://pkg.go.dev/text/template). Each template key is handed a context value; the
@@ -88,8 +120,8 @@ fields it exposes and the helpers in scope are listed below.
 
 All field names come from pkg/lx/core/types.go.
 
-FileContext is bound to the five file templates (`file_content_template`, `file_error_template`, `file_binary_template`,
-`file_compact_template`, and `file_header_template`):
+FileContext is bound to the six file templates (`file_content_template`, `file_error_template`, `file_binary_template`,
+`file_compact_template`, `file_image_template`, and `file_header_template`):
 
 | Field              | Type           | Notes                                              |
 |--------------------|----------------|----------------------------------------------------|
@@ -178,14 +210,14 @@ Provided by `pkg/lx/templatex/defaults.go`:
 
 ### Shared partials
 
-The four `file_*_templates` and the `file_header_template` are parsed into a single template set, so any of them can
-call
+Every `file_*_template` is parsed together with `file_header_template`, so any of them can call
 
 ```gotemplate
 {{ template "file_header" . }}
 ```
 
-to render the shared header. The Markdown profile uses this; the XML profile intentionally doesn't define
+to render the shared header. `file_image_template` can also call `file_content` and `file_binary`, which is how the
+built-in profiles render images. The Markdown profile uses this; the XML profile intentionally doesn't define
 `file_header_template` (see the comment at the top of `xml_config.yaml`).
 
 ## Override recipes

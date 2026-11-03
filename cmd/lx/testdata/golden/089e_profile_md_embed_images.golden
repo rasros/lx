@@ -1,0 +1,12 @@
+--- STDOUT ---
+[1/2] langs/main.rs (1 rows)
+---
+```rust
+fn main() {}
+```
+
+[2/2] assets/logo.png
+![assets/logo.png](data:image/png;base64,iVBORw0KGgoAAAAN)
+
+
+--- STDERR ---
