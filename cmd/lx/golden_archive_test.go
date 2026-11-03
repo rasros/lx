@@ -54,13 +54,10 @@ func TestGoldenArchiveMaxSize(t *testing.T) {
 	})
 }
 
-// Archives that misbehave are read as far as they can be. An entry whose
-// path leaves the archive is skipped. An entry that ends short of what it
-// claims fails, once, as any entry that cannot be read does, without lx
-// trusting the claim with memory; when that ends a tar archive, the
-// archive's own failure is the same one and is not counted again. The content of a compressed URL is named after the URL, not
-// the file it was downloaded to. An archive is read as its content says,
-// whatever its name says.
+// Archives that misbehave are read as far as they can be. Entries escaping
+// the archive are skipped, and an entry shorter than it claims fails once.
+// A compressed URL's content is named after the URL, and an archive is read
+// as its content says, whatever its name.
 func TestGoldenArchiveEdges(t *testing.T) {
 	dir := gf.SetupArchiveEdgeFixture(t)
 	url, host := fileServer(t, dir)
@@ -76,11 +73,8 @@ func TestGoldenArchiveEdges(t *testing.T) {
 	})
 }
 
-// repoServer serves dir, with the repository URL host/owner/name of its
-// host fetched as dir/name.zip. The registry of repository hosts is global, but each
-// server has a host of its own and the registry is locked, so parallel
-// goldens cannot meet there. Their cases run after the test function
-// returns, so the host is removed on cleanup.
+// repoServer serves dir, with the repository URL host/owner/name fetched as
+// dir/name.zip. Each server registers its own host, removed on cleanup.
 func repoServer(t *testing.T, dir string) (url, host string) {
 	server := httptest.NewServer(http.FileServer(http.Dir(dir)))
 	t.Cleanup(server.Close)

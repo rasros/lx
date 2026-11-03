@@ -16,9 +16,8 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-// Run runs lx with args against env, which stands for the process: Run reads
-// and writes nothing else of it, and logs to env.Stderr through a logger of
-// its own. A run that ctx cancels returns ctx's error without logging it.
+// Run runs lx with args against env, which stands for the process. A
+// cancelled run returns ctx's error without logging it.
 func Run(ctx context.Context, args []string, env Env) error {
 	parsed, err := Parse(args, definitions)
 	if err != nil {
@@ -81,8 +80,8 @@ func handleGlobals(parsed *ParsedArgs, env Env) (bool, error) {
 // gatherInputs adds the paths piped to stdin when no file is named, and "."
 // when there is still nothing to render.
 func gatherInputs(ctx context.Context, parsed *ParsedArgs, env Env) error {
-	// Stdin depends only on explicit file arguments; the "." fallback also
-	// depends on generators, which already give the run something to emit.
+	// Stdin depends only on file arguments; the "." fallback also on
+	// generators.
 	hasFiles := false
 	hasGenerators := false
 	for _, op := range parsed.Ops {

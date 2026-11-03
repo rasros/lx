@@ -32,11 +32,9 @@ func overrideIfSet[T comparable](dst *T, src T) {
 	}
 }
 
-// LoadConfigChain merges the user's config file, the one $LX_CONFIG names and
-// the one cliPath names, each over the ones before it. A missing user or
-// $LX_CONFIG file is skipped and one that fails is logged and skipped; a
-// cliPath file that fails is the error, which is left to the caller to
-// report.
+// LoadConfigChain merges the user's config file, $LX_CONFIG's and cliPath's,
+// each over the ones before. A broken user or $LX_CONFIG file is logged and
+// skipped; a broken cliPath file is the error.
 func LoadConfigChain(env Env, log *slog.Logger, cliPath string) (*lx.Config, *CliConfig, error) {
 	lxCfg := lx.NewConfig()
 

@@ -1,6 +1,5 @@
 // Package osenv is the environment of a run as a lookup function, and the
-// user's home and config directories found through it, the way
-// os.UserHomeDir and os.UserConfigDir find them in the process environment.
+// user's home and config directories found through it.
 package osenv
 
 import (

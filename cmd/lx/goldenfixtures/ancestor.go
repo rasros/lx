@@ -153,11 +153,9 @@ func SetupNegatedIgnoredDirFixture(t *testing.T) string {
 }
 
 // SetupIgnoredDirNegationsFixture builds a git repository with negations
-// that can and cannot re-include a file: glob/* and deep/** ignore what is
-// inside a directory, so a negation re-includes a file there, while nested/
-// ignores the directory itself, so its own .gitignore never applies. ovr is
-// left to the -e patterns. all, any and two each hold a .gitignore with a
-// rule ending in /**.
+// that can and cannot re-include a file: glob/* and deep/** ignore a
+// directory's contents, so a negation works there, while nested/ ignores the
+// directory itself.
 func SetupIgnoredDirNegationsFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
