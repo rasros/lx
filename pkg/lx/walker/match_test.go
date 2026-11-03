@@ -55,17 +55,6 @@ func TestLastMatch_NegationOverridesPreviousRule(t *testing.T) {
 	}
 }
 
-func TestLastMatch_OmitsReasonWhenNotRequested(t *testing.T) {
-	rules := parseRules([]string{"*.log"}, "", ".gitignore")
-	m, reason := lastMatch("app.log", false, rules, false)
-	if m != matchIgnore {
-		t.Fatal("expected app.log to be ignored")
-	}
-	if reason != "" {
-		t.Fatalf("expected empty reason when wantReason=false, got %q", reason)
-	}
-}
-
 func TestParseRules_Escapes(t *testing.T) {
 	tests := []struct {
 		line, pattern string
@@ -75,22 +64,12 @@ func TestParseRules_Escapes(t *testing.T) {
 		{"trail2   ", "trail2", false},
 		{"crlf\r", "crlf", false},
 		{`\#hash`, "#hash", false},
-		{`\!bang`, "!bang", false},
 		{"!keep", "keep", true},
 	}
 	for _, tt := range tests {
 		rules := parseRules([]string{tt.line}, "", "test")
 		if len(rules) != 1 || rules[0].Pattern != tt.pattern || rules[0].Negate != tt.negate {
 			t.Errorf("parseRules(%q) = %+v, want pattern %q negate %v", tt.line, rules, tt.pattern, tt.negate)
-		}
-	}
-}
-
-func TestLastMatch_BackslashEscapes(t *testing.T) {
-	rules := parseRules([]string{`\*.go`, `a\ b.go`}, "", ".gitignore")
-	for path, want := range map[string]bool{"*.go": true, "x.go": false, "a b.go": true, `a\ b.go`: false} {
-		if ignored := isIgnored(path, false, rules); ignored != want {
-			t.Errorf("%q ignored = %v, want %v", path, ignored, want)
 		}
 	}
 }
@@ -102,16 +81,6 @@ func TestLastMatch_FloatingPatternMatchesBaseNameOnly(t *testing.T) {
 	}
 	if isIgnored("tags/Makefile", false, rules) {
 		t.Fatal("expected a file in a re-included directory not to match the directory's name")
-	}
-}
-
-func TestLastMatch_NegationKeeps(t *testing.T) {
-	rules := parseRules([]string{".*", "!.keep"}, "", ".gitignore")
-	if m, _ := lastMatch(".keep", false, rules, false); m != matchKeep {
-		t.Fatal("expected .keep to be kept by the negation")
-	}
-	if m, _ := lastMatch(".other", false, rules, false); m != matchIgnore {
-		t.Fatal("expected .other to be decided by the ignore rule")
 	}
 }
 

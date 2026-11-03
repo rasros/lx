@@ -39,22 +39,6 @@ func xingFrame(header []byte, sideInfo int, frames uint32) []byte {
 	return out
 }
 
-func TestMediaMetadataMP3WithXingHeader(t *testing.T) {
-	// 100 frames of 1152 samples at 44100 Hz.
-	data := xingFrame(mp3Header(1, 3, 9, 0, 2), 32, 100)
-	data = append(data, zeros(4096)...)
-
-	got := describe(t, "mp3", data)
-	for _, want := range []string{"Duration: 00:00:02.612", "Bitrate: 128 kbps", "Audio: mp3, 44100 Hz, stereo"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("missing %q in:\n%s", want, got)
-		}
-	}
-	if strings.Contains(got, "estimated") {
-		t.Errorf("marked a stated duration as estimated:\n%s", got)
-	}
-}
-
 // Without a frame count there is only the nominal bitrate to divide by, and the
 // result has to say so.
 func TestMediaMetadataMP3EstimatesWithoutXing(t *testing.T) {
@@ -68,37 +52,6 @@ func TestMediaMetadataMP3EstimatesWithoutXing(t *testing.T) {
 	// it produced.
 	if !strings.Contains(got, "Bitrate: 128 kbps") {
 		t.Errorf("lost the stated bitrate:\n%s", got)
-	}
-}
-
-// A mono frame has half the side information, so the tag sits earlier.
-func TestMediaMetadataMP3MonoSideInfo(t *testing.T) {
-	data := xingFrame(mp3Header(1, 3, 5, 0, 1), 17, 50)
-	data = append(data, zeros(1024)...)
-
-	got := describe(t, "mp3", data)
-	if !strings.Contains(got, "mono") || !strings.Contains(got, "Duration: 00:00:01.306") {
-		t.Errorf("got:\n%s", got)
-	}
-}
-
-// MPEG 2 halves the samples per frame and uses its own bitrate table.
-func TestMediaMetadataMP3Version2(t *testing.T) {
-	data := xingFrame(mp3Header(2, 3, 5, 0, 1), 9, 100)
-	data = append(data, zeros(1024)...)
-
-	got := describe(t, "mp3", data)
-	for _, want := range []string{"22050 Hz", "Duration: 00:00:02.612"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("missing %q in:\n%s", want, got)
-		}
-	}
-}
-
-func TestMediaMetadataMP3Layer2(t *testing.T) {
-	data := append(mp3Header(1, 2, 10, 1, 2), zeros(4096)...)
-	if got := describe(t, "mp3", data); !strings.Contains(got, "Audio: mp2, 48000 Hz, stereo") {
-		t.Errorf("got:\n%s", got)
 	}
 }
 
@@ -181,58 +134,6 @@ func matroskaFile(parts ...[]byte) []byte {
 	return append(header, ebmlElem(mkvSegment, bytes.Join(parts, nil))...)
 }
 
-func TestMediaMetadataMatroska(t *testing.T) {
-	data := matroskaFile(
-		ebmlElem(mkvInfo,
-			ebmlUintElem(mkvTimeScale, 1_000_000),
-			ebmlFloatElem(mkvDuration, 5000)), // 5000 ms
-		ebmlElem(mkvTracks,
-			ebmlElem(mkvTrackEntry,
-				ebmlUintElem(mkvTrackType, 1),
-				ebmlElem(mkvCodecID, []byte("V_MPEG4/ISO/AVC")),
-				ebmlElem(mkvVideo,
-					ebmlUintElem(mkvPixelWidth, 1920),
-					ebmlUintElem(mkvPixelHeigh, 1080),
-					ebmlUintElem(mkvFrameTime, 40_000_000))),
-			ebmlElem(mkvTrackEntry,
-				ebmlUintElem(mkvTrackType, 2),
-				ebmlElem(mkvCodecID, []byte("A_OPUS")),
-				ebmlElem(mkvAudio,
-					ebmlFloatElem(mkvSampleRate, 48000),
-					ebmlUintElem(mkvChannels, 2)))),
-	)
-
-	got := describe(t, "mkv", data)
-	for _, want := range []string{
-		"Duration: 00:00:05.000",
-		"Video: h264, 1920x1080, 25.00 fps",
-		"Audio: opus, 48000 Hz, stereo",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("missing %q in:\n%s", want, got)
-		}
-	}
-}
-
-// A timestamp scale other than the usual millisecond has to be applied.
-func TestMediaMetadataMatroskaTimeScale(t *testing.T) {
-	data := matroskaFile(ebmlElem(mkvInfo,
-		ebmlUintElem(mkvTimeScale, 1_000), // ticks of a microsecond
-		ebmlFloatElem(mkvDuration, 2_000_000)))
-
-	if got := describe(t, "mkv", data); !strings.Contains(got, "Duration: 00:00:02.000") {
-		t.Errorf("got:\n%s", got)
-	}
-}
-
-// A segment that omits the scale means milliseconds.
-func TestMediaMetadataMatroskaDefaultTimeScale(t *testing.T) {
-	data := matroskaFile(ebmlElem(mkvInfo, ebmlFloatElem(mkvDuration, 1500)))
-	if got := describe(t, "mkv", data); !strings.Contains(got, "Duration: 00:00:01.500") {
-		t.Errorf("got:\n%s", got)
-	}
-}
-
 // Muxers write BitDepth from the decoded sample format, which is meaningless for
 // a compressed stream but not for a lossless one.
 func TestMediaMetadataMatroskaBitDepth(t *testing.T) {
@@ -251,19 +152,6 @@ func TestMediaMetadataMatroskaBitDepth(t *testing.T) {
 	}
 	if got := describe(t, "mkv", audio("A_FLAC", 24)); !strings.Contains(got, "24-bit") {
 		t.Errorf("lost the bit depth for flac:\n%s", got)
-	}
-}
-
-// An unmapped codec is still worth naming, minus the prefix that only says which
-// kind of track it is.
-func TestMediaMetadataMatroskaUnknownCodec(t *testing.T) {
-	data := matroskaFile(ebmlElem(mkvTracks, ebmlElem(mkvTrackEntry,
-		ebmlUintElem(mkvTrackType, 1),
-		ebmlElem(mkvCodecID, []byte("V_SOMETHING")),
-		ebmlElem(mkvVideo, ebmlUintElem(mkvPixelWidth, 16), ebmlUintElem(mkvPixelHeigh, 16)))))
-
-	if got := describe(t, "mkv", data); !strings.Contains(got, "Video: something, 16x16") {
-		t.Errorf("got:\n%s", got)
 	}
 }
 

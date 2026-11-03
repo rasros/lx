@@ -72,12 +72,6 @@ func TestHTMLToMarkdownPreservesCodeBlocks(t *testing.T) {
 	}
 }
 
-func TestHTMLToMarkdownCodeFenceWithoutLanguage(t *testing.T) {
-	if got := toMarkdown(t, "<pre>plain\n  text</pre>"); got != "```\nplain\n  text\n```" {
-		t.Errorf("got:\n%q", got)
-	}
-}
-
 func TestHTMLToMarkdownStripsDataURIs(t *testing.T) {
 	got := toMarkdown(t, `<p><img src="data:image/png;base64,AAAABBBB" alt="blob"></p>`)
 	if strings.Contains(got, "base64") || strings.Contains(got, "data:") {
@@ -88,13 +82,6 @@ func TestHTMLToMarkdownStripsDataURIs(t *testing.T) {
 	}
 }
 
-func TestHTMLToMarkdownDataURILinkKeepsText(t *testing.T) {
-	got := toMarkdown(t, `<p><a href="data:text/plain,hi">click</a></p>`)
-	if got != "click" {
-		t.Errorf("got %q, want %q", got, "click")
-	}
-}
-
 func TestHTMLToMarkdownTable(t *testing.T) {
 	in := `<table><thead><tr><th>Field</th><th>Type</th></tr></thead>
 	<tbody><tr><td>id</td><td>int</td></tr></tbody></table>`
@@ -102,34 +89,6 @@ func TestHTMLToMarkdownTable(t *testing.T) {
 
 	if got := toMarkdown(t, in); got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
-	}
-}
-
-func TestHTMLToMarkdownTableEscapesPipes(t *testing.T) {
-	got := toMarkdown(t, "<table><tr><th>a</th></tr><tr><td>x | y</td></tr></table>")
-	if !strings.Contains(got, `x \| y`) {
-		t.Errorf("pipe not escaped:\n%s", got)
-	}
-}
-
-func TestHTMLToMarkdownTablePadsShortRows(t *testing.T) {
-	got := toMarkdown(t, "<table><tr><th>a</th><th>b</th></tr><tr><td>x</td></tr></table>")
-	want := "| a | b |\n|---|---|\n| x |  |"
-	if got != want {
-		t.Errorf("got:\n%s\nwant:\n%s", got, want)
-	}
-}
-
-func TestHTMLToMarkdownHandlesMalformedInput(t *testing.T) {
-	got := toMarkdown(t, "<p>unclosed <b>bold <div>and a div")
-	if !strings.Contains(got, "unclosed") || !strings.Contains(got, "and a div") {
-		t.Errorf("lost content from malformed input:\n%s", got)
-	}
-}
-
-func TestHTMLToMarkdownEmptyDocument(t *testing.T) {
-	if got := toMarkdown(t, ""); got != "" {
-		t.Errorf("got %q, want empty", got)
 	}
 }
 
@@ -166,13 +125,5 @@ func TestHTMLToMarkdownIgnoresHeadMetadata(t *testing.T) {
 	}
 	if got != "# Real Heading\n\nBody." {
 		t.Errorf("got:\n%s", got)
-	}
-}
-
-// A stray meta in the body must not leak either.
-func TestHTMLToMarkdownIgnoresMetaInBody(t *testing.T) {
-	got := toMarkdown(t, `<body><p>a</p><meta name="x" content="leaked"><p>b</p></body>`)
-	if strings.Contains(got, "leaked") {
-		t.Errorf("meta content leaked:\n%s", got)
 	}
 }

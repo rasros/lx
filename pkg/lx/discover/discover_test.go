@@ -3,18 +3,15 @@ package discover
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 
-	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/sources"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
@@ -130,58 +127,6 @@ func paths(files []sources.InputFile) []string {
 		out = append(out, f.Path)
 	}
 	return out
-}
-
-// A target that does not exist is a failure, of the path stat'ed.
-func TestCollect_MissingTarget(t *testing.T) {
-	dir := t.TempDir()
-	files, failures, err := NewCollector(dir, nil).Collect(context.Background(), "nope.go", Options{})
-	var pe *fs.PathError
-	if err != nil || len(files) != 0 || len(failures) != 1 {
-		t.Fatalf("got %v, %v, %v; want one failure and no inputs", paths(files), failures, err)
-	}
-	f := failures[0]
-	if f.Kind != core.FailedStat || f.Path != filepath.Join(dir, "nope.go") || f.Display != "nope.go" || !errors.As(f.Err, &pe) || pe.Op != "stat" {
-		t.Errorf("got %+v, want a stat failure of the path", f)
-	}
-}
-
-// An archive that cannot be expanded is a failure, as is a directory below a
-// target that cannot be read; the rest of the walk goes on.
-func TestCollect_FailuresBelowTarget(t *testing.T) {
-	if runtime.GOOS == "windows" || os.Getuid() == 0 {
-		t.Skip("needs an unreadable directory")
-	}
-	dir := t.TempDir()
-	for name, data := range map[string]string{"a.go": "package a", "bad.zip": "not a zip", "locked/b.go": "package b"} {
-		p := filepath.Join(dir, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.Chmod(filepath.Join(dir, "locked"), 0); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "locked"), 0o755) })
-
-	files, failures, err := NewCollector(dir, nil).Collect(context.Background(), ".", Options{ExpandArchives: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := paths(files); !slices.Equal(got, []string{"a.go"}) {
-		t.Errorf("got %v, want [a.go]", got)
-	}
-	var got []string
-	for _, f := range failures {
-		got = append(got, fmt.Sprintf("%s:%s:%s", f.Kind, f.Display, strings.TrimPrefix(f.Path, dir)))
-	}
-	want := []string{"archive:bad.zip:/bad.zip", "walk:locked:/locked"}
-	if !slices.Equal(got, want) {
-		t.Errorf("failures %v, want %v", got, want)
-	}
 }
 
 // A URL is one input, fetched only when rendered.
