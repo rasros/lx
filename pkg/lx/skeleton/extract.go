@@ -52,9 +52,7 @@ func extract(langName string, src []byte, lines [][]byte, functions, structs boo
 		out = def.processNode(c, out, root.Child(i))
 	}
 	if def.conditionals {
-		hidden := hiddenRows(c, root)
-		out = langs.DropStrayClosers(lines, out, hidden)
-		out = langs.BalanceConditionals(lines, out, hidden)
+		out = langs.BalanceConditionals(lines, out, hiddenRows(c, root))
 	}
 	return out, true
 }
@@ -149,15 +147,6 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 		nodeType = c.Type(node)
 	}
 	sigStart := int(node.StartPoint().Row)
-
-	if def.recoverErrors && langs.Misparsed(c, node) {
-		if typ := langs.EmitMisparsed(c, nil, node); len(typ) > 0 {
-			out = c.EmitLeadingDoc(out, outerStart)
-			out = langs.EmitDecorators(out, c.Lines, outerStart, sigStart)
-			out = append(out, typ...)
-		}
-		return out
-	}
 
 	// A node of both funcTypes and structTypes (a C declaration) that is no
 	// function is a type.

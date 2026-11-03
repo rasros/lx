@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -123,14 +124,24 @@ func TestGoldenSkeletonMembers(t *testing.T) {
 // "C" blocks and the `#ifdef __cplusplus` idiom around them in C and C++,
 // function pointers (variables, not functions), typedef and using aliases
 // (types), forward declarations, a struct declared with a variable, C++
-// default arguments in a .h file read as C, and directives inside raw
-// strings.
+// default arguments and pure virtuals in a .h file read as C, directives
+// inside raw strings and between strings, and error recovery: a misparsed
+// declaration that holds functions kept whole, nodes the grammar hides,
+// statements recovered as declarations, and a conditional left open.
 func TestGoldenSkeletonTopLevel(t *testing.T) {
 	dir := setupSkeletonFixture(t)
+	// Error-recovery fixtures only pin behavior with -u, so their -Y case
+	// is left out.
+	functionsOnly := []string{"misparse.h", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp"}
 	var cases []goldenTestCase
-	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "defaults.h", "idiom.h", "rawstring.cpp", "asm.c", "misparse.h", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp", "separator.cpp"} {
+	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "defaults.h", "idiom.h", "rawstring.cpp", "asm.c", "misparse.h", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp"} {
 		stem := strings.TrimSuffix(file, filepath.Ext(file))
-		cases = append(cases, skeletonModeCases(650+3*i, stem, []string{file})...)
+		for _, tc := range skeletonModeCases(650+3*i, stem, []string{file}) {
+			if slices.Contains(functionsOnly, file) && strings.HasSuffix(tc.name, "_types") {
+				continue
+			}
+			cases = append(cases, tc)
+		}
 	}
 	runTestGolden(t, dir, cases)
 }

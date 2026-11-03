@@ -224,17 +224,19 @@ trait T {
 }
 
 // TestCFuncVisible checks which top-level C declarations declare a
-// function.
+// function. The C grammar reads a C++ default argument as an initializer,
+// which must not hide the function.
 func TestCFuncVisible(t *testing.T) {
 	c, root := parse(t, grammars.CLanguage(), `int add(int a, int b);
 int *make(void);
 int (*pick(int kind))(int);
+void resize(int w, int h = 1);
 int (*handler)(int);
 int (*fp)(int) = add;
 void (*hooks[4])(void);
 int x = 1;
 `)
-	want := []bool{true, true, true, false, false, false, false}
+	want := []bool{true, true, true, true, false, false, false, false}
 	var got []bool
 	for i := 0; i < root.ChildCount(); i++ {
 		if n := root.Child(i); c.Type(n) == "declaration" {
