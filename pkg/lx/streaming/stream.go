@@ -259,7 +259,8 @@ func (s *Stream) prepare() (core.Plan, []*core.SectionContext, []render.Prepared
 				currentSection.TotalSize += f.Size
 				global.TotalSize += f.Size
 			}
-			// Size-only: no content read yet. The Report replaces this.
+			// Size-only: no content read yet. The Report adds WrittenTokenEstimate,
+			// over the written output, beside it.
 			global.TokenEstimate += s.tokenizer.Estimate(f.Size, nil)
 
 			prepared = append(prepared, render.PreparedItem{
