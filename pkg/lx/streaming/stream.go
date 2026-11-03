@@ -14,7 +14,9 @@ import (
 )
 
 // FailureHandler is told about each input that could not be read. It is
-// called from the goroutine running Execute, in output order.
+// called from the goroutine running Execute, in output order. It may read the
+// stream's Plan, but changing the stream from it panics, as it does after
+// Execute.
 type FailureHandler func(core.Failure)
 
 type defaultTokenizer struct{}
@@ -25,7 +27,8 @@ func (defaultTokenizer) Estimate(size int64, content interface{}) int64 {
 
 // Stream manages a collection of files, sections, and prompts for rendering.
 // It is not safe for concurrent use: build it and execute it from one
-// goroutine.
+// goroutine. It renders once: once Execute has started, the methods that
+// change the stream panic with ErrExecuted, and Execute returns it.
 type Stream struct {
 	items       []interface{}
 	tokenizer   core.Tokenizer
@@ -82,6 +85,7 @@ const maxSkeletonWorkers = 2
 // WithConcurrency sets the concurrent workers for file processing. The stream
 // lowers it to maxSkeletonWorkers when any queued file renders as a skeleton.
 func (s *Stream) WithConcurrency(n int) *Stream {
+	s.mustChange()
 	if n < 1 {
 		n = 1
 	}
@@ -90,6 +94,7 @@ func (s *Stream) WithConcurrency(n int) *Stream {
 }
 
 func (s *Stream) WithTokenizer(t core.Tokenizer) *Stream {
+	s.mustChange()
 	s.tokenizer = t
 	return s
 }
@@ -98,6 +103,7 @@ func (s *Stream) WithTokenizer(t core.Tokenizer) *Stream {
 // AddFailure and the files that cannot be read as they render, each counted
 // once in the Report's FailedFiles. Without one, the stream logs them.
 func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
+	s.mustChange()
 	s.onFailure = h
 	return s
 }
@@ -105,12 +111,14 @@ func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
 // WithDir sets what relative paths in templates, such as dataURI's, resolve
 // against; the default is the process's working directory.
 func (s *Stream) WithDir(dir string) *Stream {
+	s.mustChange()
 	s.engine.Dir = dir
 	return s
 }
 
 // WithLogger sets where the stream logs; the default is slog.Default().
 func (s *Stream) WithLogger(log *slog.Logger) *Stream {
+	s.mustChange()
 	if log == nil {
 		log = slog.Default()
 	}
@@ -127,6 +135,7 @@ func (s *Stream) Admit(f sources.InputFile, opts core.RenderOptions) bool {
 
 // AddFile enqueues a file to render with opts, unless Admit drops it.
 func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
+	s.mustChange()
 	if !s.Admit(f, opts) {
 		s.log.Debug("Skipped by size limit", "path", f.Path, "size", f.Size, "max_size", opts.MaxSize)
 		s.skippedBySize++
@@ -143,16 +152,19 @@ func (s *Stream) AddFile(f sources.InputFile, opts core.RenderOptions) *Stream {
 // failed on. It renders nothing, but is reported where it stands in the
 // output and counted in the Report's FailedFiles.
 func (s *Stream) AddFailure(f core.Failure) *Stream {
+	s.mustChange()
 	s.items = append(s.items, f)
 	return s
 }
 
 func (s *Stream) AddSection(title string) *Stream {
+	s.mustChange()
 	s.items = append(s.items, core.SectionContext{Body: title})
 	return s
 }
 
 func (s *Stream) AddPrompt(text string) *Stream {
+	s.mustChange()
 	s.items = append(s.items, core.PromptContext{Body: text})
 	return s
 }
@@ -162,6 +174,7 @@ func (s *Stream) AddPrompt(text string) *Stream {
 // stand in for content. A tree with no admitted files is left out. Repeated
 // calls with the same files slice and MaxSize share one built tree.
 func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *Stream {
+	s.mustChange()
 	if t := s.lastTree; len(files) > 0 && len(files) == len(t.files) &&
 		&files[0] == &t.files[0] && opts.MaxSize == t.maxSize {
 		s.log.Debug("Adding tree", "files", t.admitted)
@@ -185,20 +198,29 @@ func (s *Stream) AddTree(files []sources.InputFile, opts core.RenderOptions) *St
 }
 
 func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
+	s.mustChange()
 	s.items = append(s.items, core.MetaContext{Body: body, Fields: fields})
 	return s
 }
 
-// prepare plans the items queued so far, organizing them into sections.
-func (s *Stream) prepare() core.Plan {
+// mustChange panics once Execute has started: a stream renders once, and
+// nothing may change it while it renders.
+func (s *Stream) mustChange() {
+	if s.executed {
+		panic(ErrExecuted)
+	}
+}
+
+// prepare plans the items queued so far, organizing them into sections. It
+// only reads the stream.
+func (s *Stream) prepare() (core.Plan, []*core.SectionContext, []render.PreparedItem) {
 	global := core.Plan{
 		WorkDir:       s.workDir,
-		Metadata:      make(map[string]string),
 		SkippedBySize: s.skippedBySize,
 	}
 
-	s.sections = make([]*core.SectionContext, 0)
-	s.prepared = make([]render.PreparedItem, 0, len(s.items))
+	sections := make([]*core.SectionContext, 0)
+	prepared := make([]render.PreparedItem, 0, len(s.items))
 
 	currentSection := &core.SectionContext{Index: 0, Body: "", IsImplicit: true}
 	usingImplicit := true
@@ -208,7 +230,7 @@ func (s *Stream) prepare() core.Plan {
 		}
 	}
 	if usingImplicit {
-		s.sections = append(s.sections, currentSection)
+		sections = append(sections, currentSection)
 	}
 
 	sectionCounter := 0
@@ -221,9 +243,9 @@ func (s *Stream) prepare() core.Plan {
 		if sec, ok := item.(core.SectionContext); ok {
 			sectionCounter++
 			newSec := &core.SectionContext{Index: sectionCounter, Body: sec.Body, IsImplicit: false}
-			s.sections = append(s.sections, newSec)
+			sections = append(sections, newSec)
 			currentSection = newSec
-			s.prepared = append(s.prepared, render.PreparedItem{Raw: item, Section: currentSection, StreamIndex: i})
+			prepared = append(prepared, render.PreparedItem{Raw: item, Section: currentSection, StreamIndex: i})
 			continue
 		}
 
@@ -240,7 +262,7 @@ func (s *Stream) prepare() core.Plan {
 			// Size-only: no content read yet. The Report replaces this.
 			global.TokenEstimate += s.tokenizer.Estimate(f.Size, nil)
 
-			s.prepared = append(s.prepared, render.PreparedItem{
+			prepared = append(prepared, render.PreparedItem{
 				Raw:              item,
 				Section:          currentSection,
 				FileIndexGlobal:  globalFileIdx,
@@ -251,21 +273,25 @@ func (s *Stream) prepare() core.Plan {
 			continue
 		}
 
-		s.prepared = append(s.prepared, render.PreparedItem{Raw: item, Section: currentSection, StreamIndex: i})
+		prepared = append(prepared, render.PreparedItem{Raw: item, Section: currentSection, StreamIndex: i})
 	}
 
-	global.TotalSections = len(s.sections)
-	for _, sec := range s.sections {
+	global.TotalSections = len(sections)
+	for _, sec := range sections {
 		sec.Global = global
 	}
 
-	return global
+	return global, sections, prepared
 }
 
 // Plan returns what the stream would render now, as templates will see it.
-func (s *Stream) Plan() core.Plan { return s.prepare() }
+func (s *Stream) Plan() core.Plan {
+	plan, _, _ := s.prepare()
+	return plan
+}
 
-// ErrExecuted is returned by Execute on a stream that already ran.
+// ErrExecuted is returned by Execute on a stream that already ran, and the
+// panic of a change to the stream once Execute has started.
 var ErrExecuted = errors.New("stream already executed")
 
 // Execute renders the stream to w and reports what was rendered. A stream
@@ -276,7 +302,8 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) (core.Report, error) 
 	}
 	s.executed = true
 
-	plan := s.prepare()
+	plan, sections, prepared := s.prepare()
+	s.sections, s.prepared = sections, prepared
 	counter := &byteCounter{w: w}
 
 	headerTokens, err := render.ExecuteCounted(counter, s.engine.OutputHeader, core.HeaderContext{Global: plan}, s.tokenizer)
@@ -293,11 +320,11 @@ func (s *Stream) Execute(ctx context.Context, w io.Writer) (core.Report, error) 
 	}
 
 	return core.Report{
-		Plan:              plan,
-		TotalWrittenBytes: counter.count,
-		TotalRows:         totals.rows,
-		TokenEstimate:     headerTokens + totals.tokens + footerTokens,
-		BinaryFiles:       totals.binary,
-		FailedFiles:       totals.failed,
+		Plan:                 plan,
+		TotalWrittenBytes:    counter.count,
+		TotalRows:            totals.rows,
+		WrittenTokenEstimate: headerTokens + totals.tokens + footerTokens,
+		BinaryFiles:          totals.binary,
+		FailedFiles:          totals.failed,
 	}, nil
 }

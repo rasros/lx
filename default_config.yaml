@@ -54,10 +54,12 @@ output_footer_template: "\n\n"
 section_header_template: ""
 section_footer_template: ""
 
-stats_template: |
-  Files: {{ .Global.TotalFiles }}
-  Size: {{ .Global.TotalWrittenBytes | humanize }}
-  Est. Tokens: {{ .Global.TokenEstimate }}
+# The summary footer. Unset, it is the built-in two- or three-line summary;
+# it renders a StatsContext, whose Global is the run's Report (see CONFIG.md).
+# stats_template: |
+#   Files: {{ .Global.TotalFiles }}
+#   Size: {{ .Global.TotalWrittenBytes | humanize }}
+#   Est. Tokens: {{ .Global.WrittenTokenEstimate }}
 
 # -----------------------------------------------------------------------------
 # Options

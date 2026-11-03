@@ -6,6 +6,7 @@ import (
 
 	"github.com/rasros/lx/internal/ansi"
 	"github.com/rasros/lx/pkg/lx"
+	"github.com/rasros/lx/pkg/lx/templatex"
 )
 
 // StatsContext is what the stats template renders: the report of a run and
@@ -26,7 +27,7 @@ const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
 	`{{ commafy .Global.TotalRows }} {{ plural .Global.TotalRows "row" "rows" }} {{ dim .ColorEnabled "·" }} ` +
 	`{{ commafy .Global.TotalSections }} {{ plural .Global.TotalSections "section" "sections" }}` +
 	`{{ if not .Global.SizeUnknown }} {{ dim .ColorEnabled "·" }} {{ humanize .Global.TotalSize }}{{ end }}` + "\n" +
-	`  {{ tokenLabel .Global.TokenEstimate .ColorEnabled }}` + "\n" +
+	`  {{ tokenLabel .Global.WrittenTokenEstimate .ColorEnabled }}` + "\n" +
 	`{{ if or .Global.SkippedBySize .Global.BinaryFiles .Global.FailedFiles }}  ` +
 	`{{ $sep := "" }}` +
 	`{{ if .Global.SkippedBySize }}{{ commafy .Global.SkippedBySize }} skipped (size){{ $sep = printf " %s " (dim .ColorEnabled "·") }}{{ end }}` +
@@ -35,24 +36,26 @@ const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
 	"\n" + `{{ end }}`
 
 // compileStats parses the stats template, or the default one when tmpl is
-// empty. It can call every function the other templates can, with dataURI
-// resolving against dir, and the coloring helpers below.
+// empty, failing on a field StatsContext lacks. It can call every function
+// the other templates can, with dataURI resolving against dir, and the
+// coloring helpers below.
 func compileStats(tmpl, dir string) (*template.Template, error) {
 	if tmpl == "" {
 		tmpl = defaultStatsTemplate
 	}
-	funcs := lx.TemplateFuncs(dir)
-	commafy := funcs["commafy"].(func(interface{}) string)
-	t, err := template.New("stats").Funcs(funcs).Funcs(statsFuncs(commafy)).Parse(tmpl)
+	t, err := template.New("stats").Funcs(templatex.Funcs(dir)).Funcs(statsFuncs()).Parse(tmpl)
+	if err == nil {
+		// The stats render after the output, too late to fail cleanly.
+		err = templatex.CheckFields(t, StatsContext{})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("stats template: %w", err)
 	}
 	return t, nil
 }
 
-// statsFuncs returns the coloring helpers of the stats template, which
-// writes numbers with commafy.
-func statsFuncs(commafy func(interface{}) string) template.FuncMap {
+// statsFuncs returns the coloring helpers of the stats template.
+func statsFuncs() template.FuncMap {
 	return template.FuncMap{
 		"accent": func(enabled bool, s string) string {
 			return ansi.New(enabled).Paint(s, ansi.Cyan)
@@ -61,7 +64,7 @@ func statsFuncs(commafy func(interface{}) string) template.FuncMap {
 			return ansi.New(enabled).Paint(s, ansi.Dim)
 		},
 		"tokenLabel": func(n int64, enabled bool) string {
-			label := fmt.Sprintf("~%s tokens", commafy(n))
+			label := fmt.Sprintf("~%s tokens", templatex.Commafy(n))
 			color := ansi.Green
 			switch {
 			case n >= tokenDangerThreshold:

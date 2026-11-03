@@ -1,13 +1,30 @@
 package templatex
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"text/template"
 
 	"github.com/rasros/lx/pkg/lx/core"
 )
 
-// Compile parses configuration templates into an engine.
+// CheckFields renders t with data, a zero context of the kind t is given,
+// and returns the error of a field the context does not have. It only finds
+// fields on the path the zero context takes. Other errors are left to
+// rendering, which real data may avoid.
+func CheckFields(t *template.Template, data interface{}) error {
+	err := t.Execute(io.Discard, data)
+	var ee template.ExecError
+	if errors.As(err, &ee) && strings.Contains(err.Error(), "can't evaluate field") {
+		return err
+	}
+	return nil
+}
+
+// Compile parses configuration templates into an engine. A template that
+// names a field its context lacks is an error too.
 func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 	format := cfg.OutputFormat
 	if format == "" {
@@ -94,6 +111,31 @@ func Compile(cfg *core.Config) (*core.TemplateEngine, error) {
 	tFooter, err := parse("output_footer", pick(cfg.OutputFooterTemplate, defaults.OutputFooter))
 	if err != nil {
 		return nil, fmt.Errorf("output_footer template: %w", err)
+	}
+
+	// A field a context lacks, such as one only the stats know, would fail
+	// once output is under way; fail before any is written.
+	for _, c := range []struct {
+		name string
+		t    *template.Template
+		data interface{}
+	}{
+		{"file_content", tContent, &core.FileContext{}},
+		{"file_error", tError, &core.FileContext{}},
+		{"file_binary", tBinary, &core.FileContext{}},
+		{"file_compact", tCompact, &core.FileContext{}},
+		{"section", tSection, &core.SectionContext{}},
+		{"prompt", tPrompt, &core.PromptContext{}},
+		{"tree", tTree, &core.TreeContext{}},
+		{"meta", tMeta, &core.MetaContext{}},
+		{"section_header", tSecHeader, core.SectionContext{}},
+		{"section_footer", tSecFooter, core.SectionContext{}},
+		{"output_header", tHeader, core.HeaderContext{}},
+		{"output_footer", tFooter, core.FooterContext{}},
+	} {
+		if err := CheckFields(c.t, c.data); err != nil {
+			return nil, fmt.Errorf("%s template: %w", c.name, err)
+		}
 	}
 
 	// HTML embeds images inline; every other format reports them like binaries.

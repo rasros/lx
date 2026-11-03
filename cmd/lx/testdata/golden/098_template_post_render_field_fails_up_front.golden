@@ -1,0 +1,5 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: output_footer template: template: output_footer:1:15: executing "output_footer" at <.Global.TotalRows>: can't evaluate field TotalRows in type core.Plan

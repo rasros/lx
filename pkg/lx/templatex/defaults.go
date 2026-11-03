@@ -321,7 +321,7 @@ func templateFuncs(engine *core.TemplateEngine) template.FuncMap {
 			if !ok {
 				return fmt.Sprintf("%v", n)
 			}
-			return commafy(v)
+			return Commafy(v)
 		},
 		"plural": func(n interface{}, singular, plural string) string {
 			if v, ok := asInt64(n); ok && v == 1 {
@@ -344,7 +344,9 @@ func asInt64(n interface{}) (int64, bool) {
 	return 0, false
 }
 
-func commafy(v int64) string {
+// Commafy writes v with a comma between each group of three digits, as the
+// commafy template function does.
+func Commafy(v int64) string {
 	neg := v < 0
 	if neg {
 		v = -v

@@ -151,15 +151,16 @@ HeaderContext and FooterContext are bound to `output_header_template` and `outpu
 field, Global (a Plan).
 
 Plan is reachable from every other context as `.Global`. It is known before anything renders: TotalFiles, TotalSize,
-SizeUnknown, TokenEstimate (estimated from file sizes), TotalSections, WorkDir, Metadata (a map of string to string),
-and SkippedBySize.
+SizeUnknown, TokenEstimate (estimated from file sizes), TotalSections, WorkDir, and SkippedBySize. Numbers only
+rendering finds out, such as rows written or files that failed, exist only in `stats_template`. A template naming a
+field its context lacks fails before any output is written, as a template that does not parse does.
 
 StatsContext is bound to `stats_template`, which renders after the output is written. It carries Global, a Report, plus
 ColorEnabled (a bool, false when output is piped or `NO_COLOR` is set). A Report has every Plan field and what only
-rendering finds out: TotalWrittenBytes, TotalRows, BinaryFiles, FailedFiles, and a TokenEstimate over the written output
-in place of the Plan's. The default template adds a third line listing SkippedBySize, BinaryFiles, and FailedFiles,
-showing only the counters that are non-zero. Besides the helpers below, `stats_template` can call `accent`, `dim` and
-`tokenLabel`, which color their text when ColorEnabled is set.
+rendering finds out: TotalWrittenBytes, TotalRows, BinaryFiles, FailedFiles, and WrittenTokenEstimate, estimated over
+the written output where TokenEstimate is estimated from file sizes. The default template adds a third line listing
+SkippedBySize, BinaryFiles, and FailedFiles, showing only the counters that are non-zero. Besides the helpers below,
+`stats_template` can call `accent`, `dim` and `tokenLabel`, which color their text when ColorEnabled is set.
 
 ### Helper functions
 
@@ -172,6 +173,8 @@ Provided by `pkg/lx/templatex/defaults.go`:
 | `date`       | `layout, time.Time → string`    | Wrapper around `time.Format`.                                 |
 | `dataURI`    | `path → string`                 | Reads a file and emits a `data:<mime>;base64,…` URI.          |
 | `escape`     | `interface{} → string`          | HTML-escape (used by the HTML format's defaults).             |
+| `commafy`    | `int → string`                  | `1234567` → `"1,234,567"`.                                    |
+| `plural`     | `n, singular, plural → string`  | `singular` when n is 1, else `plural`.                        |
 
 ### Shared partials
 
