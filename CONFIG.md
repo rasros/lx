@@ -186,7 +186,7 @@ HeaderContext and FooterContext are bound to `output_header_template` and `outpu
 field, Global (a Plan).
 
 Plan is reachable from every other context as `.Global`. It is known before anything renders: TotalFiles, TotalSize,
-SizeUnknown, TokenEstimate (estimated from file sizes), TotalSections, WorkDir, and SkippedBySize. Numbers only
+SizeUnknown, TokenEstimate (estimated from file sizes), TotalSections, and SkippedBySize. Numbers only
 rendering finds out, such as rows written or files that failed, exist only in `stats_template`. A template naming a
 field its context lacks fails before any output is written, as a template that does not parse does.
 

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"os"
 	"runtime"
 
 	"github.com/rasros/lx/pkg/lx/core"
@@ -184,11 +183,7 @@ func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
 // prepare plans the items queued so far, organizing them into sections.
 func (s *Stream) prepare() (core.Plan, []*core.SectionContext, []render.PreparedItem) {
 	global := core.Plan{
-		WorkDir:       s.engine.Dir,
 		SkippedBySize: s.skippedBySize,
-	}
-	if global.WorkDir == "" {
-		global.WorkDir, _ = os.Getwd()
 	}
 
 	sections := make([]*core.SectionContext, 0)

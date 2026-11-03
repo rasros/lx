@@ -15,9 +15,6 @@ type Plan struct {
 	// TokenEstimate is estimated from the sizes of the files alone.
 	TokenEstimate int64
 	TotalSections int
-	// WorkDir is what relative paths resolve against: the Stream's WithDir,
-	// or else the process's working directory.
-	WorkDir string
 
 	SkippedBySize int
 }
