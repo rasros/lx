@@ -112,7 +112,7 @@ func ExtractDocumentText(ctx context.Context, path string, r io.ReaderAt, size i
 	case ".pdf":
 		text, err = extractPDFText(internal.ContextReaderAt(ctx, r), size)
 	case ".docx":
-		text, err = extractDOCXText(internal.ContextReaderAt(ctx, r), size)
+		text, err = extractDOCXText(ctx, internal.ContextReaderAt(ctx, r), size)
 	case ".xlsx":
 		text, err = extractXLSXText(ctx, internal.ContextReaderAt(ctx, r), size)
 	case ".pptx":
@@ -152,13 +152,13 @@ func extractPDFText(r io.ReaderAt, size int64) ([]byte, error) {
 	return io.ReadAll(textReader)
 }
 
-func extractDOCXText(r io.ReaderAt, size int64) ([]byte, error) {
+func extractDOCXText(ctx context.Context, r io.ReaderAt, size int64) ([]byte, error) {
 	doc, err := docx.ReadDocxFromMemory(r, size)
 	if err != nil {
 		return nil, err
 	}
 	defer doc.Close()
-	return []byte(xmlToText(strings.NewReader(doc.Editable().GetContent()))), nil
+	return []byte(xmlToText(ctx, strings.NewReader(doc.Editable().GetContent()))), nil
 }
 
 func extractPPTXText(ctx context.Context, r io.ReaderAt, size int64) ([]byte, error) {
@@ -198,18 +198,26 @@ func extractPPTXText(ctx context.Context, r io.ReaderAt, size int64) ([]byte, er
 		if err != nil {
 			continue
 		}
-		sb.WriteString(xmlToText(rc))
+		sb.WriteString(xmlToText(ctx, rc))
 		rc.Close()
 	}
 	return []byte(sb.String()), nil
 }
 
-// xmlToText extracts plain text from XML content.
-// Paragraph ends (</p> in any namespace) become newlines.
-func xmlToText(r io.Reader) string {
+// ctxCheckEvery is how many units of work, tokens or rows, a converter does
+// between looks at ctx: often enough to stop within milliseconds, rarely
+// enough to cost nothing.
+const ctxCheckEvery = 1024
+
+// xmlToText extracts plain text from XML content, stopping short once ctx is
+// done. Paragraph ends (</p> in any namespace) become newlines.
+func xmlToText(ctx context.Context, r io.Reader) string {
 	decoder := xml.NewDecoder(r)
 	var sb strings.Builder
-	for {
+	for i := 1; ; i++ {
+		if i%ctxCheckEvery == 0 && ctx.Err() != nil {
+			break
+		}
 		tok, err := decoder.Token()
 		if err != nil {
 			break
@@ -226,26 +234,69 @@ func xmlToText(r io.Reader) string {
 	return sb.String()
 }
 
+// extractXLSXText lists each sheet's rows, tab-separated, as GetRows would
+// return them, with the rows a sheet ends on that are empty left out. It
+// streams the rows, so it can stop within a sheet once ctx is done: a single
+// sheet can take seconds.
+//
+// Opening the workbook unzips every sheet, which for a large one takes most of
+// a second and cannot be interrupted. An open that ctx abandons finishes in
+// the background and then closes the workbook, which removes the temporary
+// files it unzipped large sheets to.
 func extractXLSXText(ctx context.Context, r io.ReaderAt, size int64) ([]byte, error) {
-	f, err := excelize.OpenReader(io.NewSectionReader(r, 0, size))
+	f, err := openUntilDone(ctx, func() (*excelize.File, error) {
+		return excelize.OpenReader(io.NewSectionReader(r, 0, size))
+	})
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 	var sb strings.Builder
 	for _, sheet := range f.GetSheetList() {
-		if err := ctx.Err(); err != nil {
-			return nil, err
+		text, err := xlsxSheetText(ctx, f, sheet)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
 		}
-		rows, err := f.GetRows(sheet)
 		if err != nil {
 			continue
 		}
 		fmt.Fprintf(&sb, "%s:\n", sheet)
-		for _, row := range rows {
-			sb.WriteString(strings.Join(row, "\t"))
-			sb.WriteByte('\n')
-		}
+		sb.WriteString(text)
 	}
 	return []byte(sb.String()), nil
+}
+
+// xlsxSheetText renders one sheet's rows. A row that fails to read ends the
+// sheet, as it ends GetRows.
+func xlsxSheetText(ctx context.Context, f *excelize.File, sheet string) (string, error) {
+	rows, err := f.Rows(sheet)
+	if err != nil {
+		return "", err
+	}
+	var sb strings.Builder
+	// Empty rows are written only once a row with cells follows them.
+	cur, written := 0, 0
+	for rows.Next() {
+		cur++
+		if cur%ctxCheckEvery == 0 && ctx.Err() != nil {
+			break
+		}
+		row, err := rows.Columns()
+		if err != nil {
+			break
+		}
+		if len(row) == 0 {
+			continue
+		}
+		for ; written < cur-1; written++ {
+			sb.WriteByte('\n')
+		}
+		sb.WriteString(strings.Join(row, "\t"))
+		sb.WriteByte('\n')
+		written = cur
+	}
+	if err := rows.Close(); err != nil {
+		return "", err
+	}
+	return sb.String(), nil
 }
