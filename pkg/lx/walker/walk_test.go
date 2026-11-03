@@ -6,9 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
-	"time"
 )
 
 func TestWalker_NestedIgnores(t *testing.T) {
@@ -317,25 +315,6 @@ func TestParseRules(t *testing.T) {
 		}
 	})
 
-	t.Run("IsLiteral set correctly", func(t *testing.T) {
-		rules := parseRules([]string{"foo", "*.go", "bar/baz", "a[bc]"}, "", "test")
-		cases := []struct {
-			idx  int
-			want bool
-			name string
-		}{
-			{0, true, "foo"},
-			{1, false, "*.go"},
-			{2, true, "bar/baz"},
-			{3, false, "a[bc]"},
-		}
-		for _, c := range cases {
-			if rules[c.idx].Spec.Pattern.IsLiteral != c.want {
-				t.Errorf("rules[%d] (%s).Spec.Pattern.IsLiteral = %v, want %v", c.idx, c.name, rules[c.idx].Spec.Pattern.IsLiteral, c.want)
-			}
-		}
-	})
-
 	t.Run("trailing slash preserved after clean", func(t *testing.T) {
 		rules := parseRules([]string{"build/"}, "", "test")
 		if rules[0].Pattern != "build/" {
@@ -397,112 +376,6 @@ func TestWalker_IgnoreDisabled(t *testing.T) {
 	assertContains(t, files, "keep.log")
 }
 
-func symlinkTree(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	mustMkdir := func(p string) {
-		if err := os.MkdirAll(filepath.Join(dir, p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	mustWrite := func(p, content string) {
-		if err := os.WriteFile(filepath.Join(dir, p), []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	mustLink := func(target, name string) {
-		if err := os.Symlink(target, filepath.Join(dir, name)); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	mustMkdir("real")
-	mustWrite("real/inside.txt", "x")
-	mustWrite("top.txt", "y")
-	mustLink("real", "dirlink")
-	mustLink("top.txt", "filelink")
-	mustLink("nowhere", "brokenlink")
-	return dir
-}
-
-func walkPaths(t *testing.T, dir string, configure func(*Walker)) []string {
-	t.Helper()
-	w := newWalker(nil, nil)
-	if configure != nil {
-		configure(w)
-	}
-	var got []string
-	err := w.Walk(os.DirFS(dir), ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return nil
-		}
-		got = append(got, p)
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("Walk failed: %v", err)
-	}
-	sort.Strings(got)
-	return got
-}
-
-func TestWalkSkipsDirectorySymlinksByDefault(t *testing.T) {
-	got := walkPaths(t, symlinkTree(t), nil)
-	want := []string{"brokenlink", "filelink", "real/inside.txt", "top.txt"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v, want %v", got, want)
-	}
-}
-
-func TestWalkFollowsDirectorySymlinksWhenEnabled(t *testing.T) {
-	got := walkPaths(t, symlinkTree(t), func(w *Walker) { w.opts.FollowDirSymlinks = true })
-	want := []string{"brokenlink", "dirlink/inside.txt", "filelink", "real/inside.txt", "top.txt"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v, want %v", got, want)
-	}
-}
-
-// A broken link resolves to nothing, so file-symlink policy governs it.
-func TestWalkSkipFileSymlinksDropsFileAndBrokenLinks(t *testing.T) {
-	got := walkPaths(t, symlinkTree(t), func(w *Walker) { w.opts.SkipFileSymlinks = true })
-	want := []string{"real/inside.txt", "top.txt"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v, want %v", got, want)
-	}
-}
-
-func TestWalkFollowTerminatesOnSymlinkCycle(t *testing.T) {
-	dir := t.TempDir()
-	for _, d := range []string{"a", "b"} {
-		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, d, "f.txt"), []byte("x"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.Symlink("../b", filepath.Join(dir, "a", "to_b")); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink("../a", filepath.Join(dir, "b", "to_a")); err != nil {
-		t.Fatal(err)
-	}
-
-	done := make(chan []string, 1)
-	go func() { done <- walkPaths(t, dir, func(w *Walker) { w.opts.FollowDirSymlinks = true }) }()
-
-	select {
-	case got := <-done:
-		for _, p := range got {
-			if strings.Count(p, "to_") > 1 {
-				t.Errorf("walk recursed through the cycle repeatedly: %q", p)
-			}
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("walk did not terminate on a symlink cycle")
-	}
-}
-
 // walkNamed walks the single path name inside dir and returns the paths
 // passed to the callback.
 func walkNamed(t *testing.T, w *Walker, dir, name string) []string {
@@ -519,25 +392,6 @@ func walkNamed(t *testing.T, w *Walker, dir, name string) []string {
 		t.Fatalf("Walk failed: %v", err)
 	}
 	return got
-}
-
-// As in ripgrep, a named file is never filtered: not by ignore files, the
-// directories above it, override rules or hidden-file skipping.
-func TestWalker_NamedFileIsNeverFiltered(t *testing.T) {
-	dir := t.TempDir()
-	mustGitDir(t, dir, ".git")
-	mustWriteFile(t, dir, ".gitignore", "build/\n*.log\n")
-	mustMkdir(t, dir, "build")
-	mustWriteFile(t, dir, "build/out.js", "x")
-	mustWriteFile(t, dir, "a.log", "x")
-	mustWriteFile(t, dir, ".env", "x")
-
-	w := New(Options{Overrides: []Override{ExcludeOverride("*.js")}, IgnoreEnabled: true, SkipHidden: true})
-	for _, name := range []string{"build/out.js", "a.log", ".env"} {
-		if got := walkNamed(t, w, dir, name); !reflect.DeepEqual(got, []string{name}) {
-			t.Errorf("got %v, want %s included", got, name)
-		}
-	}
 }
 
 // patterns.

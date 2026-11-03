@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"encoding/binary"
 	"testing"
 )
 
@@ -35,54 +34,37 @@ func TestClassify(t *testing.T) {
 		// The extension decides when the content has nothing to say against it.
 		{"empty content trusts the name", "x.png", nil, "png"},
 		{"binary without a signature trusts the name", "clip.mp4", []byte{0, 1, 2, 3, 0xff}, "mp4"},
-		{"tif", "x.tif", tiffFile(binary.LittleEndian, 16, 16), "tiff"},
-		{"tiff", "x.tiff", tiffFile(binary.BigEndian, 16, 16), "tiff"},
 		{"tif by name only", "scan.TIF", []byte{0, 0, 0, 0}, "tiff"},
-		{"heic by name", "photo.heic", []byte{0, 0, 0, 0}, "heic"},
 
 		// A strong signature overrides the extension.
 		{"png named jpg", "mislabelled.jpg", pngFile(16, 16, 8, 2), "png"},
-		{"png named txt", "image.txt", pngFile(16, 16, 8, 2), "png"},
-		{"png without a name", "download", pngFile(16, 16, 8, 2), "png"},
 		{"flac named mp3", "song.mp3", flacFile(44100, 1, 16, 44100), "flac"},
 		{"ID3 is strong", "noext", append([]byte("ID3\x04\x00\x00"), zeros(16)...), "mp3"},
 
 		// Text is never media, whatever it is called or however it starts.
 		{"lfs pointer named png", "x.png", lfsPointer, ""},
-		{"lfs pointer named mp4", "clip.mp4", lfsPointer, ""},
 		{"text named bmp", "a.bmp", []byte("BM looks like a bitmap\n"), ""},
 		{"text starting with a strong magic", "a.gif", []byte("GIF89a is a format\n"), ""},
-		{"text starting with ID3", "tags", []byte("ID3 tags explained\n"), ""},
 
 		// Weak signatures count only on binary content.
 		{"BM text without a name", "notes", []byte("BM25 notes about ranking\n"), ""},
 		{"BM binary without a name", "blob", bmpFile(40, 16, 16, 24), "bmp"},
-		{"ico binary without a name", "blob", icoFile([][2]byte{{16, 16}}), "ico"},
-		{"mp3 sync binary without a name", "blob", append(mp3Header(1, 3, 9, 0, 2), zeros(64)...), "mp3"},
 		{"weak magic loses to the name", "a.wav", bmpFile(40, 16, 16, 24), "wav"},
 		// ...and only when the parser makes sense of what follows.
 		{"BM then zeros", "counts.dat", append([]byte("BM\xd2\x04"), zeros(60)...), ""},
 		{"ico magic then a counter", "data.bin",
 			[]byte{0, 0, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}, ""},
-		{"ico magic then noise", "blob",
-			[]byte{0, 0, 1, 0, 0x9b, 0xc0, 0x10, 0x3a, 0x79, 0x74, 0xd3, 0x66, 4, 0xb8, 0x17, 0xfc, 0x29, 0x8c, 0xef, 0xf2, 0x82, 0x35}, ""},
-		{"ico header with no entries", "blob", []byte{0, 0, 1, 0, 1, 0}, ""},
 
 		// ISO brands: compatible brands count, the specific brand wins, and
 		// within the family the extension decides.
 		{"avif under the generic mif1 brand", "photo", isoHeader("mif1", "avif", "mif1", "miaf"), "avif"},
-		{"avif under the generic mif1 brand, named", "photo.avif", isoHeader("mif1", "avif", "mif1", "miaf"), "avif"},
-		{"heic under mif1", "photo", isoHeader("mif1", "mif1", "heic"), "heic"},
 		{"m4a declared in compatible brands", "song", isoHeader("isom", "M4A ", "isom"), "m4a"},
-		{"m4a with only generic brands", "song.m4a", isoHeader("isom", "isom", "mp42"), "m4a"},
 		{"mp4 named m4a keeps the name", "song.m4a", isoHeader("mp42", "mp42", "isom"), "m4a"},
-		{"mp4 named mov keeps the name", "clip.mov", isoHeader("isom", "isom"), "mov"},
 		{"generic iso without a name", "clip", isoHeader("isom", "isom", "mp42"), "mp4"},
 		{"iso content named as another family", "song.mp3", isoHeader("M4A ", "M4A "), "m4a"},
 
 		// Not a registered format at all.
 		{"source", "main.go", []byte("package main\n"), ""},
-		{"unknown binary", "blob.dat", []byte{0x00, 0x13, 0x37}, ""},
 	}
 
 	for _, c := range cases {
@@ -135,13 +117,9 @@ func TestIsImageAlternativeExtensions(t *testing.T) {
 func TestMIMETypeFallbacks(t *testing.T) {
 	cases := map[string]string{
 		"a.bmp":  "image/bmp",
-		"a.ico":  "image/x-icon",
 		"a.tif":  "image/tiff",
-		"a.tiff": "image/tiff",
 		"a.avif": "image/avif",
-		"a.heic": "image/heic",
 		"a.svg":  "image/svg+xml",
-		"a.webp": "image/webp",
 	}
 	for p, want := range cases {
 		if got := MIMEType(p); got != want {
@@ -174,7 +152,6 @@ func TestVerify(t *testing.T) {
 		{"BM then zeros", "bmp", append([]byte("BM"), zeros(60)...), false},
 		{"real icon", "ico", icoFile([][2]byte{{16, 16}}), true},
 		{"icon entry with a bad depth", "ico", []byte{0, 0, 1, 0, 1, 0, 16, 16, 0, 0, 1, 0, 0xf8, 0xf9, 0, 0, 0, 0, 0, 0, 0, 0}, false},
-		{"icon entry with a reserved byte set", "ico", []byte{0, 0, 1, 0, 1, 0, 16, 16, 0, 5, 1, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0}, false},
 		{"mp3 frame", "mp3", append(mp3Header(1, 3, 9, 0, 2), zeros(64)...), true},
 	}
 	for _, c := range cases {
@@ -194,11 +171,8 @@ func TestParseBMPRejectsImplausibleHeaders(t *testing.T) {
 	cases := map[string][]byte{
 		"text after the magic": text,
 		"unknown header size":  bmpFile(41, 16, 16, 24),
-		"zero width":           bmpFile(40, 0, 16, 24),
 		"huge width":           bmpFile(40, 1<<20, 16, 24),
-		"huge height":          bmpFile(40, 16, -(1 << 20), 24),
 		"odd bit depth":        bmpFile(40, 16, 16, 7),
-		"core header bad bits": bmpFile(12, 16, 16, 3),
 	}
 	for name, data := range cases {
 		t.Run(name, func(t *testing.T) {

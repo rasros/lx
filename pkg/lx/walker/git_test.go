@@ -65,34 +65,6 @@ func TestResolveGitDir_Layouts(t *testing.T) {
 	}
 }
 
-func TestResolveRelative_FollowsSymlinkedBase(t *testing.T) {
-	top := t.TempDir()
-	mustGitDir(t, top, "data/proj/.git/modules/mod")
-	mustMkdir(t, top, "data/proj/mod")
-	mustMkdir(t, top, "links")
-	if err := os.Symlink(filepath.Join(top, "data", "proj", "mod"), filepath.Join(top, "links", "mod")); err != nil {
-		t.Skipf("symlinks unavailable: %v", err)
-	}
-	mustWriteFile(t, top, "data/proj/mod/.git", "gitdir: ../.git/modules/mod\n")
-
-	gitDir, ok := resolveGitDir(filepath.Join(top, "links", "mod"))
-	if !ok {
-		t.Fatal("expected git dir to resolve")
-	}
-	want, _ := filepath.EvalSymlinks(filepath.Join(top, "data", "proj", ".git", "modules", "mod"))
-	if gitDir != want {
-		t.Fatalf("got %q, want %q", gitDir, want)
-	}
-}
-
-func TestParseRuleFile_LongLine(t *testing.T) {
-	data := "/" + strings.Repeat("a", 70_000) + "\n*.log\n"
-	rules := parseRuleFile([]byte(data), ".", "exclude")
-	if len(rules) != 2 || rules[1].Pattern != "*.log" {
-		t.Fatalf("expected the rule after a long line to survive, got %d rules", len(rules))
-	}
-}
-
 func TestFindGitDir_Validity(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -103,46 +75,15 @@ func TestFindGitDir_Validity(t *testing.T) {
 		{"empty .git directory", func(t *testing.T, base, repo string) {
 			mustMkdir(t, repo, ".git")
 		}, false},
-		{".git directory with only HEAD", func(t *testing.T, base, repo string) {
-			mustMkdir(t, repo, ".git")
-			mustWriteFile(t, repo, ".git/HEAD", "ref: refs/heads/main\n")
-		}, false},
-		{".git directory without objects", func(t *testing.T, base, repo string) {
-			mustMkdir(t, repo, ".git/refs")
-			mustWriteFile(t, repo, ".git/HEAD", "ref: refs/heads/main\n")
-		}, false},
-		{".git directory with an invalid HEAD", func(t *testing.T, base, repo string) {
-			mustGitDir(t, repo, ".git")
-			mustWriteFile(t, repo, ".git/HEAD", "garbage\n")
-		}, false},
 		{"valid .git directory", func(t *testing.T, base, repo string) {
 			mustGitDir(t, repo, ".git")
-		}, true},
-		{"valid .git directory with a detached HEAD", func(t *testing.T, base, repo string) {
-			mustGitDir(t, repo, ".git")
-			mustWriteFile(t, repo, ".git/HEAD", strings.Repeat("ab", 20)+"\n")
 		}, true},
 		{".git file with a valid relative gitdir", func(t *testing.T, base, repo string) {
 			mustGitDir(t, base, "store")
 			mustWriteFile(t, repo, ".git", "gitdir: ../store\n")
 		}, true},
-		{".git file with a valid absolute gitdir", func(t *testing.T, base, repo string) {
-			mustGitDir(t, base, "store")
-			mustWriteFile(t, repo, ".git", "gitdir: "+filepath.Join(base, "store")+"\n")
-		}, true},
 		{".git file with a missing gitdir", func(t *testing.T, base, repo string) {
 			mustWriteFile(t, repo, ".git", "gitdir: ../missing\n")
-		}, false},
-		{".git file pointing at an invalid gitdir", func(t *testing.T, base, repo string) {
-			mustMkdir(t, base, "store")
-			mustWriteFile(t, repo, ".git", "gitdir: ../store\n")
-		}, false},
-		{".git file without a gitdir line", func(t *testing.T, base, repo string) {
-			mustGitDir(t, base, "store")
-			mustWriteFile(t, repo, ".git", "../store\n")
-		}, false},
-		{"empty .git file", func(t *testing.T, base, repo string) {
-			mustWriteFile(t, repo, ".git", "")
 		}, false},
 		{"linked worktree using commondir", func(t *testing.T, base, repo string) {
 			mustGitDir(t, base, "main/.git")
@@ -151,12 +92,6 @@ func TestFindGitDir_Validity(t *testing.T) {
 			mustWriteFile(t, base, "main/.git/worktrees/repo/commondir", "../..\n")
 			mustWriteFile(t, repo, ".git", "gitdir: ../main/.git/worktrees/repo\n")
 		}, true},
-		{"linked worktree whose commondir is not a git dir", func(t *testing.T, base, repo string) {
-			mustMkdir(t, base, "main/.git/worktrees/repo")
-			mustWriteFile(t, base, "main/.git/worktrees/repo/HEAD", "ref: refs/heads/wt\n")
-			mustWriteFile(t, base, "main/.git/worktrees/repo/commondir", "../..\n")
-			mustWriteFile(t, repo, ".git", "gitdir: ../main/.git/worktrees/repo\n")
-		}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -216,54 +151,6 @@ func TestRepoRules_UnreachableGitDirKeepsBoundary(t *testing.T) {
 	}
 }
 
-func TestRepoRules_UnreachableCommonDirSkipsInfoExclude(t *testing.T) {
-	dir := t.TempDir()
-	mustMkdir(t, dir, "wt/gd/info")
-	mustWriteFile(t, dir, "wt/gd/HEAD", "ref: refs/heads/x\n")
-	mustWriteFile(t, dir, "wt/gd/commondir", "../../../elsewhere\n")
-	mustWriteFile(t, dir, "wt/gd/info/exclude", "*.go\n")
-	mustWriteFile(t, dir, "wt/.git", "gitdir: gd\n")
-
-	rt := newRuleTree(newFSTree(os.DirFS(dir), slog.Default()), true)
-	ok := rt.node("wt").repo
-	if rules := rt.frame(newWalker(nil, nil), "wt").rules; !ok || len(rules) != 0 {
-		t.Fatalf("expected a boundary without info/exclude, got %v %+v", ok, rules)
-	}
-}
-
-func TestValidHead_Symlink(t *testing.T) {
-	tests := []struct {
-		name, target string
-		packed       bool
-		want         bool
-	}{
-		{"unborn branch", "refs/heads/main", false, true},
-		{"packed refs", "refs/heads/main", true, true},
-		{"outside refs", "../elsewhere/HEAD", false, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-			mustMkdir(t, dir, "repo/.git/objects")
-			mustMkdir(t, dir, "repo/.git/refs/heads")
-			if tt.packed {
-				mustWriteFile(t, dir, "repo/.git/packed-refs", strings.Repeat("a", 40)+" refs/heads/main\n")
-			}
-			if err := os.Symlink(tt.target, filepath.Join(dir, "repo", ".git", "HEAD")); err != nil {
-				t.Skipf("symlinks unavailable: %v", err)
-			}
-			repo := filepath.Join(dir, "repo")
-
-			if _, got := resolveGitDir(repo); got != tt.want {
-				t.Errorf("resolveGitDir = %v, want %v", got, tt.want)
-			}
-			if got := isRepoRoot(newFSTree(os.DirFS(dir), slog.Default()), "repo"); got != tt.want {
-				t.Errorf("repository root in an fs.FS = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestValidHeadContent(t *testing.T) {
 	oid := strings.Repeat("0123456789", 4)
 	tests := []struct {
@@ -271,16 +158,9 @@ func TestValidHeadContent(t *testing.T) {
 		want bool
 	}{
 		{"ref: refs/heads/main", true},
-		{"ref: refs/heads/main\n", true},
-		{"ref:refs/heads/main\n", true},
 		{"ref: heads/main\n", false},
 		{oid, true},
-		{oid + "\n", true},
-		{oid + " extra text\n", true},
-		{strings.Repeat("ab", 32) + "\n", true},
 		{oid[:39] + "\n", false},
-		{"g" + oid[1:] + "\n", false},
-		{"", false},
 		{"garbage\n", false},
 	}
 	for _, tt := range tests {

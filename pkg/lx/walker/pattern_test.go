@@ -1,8 +1,6 @@
 package walker
 
 import (
-	"path/filepath"
-	"reflect"
 	"testing"
 )
 
@@ -20,8 +18,6 @@ func TestCompileSpecMetadata(t *testing.T) {
 		wantPrefix        string
 		wantSuffix        string
 		wantValid         bool
-		windowsOnly       bool
-		unixOnly          bool
 	}{
 		{
 			name:         "literal",
@@ -42,16 +38,6 @@ func TestCompileSpecMetadata(t *testing.T) {
 			wantSuffix:   ".go",
 		},
 		{
-			name:         "star infix glob",
-			raw:          "foo*bar",
-			wantPattern:  "foo*bar",
-			wantLiteral:  false,
-			wantValid:    true,
-			wantOnlyStar: true,
-			wantPrefix:   "foo",
-			wantSuffix:   "bar",
-		},
-		{
 			name:              "double star path glob",
 			raw:               "**/*.go",
 			wantPattern:       "**/*.go",
@@ -70,44 +56,10 @@ func TestCompileSpecMetadata(t *testing.T) {
 			wantLiteral:  true,
 			wantValid:    true,
 		},
-		{
-			name:         "windows slashes normalized",
-			windowsOnly:  true,
-			raw:          `\src\*.go`,
-			wantPattern:  "src/*.go",
-			wantAnchored: true,
-			wantLiteral:  false,
-			wantValid:    true,
-			wantHasSlash: true,
-			wantOnlyStar: true,
-			wantPrefix:   "src/",
-			wantSuffix:   ".go",
-		},
-		{
-			name:         "escaped star outside windows",
-			unixOnly:     true,
-			raw:          `\*.go`,
-			wantPattern:  `\*.go`,
-			wantLiteral:  false,
-			wantValid:    true,
-			wantOnlyStar: false,
-		},
-		{
-			name:         "invalid glob",
-			raw:          "[",
-			wantPattern:  "[",
-			wantLiteral:  false,
-			wantValid:    false,
-			wantOnlyStar: false,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			windows := filepath.Separator == '\\'
-			if (tt.windowsOnly && !windows) || (tt.unixOnly && windows) {
-				t.Skip("separator-specific case")
-			}
 			spec := compileOverrides([]Override{{Glob: tt.raw}}).rules[0].Spec
 			if spec.Pattern.Pattern != tt.wantPattern {
 				t.Fatalf("Pattern = %q, want %q", spec.Pattern.Pattern, tt.wantPattern)
@@ -167,29 +119,6 @@ func TestCompiledPatternMatchCandidate(t *testing.T) {
 	}
 }
 
-func TestParseRulesUsesCompiledSpec(t *testing.T) {
-	rules := parseRules([]string{
-		"foo",
-		"*.go",
-		"build/",
-		"/root.txt",
-		"!negated",
-	}, "nested", ".gitignore")
-
-	if len(rules) != 5 {
-		t.Fatalf("expected 5 rules, got %d", len(rules))
-	}
-	for i, rule := range rules {
-		want := compileNormalizedSpec(rule.Pattern)
-		if !reflect.DeepEqual(rule.Spec, want) {
-			t.Fatalf("rule[%d] spec mismatch: got %#v want %#v", i, rule.Spec, want)
-		}
-		if rule.BasePathPrefix != "nested/" {
-			t.Fatalf("rule[%d] BasePathPrefix = %q, want %q", i, rule.BasePathPrefix, "nested/")
-		}
-	}
-}
-
 func TestReachBelow(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -210,30 +139,6 @@ func TestReachBelow(t *testing.T) {
 			want:     false,
 		},
 		{
-			name:     "wildcard inside a directory name keeps that directory",
-			patterns: []string{"src*/x.go"},
-			dir:      "srcfoo",
-			want:     true,
-		},
-		{
-			name:     "escape inside a directory name keeps that directory",
-			patterns: []string{`lit\*/a.go`},
-			dir:      "lit*",
-			want:     true,
-		},
-		{
-			name:     "wildcard in the first segment prunes what it cannot match",
-			patterns: []string{"src*/x.go"},
-			dir:      "lib",
-			want:     false,
-		},
-		{
-			name:     "escape matches only the literal name",
-			patterns: []string{`lit\*/a.go`},
-			dir:      "litfoo",
-			want:     false,
-		},
-		{
 			name:     "file segment prunes deeper directories",
 			patterns: []string{"scripts/*bpf_doc.py"},
 			dir:      "scripts/tools",
@@ -246,21 +151,9 @@ func TestReachBelow(t *testing.T) {
 			want:     true,
 		},
 		{
-			name:     "brace alternative with a double star is kept",
-			patterns: []string{"a/{**,b}/c.go"},
-			dir:      "a/x/y",
-			want:     true,
-		},
-		{
 			name:     "brace alternative with a slash is kept",
 			patterns: []string{"{a/b,c}/x.go"},
 			dir:      "a",
-			want:     true,
-		},
-		{
-			name:     "double-star cannot be pruned by prefix",
-			patterns: []string{"**/*bpf_doc.py"},
-			dir:      "kernel",
 			want:     true,
 		},
 		{

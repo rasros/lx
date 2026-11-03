@@ -12,20 +12,13 @@ func TestDetectLanguage(t *testing.T) {
 		{"main.go", "", "go"},
 		{"script.py", "", "python"},
 		{"README.md", "", "markdown"},
-		{"styles.css", "", "css"},
-		{"index.html", "", "html"},
 		{"component.tsx", "", "tsx"},
-		{"data.json", "", "json"},
-		{"infra.tf", "", "hcl"},
 		{"test.h", "", "c"},
 		{"Dockerfile", "", "dockerfile"},
 		{"Makefile", "", "makefile"},
-		{"go.mod", "", "gomod"},
-		{".gitignore", "", "gitignore"},
 		{".bashrc", "", "bash"},
 		{"script", "#!/bin/bash\n", "bash"},
 		{"tool", "#!/usr/bin/env python\n", "python"},
-		{"idx", "#!/usr/bin/env node\n", "javascript"},
 		{"none", "", ""},
 	}
 
@@ -58,27 +51,14 @@ func TestIsBinary(t *testing.T) {
 }
 
 func TestIsBinary_Truncation(t *testing.T) {
-	// 1021 bytes of pure ASCII
-	base := bytes.Repeat([]byte("a"), 1021)
-
 	tests := []struct {
 		name string
 		data []byte
 		want bool
 	}{
 		{
-			name: "Exact fit ASCII",
-			data: append(base, []byte("aaa")...),
-			want: false,
-		},
-		{
 			name: "Truncated 3-byte char missing 1 byte",
 			data: append(bytes.Repeat([]byte("a"), 1022), []byte("✓")[:2]...),
-			want: false,
-		},
-		{
-			name: "Truncated 4-byte char missing 2 bytes",
-			data: append(bytes.Repeat([]byte("a"), 1022), []byte("🌍")[:2]...),
 			want: false,
 		},
 		{

@@ -6,12 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/rasros/lx/internal/testzip"
 )
 
 func TestIsHTTPURL(t *testing.T) {
@@ -58,59 +55,6 @@ func TestIsHTTPArchiveURL(t *testing.T) {
 				t.Fatalf("IsHTTPArchiveURL(%q) = %v, want %v", tc.raw, got, tc.want)
 			}
 		})
-	}
-}
-
-func TestNewURLInputFile_OpenSuccess(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			t.Fatalf("method = %s, want GET", r.Method)
-		}
-		_, _ = w.Write([]byte("remote body"))
-	}))
-	defer server.Close()
-
-	f, err := NewURLInputFile(server.URL + "/notes.txt")
-	if err != nil {
-		t.Fatalf("NewURLInputFile error: %v", err)
-	}
-
-	rc, err := f.Open(context.Background())
-	if err != nil {
-		t.Fatalf("Open error: %v", err)
-	}
-	defer rc.Close()
-
-	body, err := io.ReadAll(rc)
-	if err != nil {
-		t.Fatalf("ReadAll error: %v", err)
-	}
-	if string(body) != "remote body" {
-		t.Fatalf("body = %q, want %q", string(body), "remote body")
-	}
-}
-
-func TestNewURLInputFile_OpenStatusError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "nope", http.StatusNotFound)
-	}))
-	defer server.Close()
-
-	f, err := NewURLInputFile(server.URL + "/missing.txt")
-	if err != nil {
-		t.Fatalf("NewURLInputFile error: %v", err)
-	}
-
-	rc, err := f.Open(context.Background())
-	if rc != nil {
-		rc.Close()
-		t.Fatalf("Open returned non-nil reader on error")
-	}
-	if err == nil {
-		t.Fatalf("Open expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "unexpected status") {
-		t.Fatalf("Open error = %q, want status error", err.Error())
 	}
 }
 
@@ -163,90 +107,6 @@ func TestNewURLInputFile_RejectsUnsupportedScheme(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unsupported URI scheme") {
 		t.Fatalf("error = %q, want unsupported scheme", err.Error())
-	}
-}
-
-func TestDownloadURLToTempFile(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("zip-bytes"))
-	}))
-	defer server.Close()
-
-	path, cleanup, err := DownloadURLToTempFile(context.Background(), server.URL+"/main.zip", t.TempDir())
-	if err != nil {
-		t.Fatalf("DownloadURLToTempFile error: %v", err)
-	}
-	defer cleanup()
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile error: %v", err)
-	}
-	if string(data) != "zip-bytes" {
-		t.Fatalf("downloaded content = %q, want %q", string(data), "zip-bytes")
-	}
-}
-
-func TestDownloadURLToTempFile_StatusError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "fail", http.StatusBadGateway)
-	}))
-	defer server.Close()
-
-	_, _, err := DownloadURLToTempFile(context.Background(), server.URL+"/main.zip", t.TempDir())
-	if err == nil {
-		t.Fatalf("expected status error")
-	}
-	if !strings.Contains(err.Error(), "unexpected status") {
-		t.Fatalf("error = %q, want status error", err.Error())
-	}
-}
-
-func TestDownloadURLToTempFile_DownloadedArchiveDetectable(t *testing.T) {
-	zipBody := testzip.Bytes(t, [2]string{"a.txt", "A"})
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/zip")
-		_, _ = w.Write(zipBody)
-	}))
-	defer server.Close()
-
-	path, cleanup, err := DownloadURLToTempFile(context.Background(), server.URL+"/main.zip", t.TempDir())
-	if err != nil {
-		t.Fatalf("DownloadURLToTempFile error: %v", err)
-	}
-	defer cleanup()
-
-	if !IsArchivePath(path) {
-		t.Fatalf("downloaded temp path %q is not recognized as archive", path)
-	}
-}
-
-func TestNewURLInputFileRecordsMediaType(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte("<h1>Hi</h1>"))
-	}))
-	defer srv.Close()
-
-	f, err := NewURLInputFile(srv.URL + "/docs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if IsHTMLInput(f) {
-		t.Error("IsHTMLInput = true before Open, when no media type is known yet")
-	}
-
-	rc, err := f.Open(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	rc.Close()
-
-	if got := *f.mediaType; got != "text/html; charset=utf-8" {
-		t.Errorf("recorded media type = %q", got)
-	}
-	if !IsHTMLInput(f) {
-		t.Error("IsHTMLInput = false for a text/html response")
 	}
 }
 

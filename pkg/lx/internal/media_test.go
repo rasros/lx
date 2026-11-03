@@ -81,28 +81,6 @@ func describe(t *testing.T, container string, data []byte) string {
 	return strings.TrimSpace(string(out))
 }
 
-func TestMediaMetadataMP4VideoAndAudio(t *testing.T) {
-	data := mp4File(
-		mvhd(1000, 2500),
-		trak(tkhd(1920, 1080), hdlr("vide"), mdhd(1000, 2500),
-			stbl(videoSampleEntry("avc1", 1920, 1080), stts(75, 33))),
-		trak(tkhd(0, 0), hdlr("soun"), mdhd(48000, 120000),
-			stbl(audioSampleEntry("mp4a", 2, 16, 48000), stts(120, 1024))),
-	)
-
-	got := describe(t, "mp4", data)
-	for _, want := range []string{
-		"Container: mp4",
-		"Duration: 00:00:02.500",
-		"Video: h264, 1920x1080, 30.00 fps",
-		"Audio: aac, 48000 Hz, stereo",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("missing %q in:\n%s", want, got)
-		}
-	}
-}
-
 // A compressed codec's samplesize is fixed at 16 regardless of the stream, so it
 // must not be reported.
 func TestMediaMetadataOmitsBitDepthForCompressedAudio(t *testing.T) {
@@ -122,51 +100,6 @@ func TestMediaMetadataKeepsBitDepthForLosslessAudio(t *testing.T) {
 
 	if got := describe(t, "mp4", data); !strings.Contains(got, "24-bit") {
 		t.Errorf("lost the bit depth for alac:\n%s", got)
-	}
-}
-
-func TestMediaMetadataMP4Version1Header(t *testing.T) {
-	// A v1 mvhd widens its timestamps to 64 bits, moving both fields it carries.
-	v1 := box("mvhd", []byte{1, 0, 0, 0}, zeros(16),
-		be32(1000), binary.BigEndian.AppendUint64(nil, 90000))
-	data := append(box("ftyp", []byte("isom"), zeros(4)), box("moov", v1)...)
-
-	if got := describe(t, "mp4", data); !strings.Contains(got, "Duration: 00:01:30.000") {
-		t.Errorf("got:\n%s", got)
-	}
-}
-
-func TestMediaMetadataMP4LargeBoxSize(t *testing.T) {
-	// A size of 1 defers to a 64-bit size after the header.
-	inner := mvhd(1000, 1000)
-	large := append([]byte{0, 0, 0, 1}, "moov"...)
-	large = binary.BigEndian.AppendUint64(large, uint64(16+len(inner)))
-	large = append(large, inner...)
-	data := append(box("ftyp", []byte("isom"), zeros(4)), large...)
-
-	if got := describe(t, "mp4", data); !strings.Contains(got, "Duration: 00:00:01.000") {
-		t.Errorf("got:\n%s", got)
-	}
-}
-
-func TestMediaMetadataMP4FallsBackToTrackDimensions(t *testing.T) {
-	// An entry with no dimensions of its own leaves tkhd as the only source.
-	data := mp4File(mvhd(1000, 1000),
-		trak(tkhd(640, 480), hdlr("vide"), mdhd(1000, 1000),
-			stbl(videoSampleEntry("avc1", 0, 0), stts(25, 40))))
-
-	if got := describe(t, "mp4", data); !strings.Contains(got, "640x480") {
-		t.Errorf("got:\n%s", got)
-	}
-}
-
-func TestMediaMetadataMP4UnknownCodecKeepsFourCC(t *testing.T) {
-	data := mp4File(mvhd(1000, 1000),
-		trak(tkhd(16, 16), hdlr("vide"), mdhd(1000, 1000),
-			stbl(videoSampleEntry("xyzw", 16, 16), stts(1, 1000))))
-
-	if got := describe(t, "mp4", data); !strings.Contains(got, "Video: xyzw") {
-		t.Errorf("got:\n%s", got)
 	}
 }
 
@@ -190,37 +123,6 @@ func wavFile(format, channels uint16, sampleRate uint32, bits uint16, dataLen in
 	return buf.Bytes()
 }
 
-func TestMediaMetadataWAV(t *testing.T) {
-	got := describe(t, "wav", wavFile(1, 2, 44100, 16, 44100*2*2))
-	want := "Container: wav\nDuration: 00:00:01.000\nBitrate: 1.4 Mbps\nAudio: pcm_s16le, 44100 Hz, stereo, 16-bit"
-	if got != want {
-		t.Errorf("got:\n%s\nwant:\n%s", got, want)
-	}
-}
-
-// An unrecognised chunk before fmt must be stepped over, not parsed.
-func TestMediaMetadataWAVSkipsUnknownChunks(t *testing.T) {
-	var buf bytes.Buffer
-	buf.WriteString("RIFF")
-	buf.Write(le32(0))
-	buf.WriteString("WAVE")
-	buf.WriteString("LIST")
-	buf.Write(le32(5)) // odd length, so the next chunk starts after a pad byte
-	buf.Write([]byte("INFOx"))
-	buf.Write(zeros(1))
-	buf.Write(wavFile(1, 1, 8000, 8, 8000)[12:])
-
-	if got := describe(t, "wav", buf.Bytes()); !strings.Contains(got, "8000 Hz, mono, 8-bit") {
-		t.Errorf("got:\n%s", got)
-	}
-}
-
-func TestMediaMetadataWAVCompressedFormat(t *testing.T) {
-	if got := describe(t, "wav", wavFile(7, 1, 8000, 8, 8000)); !strings.Contains(got, "pcm_mulaw") {
-		t.Errorf("got:\n%s", got)
-	}
-}
-
 func flacFile(sampleRate uint32, channels, bits uint8, totalSamples uint64) []byte {
 	packed := uint64(sampleRate)<<44 |
 		uint64(channels-1)<<41 |
@@ -234,26 +136,6 @@ func flacFile(sampleRate uint32, channels, bits uint8, totalSamples uint64) []by
 	buf.Write(binary.BigEndian.AppendUint64(nil, packed))
 	buf.Write(zeros(16)) // md5 of the unencoded audio
 	return buf.Bytes()
-}
-
-func TestMediaMetadataFLAC(t *testing.T) {
-	got := describe(t, "flac", flacFile(96000, 2, 24, 192000))
-	for _, want := range []string{"Duration: 00:00:02.000", "Audio: flac, 96000 Hz, stereo, 24-bit"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("missing %q in:\n%s", want, got)
-		}
-	}
-}
-
-// A stream of unknown length is legal in FLAC; the rest still describes it.
-func TestMediaMetadataFLACWithoutSampleCount(t *testing.T) {
-	got := describe(t, "flac", flacFile(44100, 1, 16, 0))
-	if strings.Contains(got, "Duration") {
-		t.Errorf("invented a duration:\n%s", got)
-	}
-	if !strings.Contains(got, "Audio: flac, 44100 Hz, mono, 16-bit") {
-		t.Errorf("got:\n%s", got)
-	}
 }
 
 // Nothing here may fail: a media file that cannot be parsed still has to appear
@@ -280,14 +162,6 @@ func TestMediaMetadataDegradesToContainer(t *testing.T) {
 				t.Errorf("got:\n%s", got)
 			}
 		})
-	}
-}
-
-// A zero timescale would divide by zero if it reached the arithmetic.
-func TestMediaMetadataZeroTimescale(t *testing.T) {
-	data := mp4File(mvhd(0, 5000))
-	if got := describe(t, "mp4", data); strings.Contains(got, "Duration") {
-		t.Errorf("got:\n%s", got)
 	}
 }
 

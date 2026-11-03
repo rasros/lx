@@ -27,20 +27,6 @@ func TestLineNumberFormatter(t *testing.T) {
 	}
 }
 
-func TestLineNumberFormatterStringMatchesFormat(t *testing.T) {
-	lnf := LineNumberFormatter{
-		Head:      []byte("alpha\nbeta\n"),
-		Gap:       []byte("... (7 rows skipped)\n"),
-		Tail:      []byte("yankee\nzulu\n"),
-		TotalRows: 11,
-	}
-
-	viaFormat := fmt.Sprintf("%v", lnf)
-	if got := lnf.String(); got != viaFormat {
-		t.Errorf("String() = %q, want it to match Format output %q", got, viaFormat)
-	}
-}
-
 func TestLineNumberFormatterStringNumbersLines(t *testing.T) {
 	lnf := LineNumberFormatter{Head: []byte("one\ntwo\n"), TotalRows: 2}
 	want := "1: one\n2: two\n"

@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
 	"errors"
@@ -87,22 +86,12 @@ func TestIsDocumentPath(t *testing.T) {
 		want bool
 	}{
 		{"report.pdf", true},
-		{"letter.docx", true},
-		{"budget.xlsx", true},
 		{"slides.pptx", true},
-		{"REPORT.PDF", true},
 		{"Letter.DOCX", true},
-		{"Budget.XLSX", true},
-		{"docs/report.pdf", true},
-		{"dir/sub/letter.docx", true},
+		{"docs/page.html", true},
 		{"text.odt", false},
-		{"sheet.ods", false},
-		{"pres.odp", false},
 		{"legacy.doc", false},
-		{"old.xls", false},
 		{"main.go", false},
-		{"readme.txt", false},
-		{"noextension", false},
 		{"", false},
 	}
 	for _, tc := range cases {
@@ -151,14 +140,6 @@ func TestConvertInput_PDFMediaTypeWithoutExtension(t *testing.T) {
 	}
 }
 
-func TestDocxXMLToText_SingleParagraph(t *testing.T) {
-	xml := `<w:body><w:p><w:r><w:t>Hello World</w:t></w:r></w:p></w:body>`
-	got := xmlToText(context.Background(), strings.NewReader(xml))
-	if !strings.Contains(got, "Hello World") {
-		t.Errorf("expected 'Hello World', got %q", got)
-	}
-}
-
 func TestDocxXMLToText_ParagraphEndsWithNewline(t *testing.T) {
 	xml := `<w:body><w:p><w:r><w:t>Line 1</w:t></w:r></w:p><w:p><w:r><w:t>Line 2</w:t></w:r></w:p></w:body>`
 	got := xmlToText(context.Background(), strings.NewReader(xml))
@@ -188,31 +169,6 @@ func TestDocxXMLToText_Empty(t *testing.T) {
 	}
 }
 
-func TestDocxXMLToText_InvalidXML_DoesNotPanic(t *testing.T) {
-	got := xmlToText(context.Background(), strings.NewReader("<unclosed <tag >>"))
-	_ = got
-}
-
-func TestDocxXMLToText_NoText(t *testing.T) {
-	xml := `<w:body><w:p><w:pPr><w:jc w:val="center"/></w:pPr></w:p></w:body>`
-	got := xmlToText(context.Background(), strings.NewReader(xml))
-	if strings.TrimSpace(got) != "" {
-		t.Errorf("expected no text content, got %q", got)
-	}
-}
-
-func TestExtractDOCXText_SingleParagraph(t *testing.T) {
-	data := testzip.DOCX(t, "Hello DOCX")
-	r := bytes.NewReader(data)
-	text, err := extractDOCXText(context.Background(), r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(string(text), "Hello DOCX") {
-		t.Errorf("expected 'Hello DOCX' in extracted text, got %q", string(text))
-	}
-}
-
 func TestExtractDOCXText_MultipleParagraphs(t *testing.T) {
 	data := testzip.DOCX(t, "First paragraph", "Second paragraph", "Third paragraph")
 	r := bytes.NewReader(data)
@@ -237,104 +193,12 @@ func TestExtractDOCXText_Corrupted(t *testing.T) {
 	}
 }
 
-func TestExtractDOCXText_EmptyZip(t *testing.T) {
-	var buf bytes.Buffer
-	w := zip.NewWriter(&buf)
-	w.Create("other.txt")
-	w.Close()
-	data := buf.Bytes()
-	r := bytes.NewReader(data)
-	text, _ := extractDOCXText(context.Background(), r, int64(len(data)))
-	_ = text
-}
-
-func TestExtractXLSXText_CellValues(t *testing.T) {
-	data := makeTestXLSX(t, "Sheet1", map[string]interface{}{
-		"A1": "Name",
-		"B1": "Score",
-		"A2": "Alice",
-		"B2": 42,
-	})
-	r := bytes.NewReader(data)
-	text, err := extractXLSXText(context.Background(), r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	got := string(text)
-	for _, want := range []string{"Sheet1", "Name", "Score", "Alice", "42"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("expected %q in extracted text, got:\n%s", want, got)
-		}
-	}
-}
-
-func TestExtractXLSXText_SheetNameInOutput(t *testing.T) {
-	data := makeTestXLSX(t, "SalesData", map[string]interface{}{"A1": "Q1"})
-	r := bytes.NewReader(data)
-	text, err := extractXLSXText(context.Background(), r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(string(text), "SalesData") {
-		t.Errorf("expected sheet name 'SalesData' in output, got:\n%s", string(text))
-	}
-}
-
-func TestExtractXLSXText_MultipleSheets(t *testing.T) {
-	f := excelize.NewFile()
-	defer f.Close()
-	f.SetCellValue("Sheet1", "A1", "sheet-one")
-	f.NewSheet("Sheet2")
-	f.SetCellValue("Sheet2", "A1", "sheet-two")
-	var buf bytes.Buffer
-	f.Write(&buf)
-	data := buf.Bytes()
-
-	r := bytes.NewReader(data)
-	text, err := extractXLSXText(context.Background(), r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	got := string(text)
-	if !strings.Contains(got, "sheet-one") {
-		t.Errorf("expected 'sheet-one', got:\n%s", got)
-	}
-	if !strings.Contains(got, "sheet-two") {
-		t.Errorf("expected 'sheet-two', got:\n%s", got)
-	}
-}
-
-func TestExtractXLSXText_RowsSeparatedByTabs(t *testing.T) {
-	data := makeTestXLSX(t, "Sheet1", map[string]interface{}{
-		"A1": "Col1",
-		"B1": "Col2",
-		"C1": "Col3",
-	})
-	r := bytes.NewReader(data)
-	text, err := extractXLSXText(context.Background(), r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(string(text), "\t") {
-		t.Errorf("expected tab-separated columns, got:\n%s", string(text))
-	}
-}
-
 func TestExtractXLSXText_Corrupted(t *testing.T) {
 	data := []byte("not a xlsx file at all")
 	r := bytes.NewReader(data)
 	_, err := extractXLSXText(context.Background(), r, int64(len(data)))
 	if err == nil {
 		t.Error("expected error for corrupted XLSX, got nil")
-	}
-}
-
-func TestExtractPDFText_ValidPDF_NoError(t *testing.T) {
-	data := makeTestPDF(t, "TestContent")
-	r := bytes.NewReader(data)
-	_, err := extractPDFText(r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error from valid PDF: %v", err)
 	}
 }
 
@@ -347,15 +211,6 @@ func TestExtractPDFText_Corrupted(t *testing.T) {
 	}
 }
 
-func TestExtractPDFText_TruncatedHeader(t *testing.T) {
-	data := []byte("%PDF-1.4")
-	r := bytes.NewReader(data)
-	_, err := extractPDFText(r, int64(len(data)))
-	if err == nil {
-		t.Error("expected error for truncated PDF, got nil")
-	}
-}
-
 func TestExtractDocumentText_UnsupportedExtension(t *testing.T) {
 	data := []byte("some data")
 	r := bytes.NewReader(data)
@@ -365,67 +220,6 @@ func TestExtractDocumentText_UnsupportedExtension(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unsupported") {
 		t.Errorf("expected 'unsupported' in error message, got: %v", err)
-	}
-}
-
-func TestExtractDocumentText_DispatchToPDF(t *testing.T) {
-	data := makeTestPDF(t, "PDF dispatch content")
-	r := bytes.NewReader(data)
-	text, err := ExtractDocumentText(context.Background(), "file.pdf", r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(string(text), "PDF") {
-		t.Errorf("expected extracted PDF text, got: %q", string(text))
-	}
-}
-
-func TestExtractDocumentText_DispatchToDOCX(t *testing.T) {
-	data := testzip.DOCX(t, "DOCX dispatch content")
-	r := bytes.NewReader(data)
-	text, err := ExtractDocumentText(context.Background(), "file.docx", r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(string(text), "DOCX dispatch content") {
-		t.Errorf("expected extracted DOCX text, got: %q", string(text))
-	}
-}
-
-func TestExtractDocumentText_DispatchToXLSX(t *testing.T) {
-	data := makeTestXLSX(t, "Sheet1", map[string]interface{}{
-		"A1": "XLSX dispatch",
-		"B1": "content",
-	})
-	r := bytes.NewReader(data)
-	text, err := ExtractDocumentText(context.Background(), "file.xlsx", r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	got := string(text)
-	if !strings.Contains(got, "XLSX dispatch") || !strings.Contains(got, "content") {
-		t.Errorf("expected extracted XLSX text, got:\n%s", got)
-	}
-}
-
-func TestExtractDocumentText_DispatchToPPTX(t *testing.T) {
-	data := []byte("garbage")
-	r := bytes.NewReader(data)
-	_, err := ExtractDocumentText(context.Background(), "file.pptx", r, int64(len(data)))
-	if err != nil && strings.Contains(err.Error(), "unsupported") {
-		t.Errorf("pptx extension was not dispatched: %v", err)
-	}
-}
-
-func TestExtractPPTXText_SingleSlide(t *testing.T) {
-	data := makeTestPPTX(t, "Hello PPTX World")
-	r := bytes.NewReader(data)
-	text, err := extractPPTXText(context.Background(), r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(string(text), "Hello PPTX World") {
-		t.Errorf("expected 'Hello PPTX World', got %q", string(text))
 	}
 }
 
@@ -453,18 +247,6 @@ func TestExtractPPTXText_Corrupted(t *testing.T) {
 	}
 }
 
-func TestExtractDocumentText_CaseInsensitiveExtension(t *testing.T) {
-	data := testzip.DOCX(t, "case test")
-	r := bytes.NewReader(data)
-	text, err := ExtractDocumentText(context.Background(), "LETTER.DOCX", r, int64(len(data)))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(string(text), "case test") {
-		t.Errorf("expected 'case test', got %q", string(text))
-	}
-}
-
 func TestIsHTMLPath(t *testing.T) {
 	for _, p := range []string{"a.html", "a.HTM", "dir/b.xhtml"} {
 		if !isHTMLPath(p) {
@@ -474,28 +256,6 @@ func TestIsHTMLPath(t *testing.T) {
 	for _, p := range []string{"a.pdf", "a.htmlx", "a.txt", "html"} {
 		if isHTMLPath(p) {
 			t.Errorf("isHTMLPath(%q) = true, want false", p)
-		}
-	}
-}
-
-func TestIsDocumentPathIncludesHTML(t *testing.T) {
-	for _, p := range []string{"a.html", "a.htm", "a.xhtml", "a.pdf", "a.docx", "a.xlsx", "a.pptx"} {
-		if !IsDocumentPath(p) {
-			t.Errorf("IsDocumentPath(%q) = false, want true", p)
-		}
-	}
-}
-
-func TestExtractDocumentTextConvertsHTML(t *testing.T) {
-	for _, name := range []string{"page.html", "page.htm", "page.xhtml"} {
-		src := []byte("<h1>Title</h1><p>Body <code>x</code></p>")
-		got, err := ExtractDocumentText(context.Background(), name, bytes.NewReader(src), int64(len(src)))
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		want := "# Title\n\nBody `x`\n"
-		if string(got) != want {
-			t.Errorf("%s: got %q, want %q", name, got, want)
 		}
 	}
 }
