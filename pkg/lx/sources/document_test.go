@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/rasros/lx/internal/testzip"
-	"github.com/xuri/excelize/v2"
 )
 
 func makeTestPPTX(t *testing.T, slides ...string) []byte {
@@ -27,26 +26,6 @@ func makeTestPPTX(t *testing.T, slides ...string) []byte {
 				`</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`, text)})
 	}
 	return testzip.Bytes(t, entries...)
-}
-
-func makeTestXLSX(t *testing.T, sheet string, cells map[string]interface{}) []byte {
-	t.Helper()
-	f := excelize.NewFile()
-	defer f.Close()
-	if sheet != "Sheet1" {
-		f.NewSheet(sheet)
-		f.DeleteSheet("Sheet1")
-	}
-	for cell, val := range cells {
-		if err := f.SetCellValue(sheet, cell, val); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var buf bytes.Buffer
-	if err := f.Write(&buf); err != nil {
-		t.Fatal(err)
-	}
-	return buf.Bytes()
 }
 
 func makeTestPDF(t *testing.T, text string) []byte {
