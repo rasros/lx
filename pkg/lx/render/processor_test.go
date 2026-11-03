@@ -378,7 +378,7 @@ func TestApplySkeletonReportsOriginalRowCount(t *testing.T) {
 	src := []byte("package main\n\nfunc Alpha() int {\n\treturn 1\n}\n")
 	cfg := core.RenderOptions{Head: -1, SkeletonFunctions: true}
 
-	sk := applySkeleton(cfg, "go", bytes.NewReader(src), int64(len(src)), false, false)
+	sk := applySkeleton(cfg, "go", false, bytes.NewReader(src), int64(len(src)), false, false)
 	if sk == nil {
 		t.Fatal("skeleton did not run")
 	}
@@ -407,7 +407,7 @@ func TestApplySkeletonSkipsBinaryAndImages(t *testing.T) {
 		{"binary", true, false},
 		{"image", false, true},
 	} {
-		if sk := applySkeleton(cfg, "go", bytes.NewReader(src), int64(len(src)), tc.isBinary, tc.isImage); sk != nil {
+		if sk := applySkeleton(cfg, "go", false, bytes.NewReader(src), int64(len(src)), tc.isBinary, tc.isImage); sk != nil {
 			t.Errorf("%s: skeleton ran anyway (mode=%q)", tc.name, sk.mode)
 		}
 	}

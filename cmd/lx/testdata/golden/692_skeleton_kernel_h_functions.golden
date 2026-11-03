@@ -1,0 +1,11 @@
+--- STDOUT ---
+skeleton/kernel.h (26 rows, function signatures)
+---
+```c
+static inline void barrier(void) {
+...
+[[gnu::always_inline]] static inline int get(struct device_class *class) {
+```
+
+
+--- STDERR ---

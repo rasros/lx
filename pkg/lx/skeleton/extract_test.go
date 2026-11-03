@@ -36,7 +36,7 @@ func (p Point) helper() {}
 `
 
 func TestGo_Functions(t *testing.T) {
-	out := string(Extract("go", []byte(goSrc), true, false))
+	out := string(Extract("go", false, []byte(goSrc), true, false))
 	if !strings.Contains(out, "func NewPoint(x, y float64) Point {") {
 		t.Errorf("expected NewPoint, got:\n%s", out)
 	}
@@ -55,7 +55,7 @@ func TestGo_Functions(t *testing.T) {
 }
 
 func TestGo_Structs(t *testing.T) {
-	out := string(Extract("go", []byte(goSrc), false, true))
+	out := string(Extract("go", false, []byte(goSrc), false, true))
 	if !strings.Contains(out, "type Point struct {") {
 		t.Errorf("expected Point struct, got:\n%s", out)
 	}
@@ -77,7 +77,7 @@ func TestGo_Structs(t *testing.T) {
 }
 
 func TestGo_Both(t *testing.T) {
-	out := string(Extract("go", []byte(goSrc), true, true))
+	out := string(Extract("go", false, []byte(goSrc), true, true))
 	if !strings.Contains(out, "type Point struct {") {
 		t.Errorf("expected Point struct")
 	}
@@ -114,7 +114,7 @@ type (
 	}
 )
 `)
-	out := string(Extract("go", src, true, true))
+	out := string(Extract("go", false, src, true, true))
 	if strings.Count(out, "type (") != 1 {
 		t.Errorf("expected grouped type header once, got:\n%s", out)
 	}
@@ -161,7 +161,7 @@ static int helper(void) {
 `
 
 func TestC_Functions(t *testing.T) {
-	out := string(Extract("c", []byte(cSrc), true, false))
+	out := string(Extract("c", false, []byte(cSrc), true, false))
 	if !strings.Contains(out, "int add(int a, int b) {") {
 		t.Errorf("expected add() signature, got:\n%s", out)
 	}
@@ -177,7 +177,7 @@ func TestC_Functions(t *testing.T) {
 }
 
 func TestC_Structs(t *testing.T) {
-	out := string(Extract("c", []byte(cSrc), false, true))
+	out := string(Extract("c", false, []byte(cSrc), false, true))
 	if !strings.Contains(out, "typedef struct Point {") {
 		t.Errorf("expected struct definition, got:\n%s", out)
 	}
@@ -204,7 +204,7 @@ func TestC_ControlFlowExcluded(t *testing.T) {
     }
 }
 `)
-	out := string(Extract("c", src, true, false))
+	out := string(Extract("c", false, src, true, false))
 	if !strings.Contains(out, "void foo(void) {") {
 		t.Errorf("expected foo() signature, got:\n%s", out)
 	}
@@ -219,7 +219,7 @@ func TestC_ControlFlowExcluded(t *testing.T) {
 func TestC_SingleLineBodyExcluded(t *testing.T) {
 	src := []byte(`int add(int a, int b) { return a + b; }
 `)
-	out := string(Extract("c", src, true, false))
+	out := string(Extract("c", false, src, true, false))
 	if !strings.Contains(out, "int add(int a, int b)") {
 		t.Errorf("expected add() signature, got:\n%s", out)
 	}
@@ -253,7 +253,7 @@ public class Calculator {
 `
 
 func TestJava_Structs(t *testing.T) {
-	out := string(Extract("java", []byte(javaSrc), false, true))
+	out := string(Extract("java", false, []byte(javaSrc), false, true))
 	if !strings.Contains(out, "public class Calculator {") {
 		t.Errorf("expected class declaration, got:\n%s", out)
 	}
@@ -272,7 +272,7 @@ func TestJava_Structs(t *testing.T) {
 }
 
 func TestJava_Both(t *testing.T) {
-	out := string(Extract("java", []byte(javaSrc), true, true))
+	out := string(Extract("java", false, []byte(javaSrc), true, true))
 	if !strings.Contains(out, "public class Calculator {") {
 		t.Errorf("expected class declaration")
 	}
@@ -306,7 +306,7 @@ func TestJava_AnnotatedPrivateMethodExcluded(t *testing.T) {
 	public int ok() { return 2; }
 }
 `)
-	out := string(Extract("java", src, true, true))
+	out := string(Extract("java", false, src, true, true))
 	if strings.Contains(out, "secret(") {
 		t.Errorf("annotated private method should not appear:\n%s", out)
 	}
@@ -349,7 +349,7 @@ class Dog(Animal):
 `
 
 func TestPython_Functions(t *testing.T) {
-	out := string(Extract("python", []byte(pySrc), true, false))
+	out := string(Extract("python", false, []byte(pySrc), true, false))
 	if !strings.Contains(out, "def standalone(x, y):") {
 		t.Errorf("expected standalone(), got:\n%s", out)
 	}
@@ -367,7 +367,7 @@ func TestPython_Functions(t *testing.T) {
 }
 
 func TestPython_Structs(t *testing.T) {
-	out := string(Extract("python", []byte(pySrc), false, true))
+	out := string(Extract("python", false, []byte(pySrc), false, true))
 	if !strings.Contains(out, "class Animal:") {
 		t.Errorf("expected Animal class, got:\n%s", out)
 	}
@@ -392,7 +392,7 @@ func TestPython_Structs(t *testing.T) {
 }
 
 func TestPython_Both(t *testing.T) {
-	out := string(Extract("python", []byte(pySrc), true, true))
+	out := string(Extract("python", false, []byte(pySrc), true, true))
 	if !strings.Contains(out, "class Animal:") {
 		t.Errorf("expected class")
 	}
@@ -434,7 +434,7 @@ async def update_logo() -> None:
 async def get_logo() -> None:
     pass
 `)
-	out := string(Extract("python", src, true, true))
+	out := string(Extract("python", false, src, true, true))
 	if !strings.Contains(out, "class SwitchTenantRequest(BaseModel):") {
 		t.Errorf("expected class, got:\n%s", out)
 	}
@@ -462,7 +462,7 @@ func TestPython_ClassVarMultiLineValue(t *testing.T) {
 def test_something():
     assert result == expected
 `)
-	out := string(Extract("python", src, false, true))
+	out := string(Extract("python", false, src, false, true))
 	if !strings.Contains(out, "class StubBackend(BaseBackend):") {
 		t.Errorf("expected class, got:\n%s", out)
 	}
@@ -489,7 +489,7 @@ REGISTRY: list[Example] = [
     Example(query="foo", label="bar"),
 ]
 `)
-	out := string(Extract("python", src, false, true))
+	out := string(Extract("python", false, src, false, true))
 	if !strings.Contains(out, "class Example(BaseModel):") {
 		t.Errorf("expected class declaration, got:\n%s", out)
 	}
@@ -515,7 +515,7 @@ func TestPython_MultiLineSignature(t *testing.T) {
     def test_two(self) -> None:
         pass
 `)
-	out := string(Extract("python", src, true, true))
+	out := string(Extract("python", false, src, true, true))
 	if !strings.Contains(out, "    def test_one(") {
 		t.Errorf("expected test_one opening, got:\n%s", out)
 	}
@@ -540,7 +540,7 @@ func TestPython_NestedFunctionExcluded(t *testing.T) {
         y = 2
     return x
 `)
-	out := string(Extract("python", src, true, false))
+	out := string(Extract("python", false, src, true, false))
 	if !strings.Contains(out, "def outer():") {
 		t.Errorf("expected outer(), got:\n%s", out)
 	}
@@ -586,7 +586,7 @@ fn private_fn() {}
 `
 
 func TestRust_Functions(t *testing.T) {
-	out := string(Extract("rust", []byte(rustSrc), true, false))
+	out := string(Extract("rust", false, []byte(rustSrc), true, false))
 	if !strings.Contains(out, "pub fn top_level(x: i32) -> i32 {") {
 		t.Errorf("expected top_level, got:\n%s", out)
 	}
@@ -602,7 +602,7 @@ func TestRust_Functions(t *testing.T) {
 }
 
 func TestRust_Structs(t *testing.T) {
-	out := string(Extract("rust", []byte(rustSrc), false, true))
+	out := string(Extract("rust", false, []byte(rustSrc), false, true))
 	if !strings.Contains(out, "pub struct Point {") {
 		t.Errorf("expected struct Point, got:\n%s", out)
 	}
@@ -630,7 +630,7 @@ func TestRust_Structs(t *testing.T) {
 }
 
 func TestRust_Both(t *testing.T) {
-	out := string(Extract("rust", []byte(rustSrc), true, true))
+	out := string(Extract("rust", false, []byte(rustSrc), true, true))
 	if !strings.Contains(out, "pub struct Point {") {
 		t.Errorf("expected struct Point")
 	}
@@ -685,7 +685,7 @@ function localFn(): void {}
 `
 
 func TestTypeScript_Functions(t *testing.T) {
-	out := string(Extract("typescript", []byte(tsSrc), true, false))
+	out := string(Extract("typescript", false, []byte(tsSrc), true, false))
 	if !strings.Contains(out, "export function topLevel(x: number): number {") {
 		t.Errorf("expected exported topLevel, got:\n%s", out)
 	}
@@ -698,7 +698,7 @@ func TestTypeScript_Functions(t *testing.T) {
 }
 
 func TestTypeScript_Structs(t *testing.T) {
-	out := string(Extract("typescript", []byte(tsSrc), false, true))
+	out := string(Extract("typescript", false, []byte(tsSrc), false, true))
 	if !strings.Contains(out, "export interface Shape {") {
 		t.Errorf("expected Shape interface, got:\n%s", out)
 	}
@@ -723,7 +723,7 @@ func TestTypeScript_Structs(t *testing.T) {
 }
 
 func TestTypeScript_Both(t *testing.T) {
-	out := string(Extract("typescript", []byte(tsSrc), true, true))
+	out := string(Extract("typescript", false, []byte(tsSrc), true, true))
 	if !strings.Contains(out, "export interface Shape {") {
 		t.Errorf("expected Shape interface")
 	}
@@ -771,7 +771,7 @@ fun topLevel(x: Int): Int {
 `
 
 func TestKotlin_Functions(t *testing.T) {
-	out := string(Extract("kotlin", []byte(kotlinSrc), true, false))
+	out := string(Extract("kotlin", false, []byte(kotlinSrc), true, false))
 	if !strings.Contains(out, "fun topLevel(x: Int): Int {") {
 		t.Errorf("expected topLevel, got:\n%s", out)
 	}
@@ -781,7 +781,7 @@ func TestKotlin_Functions(t *testing.T) {
 }
 
 func TestKotlin_Structs(t *testing.T) {
-	out := string(Extract("kotlin", []byte(kotlinSrc), false, true))
+	out := string(Extract("kotlin", false, []byte(kotlinSrc), false, true))
 	if !strings.Contains(out, "data class Point(val x: Double, val y: Double)") {
 		t.Errorf("expected Point data class, got:\n%s", out)
 	}
@@ -803,7 +803,7 @@ func TestKotlin_Structs(t *testing.T) {
 }
 
 func TestKotlin_Both(t *testing.T) {
-	out := string(Extract("kotlin", []byte(kotlinSrc), true, true))
+	out := string(Extract("kotlin", false, []byte(kotlinSrc), true, true))
 	if !strings.Contains(out, "fun area(): Double") {
 		t.Errorf("expected interface method area, got:\n%s", out)
 	}
@@ -842,7 +842,7 @@ public class Point {
 `
 
 func TestCSharp_Structs(t *testing.T) {
-	out := string(Extract("csharp", []byte(csharpSrc), false, true))
+	out := string(Extract("csharp", false, []byte(csharpSrc), false, true))
 	if !strings.Contains(out, "public interface IShape {") {
 		t.Errorf("expected IShape interface, got:\n%s", out)
 	}
@@ -861,7 +861,7 @@ func TestCSharp_Structs(t *testing.T) {
 }
 
 func TestCSharp_Both(t *testing.T) {
-	out := string(Extract("csharp", []byte(csharpSrc), true, true))
+	out := string(Extract("csharp", false, []byte(csharpSrc), true, true))
 	if !strings.Contains(out, "double Area();") {
 		t.Errorf("expected interface method Area, got:\n%s", out)
 	}
@@ -904,7 +904,7 @@ end
 `
 
 func TestRuby_Functions(t *testing.T) {
-	out := string(Extract("ruby", []byte(rubySrc), true, false))
+	out := string(Extract("ruby", false, []byte(rubySrc), true, false))
 	if !strings.Contains(out, "def standalone(x)") {
 		t.Errorf("expected standalone, got:\n%s", out)
 	}
@@ -914,7 +914,7 @@ func TestRuby_Functions(t *testing.T) {
 }
 
 func TestRuby_Structs(t *testing.T) {
-	out := string(Extract("ruby", []byte(rubySrc), false, true))
+	out := string(Extract("ruby", false, []byte(rubySrc), false, true))
 	if !strings.Contains(out, "class Animal") {
 		t.Errorf("expected Animal class, got:\n%s", out)
 	}
@@ -930,7 +930,7 @@ func TestRuby_Structs(t *testing.T) {
 }
 
 func TestRuby_Both(t *testing.T) {
-	out := string(Extract("ruby", []byte(rubySrc), true, true))
+	out := string(Extract("ruby", false, []byte(rubySrc), true, true))
 	if !strings.Contains(out, "class Animal") {
 		t.Errorf("expected Animal class")
 	}
@@ -980,7 +980,7 @@ public func topLevel(x: Double) -> Double {
 `
 
 func TestSwift_Structs(t *testing.T) {
-	out := string(Extract("swift", []byte(swiftSrc), false, true))
+	out := string(Extract("swift", false, []byte(swiftSrc), false, true))
 	if !strings.Contains(out, "public protocol Shape {") {
 		t.Errorf("expected Shape protocol, got:\n%s", out)
 	}
@@ -999,7 +999,7 @@ func TestSwift_Structs(t *testing.T) {
 }
 
 func TestSwift_Both(t *testing.T) {
-	out := string(Extract("swift", []byte(swiftSrc), true, true))
+	out := string(Extract("swift", false, []byte(swiftSrc), true, true))
 	if !strings.Contains(out, "public init(x: Double, y: Double) {") {
 		t.Errorf("expected init, got:\n%s", out)
 	}
@@ -1041,7 +1041,7 @@ def topLevel(x: Int): Int = x + 1
 `
 
 func TestScala_Structs(t *testing.T) {
-	out := string(Extract("scala", []byte(scalaSrc), false, true))
+	out := string(Extract("scala", false, []byte(scalaSrc), false, true))
 	if !strings.Contains(out, "trait Shape {") {
 		t.Errorf("expected Shape trait, got:\n%s", out)
 	}
@@ -1063,7 +1063,7 @@ func TestScala_Structs(t *testing.T) {
 }
 
 func TestScala_Both(t *testing.T) {
-	out := string(Extract("scala", []byte(scalaSrc), true, true))
+	out := string(Extract("scala", false, []byte(scalaSrc), true, true))
 	if !strings.Contains(out, "def area(): Double") {
 		t.Errorf("expected trait method area, got:\n%s", out)
 	}
@@ -1110,7 +1110,7 @@ function topLevel(int $x): int {
 `
 
 func TestPHP_Structs(t *testing.T) {
-	out := string(Extract("php", []byte(phpSrc), false, true))
+	out := string(Extract("php", false, []byte(phpSrc), false, true))
 	if !strings.Contains(out, "interface Shape {") {
 		t.Errorf("expected Shape interface, got:\n%s", out)
 	}
@@ -1129,7 +1129,7 @@ func TestPHP_Structs(t *testing.T) {
 }
 
 func TestPHP_Both(t *testing.T) {
-	out := string(Extract("php", []byte(phpSrc), true, true))
+	out := string(Extract("php", false, []byte(phpSrc), true, true))
 	if !strings.Contains(out, "public function area(): float;") {
 		t.Errorf("expected interface method area, got:\n%s", out)
 	}

@@ -20,56 +20,80 @@ var (
 )
 
 // extract returns the rows of src (split into lines) that make up its
-// skeleton, unmerged, or ok=false when src cannot be parsed.
-func extract(langName string, src []byte, lines [][]byte, functions, structs bool) (out []internal.LineRange, ok bool) {
+// skeleton, unmerged, or ok=false when src cannot be parsed. A C header
+// (header) may be C++: see extractHeader.
+func extract(langName string, header bool, src []byte, lines [][]byte, functions, structs bool) (out []internal.LineRange, ok bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			out, ok = nil, false
 		}
 	}()
 
+	if langName == "c" && header {
+		return extractHeader(src, lines, functions, structs)
+	}
+	p, ok := parse(langName, src)
+	if !ok {
+		return nil, false
+	}
+	defer p.tree.Release()
+	return p.walk(src, lines, functions, structs), true
+}
+
+// parsed is src parsed with one language's grammar.
+type parsed struct {
+	def  *langDef
+	lang *gotreesitter.Language
+	tree *gotreesitter.Tree
+}
+
+func parse(langName string, src []byte) (parsed, bool) {
 	def, found := langDefs[langName]
 	if !found {
-		return nil, false
+		return parsed{}, false
 	}
 	pool, lang := parserPoolFor(langName, def.newLang)
 	tree, err := pool.Parse(src)
 	if err != nil {
-		return nil, false
+		return parsed{}, false
 	}
-	defer tree.Release()
+	return parsed{def: &def, lang: lang, tree: tree}, true
+}
 
+// walk returns the rows of the skeleton of the parsed src, unmerged.
+func (p parsed) walk(src []byte, lines [][]byte, functions, structs bool) []internal.LineRange {
 	c := &langs.Ctx{
 		Src:       src,
 		Lines:     lines,
-		Lang:      lang,
-		Comments:  def.comments,
+		Lang:      p.lang,
+		Comments:  p.def.comments,
 		Functions: functions,
 		Structs:   structs,
 	}
-	root := tree.RootNode()
+	var out []internal.LineRange
+	root := p.tree.RootNode()
 	for i := 0; i < root.ChildCount(); i++ {
-		out = def.processNode(c, out, root.Child(i))
+		out = p.def.processNode(c, out, root.Child(i))
 	}
-	if def.conditionals {
-		out = langs.BalanceConditionals(lines, out, hiddenRows(c, root))
+	if p.def.conditionals {
+		out = langs.BalanceConditionals(lines, out, p.hiddenRows(lines))
 	}
-	return out, true
+	return out
 }
 
 // hiddenRows reports the rows inside comments and raw strings that span
 // several rows (all but their first), where a line that reads like a
 // preprocessor directive is none. Ordinary string literals are left alone:
 // a directive between two of them (in inline asm) is a real one.
-func hiddenRows(c *langs.Ctx, root *gotreesitter.Node) []bool {
-	rows := make([]bool, len(c.Lines))
+func (p parsed) hiddenRows(lines [][]byte) []bool {
+	rows := make([]bool, len(lines))
 	var walk func(n *gotreesitter.Node)
 	walk = func(n *gotreesitter.Node) {
 		first, last := int(n.StartPoint().Row), int(n.EndPoint().Row)
 		if first == last {
 			return
 		}
-		switch c.Type(n) {
+		switch n.Type(p.lang) {
 		case "comment", "raw_string_literal":
 			for row := first + 1; row <= last && row < len(rows); row++ {
 				rows[row] = true
@@ -80,7 +104,7 @@ func hiddenRows(c *langs.Ctx, root *gotreesitter.Node) []bool {
 			walk(n.Child(i))
 		}
 	}
-	walk(root)
+	walk(p.tree.RootNode())
 	return rows
 }
 

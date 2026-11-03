@@ -18,18 +18,19 @@ func Supported(lang string) bool {
 
 // Ranges returns the rows of src that make up its skeleton (function
 // signatures and/or struct/class definitions) for lang, sorted and merged as
-// internal.MergeRanges does. Source that cannot be parsed, an unsupported
+// internal.MergeRanges does. A C header (header, a .h file) is read as C or
+// C++, whichever fits it. Source that cannot be parsed, an unsupported
 // lang, or asking for neither part keeps every row.
-func Ranges(lang string, src []byte, functions, structs bool) []Range {
-	ranges, _ := ranges(lang, src, internal.SplitLines(src), functions, structs)
+func Ranges(lang string, header bool, src []byte, functions, structs bool) []Range {
+	ranges, _ := ranges(lang, header, src, internal.SplitLines(src), functions, structs)
 	return ranges
 }
 
 // ranges is Ranges over src already split into lines. It also reports whether
 // src was reduced at all.
-func ranges(lang string, src []byte, lines [][]byte, functions, structs bool) ([]Range, bool) {
+func ranges(lang string, header bool, src []byte, lines [][]byte, functions, structs bool) ([]Range, bool) {
 	if functions || structs {
-		if kept, ok := extract(lang, src, lines, functions, structs); ok {
+		if kept, ok := extract(lang, header, src, lines, functions, structs); ok {
 			return internal.MergeRanges(kept), true
 		}
 	}
@@ -41,18 +42,18 @@ func ranges(lang string, src []byte, lines [][]byte, functions, structs bool) ([
 
 // Keep returns the skeleton of src as kept source lines, ready to slice and
 // number by their source rows.
-func Keep(lang string, src []byte, functions, structs bool) Lines {
+func Keep(lang string, header bool, src []byte, functions, structs bool) Lines {
 	lines := internal.SplitLines(src)
-	r, _ := ranges(lang, src, lines, functions, structs)
+	r, _ := ranges(lang, header, src, lines, functions, structs)
 	return internal.KeepRanges(lines, r)
 }
 
 // Extract returns the skeleton of src as text, with an elision marker line
 // wherever source was left out between two kept lines. Source it does not
 // reduce (see Ranges) comes back unchanged.
-func Extract(lang string, src []byte, functions, structs bool) []byte {
+func Extract(lang string, header bool, src []byte, functions, structs bool) []byte {
 	lines := internal.SplitLines(src)
-	r, reduced := ranges(lang, src, lines, functions, structs)
+	r, reduced := ranges(lang, header, src, lines, functions, structs)
 	if !reduced {
 		return src
 	}

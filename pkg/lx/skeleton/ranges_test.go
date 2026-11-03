@@ -20,11 +20,11 @@ func cutAfterBrace(t *testing.T, src string, row int) int {
 
 func checkRanges(t *testing.T, lang, src string, functions, structs bool, want []Range, wantText string) {
 	t.Helper()
-	got := Ranges(lang, []byte(src), functions, structs)
+	got := Ranges(lang, false, []byte(src), functions, structs)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Ranges = %v\nwant     %v", got, want)
 	}
-	if text := string(Extract(lang, []byte(src), functions, structs)); text != wantText {
+	if text := string(Extract(lang, false, []byte(src), functions, structs)); text != wantText {
 		t.Errorf("Extract =\n%s\nwant\n%s", text, wantText)
 	}
 }
@@ -85,7 +85,7 @@ func (p Point) Len() float64 {
 }
 
 func TestKeep_GoRows(t *testing.T) {
-	k := Keep("go", []byte(goRangesSrc), true, false)
+	k := Keep("go", false, []byte(goRangesSrc), true, false)
 	if want := []int{18, 19, 21}; !reflect.DeepEqual(k.Rows, want) {
 		t.Errorf("rows = %v, want %v", k.Rows, want)
 	}
@@ -251,13 +251,13 @@ pub fn free() -> i32 {
 func TestRanges_KeepsEverythingWhenNotReduced(t *testing.T) {
 	src := []byte("a\nb\nc")
 	want := []Range{{Start: 0, End: 3}}
-	if got := Ranges("erlang", src, true, true); !reflect.DeepEqual(got, want) {
+	if got := Ranges("erlang", false, src, true, true); !reflect.DeepEqual(got, want) {
 		t.Errorf("unsupported: %v, want %v", got, want)
 	}
-	if got := Ranges("go", src, false, false); !reflect.DeepEqual(got, want) {
+	if got := Ranges("go", false, src, false, false); !reflect.DeepEqual(got, want) {
 		t.Errorf("no flags: %v, want %v", got, want)
 	}
-	if got := Ranges("go", nil, true, true); got != nil {
+	if got := Ranges("go", false, nil, true, true); got != nil {
 		t.Errorf("empty source: %v", got)
 	}
 }
@@ -273,11 +273,11 @@ func TestExtract_PassesUnreducedSourceThrough(t *testing.T) {
 		{"unsupported", "erlang", true, true},
 		{"no flags", "go", false, false},
 	} {
-		if got := Extract(tc.lang, src, tc.functions, tc.structs); string(got) != string(src) {
+		if got := Extract(tc.lang, false, src, tc.functions, tc.structs); string(got) != string(src) {
 			t.Errorf("%s: Extract = %q, want %q unchanged", tc.name, got, src)
 		}
 	}
-	if got := Extract("go", nil, true, true); len(got) != 0 {
+	if got := Extract("go", false, nil, true, true); len(got) != 0 {
 		t.Errorf("empty source: %q", got)
 	}
 }
@@ -285,10 +285,10 @@ func TestExtract_PassesUnreducedSourceThrough(t *testing.T) {
 func TestExtract_MarksInlineCuts(t *testing.T) {
 	src := "def f(): return 1\ndef g(): return 2\ndef h(): return 3\n"
 	want := "def f(): \n...\ndef g(): \n...\ndef h(): \n"
-	if got := string(Extract("python", []byte(src), true, false)); got != want {
+	if got := string(Extract("python", false, []byte(src), true, false)); got != want {
 		t.Errorf("Extract = %q, want %q", got, want)
 	}
-	k := Keep("python", []byte(src), true, false)
+	k := Keep("python", false, []byte(src), true, false)
 	if want := []int{1, 2, 3}; !reflect.DeepEqual(k.Rows, want) {
 		t.Errorf("rows = %v, want %v", k.Rows, want)
 	}

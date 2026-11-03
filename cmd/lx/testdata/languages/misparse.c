@@ -1,6 +1,6 @@
 /**
-   C++ read as C: the struct misparses into a declaration that holds
-   functions, kept whole.
+   C++ in a .c file, read as C: the struct misparses into a declaration
+   that holds functions, kept whole.
 */
 struct expr_pair {
     unsigned hash() const { return mix(m_node->hash(), m_delta); }

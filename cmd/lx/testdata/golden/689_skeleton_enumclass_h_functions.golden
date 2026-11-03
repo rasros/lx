@@ -1,0 +1,18 @@
+--- STDOUT ---
+skeleton/enumclass.h (20 rows, function signatures)
+---
+```c
+struct Point {
+...
+    /* Length along both axes. */
+    int manhattan() const {
+...
+    bool operator==(const Point& other) const {
+...
+};
+...
+Point origin();
+```
+
+
+--- STDERR ---

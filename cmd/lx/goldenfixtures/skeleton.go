@@ -19,6 +19,7 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"main.c",
 		"main.cpp",
 		"blockdoc.c",
+		"nohint.h",
 		"Main.java",
 		"main.rs",
 		"main.ts",
@@ -66,11 +67,14 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"idiom.h",
 		"rawstring.cpp",
 		"asm.c",
-		"misparse.h",
+		"misparse.c",
 		"hidden.cpp",
 		"openif.c",
 		"stmt.c",
 		"stmt.cpp",
+		"enumclass.h",
+		"kernel.h",
+		"cppempty.h",
 	}
 	for _, name := range languageFiles {
 		content := readFixtureFile(t, filepath.Join("languages", name))
