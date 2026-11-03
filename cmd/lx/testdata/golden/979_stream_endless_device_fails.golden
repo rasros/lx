@@ -1,0 +1,6 @@
+--- STDOUT ---
+/dev/zero - error: stopped reading after 67108864 bytes, the default limit for a stream (-m sets another)
+
+
+--- STDERR ---
+Error: Failed to read file: stopped reading after 67108864 bytes, the default limit for a stream (-m sets another) (path=/dev/zero)

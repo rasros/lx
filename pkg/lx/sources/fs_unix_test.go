@@ -100,12 +100,13 @@ func TestReadIdleFIFOStopsWhenCancelled(t *testing.T) {
 		}
 		w2 <- w
 	}()
-	// Open reads the stream whole, so it is Open that waits on the writer.
 	waitCancelled(t, func(ctx context.Context) error {
 		rc, err := f.Open(ctx)
-		if err == nil {
-			rc.Close()
+		if err != nil {
+			return err
 		}
+		defer rc.Close()
+		_, err = io.ReadAll(rc)
 		return err
 	})
 	if w := <-w2; w != nil {
@@ -136,15 +137,57 @@ func TestOpenFIFOReadsWhatWasWritten(t *testing.T) {
 	}
 }
 
-// A device that never ends is read only up to maxStreamSize.
-func TestOpenEndlessDeviceStops(t *testing.T) {
+// A device that never ends is read only up to DefaultStreamLimit.
+func TestReadEndlessDeviceStopsAtDefaultLimit(t *testing.T) {
 	f, err := NewInputFileFromPath(os.DirFS("/dev"), "zero")
 	if err != nil {
 		t.Skip("no /dev/zero:", err)
 	}
 	rc, err := f.Open(context.Background())
-	if err == nil {
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rc.Close()
+	got, err := io.ReadAll(rc)
+	var limitErr *StreamLimitError
+	if !errors.As(err, &limitErr) || !limitErr.Default || len(got) != DefaultStreamLimit {
+		t.Fatalf("read %d bytes, %v; want %d and the default limit's error", len(got), err, DefaultStreamLimit)
+	}
+}
+
+// A stream that ends at its limit is whole; one that goes on past it fails.
+func TestStreamLimit(t *testing.T) {
+	for _, tc := range []struct {
+		body    string
+		wantErr bool
+	}{
+		{"1234", false},
+		{"12345", true},
+	} {
+		dir, name := newFIFO(t)
+		f, err := NewInputFileFromPath(os.DirFS(dir), name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		go func() {
+			if w, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY, 0); err == nil {
+				_, _ = w.Write([]byte(tc.body))
+				w.Close()
+			}
+		}()
+		rc, err := f.Open(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		rc.(*Stream).SetLimit(4)
+		got, err := io.ReadAll(rc)
 		rc.Close()
-		t.Fatal("Open of /dev/zero succeeded, want it stopped at the size cap")
+		var limitErr *StreamLimitError
+		if gotErr := errors.As(err, &limitErr); gotErr != tc.wantErr || string(got) != "1234" {
+			t.Errorf("%q: read %q, %v; want 1234 and a limit error %v", tc.body, got, err, tc.wantErr)
+		}
+		if tc.wantErr && (limitErr.Limit != 4 || limitErr.Default) {
+			t.Errorf("%q: limit error %+v, want the set limit 4", tc.body, *limitErr)
+		}
 	}
 }

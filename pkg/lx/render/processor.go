@@ -401,7 +401,20 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 		}
 	}
 
+	// A stream that may never end reads up to the size limit, which for
+	// files that state their size is applied before they are opened.
+	stream, isStream := rc.(*sources.Stream)
+	if isStream && cfg.MaxSize > 0 {
+		stream.SetLimit(cfg.MaxSize)
+	}
+
+	// A stream is read to its end here, for its size.
 	reader, size := readerFor(rc, file.Size)
+
+	if isStream && stream.Err() != nil {
+		issues.ReadErr = stream.Err()
+		return p.errorContext(file, index, stream.Err().Error()), issues
+	}
 
 	if scratch == nil {
 		scratch = make([]byte, 1024)
