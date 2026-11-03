@@ -184,7 +184,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 			log.Warn("Tree options cover no files", "flags", flags)
 		}
 	}
-	addSections(log, env, stream, sections, rawArgs)
+	if err := addSections(log, env, stream, sections, rawArgs); err != nil {
+		return err
+	}
 
 	if sink != nil {
 		log.Info("Writing output to file", "path", out.name)
@@ -224,16 +226,17 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 	return nil
 }
 
-// addSections adds the items of sections to stream, in order.
-func addSections(log *slog.Logger, env Env, stream *lx.Stream, sections []Section, rawArgs []string) {
+// addSections adds the items of sections to stream, in order, failing on a
+// prompt file it cannot read.
+func addSections(log *slog.Logger, env Env, stream *lx.Stream, sections []Section, rawArgs []string) error {
 	var metaFields map[string]string
 	var metaBody string
 	for si, section := range sections {
 		log.Debug("Processing section", "index", si, "ops", len(section.Items))
 
 		for _, it := range section.Items {
-			op := it.source()
-			log.Debug("Processing op", "action", op.Action, "value", op.Value)
+			action, value := it.opAttrs()
+			log.Debug("Processing op", "action", action, "value", value)
 
 			switch it := it.(type) {
 			case *fileItem:
@@ -275,15 +278,18 @@ func addSections(log *slog.Logger, env Env, stream *lx.Stream, sections []Sectio
 				log.Debug("Adding system context", "fields", len(metaFields))
 				stream.AddMeta(metaBody, metaFields)
 			case *promptItem:
-				if it.path != "" {
-					log.Debug("Adding prompt from file", "path", it.path, "length", len(it.text))
-				} else {
-					log.Debug("Adding prompt", "length", len(it.text))
+				log.Debug("Adding prompt", "length", len(it.text))
+				stream.AddPrompt(it.text)
+			case *promptFileItem:
+				if err := it.readText(env); err != nil {
+					return err
 				}
+				log.Debug("Adding prompt from file", "path", it.path, "length", len(it.text))
 				stream.AddPrompt(it.text)
 			}
 		}
 	}
+	return nil
 }
 
 // newLogger returns the logger of a run at level, writing to env.Stderr.

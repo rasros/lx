@@ -8,7 +8,7 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-func TestParseSections_NoSplitBeforeFiles(t *testing.T) {
+func TestCompile_NoSplitBeforeFiles(t *testing.T) {
 	defaultRender := lx.RenderOptions{Head: -1, Tail: 0}
 	ops := []Op{
 		{Action: "include", Value: "*.go", Type: CmdInterleaved},
@@ -29,7 +29,7 @@ func TestParseSections_NoSplitBeforeFiles(t *testing.T) {
 	}
 }
 
-func TestParseSections_SplitsAndResetsAfterFiles(t *testing.T) {
+func TestCompile_SplitsAndResetsAfterFiles(t *testing.T) {
 	defaultRender := lx.RenderOptions{Head: -1, Tail: 0}
 	ops := []Op{
 		{Action: "head", Value: "7", Type: CmdInterleaved},

@@ -10,27 +10,43 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-// resolvePrompts reads the text of every -P prompt, failing on the first it
-// cannot find or read. It runs before any input is collected, so a bad prompt
-// fails before the downloads and walks of the run.
+// resolvePrompts finds every -P prompt, failing on the first it cannot find,
+// and reads those in regular files; it leaves stdin, devices and pipes to be
+// read in command-line order while rendering. It runs before any input is collected, so
+// a bad prompt fails before the walks and downloads of the run.
 func resolvePrompts(sections []Section, r *promptResolver, env Env) error {
 	for _, s := range sections {
 		for _, it := range s.Items {
-			p, ok := it.(*promptItem)
-			if !ok || p.ref == "" {
+			p, ok := it.(*promptFileItem)
+			if !ok {
 				continue
 			}
 			path, err := r.resolve(p.ref)
 			if err != nil {
 				return err
 			}
-			data, err := env.readFile(path)
-			if err != nil {
-				return fmt.Errorf("read prompt file %s: %w", path, err)
+			p.path = path
+			// A directory fails to read, so it fails here too.
+			if info, err := env.stat(path); err == nil && (info.Mode().IsRegular() || info.IsDir()) {
+				if err := p.readText(env); err != nil {
+					return err
+				}
 			}
-			p.text, p.path = string(data), path
 		}
 	}
+	return nil
+}
+
+// readText reads the text of p, once.
+func (p *promptFileItem) readText(env Env) error {
+	if p.read {
+		return nil
+	}
+	data, err := env.readFile(p.path)
+	if err != nil {
+		return fmt.Errorf("read prompt file %s: %w", p.path, err)
+	}
+	p.text, p.read = string(data), true
 	return nil
 }
 
