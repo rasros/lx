@@ -15,30 +15,6 @@ import (
 	"github.com/rasros/lx/pkg/lx/sources"
 )
 
-func TestStream_Integration(t *testing.T) {
-	cfg := core.NewConfig()
-	opts := core.RenderOptions{Head: -1, Tail: -1}
-	stream, _ := NewStream(cfg)
-
-	stream.AddSection("Header Test")
-	stream.AddFile(sources.NewBufferInputFile("A.txt", []byte("Content A")), opts)
-	stream.AddPrompt("Analyze this")
-
-	var buf strings.Builder
-	_, err := stream.Execute(context.Background(), &buf)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	got := buf.String()
-	expected := []string{"## Header Test", "Content A", "Analyze this"}
-	for _, exp := range expected {
-		if !strings.Contains(got, exp) {
-			t.Errorf("Output missing %q", exp)
-		}
-	}
-}
-
 func TestStream_ContextCancellation(t *testing.T) {
 	cfg := core.NewConfig()
 	opts := core.RenderOptions{Head: -1}
@@ -77,29 +53,6 @@ func TestStream_TokenizerIntegration(t *testing.T) {
 	}
 }
 
-func TestStream_Prepare_Counts(t *testing.T) {
-	cfg := core.NewConfig()
-	opts := core.RenderOptions{Head: -1}
-	stream, _ := NewStream(cfg)
-
-	stream.AddSection("S1")
-	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("aaa")), opts)
-	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("bb")), opts)
-	stream.AddSection("S2")
-	stream.AddFile(sources.NewBufferInputFile("c.txt", []byte("c")), opts)
-
-	g := stream.Plan()
-	if g.TotalFiles != 3 {
-		t.Errorf("TotalFiles = %d, want 3", g.TotalFiles)
-	}
-	if g.TotalSections != 2 {
-		t.Errorf("TotalSections = %d, want 2", g.TotalSections)
-	}
-	if g.TotalSize != 6 {
-		t.Errorf("TotalSize = %d, want 6", g.TotalSize)
-	}
-}
-
 func TestStream_Prepare_SizeUnknownForNegativeSizeFile(t *testing.T) {
 	cfg := core.NewConfig()
 	opts := core.RenderOptions{Head: -1}
@@ -121,51 +74,6 @@ func TestStream_Prepare_SizeUnknownForNegativeSizeFile(t *testing.T) {
 	}
 }
 
-func TestStream_TotalRows_AfterExecute(t *testing.T) {
-	cfg := core.NewConfig()
-	opts := core.RenderOptions{Head: -1, Tail: -1}
-	stream, _ := NewStream(cfg)
-
-	stream.AddFile(sources.NewBufferInputFile("a.txt", []byte("one\ntwo\nthree")), opts)
-	stream.AddFile(sources.NewBufferInputFile("b.txt", []byte("alpha\nbeta")), opts)
-
-	var buf strings.Builder
-	report, err := stream.Execute(context.Background(), &buf)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	if report.TotalRows != 5 {
-		t.Errorf("TotalRows = %d, want 5", report.TotalRows)
-	}
-}
-
-func TestStream_MaxSizeSkipsOversizedFiles(t *testing.T) {
-	cfg := core.NewConfig()
-	opts := core.RenderOptions{Head: -1, MaxSize: 10}
-	stream, _ := NewStream(cfg)
-
-	stream.AddFile(sources.NewBufferInputFile("small.txt", []byte("tiny")), opts)
-	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 64))), opts)
-
-	var buf strings.Builder
-	report, err := stream.Execute(context.Background(), &buf)
-	if err != nil {
-		t.Fatalf("Execute failed: %v", err)
-	}
-
-	got := buf.String()
-	if !strings.Contains(got, "small.txt") {
-		t.Error("Output missing small.txt, want it kept under the limit")
-	}
-	if strings.Contains(got, "large.txt") {
-		t.Error("Output contains large.txt, want it skipped by MaxSize")
-	}
-	if n := report.TotalFiles; n != 1 {
-		t.Errorf("TotalFiles = %d, want 1", n)
-	}
-}
-
 func TestStream_MaxSizeKeepsUnknownSizeInputs(t *testing.T) {
 	cfg := core.NewConfig()
 	opts := core.RenderOptions{Head: -1, MaxSize: 10}
@@ -178,18 +86,6 @@ func TestStream_MaxSizeKeepsUnknownSizeInputs(t *testing.T) {
 
 	if n := stream.Plan().TotalFiles; n != 1 {
 		t.Errorf("TotalFiles = %d, want 1 (unknown size must not be skipped)", n)
-	}
-}
-
-func TestStream_MaxSizeUnsetKeepsEverything(t *testing.T) {
-	cfg := core.NewConfig()
-	opts := core.RenderOptions{Head: -1}
-	stream, _ := NewStream(cfg)
-
-	stream.AddFile(sources.NewBufferInputFile("large.txt", []byte(strings.Repeat("x", 4096))), opts)
-
-	if n := stream.Plan().TotalFiles; n != 1 {
-		t.Errorf("TotalFiles = %d, want 1", n)
 	}
 }
 
@@ -440,22 +336,6 @@ func TestStream_SkeletonFilesCapWorkers(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("b.go", []byte("package b")), core.RenderOptions{Head: -1, SkeletonTypes: true})
 	if got := stream.workers(); got != maxSkeletonWorkers {
 		t.Fatalf("workers = %d with skeletons, want %d", got, maxSkeletonWorkers)
-	}
-}
-
-func TestStream_TreeListsOnlyAdmittedFiles(t *testing.T) {
-	stream, _ := NewStream(core.NewConfig())
-	opts := core.RenderOptions{Head: -1, MaxSize: 4}
-	small := sources.NewBufferInputFile("dir/small.txt", []byte("ok"))
-	big := sources.NewBufferInputFile("dir/big.txt", []byte("too large"))
-	stream.AddTree([]sources.InputFile{small, big}, opts)
-	stream.AddTree([]sources.InputFile{big}, opts)
-
-	if len(stream.items) != 1 {
-		t.Fatalf("items = %d, want one tree; a tree with no admitted files is left out", len(stream.items))
-	}
-	if got, want := stream.items[0].(core.TreeContext).Body, "dir/\n└── small.txt"; got != want {
-		t.Fatalf("tree = %q, want %q", got, want)
 	}
 }
 

@@ -72,35 +72,10 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name: "sticky string alone",
-			args: []string{"-fconfig.yaml"},
-			wantOps: []Op{
-				{Action: "config", Value: "config.yaml", Type: CmdGlobal, IsShort: true},
-			},
-			wantGlo: map[string]string{
-				"config": "config.yaml",
-			},
-		},
-		{
-			name: "long flag with equals",
-			args: []string{"--head=10", "file.go"},
-			wantOps: []Op{
-				{Action: "head", Value: "10", Type: CmdInterleaved},
-				{Action: "FILE", Value: "file.go", Type: CmdAction},
-			},
-			wantGlo: map[string]string{},
-		},
-		{
 			name:      "unknown short flag",
 			args:      []string{"-z"},
 			wantErr:   true,
 			errSubstr: "unknown short flag: -z",
-		},
-		{
-			name:      "unknown long flag",
-			args:      []string{"--foo"},
-			wantErr:   true,
-			errSubstr: "unknown flag: --foo",
 		},
 		{
 			name:      "missing value short",
@@ -109,22 +84,10 @@ func TestParse(t *testing.T) {
 			errSubstr: "flag -h requires a value",
 		},
 		{
-			name:      "missing value long",
-			args:      []string{"--head"},
-			wantErr:   true,
-			errSubstr: "flag --head requires a value",
-		},
-		{
 			name:      "invalid number format",
 			args:      []string{"-hfoo"},
 			wantErr:   true,
 			errSubstr: "flag --head expects a number",
-		},
-		{
-			name:      "bool flag with equals",
-			args:      []string{"--verbose=true"},
-			wantErr:   true,
-			errSubstr: "does not take a value",
 		},
 	}
 

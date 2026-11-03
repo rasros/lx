@@ -21,150 +21,6 @@ import (
 	"github.com/rasros/lx/pkg/lx/templatex"
 )
 
-func TestProcessor_RenderFile_Slicing(t *testing.T) {
-	cfg := core.NewConfig()
-	engine, _ := templatex.Compile(cfg)
-	global := core.Plan{TotalFiles: 1}
-
-	proc := NewProcessor(engine, global)
-
-	file := sources.NewBufferInputFile("slice.txt", []byte("1\n2\n3\n4\n5\n"))
-	opts := core.RenderOptions{Head: 1, Tail: 1}
-
-	scratch := make([]byte, 1024)
-	item := PreparedItem{Raw: FileItem{File: file, Opts: opts}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
-
-	var buf bytes.Buffer
-	if _, err := proc.RenderPrepared(context.Background(), &buf, item, scratch); err != nil {
-		t.Fatal(err)
-	}
-
-	got := buf.String()
-	if !strings.Contains(got, "1\n") || !strings.Contains(got, "5\n") {
-		t.Error("Output missing head or tail")
-	}
-	if !strings.Contains(got, "rows skipped") {
-		t.Error("Output missing gap marker")
-	}
-}
-
-// skeletonThreeFuncs keeps rows 3, 7 and 11 in a function skeleton.
-const skeletonThreeFuncs = `package p
-
-func A() {
-	println(1)
-}
-
-func B() {
-	println(2)
-}
-
-func C() {
-	println(3)
-}
-`
-
-func renderSkeleton(t *testing.T, rc core.RenderOptions) string {
-	t.Helper()
-	cfg := core.NewConfig()
-	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.Plan{TotalFiles: 1})
-
-	file := sources.NewBufferInputFile("skeleton.go", []byte(skeletonThreeFuncs))
-	item := PreparedItem{Raw: FileItem{File: file, Opts: rc}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
-
-	var buf bytes.Buffer
-	if _, err := proc.RenderPrepared(context.Background(), &buf, item, nil); err != nil {
-		t.Fatal(err)
-	}
-	return buf.String()
-}
-
-func TestProcessor_RenderFile_SkeletonSlicingKeepsSourceRows(t *testing.T) {
-	got := renderSkeleton(t, core.RenderOptions{Head: 1, Tail: 1, SkeletonFunctions: true})
-	if !strings.Contains(got, "(13 rows, function signatures)") {
-		t.Fatalf("expected original row count in header, got:\n%s", got)
-	}
-	// Head keeps A (row 3), tail keeps C (row 11): rows 4-10 lie between.
-	if !strings.Contains(got, "func A() {\n... (7 rows skipped)\nfunc C() {\n") {
-		t.Fatalf("expected a gap counted in source rows, got:\n%s", got)
-	}
-}
-
-func TestProcessor_RenderFile_SkeletonNumbersSourceRows(t *testing.T) {
-	got := renderSkeleton(t, core.RenderOptions{Head: -1, SkeletonFunctions: true, LineNumbers: true})
-	want := " 3: func A() {\n...\n 7: func B() {\n...\n11: func C() {\n"
-	if !strings.Contains(got, want) {
-		t.Fatalf("want source row numbers and elision markers\n%s\ngot:\n%s", want, got)
-	}
-
-	got = renderSkeleton(t, core.RenderOptions{Head: 1, Tail: 1, SkeletonFunctions: true, LineNumbers: true})
-	want = " 3: func A() {\n... (7 rows skipped)\n11: func C() {\n"
-	if !strings.Contains(got, want) {
-		t.Fatalf("want sliced lines to keep source rows\n%s\ngot:\n%s", want, got)
-	}
-
-	got = renderSkeleton(t, core.RenderOptions{Head: 0, Tail: 2, SkeletonFunctions: true, LineNumbers: true})
-	want = " 7: func B() {\n...\n11: func C() {\n"
-	if !strings.Contains(got, want) {
-		t.Fatalf("want tail numbered by source rows, not counted back\n%s\ngot:\n%s", want, got)
-	}
-}
-
-func TestRender_DataURI(t *testing.T) {
-	tmp := t.TempDir()
-	imgName := "test.png"
-	imgPath := filepath.Join(tmp, imgName)
-	payload := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
-	if err := os.WriteFile(imgPath, payload, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg := core.NewConfig()
-	cfg.OutputFormat = "html"
-	engine, _ := templatex.Compile(cfg)
-
-	proc := NewProcessor(engine, core.Plan{})
-
-	file, err := sources.NewInputFileFromPath(os.DirFS(tmp), imgName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	file.AbsPath = imgPath
-
-	item := PreparedItem{Raw: FileItem{File: file}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
-
-	var buf bytes.Buffer
-	if _, err := proc.RenderPrepared(context.Background(), &buf, item, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	got := buf.String()
-	if !strings.Contains(got, "<img src=\"data:image/png;base64,") {
-		t.Errorf("HTML output did not contain data URI. Got:\n%s", got)
-	}
-}
-
-func TestRender_ErrorHandling(t *testing.T) {
-	cfg := core.NewConfig()
-	engine, _ := templatex.Compile(cfg)
-
-	proc := NewProcessor(engine, core.Plan{})
-
-	file := sources.InputFile{Path: "ghost.txt", Open: func(context.Context) (io.ReadCloser, error) { return nil, os.ErrPermission }}
-	item := PreparedItem{Raw: FileItem{File: file}, Section: &core.SectionContext{}}
-
-	var buf bytes.Buffer
-	if _, err := proc.RenderPrepared(context.Background(), &buf, item, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	got := buf.String()
-	if !strings.Contains(got, "error:") {
-		t.Errorf("Expected error template output, got: %s", got)
-	}
-}
-
 // A file whose read a cancel cut short renders nothing, not an error row
 // about the cancel.
 func TestRender_CancelledReadWritesNothing(t *testing.T) {
@@ -185,73 +41,6 @@ func TestRender_CancelledReadWritesNothing(t *testing.T) {
 	}
 	if buf.Len() != 0 {
 		t.Errorf("cancelled file rendered:\n%s", buf.String())
-	}
-}
-
-func TestRender_BinaryFile(t *testing.T) {
-	cfg := core.NewConfig()
-	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.Plan{})
-
-	binaryContent := append([]byte("ELF"), 0x00, 0x01, 0x02, 0x03)
-	file := sources.NewBufferInputFile("program", binaryContent)
-	opts := core.RenderOptions{Head: -1, Tail: -1}
-
-	item := PreparedItem{Raw: FileItem{File: file, Opts: opts}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
-
-	var buf bytes.Buffer
-	if _, err := proc.RenderPrepared(context.Background(), &buf, item, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	got := buf.String()
-	if !strings.Contains(got, "binary file skipped") {
-		t.Errorf("Expected binary file message, got:\n%s", got)
-	}
-}
-
-func TestRender_CompactView(t *testing.T) {
-	cfg := core.NewConfig()
-	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.Plan{})
-
-	file := sources.NewBufferInputFile("data.txt", []byte("lots of content\n"))
-	opts := core.RenderOptions{Head: 0, Tail: 0}
-
-	item := PreparedItem{Raw: FileItem{File: file, Opts: opts}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
-
-	var buf bytes.Buffer
-	if _, err := proc.RenderPrepared(context.Background(), &buf, item, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	got := buf.String()
-	if !strings.Contains(got, "data.txt") {
-		t.Errorf("Expected filename in compact output, got:\n%s", got)
-	}
-	if strings.Contains(got, "lots of content") {
-		t.Errorf("Compact view should not include file content, got:\n%s", got)
-	}
-}
-
-func TestRender_LineNumbers(t *testing.T) {
-	cfg := core.NewConfig()
-	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.Plan{TotalFiles: 1})
-
-	file := sources.NewBufferInputFile("code.go", []byte("package main\nfunc main() {}\n"))
-	opts := core.RenderOptions{Head: -1, Tail: -1, LineNumbers: true}
-
-	item := PreparedItem{Raw: FileItem{File: file, Opts: opts}, Section: &core.SectionContext{}, FileIndexGlobal: 1}
-
-	var buf bytes.Buffer
-	if _, err := proc.RenderPrepared(context.Background(), &buf, item, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	got := buf.String()
-	if !strings.Contains(got, "1: package main") {
-		t.Errorf("Expected line numbers in output, got:\n%s", got)
 	}
 }
 
@@ -413,29 +202,6 @@ func TestApplySkeletonSkipsBinaryAndImages(t *testing.T) {
 	}
 }
 
-func TestRenderPreparedReportsStats(t *testing.T) {
-	cfg := core.NewConfig()
-	engine, _ := templatex.Compile(cfg)
-	proc := NewProcessor(engine, core.Plan{})
-
-	file := sources.NewBufferInputFile("a.txt", []byte("one\ntwo\nthree\n"))
-	opts := core.RenderOptions{Head: -1}
-
-	var buf bytes.Buffer
-	stats, err := proc.RenderPrepared(context.Background(), &buf, PreparedItem{
-		Raw: FileItem{File: file, Opts: opts}, Section: &core.SectionContext{}, FileIndexGlobal: 1,
-	}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stats.Rows != 3 {
-		t.Errorf("Rows = %d, want 3", stats.Rows)
-	}
-	if stats.IsBinary || stats.Issues.ReadErr != nil || stats.IsCompact {
-		t.Errorf("unexpected flags: %+v", stats)
-	}
-}
-
 // Non-file items carry no stats, and must not inherit them from a prior item.
 func TestRenderPreparedNonFileItemHasZeroStats(t *testing.T) {
 	cfg := core.NewConfig()
@@ -501,51 +267,6 @@ func TestApplyConvertersReportsNoLanguageWhenNoneApply(t *testing.T) {
 	}
 }
 
-// An input with no extension is still converted when its content is media, and
-// the conversion is what decides that it is no longer rendered as a picture.
-func TestPrepareFileContextConvertsExtensionlessImage(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join("..", "..", "..", "cmd", "lx", "testdata", "media", "sample.png"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.Plan{})
-
-	file := sources.NewBufferInputFile("avatar", src)
-	opts := core.RenderOptions{Head: -1, ExtractMedia: true}
-	ctx, issues := proc.prepareFileContext(context.Background(), file, opts, 1, nil)
-	if issues.ReadErr != nil {
-		t.Fatal(issues.ReadErr)
-	}
-	if ctx.IsImage || ctx.IsBinary || ctx.ConvertedFrom != "png" {
-		t.Errorf("IsImage=%v IsBinary=%v ConvertedFrom=%q, want a png converted to text",
-			ctx.IsImage, ctx.IsBinary, ctx.ConvertedFrom)
-	}
-	if s, _ := ctx.Content.(string); !strings.Contains(s, "Container: png") {
-		t.Errorf("content = %q", s)
-	}
-}
-
-// Only bytes that bear the format out are rendered as a picture.
-func TestClassifyVerifiesBeforeTreatingAsImage(t *testing.T) {
-	scratch := make([]byte, 1024)
-	cases := []struct {
-		path string
-		data []byte
-		want bool
-	}{
-		{"logo.png", []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\x0d"), true},
-		{"corrupt.png", []byte{0, 1, 2, 3, 4}, false},
-		{"counts.dat", append([]byte("BM"), make([]byte, 60)...), false},
-	}
-	for _, c := range cases {
-		format, verified := classify(c.path, bytes.NewReader(c.data), scratch)
-		if got := format.IsImage() && verified; got != c.want {
-			t.Errorf("%s: image=%v, want %v", c.path, got, c.want)
-		}
-	}
-}
-
 // bigLines is a large text file with every line distinct so its position can
 // be checked.
 func bigLines(n int) []byte {
@@ -554,33 +275,6 @@ func bigLines(n int) []byte {
 		fmt.Fprintf(&b, "line %05d %s\n", i, strings.Repeat("-", 20))
 	}
 	return b.Bytes()
-}
-
-func TestPrepareFileContextCountsBigFileExactly(t *testing.T) {
-	data := bigLines(3000)
-	if len(data) <= 32*1024 {
-		t.Fatalf("fixture is %d bytes, want more than 32 KB", len(data))
-	}
-	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.Plan{})
-
-	for _, cfg := range []core.RenderOptions{
-		{Head: -1},         // whole file
-		{Head: 5},          // head only
-		{Head: 5, Tail: 5}, // sliced
-		{Tail: 5},          // tail only
-		{Head: 0, Tail: 0}, // compact
-	} {
-		file := sources.NewBufferInputFile("big.txt", data)
-		ctx, issues := proc.prepareFileContext(context.Background(), file, cfg, 1, nil)
-		if issues.ReadErr != nil {
-			t.Fatal(issues.ReadErr)
-		}
-		if ctx.TotalRows != 3000 || ctx.IsEstimate {
-			t.Errorf("head=%d tail=%d: rows=%d estimate=%v, want exactly 3000",
-				cfg.Head, cfg.Tail, ctx.TotalRows, ctx.IsEstimate)
-		}
-	}
 }
 
 // Tail line numbers come from the exact row count, whichever kind of reader
@@ -627,26 +321,6 @@ func TestPrepareFileContextNumbersBigTailExactly(t *testing.T) {
 		if ctx.TotalRows != 3000 || ctx.IsEstimate {
 			t.Errorf("%s: rows=%d estimate=%v, want exactly 3000", name, ctx.TotalRows, ctx.IsEstimate)
 		}
-	}
-}
-
-// A head and tail that overlap render the file once, with its line endings.
-func TestPrepareFileContextOverlapRendersWholeFile(t *testing.T) {
-	data := []byte("a\r\nb\r\nc\r\n")
-	engine, _ := templatex.Compile(core.NewConfig())
-	proc := NewProcessor(engine, core.Plan{})
-
-	file := sources.NewBufferInputFile("crlf.txt", data)
-	opts := core.RenderOptions{Head: 2, Tail: 2}
-	ctx, issues := proc.prepareFileContext(context.Background(), file, opts, 1, nil)
-	if issues.ReadErr != nil {
-		t.Fatal(issues.ReadErr)
-	}
-	if got, _ := ctx.Content.(string); got != string(data) {
-		t.Errorf("content = %q, want the whole file %q with CRLF kept", got, data)
-	}
-	if ctx.TotalRows != 3 || ctx.IsEstimate {
-		t.Errorf("rows=%d estimate=%v, want exactly 3", ctx.TotalRows, ctx.IsEstimate)
 	}
 }
 

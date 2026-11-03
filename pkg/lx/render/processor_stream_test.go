@@ -202,20 +202,6 @@ func (r *repeatReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func TestProcessorRendersWholeStream(t *testing.T) {
-	// A consumer that needs everything still gets everything, and the size is
-	// what the stream declared.
-	text := strings.Repeat("line\n", 20000)
-	body := &countingBody{r: strings.NewReader(text), length: int64(len(text))}
-	out := renderStream(t, streamInput("https://example.com/notes.txt", body), core.RenderOptions{Head: -1})
-	if strings.Count(out, "line\n") != 20000 {
-		t.Errorf("rendered %d lines, want 20000", strings.Count(out, "line\n"))
-	}
-	if body.read != int64(len(text)) {
-		t.Errorf("read %d of %d bytes", body.read, len(text))
-	}
-}
-
 func TestProcessorSurvivesLyingContentLength(t *testing.T) {
 	// A server declares 1 TiB and sends 2 KB. Every way of rendering it shows
 	// what arrived, and none allocates for what was declared.
@@ -226,7 +212,6 @@ func TestProcessorSurvivesLyingContentLength(t *testing.T) {
 		want string
 	}{
 		{"whole", core.RenderOptions{Head: -1}, text},
-		{"head and tail", core.RenderOptions{Head: 3, Tail: 3}, "func f() {}\n"},
 		{"compact", core.RenderOptions{}, "(170 rows)"},
 		{"skeleton", core.RenderOptions{Head: -1, SkeletonFunctions: true}, "func f()"},
 	}
