@@ -1,0 +1,20 @@
+--- STDOUT ---
+```
+HOST/
+└── owner/
+    └── repo/
+        ├── docs/
+        │   ├── deep/
+        │   │   └── more.md
+        │   └── guide.md
+        ├── internal/
+        │   ├── cli/
+        │   │   ├── app.go
+        │   │   └── app_test.go
+        │   └── other/
+        │       └── o.go
+        └── README.md
+```
+
+
+--- STDERR ---

@@ -1,0 +1,10 @@
+--- STDOUT ---
+[1/6] HOST/owner/repo/README.md (1 rows)
+[2/6] HOST/owner/repo/docs/deep/more.md (1 rows)
+[3/6] HOST/owner/repo/docs/guide.md (1 rows)
+[4/6] HOST/owner/repo/internal/cli/app.go (1 rows)
+[5/6] HOST/owner/repo/internal/cli/app_test.go (1 rows)
+[6/6] HOST/owner/repo/internal/other/o.go (1 rows)
+
+
+--- STDERR ---

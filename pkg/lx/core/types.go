@@ -126,9 +126,8 @@ type Config struct {
 type FileContext struct {
 	Path    string
 	AbsPath string
-	// Archive and Entry name an archive entry, which has no AbsPath: the
-	// archive's absolute path, or its URL when it was downloaded, and the
-	// entry's path inside it.
+	// Archive and Entry name an archive entry, which has no AbsPath, as
+	// sources.InputFile does.
 	Archive          string
 	Entry            string
 	Size             int64

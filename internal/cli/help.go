@@ -88,6 +88,14 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
             5. "-" to read file paths from stdin.
 
           Archive URLs (.zip, .tar.gz, etc.) are expanded when -Z is active.
+          Repository URLs (github.com/owner/repo and the like on GitHub,
+          GitLab, Bitbucket and Codeberg) are always fetched as an archive
+          and read as a checkout: the files are shown below the URL, the
+          repository's ignore files apply, and -i/-e match the files from
+          the repository's root: -e "docs/**" github.com/owner/repo. The
+          globs of a section apply to every path in it, so to give two
+          repositories globs of their own, put them in sections of their
+          own with -s. Unlike a checkout, symbolic links are left out.
 
           As in rg, a path you name is never filtered itself: ignore files,
           hidden-file skipping and -i/-e do not apply to it. They filter what
@@ -162,6 +170,9 @@ const longHelpTmpl = `{{"lx" | bold }} - File discovery, slicing, and formatting
   6. {{ "URL Input" | underline }}
      Fetch a remote file directly (no download step needed):
        $ lx https://example.com/config.yaml src/
+
+     Bundle a repository's internal/cli/ Go files without cloning it:
+       $ lx -i "internal/cli/*.go" github.com/owner/repo
 
      Expand a GitHub archive and filter to Go files only:
        $ lx -Z -i "*.go" https://github.com/owner/repo/archive/refs/heads/main.zip

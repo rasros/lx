@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/rasros/lx/pkg/lx/core"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -565,6 +566,99 @@ func TestExpandArchive_CorruptEntriesFail(t *testing.T) {
 		if len(files) != 0 || len(failures) != 1 || failures[0].Kind != core.FailedArchiveEntry || failures[0].Display != "corrupt.zip/bad.txt" || failures[0].Path != path+"/bad.txt" {
 			t.Errorf("method %d: files %v, failures %+v; want one entry failure", method, filePaths(files), failures)
 		}
+	}
+}
+
+func TestSingleEntryName(t *testing.T) {
+	for origin, want := range map[string]string{
+		"/tmp/notes.txt.gz":                    "notes.txt",
+		"/tmp/NOTES.TXT.GZ":                    "NOTES.TXT",
+		"/tmp/data.json.zst":                   "data.json",
+		"/tmp/.gz":                             ".gz",
+		"/tmp/foo.tar.gz":                      "foo.tar",
+		"/tmp/foo.tgz":                         "foo.tar",
+		"/tmp/NOTAR.TGZ":                       "NOTAR.TAR",
+		"https://example.com/a/log.txt.gz?x=1": "log.txt",
+	} {
+		if got := singleEntryName(origin); got != want {
+			t.Errorf("singleEntryName(%q) = %q, want %q", origin, got, want)
+		}
+	}
+}
+
+// A nil Walker keeps every file, as with ExpandArchive.
+func TestExpandRepoArchive_NilWalker(t *testing.T) {
+	path := makeTestZip(t, [][2]string{{"repo-main/", ""}, {"repo-main/.hidden", "h"}, {"repo-main/a.txt", "a"}})
+	files, _, err := ExpandRepoArchive(context.Background(), path, ArchiveOptions{Display: "r", Origin: path})
+	if err != nil || len(files) != 2 {
+		t.Errorf("files %v, %v; want both", filePaths(files), err)
+	}
+}
+
+// A wrapper is the one directory every entry is below, named by the first.
+func TestZipWrapper(t *testing.T) {
+	for _, c := range []struct {
+		names []string
+		want  string
+	}{
+		{[]string{"repo-main/", "repo-main/a.txt", "repo-main/d/b.txt"}, "repo-main"},
+		{[]string{"repo-main/a.txt", "repo-main/d/"}, "repo-main"},
+		{[]string{"a/x.txt", "b/x.txt", "b/y.txt"}, ""},
+		{[]string{"a/x.txt", "TOP.txt"}, ""},
+		{[]string{"TOP.txt", "a/x.txt"}, ""},
+		{[]string{"repo-main/a.txt", "repo-main-2/b.txt"}, ""},
+		{[]string{"x.txt"}, ""},
+		{nil, ""},
+	} {
+		if got := zipWrapper(c.names); got != c.want {
+			t.Errorf("zipWrapper(%q) = %q, want %q", c.names, got, c.want)
+		}
+	}
+}
+
+func TestCheckoutName(t *testing.T) {
+	for name, want := range map[string]bool{
+		"a.txt": true, `back\slash.txt`: true, "nul\x00x.txt": false, "d/a.txt": true, "repo-main": true,
+		"": false, ".": false, "..": false, "/a": false, "a//b": false,
+		"repo-main/.": false, "repo-main/..": false, "repo-main/../up.txt": false, "./a": false,
+	} {
+		if got := checkoutName(name); got != want {
+			t.Errorf("checkoutName(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+// An ignore file stored as a symbolic link is not read as patterns: its
+// content is a link target, which a checkout would follow.
+func TestExpandRepoArchive_LinkedIgnoreFileUnread(t *testing.T) {
+	var b bytes.Buffer
+	zw := zip.NewWriter(&b)
+	for _, e := range []struct {
+		name, data string
+		mode       fs.FileMode
+	}{
+		{"repo-main/.gitignore", "*.txt", fs.ModeSymlink | 0o777},
+		{"repo-main/a.txt", "a", 0o644},
+	} {
+		h := &zip.FileHeader{Name: e.name, Method: zip.Store}
+		h.SetMode(e.mode)
+		w, err := zw.CreateHeader(h)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Write([]byte(e.data))
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "repo.zip")
+	if err := os.WriteFile(path, b.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	w := walker.New(walker.Options{IgnoreEnabled: true, RepoRoot: true})
+	files, _, err := ExpandRepoArchive(context.Background(), path, ArchiveOptions{Display: "r", Origin: path, Walker: w})
+	if err != nil || len(filePaths(files)) != 1 || files[0].Path != "r/a.txt" {
+		t.Errorf("files %v, %v; want r/a.txt", filePaths(files), err)
 	}
 }
 

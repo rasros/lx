@@ -1,0 +1,12 @@
+--- STDOUT ---
+[1/8] d1/d2/low.zip/deep/src/a.go (1 rows)
+[2/8] d1/d2/low.zip/notes.txt (1 rows)
+[3/8] d1/d2/low.zip/src/b.txt (1 rows)
+[4/8] d1/mid.zip/deep/src/a.go (1 rows)
+[5/8] d1/mid.zip/notes.txt (1 rows)
+[6/8] top.zip/notes.txt (1 rows)
+[7/8] top.zip/src/a.go (1 rows)
+[8/8] top.zip/src/b.txt (1 rows)
+
+
+--- STDERR ---

@@ -345,8 +345,15 @@ prefix for entries inside it (e.g. archive.zip/hello.txt).
 Include (-i) and exclude (-e) globs match an archive being expanded as a
 directory and its entries as the paths below it, whether it is found in a
 walk or named: -i "pkg/a.zip/src/**" keeps the entries of pkg/a.zip below
-src/. The entries of an archive URL are below the URL.
-Hidden entry filtering (leading dot) is also respected.
+src/. The entries of an archive URL are below the URL. Hidden entries
+(leading dot) are skipped as hidden files are, unless -H. Ignore files
+inside an archive are not read.
+
+A repository URL (github.com/owner/repo, expanded without -Z) is read as a
+checkout instead: its files are shown below the URL without the directory
+the host wraps them in, its ignore files apply, and the globs match the
+files from the repository's root, so -e "docs/**" drops its docs/. Unlike
+a checkout, it leaves out symbolic links.
 
 Supported formats:
   ZIP-based:
@@ -357,7 +364,9 @@ Supported formats:
     .tgz, .tbz2, .txz
   Other multi-file archives:
     .rar, .7z
-  Single-file compression (exposed as one virtual entry):
+  Single-file compression (one entry, named without the suffix, so
+  notes.txt.gz holds notes.txt.gz/notes.txt, which -i "*.txt" keeps and
+  -i "*.gz" does not; -i "**/*.gz/*" keeps the content of every .gz):
     .gz, .bz2, .xz, .zst, .br, .lz4, .sz, .s2, .lz`,
 	},
 	{

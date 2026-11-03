@@ -201,7 +201,7 @@ func TestRun_ShortRepoURL_AutoExpand(t *testing.T) {
 	if want := "/owner/repo/archive/HEAD.zip"; gotPath != want {
 		t.Fatalf("server got path %q, want %q", gotPath, want)
 	}
-	if !strings.Contains(out, "/repo-main/README.md") {
+	if !strings.Contains(out, short+"/README.md (") {
 		t.Fatalf("output missing expanded archive entry. Got:\n%s", out)
 	}
 	if !strings.Contains(out, "hello archive") {

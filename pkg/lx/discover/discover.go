@@ -25,8 +25,10 @@ type Options struct {
 	// the front of an absolute one. An archive being expanded is matched as
 	// a directory, and its entries as the paths below it, so
 	// "pkg/a.zip/src/*.go" names entries of pkg/a.zip; the entries of a URL
-	// archive are below the URL. A named target is never filtered by them,
-	// nor by anything but OutPath.
+	// archive are below the URL. The files of a repository URL are matched
+	// from the repository's root, as in a checkout of it, without the
+	// directory its host's archive wraps them in. A named target is never
+	// filtered by them, nor by anything but OutPath.
 	Globs []walker.Override
 
 	// IgnoreRules apply everywhere, below every ignore file, and GitExcludes,
@@ -116,14 +118,12 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
-	forceExpand := false
-	if rewritten, ok := sources.RewriteRepoURL(target); ok {
-		c.log.Debug("Rewrote repo URL to archive", "from", target, "to", rewritten)
-		target = rewritten
-		forceExpand = true
+	if archiveURL, ok := sources.RewriteRepoURL(target); ok {
+		c.log.Debug("Rewrote repo URL to archive", "from", target, "to", archiveURL)
+		return c.collectRepo(ctx, target, archiveURL, opts)
 	}
 	if sources.IsHTTPURL(target) {
-		return c.collectURL(ctx, target, opts, forceExpand)
+		return c.collectURL(ctx, target, opts)
 	}
 
 	if opts.Piped {
@@ -191,19 +191,10 @@ func readIgnorePatterns(log *slog.Logger, p string) []string {
 }
 
 // collectURL fetches a named URL. Like a named path it is never filtered
-// itself; an archive's entries are.
-func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options, forceExpand bool) ([]sources.InputFile, []core.Failure, error) {
-	if (opts.ExpandArchives || forceExpand) && sources.IsHTTPArchiveURL(rawURL) {
-		tempPath, cleanup, err := sources.DownloadURLToTempFile(ctx, rawURL, opts.TempDir)
-		if err != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return nil, nil, ctxErr
-			}
-			return nil, urlFailure(&URLError{URL: rawURL, Download: true, Err: err}), nil
-		}
-		// Expansion reads the entries into memory.
-		defer cleanup()
-		return c.expandArchive(ctx, tempPath, rawURL, rawURL, opts, strings.TrimSuffix(rawURL, "/")+"/", "Ignored in URL archive")
+// itself; an archive's entries are, as the paths below the URL.
+func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options) ([]sources.InputFile, []core.Failure, error) {
+	if opts.ExpandArchives && sources.IsHTTPArchiveURL(rawURL) {
+		return c.downloadArchive(ctx, rawURL, archiveSource{display: rawURL, ovPrefix: strings.TrimSuffix(rawURL, "/") + "/", named: true}, opts)
 	}
 
 	urlFile, err := sources.NewURLInputFile(rawURL)
@@ -216,6 +207,33 @@ func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options,
 
 func urlFailure(err *URLError) []core.Failure {
 	return []core.Failure{{Kind: core.FailedURL, Path: err.URL, Display: err.URL, Err: err}}
+}
+
+// collectRepo collects the files of the repository a repository URL, repo,
+// names, from its host's archive at archiveURL, as from a checkout of it.
+// They are displayed below repo as written. The globs match them from the
+// repository's root: the host's archive and the directory it wraps the
+// files in are how the files are fetched, not paths anyone names, and repo
+// has no place below the working directory that globs could name it by.
+// The repository's ignore files apply at every depth, with opts' ignore
+// rules and, the root being a repository's, its global git excludes.
+func (c *Collector) collectRepo(ctx context.Context, repo, archiveURL string, opts Options) ([]sources.InputFile, []core.Failure, error) {
+	return c.downloadArchive(ctx, archiveURL, archiveSource{display: strings.TrimSuffix(repo, "/"), repo: true, named: true}, opts)
+}
+
+// downloadArchive expands the archive at rawURL as src describes it.
+func (c *Collector) downloadArchive(ctx context.Context, rawURL string, src archiveSource, opts Options) ([]sources.InputFile, []core.Failure, error) {
+	tempPath, cleanup, err := sources.DownloadURLToTempFile(ctx, rawURL, opts.TempDir)
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, nil, ctxErr
+		}
+		return nil, urlFailure(&URLError{URL: rawURL, Download: true, Err: err}), nil
+	}
+	// Expansion reads the entries into memory.
+	defer cleanup()
+	src.origin = rawURL
+	return c.expandArchive(ctx, tempPath, src, opts, "Ignored in URL archive")
 }
 
 // root is a local target: the filesystem its files are opened in and how
@@ -333,7 +351,7 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 			if r.isDir {
 				rel = path
 			}
-			entries, entryFailures, err := c.expandArchive(ctx, r.abs(path), r.abs(path), display, opts, anchor.Path(rel)+"/", "Ignored in archive")
+			entries, entryFailures, err := c.expandArchive(ctx, r.abs(path), archiveSource{origin: r.abs(path), display: display, ovPrefix: anchor.Path(rel) + "/", named: !r.isDir}, opts, "Ignored in archive")
 			files = append(files, entries...)
 			failures = append(failures, entryFailures...)
 			return err
@@ -381,34 +399,58 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 	return files, failures, nil
 }
 
-// expandArchive returns the entries of the archive at absPath, named origin
-// and displayed below displayPath, that opts keep, and the failures of the
-// archive or its entries. The globs match ovPrefix before each entry's path
-// in the archive. Its only error is ctx's.
-func (c *Collector) expandArchive(ctx context.Context, absPath, origin, displayPath string, opts Options, ovPrefix, ignoreMsg string) ([]sources.InputFile, []core.Failure, error) {
+// archiveSource is an archive to expand: its origin, an absolute path or
+// URL, the path its entries are displayed below, and what the globs match
+// before each entry's path. named marks an archive named rather than found
+// in a walk, and repo a repository host's archive of a repository, which
+// is expanded as a checkout.
+type archiveSource struct {
+	origin, display, ovPrefix string
+	named, repo               bool
+}
+
+// expandArchive returns the entries of the archive at absPath, from src,
+// that opts keep, and the failures of the archive or its entries. Its only
+// error is ctx's.
+func (c *Collector) expandArchive(ctx context.Context, absPath string, src archiveSource, opts Options, ignoreMsg string) ([]sources.InputFile, []core.Failure, error) {
+	displayPath := src.display
 	wopts := walker.Options{
 		Overrides:      opts.Globs,
-		OverridePrefix: ovPrefix,
+		OverridePrefix: src.ovPrefix,
 		SkipHidden:     !opts.ShowHidden,
 		Log:            c.log,
+	}
+	if src.repo {
+		wopts.RepoRoot = true
+		wopts.FollowDirSymlinks, wopts.SkipFileSymlinks = opts.FollowDirSymlinks, opts.SkipFileSymlinks
+		if !opts.NoIgnore {
+			wopts.IgnoreEnabled = true
+			wopts.Base, wopts.GitExcludes = opts.IgnoreRules, opts.GitExcludes
+		}
 	}
 	if c.debugEnabled(ctx) {
 		wopts.OnIgnore = func(p, reason string) {
 			c.log.Debug(ignoreMsg, "path", displayPath+"/"+p, "reason", reason)
 		}
 	}
-	files, failures, err := sources.ExpandArchive(ctx, absPath, sources.ArchiveOptions{
+	aopts := sources.ArchiveOptions{
 		Display: displayPath,
-		Origin:  origin,
+		Origin:  src.origin,
 		Walker:  walker.New(wopts),
 		MaxSize: opts.MaxSize,
+		Named:   src.named,
 		Log:     c.log,
-	})
+	}
+	expand := sources.ExpandArchive
+	if src.repo {
+		expand = sources.ExpandRepoArchive
+	}
+	files, failures, err := expand(ctx, absPath, aopts)
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return nil, nil, ctxErr
 	}
 	if err != nil {
-		failures = append(failures, core.Failure{Kind: core.FailedArchive, Path: origin, Display: displayPath, Err: err})
+		failures = append(failures, core.Failure{Kind: core.FailedArchive, Path: src.origin, Display: displayPath, Err: err})
 	}
 	return files, failures, nil
 }

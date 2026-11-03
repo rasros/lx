@@ -1,0 +1,6 @@
+--- STDOUT ---
+[1/2] HOST/owner/repo/README.md (1 rows)
+[2/2] HOST/owner/repo/docs/guide.md (1 rows)
+
+
+--- STDERR ---

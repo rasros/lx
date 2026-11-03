@@ -43,7 +43,11 @@ type Options struct {
 	// IgnoreEnabled reads .ignore and .lxignore files and, inside a git
 	// repository, .gitignore files and the repository's info/exclude.
 	IgnoreEnabled bool
-	SkipHidden    bool
+	// RepoRoot has Walk treat the root of the walked fs.FS as the root of
+	// a git repository without its .git, such as a repository host's
+	// archive of one: .gitignore files and GitExcludes apply below it.
+	RepoRoot   bool
+	SkipHidden bool
 	// FollowDirSymlinks descends into symlinks that resolve to directories.
 	// SkipFileSymlinks drops symlinks that resolve to files.
 	FollowDirSymlinks bool

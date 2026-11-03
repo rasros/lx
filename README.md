@@ -67,6 +67,11 @@ lx -n 10 github.com/eignex/combo
 lx https://gitlab.com/owner/repo/-/tree/dev
 ```
 
+A repository is read as a checkout of it would be: the files are shown below the URL, its ignore files apply, and -i/-e
+match the files from the repository's root. The one difference is that symbolic links are left out. One set of globs
+applies to every path in a section, so give each repository its own with -s:
+`lx -i 'internal/cli/*.go' -e '*_test.go' github.com/rasros/lx -s Combo -i 'docs/**' github.com/eignex/combo`.
+
 Three flags reach into files that would otherwise be skipped:
 
 ```bash

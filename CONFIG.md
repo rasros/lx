@@ -128,7 +128,7 @@ FileContext is bound to the six file templates (`file_content_template`, `file_e
 | `Path`             | string         | Display path (relative when possible).             |
 | `AbsPath`          | string         | Absolute path on disk, the URL fetched, or `stdin`. Empty for an archive entry. |
 | `Archive`          | string         | For an archive entry, the archive's absolute path, or its URL when downloaded. |
-| `Entry`            | string         | For an archive entry, its path inside the archive. |
+| `Entry`            | string         | For an archive entry, its path inside the archive, with the directory a repository host wraps a repository's files in. The content of a single compressed file has the name shown for it: `notes.txt` for `notes.txt.gz`. |
 | `Size`             | int64          | Bytes as rendered. Pair with `humanize`.           |
 | `OriginalSize`     | int64          | Bytes on disk, before any conversion.              |
 | `ModTime`          | time.Time      | Pair with `date "2006-01-02"`.                     |

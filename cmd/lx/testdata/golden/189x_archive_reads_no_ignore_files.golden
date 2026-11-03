@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/11] repo.zip/repo-main/LICENSE (1 rows)
+[2/11] repo.zip/repo-main/README.md (1 rows)
+[3/11] repo.zip/repo-main/app.log (1 rows)
+[4/11] repo.zip/repo-main/build/out.txt (1 rows)
+[5/11] repo.zip/repo-main/docs/deep/more.md (1 rows)
+[6/11] repo.zip/repo-main/docs/deep/scratch.tmp (1 rows)
+[7/11] repo.zip/repo-main/docs/drafts/wip.md (1 rows)
+[8/11] repo.zip/repo-main/docs/guide.md (1 rows)
+[9/11] repo.zip/repo-main/internal/cli/app.go (1 rows)
+[10/11] repo.zip/repo-main/internal/cli/app_test.go (1 rows)
+[11/11] repo.zip/repo-main/internal/other/o.go (1 rows)
+
+
+--- STDERR ---

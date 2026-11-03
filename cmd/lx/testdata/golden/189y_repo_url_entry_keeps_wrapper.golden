@@ -1,0 +1,6 @@
+--- STDOUT ---
+HOST/owner/repo/docs/guide.md abs=[] archive=[http://HOST/repo.zip] entry=[repo-main/docs/guide.md]
+
+
+
+--- STDERR ---
