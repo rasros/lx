@@ -14,19 +14,9 @@ import (
 func TestGoldenStreams(t *testing.T) {
 	dir := t.TempDir()
 
-	fifo := filepath.Join(dir, "in.fifo")
-	if err := syscall.Mkfifo(fifo, 0o644); err != nil {
-		t.Skip("fifos unsupported:", err)
-	}
-	go func() {
-		// Opening the write end waits for the run to open the read end.
-		w, err := os.OpenFile(fifo, os.O_WRONLY, 0)
-		if err != nil {
-			return
-		}
-		defer w.Close()
-		_, _ = w.Write([]byte("from a fifo\nsecond line\n"))
-	}()
+	fifo(t, dir, "in.fifo", "from a fifo\nsecond line\n")
+	fifo(t, dir, "over.fifo", "0123456789abcdefghij\n")
+	fifo(t, dir, "at.fifo", "012345678\n")
 
 	// The pipe is written and closed before the run, as seq would have; its
 	// read end stays open in this process, which is what /dev/fd names.
@@ -47,5 +37,26 @@ func TestGoldenStreams(t *testing.T) {
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "975_stream_fifo_with_writer", args: []string{"in.fifo"}},
 		{name: "976_stream_process_substitution", args: []string{"procsub"}},
+		{name: "977_stream_over_max_size_fails", args: []string{"-m", "10", "over.fifo"}},
+		{name: "978_stream_at_max_size_renders", args: []string{"-m", "10", "at.fifo"}},
+		{name: "979_stream_endless_device_fails", args: []string{"/dev/zero"}},
 	})
+}
+
+// fifo makes a FIFO in dir whose writer writes body once a reader opens it.
+func fifo(t *testing.T, dir, name, body string) {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := syscall.Mkfifo(path, 0o644); err != nil {
+		t.Skip("fifos unsupported:", err)
+	}
+	go func() {
+		// Opening the write end waits for the run to open the read end.
+		w, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			return
+		}
+		defer w.Close()
+		_, _ = w.Write([]byte(body))
+	}()
 }

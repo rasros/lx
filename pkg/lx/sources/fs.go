@@ -43,16 +43,15 @@ func newByteReaderReadCloser(data []byte) io.ReadCloser {
 // stated size, zero, says nothing of their content.
 const irregular = fs.ModeNamedPipe | fs.ModeSocket | fs.ModeDevice
 
-// maxStreamSize bounds how much of an irregular file is read: a device such
-// as /dev/zero never ends.
-const maxStreamSize = 64 << 20
+// DefaultStreamLimit is how much of a Stream is read when nothing sets its
+// limit: a device such as /dev/zero never ends.
+const DefaultStreamLimit = 64 << 20
 
 // NewInputFile returns the file at path in fsys. An irregular file, such as a
-// FIFO, a device or a process substitution's /dev/fd entry, is read as a
-// stream when it is opened, up to maxStreamSize, and both the open and the
-// read stop when ctx is done. An open of a FIFO that no writer ever opens
-// cannot itself be stopped: its goroutine and OS thread stay blocked for the
-// life of the process.
+// FIFO, a device or a process substitution's /dev/fd entry, opens as a Stream,
+// and both its open and its reads stop when ctx is done. An open of a FIFO that
+// no writer ever opens cannot itself be stopped: its goroutine and OS thread
+// stay blocked for the life of the process.
 func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	open := func(context.Context) (io.ReadCloser, error) { return fsys.Open(path) }
 	if info.Mode()&irregular != 0 {
@@ -67,29 +66,95 @@ func NewInputFile(fsys fs.FS, path string, info fs.FileInfo) InputFile {
 	}
 }
 
-// openStream reads an irregular file whole, through Read, since it cannot be
-// read at offsets. Once ctx is done the file is closed under the read, which
-// for an OS pipe or device ends a read in progress.
-func openStream(ctx context.Context, fsys fs.FS, path string) (io.ReadCloser, error) {
+func openStream(ctx context.Context, fsys fs.FS, path string) (*Stream, error) {
 	f, err := openUntilDone(ctx, func() (fs.File, error) { return fsys.Open(path) })
 	if err != nil {
 		return nil, err
 	}
-	stop := context.AfterFunc(ctx, func() { _ = f.Close() })
-	data, err := io.ReadAll(io.LimitReader(f, maxStreamSize+1))
-	if stop() {
-		_ = f.Close()
+	return &Stream{
+		ctx:   ctx,
+		f:     f,
+		stop:  context.AfterFunc(ctx, func() { _ = f.Close() }),
+		limit: DefaultStreamLimit,
+	}, nil
+}
+
+// Stream is an opened input that has no size, reads only forward and may
+// never end, such as a FIFO or a device. It reads up to a limit, and fails
+// with a *StreamLimitError past it. Once ctx is done the file is closed under
+// its read, which for an OS pipe or device ends a read in progress, and the
+// read fails with ctx's error.
+type Stream struct {
+	ctx      context.Context
+	f        fs.File
+	stop     func() bool
+	limit    int64
+	limitSet bool
+	n        int64
+	err      error
+}
+
+// SetLimit sets how many bytes the stream reads, in place of
+// DefaultStreamLimit, before any is read.
+func (s *Stream) SetLimit(n int64) {
+	s.limit, s.limitSet = n, true
+}
+
+// Err returns the *StreamLimitError of a stream that went past its limit.
+func (s *Stream) Err() error { return s.err }
+
+func (s *Stream) Read(p []byte) (int, error) {
+	if s.err != nil {
+		return 0, s.err
 	}
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return nil, ctxErr
+	if s.n >= s.limit {
+		// One byte more tells a stream that ended at the limit from one
+		// that goes on past it.
+		var one [1]byte
+		n, err := s.f.Read(one[:])
+		if n > 0 {
+			s.err = &StreamLimitError{Limit: s.limit, Default: !s.limitSet}
+			return 0, s.err
+		}
+		return 0, s.cause(err)
 	}
+	if rest := s.limit - s.n; int64(len(p)) > rest {
+		p = p[:rest]
+	}
+	n, err := s.f.Read(p)
+	s.n += int64(n)
+	return n, s.cause(err)
+}
+
+func (s *Stream) cause(err error) error {
 	if err != nil {
-		return nil, err
+		if ctxErr := s.ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 	}
-	if len(data) > maxStreamSize {
-		return nil, fmt.Errorf("stopped reading after %d MiB: the stream may not end", maxStreamSize>>20)
+	return err
+}
+
+func (s *Stream) Close() error {
+	if !s.stop() {
+		// ctx closed it already.
+		return nil
 	}
-	return newByteReaderReadCloser(data), nil
+	return s.f.Close()
+}
+
+// StreamLimitError is a Stream that went on past its limit.
+type StreamLimitError struct {
+	Limit int64
+	// Default is whether the limit is DefaultStreamLimit, which nothing set.
+	Default bool
+}
+
+func (e *StreamLimitError) Error() string {
+	if e.Default {
+		return fmt.Sprintf("stopped reading after %d bytes, the default limit for a stream (-m sets another)", e.Limit)
+	}
+	return fmt.Sprintf("stopped reading after %d bytes, the size limit (-m)", e.Limit)
 }
 
 // openUntilDone returns what open returns, or ctx's error once ctx is done.
