@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
 
 	"github.com/atotto/clipboard"
 	"github.com/rasros/lx/internal/ansi"
@@ -56,12 +55,7 @@ func (e ExitError) Error() string { return fmt.Sprintf("exit status %d", e.Code)
 func (e Env) getenv(key string) string { return e.LookupEnv.Get(key) }
 
 // abs returns p as an absolute path, resolved against the working directory.
-func (e Env) abs(p string) string {
-	if filepath.IsAbs(p) {
-		return filepath.Clean(p)
-	}
-	return filepath.Join(e.Cwd, p)
-}
+func (e Env) abs(p string) string { return osenv.Abs(e.Cwd, p) }
 
 // The file operations below resolve name against the working directory and,
 // as the os functions given name would, report errors with name as given.

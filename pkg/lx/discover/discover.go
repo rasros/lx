@@ -89,14 +89,6 @@ type cwdHost struct {
 
 func (h cwdHost) Getwd() (string, error) { return h.wd, nil }
 
-// abs returns p as an absolute path, resolved against the working directory.
-func (c *Collector) abs(p string) string {
-	if filepath.IsAbs(p) {
-		return filepath.Clean(p)
-	}
-	return filepath.Join(c.cwd, p)
-}
-
 // Collect returns the inputs target refers to: a file, every file below a
 // directory, the entries of an archive, or a URL. As in ripgrep, a named
 // target is never filtered itself, only the files below it. Unreadable
@@ -118,7 +110,7 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 		// A piped path stands for a walked path, which is always clean.
 		target = filepath.Clean(target)
 	}
-	absPath := c.abs(target)
+	absPath := osenv.Abs(c.cwd, target)
 	stat, err := os.Stat(absPath)
 	w := c.walker(ctx, opts)
 	if opts.Piped && !w.Accepts(target, err == nil && (stat.IsDir() || expands(opts, target))) {
@@ -431,7 +423,7 @@ func (c *Collector) isOutput(path, outPath string) bool {
 	if outPath == "" {
 		return false
 	}
-	if c.abs(path) == outPath {
+	if osenv.Abs(c.cwd, path) == outPath {
 		c.log.Warn("Skipping output file to avoid infinite recursion", "path", path)
 		return true
 	}
