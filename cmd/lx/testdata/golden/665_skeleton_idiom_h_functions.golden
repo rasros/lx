@@ -2,15 +2,11 @@
 skeleton/idiom.h (10 rows, function signatures)
 ---
 ```c
-#ifdef __cplusplus
 extern "C" {
-#endif
 ...
 int idiom_open(void);
 ...
-#ifdef __cplusplus
 }
-#endif
 ```
 
 

@@ -72,16 +72,40 @@ func (p parsed) walk(src []byte, lines [][]byte, functions, structs bool) []inte
 		Structs:   structs,
 	}
 	var out []internal.LineRange
-	root := p.tree.RootNode()
-	for i := 0; i < root.ChildCount(); i++ {
-		out = p.def.processNode(c, out, root.Child(i))
+	top := p.tree.RootNode()
+	if p.def.conditionals {
+		// An include guard says nothing about what it holds: its
+		// declarations are walked as top-level ones.
+		if guard := includeGuard(c, top); guard != nil {
+			top = guard
+		}
+	}
+	for i := 0; i < top.ChildCount(); i++ {
+		out = p.def.processNode(c, out, top.Child(i))
 	}
 	if p.def.conditionals {
-		hidden, trailing := p.comments(lines)
-		out = langs.BalanceConditionals(lines, out, hidden)
-		out = cutTrailingComments(internal.MergeRanges(out), trailing)
+		out = cutTrailingComments(internal.MergeRanges(out), p.trailingComments(lines))
 	}
 	return out
+}
+
+// includeGuard returns the conditional that holds all of root but its
+// comments and directives such as #pragma once, or nil.
+func includeGuard(c *langs.Ctx, root *gotreesitter.Node) *gotreesitter.Node {
+	var guard *gotreesitter.Node
+	for i := 0; i < root.ChildCount(); i++ {
+		switch n := root.Child(i); c.Type(n) {
+		case "comment", "preproc_call":
+		case "preproc_if", "preproc_ifdef":
+			if guard != nil {
+				return nil
+			}
+			guard = n
+		default:
+			return nil
+		}
+	}
+	return guard
 }
 
 // cutTrailingComments cuts a range's last row before a multi-row comment
@@ -95,25 +119,19 @@ func cutTrailingComments(ranges []internal.LineRange, trailing map[int]int) []in
 	return ranges
 }
 
-// comments reports the continuation rows of multi-row comments and raw
-// strings, where a directive-like line is none, and, by row, the column
-// where a multi-row comment starts after code.
-func (p parsed) comments(lines [][]byte) (hidden []bool, trailing map[int]int) {
-	hidden = make([]bool, len(lines))
-	trailing = make(map[int]int)
+// trailingComments reports, by row, the column where a multi-row comment
+// starts after code.
+func (p parsed) trailingComments(lines [][]byte) map[int]int {
+	trailing := make(map[int]int)
 	var walk func(n *gotreesitter.Node)
 	walk = func(n *gotreesitter.Node) {
 		first, last := int(n.StartPoint().Row), int(n.EndPoint().Row)
 		if first == last {
 			return
 		}
-		switch t := n.Type(p.lang); t {
-		case "comment", "raw_string_literal":
-			for row := first + 1; row <= last && row < len(hidden); row++ {
-				hidden[row] = true
-			}
-			if t == "comment" && first < len(lines) {
-				col := int(n.StartPoint().Column)
+		if n.Type(p.lang) == "comment" {
+			col := int(n.StartPoint().Column)
+			if first < len(lines) {
 				if code := bytes.TrimRight(lines[first][:min(col, len(lines[first]))], " \t"); len(bytes.TrimSpace(code)) > 0 {
 					trailing[first] = len(code)
 				}
@@ -125,7 +143,7 @@ func (p parsed) comments(lines [][]byte) (hidden []bool, trailing map[int]int) {
 		}
 	}
 	walk(p.tree.RootNode())
-	return hidden, trailing
+	return trailing
 }
 
 func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*gotreesitter.ParserPool, *gotreesitter.Language) {
@@ -154,13 +172,12 @@ func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*got
 func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *gotreesitter.Node) []internal.LineRange {
 	nodeType := c.Type(node)
 
-	if def.recoverErrors {
-		switch {
-		case node.IsError() || hidden(c.Lang, node):
-			return def.processError(c, out, node)
-		case langs.Misrecovered(c, node):
-			return out
-		}
+	if def.recoverErrors && (node.IsError() || hidden(c.Lang, node)) {
+		return def.processError(c, out, node)
+	}
+
+	if def.conditionals && slices.Contains(preprocGroups, nodeType) {
+		return def.processConditional(c, out, node)
 	}
 
 	if slices.Contains(def.iterateChildren, nodeType) {
@@ -236,6 +253,30 @@ func (def *langDef) processNamespace(c *langs.Ctx, out []internal.LineRange, n, 
 		out = internal.KeepLine(out, c.Lines, closingRow)
 	}
 	return out
+}
+
+// processConditional walks the declarations in the preprocessor conditional
+// n (#if, #ifdef, #elif or #else) like top-level ones. Its first row and the
+// row of its #endif are kept around them when any of them keeps something.
+func (def *langDef) processConditional(c *langs.Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
+	var inner []internal.LineRange
+	for i := 0; i < n.ChildCount(); i++ {
+		inner = def.processNode(c, inner, n.Child(i))
+	}
+	if len(inner) == 0 {
+		return out
+	}
+	first, condEnd := int(n.StartPoint().Row), int(n.StartPoint().Row)
+	if cond := n.ChildByFieldName("condition", c.Lang); cond != nil {
+		condEnd = int(cond.EndPoint().Row) // a condition continued with `\`
+	}
+	out = internal.KeepLines(out, c.Lines, first, condEnd)
+	if k := n.ChildCount(); k > 0 && !n.Child(k-1).IsNamed() {
+		if last := int(n.Child(k - 1).StartPoint().Row); last > first {
+			out = internal.KeepLine(out, c.Lines, last)
+		}
+	}
+	return append(out, inner...)
 }
 
 // processError walks the children of an error node, or of a node the

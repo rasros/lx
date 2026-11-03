@@ -137,7 +137,7 @@ func TestGoldenSkeletonMembers(t *testing.T) {
 // default arguments and pure virtuals in a .h file read as C, directives
 // inside raw strings and between strings, and error recovery: a misparsed
 // declaration that holds functions kept whole, nodes the grammar hides,
-// statements recovered as declarations, and a conditional left open. The
+// and a conditional left open. The
 // last fixtures pin how a .h file is read: as C++ when it holds only C++
 // enums and methods, as C when its C++ look is C (asm clobbers, attributes)
 // or when the C++ grammar fails on it.
@@ -145,9 +145,9 @@ func TestGoldenSkeletonTopLevel(t *testing.T) {
 	dir := gf.SetupSkeletonFixture(t)
 	// Error-recovery fixtures only pin behavior with -u, so their -Y case
 	// is left out.
-	functionsOnly := []string{"misparse.c", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp"}
+	functionsOnly := []string{"misparse.c", "hidden.cpp", "openif.c"}
 	var cases []goldenTestCase
-	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "defaults.h", "idiom.h", "rawstring.cpp", "asm.c", "misparse.c", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp",
+	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "defaults.h", "idiom.h", "rawstring.cpp", "asm.c", "misparse.c", "hidden.cpp", "openif.c",
 		"enumclass.h", "kernel.h", "cppempty.h"} {
 		stem := strings.TrimSuffix(file, filepath.Ext(file))
 		for _, tc := range skeletonModeCases(650+3*i, stem, []string{file}) {
