@@ -1,0 +1,10 @@
+--- STDOUT ---
+in.fifo (2 rows)
+---
+```
+from a fifo
+second line
+```
+
+
+--- STDERR ---

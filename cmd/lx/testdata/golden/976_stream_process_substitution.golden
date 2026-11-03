@@ -1,0 +1,11 @@
+--- STDOUT ---
+procsub (3 rows)
+---
+```
+1
+2
+3
+```
+
+
+--- STDERR ---
