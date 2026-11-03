@@ -8,7 +8,7 @@ import (
 )
 
 func TestGoldenAncestorIgnore(t *testing.T) {
-	dir := setupAncestorIgnoreFixture(t)
+	dir := gf.SetupAncestorIgnoreFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "104_ancestor_ignore_subdir", args: []string{"sub"}},
 		{name: "105_ancestor_ignore_explicit_dir", args: []string{"dist"}},
@@ -26,14 +26,14 @@ func TestGoldenAncestorIgnore(t *testing.T) {
 }
 
 func TestGoldenIgnoredParentDir(t *testing.T) {
-	dir := setupIgnoredParentDirFixture(t)
+	dir := gf.SetupIgnoredParentDirFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "105g_named_file_in_dir_only_ignored_dir", args: []string{"build/out.js"}},
 	})
 }
 
 func TestGoldenAncestorIgnoreFromSubdir(t *testing.T) {
-	dir := setupAncestorIgnoreFixture(t)
+	dir := gf.SetupAncestorIgnoreFixture(t)
 	runTestGolden(t, filepath.Join(dir, "sub"), []goldenTestCase{
 		{name: "106_ancestor_ignore_cwd_subdir", args: []string{"."}},
 		{name: "107_ancestor_ignore_nested_dir", args: []string{"deep"}},
@@ -41,14 +41,14 @@ func TestGoldenAncestorIgnoreFromSubdir(t *testing.T) {
 }
 
 func TestGoldenWorktreeInfoExclude(t *testing.T) {
-	dir := setupWorktreeExcludeFixture(t)
+	dir := gf.SetupWorktreeExcludeFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "109_info_exclude_linked_worktree", args: []string{"."}},
 	}, filepath.Dir(dir))
 }
 
 func TestGoldenStrayGitDir(t *testing.T) {
-	dir := setupStrayGitDirFixture(t)
+	dir := gf.SetupStrayGitDirFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "109b_stray_git_dirs_keep_repo_rules", args: []string{"."}},
 	})
@@ -59,7 +59,7 @@ func TestGoldenStrayGitDir(t *testing.T) {
 // directory, relative to the root, by an absolute path or by a ../ path from
 // a subdirectory, still includes it, since a named path is never filtered.
 func TestGoldenNegatedIgnoredDir(t *testing.T) {
-	dir := setupNegatedIgnoredDirFixture(t)
+	dir := gf.SetupNegatedIgnoredDirFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "109d_negated_ignored_dir_walk", args: []string{"."}},
 		{name: "109e_negated_ignored_dir_named_file", args: []string{"build/keep.js", "build/out.js"}},
@@ -70,7 +70,7 @@ func TestGoldenNegatedIgnoredDir(t *testing.T) {
 }
 
 func TestGoldenNegatedIgnoredDirFromSubdir(t *testing.T) {
-	dir := setupNegatedIgnoredDirFixture(t)
+	dir := gf.SetupNegatedIgnoredDirFixture(t)
 	runTestGolden(t, filepath.Join(dir, "x"), []goldenTestCase{
 		{name: "109g_negated_ignored_dir_parent_walk", args: []string{".."}},
 		{name: "109h_negated_ignored_dir_parent_relative_file", args: []string{"../build/keep.js", "../build/out.js"}},
@@ -162,7 +162,7 @@ func TestGoldenIgnoreSyntax(t *testing.T) {
 }
 
 func TestGoldenStrayGitDirAbove(t *testing.T) {
-	dir := setupStrayGitDirAboveFixture(t)
+	dir := gf.SetupStrayGitDirAboveFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "109c_stray_git_dir_above_is_not_a_repo", args: []string{"."}},
 	}, filepath.Dir(dir))

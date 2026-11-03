@@ -1,8 +1,6 @@
 package main
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -103,11 +101,10 @@ func TestGoldenGlobClasses(t *testing.T) {
 // and all, so a glob spelling out an entry's displayed path keeps it.
 func TestGoldenGlobsURLArchive(t *testing.T) {
 	dir := gf.SetupGlobsFixture(t)
-	server := httptest.NewServer(http.FileServer(http.Dir(filepath.Join(dir, "arch"))))
-	t.Cleanup(server.Close)
+	url, _ := fileServer(t, filepath.Join(dir, "arch"))
 	runTestGolden(t, dir, []goldenTestCase{
-		{name: "933_glob_url_archive_entries", args: []string{"-n0", "-Z", "-i", server.URL + "/a.zip/src/*.go", "-i", "notes.txt", server.URL + "/a.zip"}},
-	}, server.URL)
+		{name: "933_glob_url_archive_entries", args: []string{"-n0", "-Z", "-i", url + "/a.zip/src/*.go", "-i", "notes.txt", url + "/a.zip"}},
+	}, url)
 }
 
 // Below the working directory, a relative root keeps its path as written,
@@ -116,7 +113,6 @@ func TestGoldenGlobsURLArchive(t *testing.T) {
 // paths below it.
 func TestGoldenGlobsOutsideCwd(t *testing.T) {
 	dir := gf.SetupGlobsFixture(t)
-	canonical, _ := filepath.EvalSymlinks(dir)
 	runGoldenTests(t, []goldenTestCase{
 		{name: "940_glob_parent_root_as_written", args: []string{"-n0", "-i", "../build/*.js", ".."}},
 		{name: "941_glob_parent_root_misses_cwd_glob", args: []string{"-n0", "-i", "build/*.js", "-i", "../a.go", ".."}},
@@ -128,5 +124,5 @@ func TestGoldenGlobsOutsideCwd(t *testing.T) {
 		// working directory paths are matched relative to it.
 		{name: "945_glob_stdin_absolute_dir_above_cwd", args: []string{"-n0", "-i", "sub/*", "-i", "/x.js"}, stdin: dir},
 		{name: "946_glob_stdin_absolute_path_parents_not_judged", args: []string{"-n0", "-e", "ovr", "-e", "drop.js"}, stdin: filepath.Join(dir, "ovr", "keep.js") + "\n" + filepath.Join(dir, "ovr", "drop.js")},
-	}, goldenRun{cwd: filepath.Join(dir, "build"), scrub: []string{dir, canonical}})
+	}, goldenRun{cwd: filepath.Join(dir, "build"), scrub: scrubDir(dir)})
 }

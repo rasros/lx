@@ -9,13 +9,15 @@ import (
 
 	"github.com/rasros/lx/internal/cli"
 	"github.com/rasros/lx/pkg/lx"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
 )
 
 // The library flow in the package documentation renders a directory exactly
 // as lx <dir> does, ancestor ignore rules included.
 func TestLibraryMatchesCLI(t *testing.T) {
 	t.Parallel()
-	dir := setupAncestorIgnoreFixture(t)
+	dir := gf.SetupAncestorIgnoreFixture(t)
 	cwd := filepath.Join(dir, "sub")
 	lookupEnv := hermeticEnv(t, nil)
 	ctx := context.Background()

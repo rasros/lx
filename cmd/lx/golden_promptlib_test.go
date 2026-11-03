@@ -3,10 +3,12 @@ package main
 import (
 	"path/filepath"
 	"testing"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
 )
 
 func TestGoldenPromptLib(t *testing.T) {
-	dir := setupPromptLibFixture(t)
+	dir := gf.SetupPromptLibFixture(t)
 	runTestGoldenEnv(t, dir, map[string]string{"LX_PROMPTS_DIR": filepath.Join(dir, "prompts")}, []goldenTestCase{
 		{name: "800_promptlib_nested", args: []string{"-P", "go/test", "main.go"}},
 		{name: "801_promptlib_basename", args: []string{"-P", "refactor", "main.go"}},

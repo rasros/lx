@@ -2,10 +2,12 @@ package main
 
 import (
 	"testing"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
 )
 
 func TestGoldenSystemContext(t *testing.T) {
-	dir := setupSectionsFixture(t)
+	dir := gf.SetupSectionsFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "160_system_context_only", args: []string{"--system-context"}},
 		{name: "161_system_context_before_files", args: []string{"--system-context", "main.go"}},

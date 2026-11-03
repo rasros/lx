@@ -9,10 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
 )
 
 func TestGoldenWalk(t *testing.T) {
-	dir := setupWalkFixture(t)
+	dir := gf.SetupWalkFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "001_walk_default", args: []string{"."}},
 		{name: "002_walk_compact", args: []string{"-n0", "."}},
@@ -25,7 +27,7 @@ func TestGoldenWalk(t *testing.T) {
 }
 
 func TestGoldenFormatting(t *testing.T) {
-	dir := setupFormattingFixture(t)
+	dir := gf.SetupFormattingFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "010_fmt_xml", args: []string{"--xml", "."}},
 		{name: "011_fmt_html", args: []string{"--html", "main.go", "README.md"}},
@@ -40,7 +42,7 @@ func TestGoldenFormatting(t *testing.T) {
 }
 
 func TestGoldenSections(t *testing.T) {
-	dir := setupSectionsFixture(t)
+	dir := gf.SetupSectionsFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "020_sections_explicit", args: []string{"-s", "Docs", "doc", "-s", "Source", "src"}},
 		{name: "021_prompts_mixed", args: []string{"-p", "Analyze this:", "main.go", "-p", "Determine bug"}},
@@ -52,7 +54,7 @@ func TestGoldenSections(t *testing.T) {
 }
 
 func TestGoldenFiltering(t *testing.T) {
-	dir := setupFilteringFixture(t)
+	dir := gf.SetupFilteringFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "030_include_only_go", args: []string{"-i", "*.go", "."}},
 		{name: "031_exclude_tests", args: []string{"-e", "*_test.go", "."}},
@@ -68,7 +70,7 @@ func TestGoldenFiltering(t *testing.T) {
 }
 
 func TestGoldenSlicing(t *testing.T) {
-	dir := setupSlicingFixture(t)
+	dir := gf.SetupSlicingFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "040_lines_limit", args: []string{"--lines", "4", "."}},
 		{name: "041_line_numbers", args: []string{"-l", "main.go"}},
@@ -89,7 +91,7 @@ func TestGoldenSlicing(t *testing.T) {
 // Row counts and tail line numbers are exact past 32 KB, and CRLF line endings
 // survive in head and tail alike.
 func TestGoldenSlicingLarge(t *testing.T) {
-	dir := setupLargeSlicingFixture(t)
+	dir := gf.SetupLargeSlicingFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "040b_lines_large_line_numbers", args: []string{"--lines", "6", "-l", "big.txt"}},
 		{name: "040c_lines_crlf", args: []string{"--lines", "4", "crlf.txt"}},
@@ -104,7 +106,7 @@ func TestGoldenSlicingLarge(t *testing.T) {
 }
 
 func TestGoldenSymlinks(t *testing.T) {
-	dir := setupSymlinksFixture(t)
+	dir := gf.SetupSymlinksFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "049_symlinks_relative_target", args: []string{"rellinks"}},
 		{name: "050_symlinks_default", args: []string{"links"}},
@@ -121,7 +123,7 @@ func TestGoldenSymlinks(t *testing.T) {
 }
 
 func TestGoldenErrors(t *testing.T) {
-	dir := setupErrorsFixture(t)
+	dir := gf.SetupErrorsFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "060_access_denied_file", args: []string{"secret/locked.txt"}},
 		{name: "061_access_denied_dir", args: []string{"secret/locked_dir"}},
@@ -144,7 +146,7 @@ func TestGoldenErrors(t *testing.T) {
 }
 
 func TestGoldenStats(t *testing.T) {
-	dir := setupStatsFixture(t)
+	dir := gf.SetupStatsFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "070_stats_forced", args: []string{"--stats", "main.go"}},
 		{name: "071_quiet_mode", args: []string{"-q", "main.go"}},
@@ -160,7 +162,7 @@ func TestGoldenStats(t *testing.T) {
 }
 
 func TestGoldenDetection(t *testing.T) {
-	dir := setupDetectionFixture(t)
+	dir := gf.SetupDetectionFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "080_binary_detection", args: []string{"bin/data.bin"}},
 		{name: "081_empty_file", args: []string{"bin/empty.txt"}},
@@ -179,7 +181,7 @@ func TestGoldenDetection(t *testing.T) {
 // The layout properties of a format's profile can be overridden from config,
 // as its templates can.
 func TestGoldenProfileOverrides(t *testing.T) {
-	dir := setupDetectionFixture(t)
+	dir := gf.SetupDetectionFixture(t)
 	// Outside the fixture, so no case renders them.
 	cfgDir := t.TempDir()
 	cfgs := map[string]string{
@@ -210,7 +212,7 @@ func TestGoldenProfileOverrides(t *testing.T) {
 }
 
 func TestGoldenConfig(t *testing.T) {
-	dir := setupConfigFixture(t)
+	dir := gf.SetupConfigFixture(t)
 	copyCfgDir := t.TempDir()
 	copyCfgPath := filepath.Join(copyCfgDir, "copy.yaml")
 	if err := os.WriteFile(copyCfgPath, []byte("output_mode: copy\n"), 0644); err != nil {
@@ -243,7 +245,7 @@ func TestGoldenConfig(t *testing.T) {
 }
 
 func TestGoldenComplex(t *testing.T) {
-	dir := setupComplexFixture(t)
+	dir := gf.SetupComplexFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "100_complex_review_bundle", args: []string{
 			"--xml",
@@ -260,7 +262,7 @@ func TestGoldenComplex(t *testing.T) {
 }
 
 func TestGoldenArchive(t *testing.T) {
-	dir := setupArchiveFixture(t)
+	dir := gf.SetupArchiveFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "110_expand_archive_zip", args: []string{"-Z", "archive.zip"}},
 		{name: "111_expand_archive_no_flag", args: []string{"archive.zip"}},
@@ -281,18 +283,17 @@ func TestGoldenArchive(t *testing.T) {
 }
 
 func TestGoldenDocumentURLMediaType(t *testing.T) {
-	dir := setupDocumentsFixture(t)
-	server := httptest.NewServer(http.FileServer(http.Dir(dir)))
-	t.Cleanup(server.Close)
+	dir := gf.SetupDocumentsFixture(t)
+	url, _ := fileServer(t, dir)
 
 	runTestGolden(t, dir, []goldenTestCase{
-		{name: "139e_url_html_by_media_type", args: []string{"-D", server.URL + "/suffixless"}},
-		{name: "139f_url_html_no_extract_flag", args: []string{server.URL + "/suffixless"}},
-	}, server.URL)
+		{name: "139e_url_html_by_media_type", args: []string{"-D", url + "/suffixless"}},
+		{name: "139f_url_html_no_extract_flag", args: []string{url + "/suffixless"}},
+	}, url)
 }
 
 func TestGoldenDocuments(t *testing.T) {
-	dir := setupDocumentsFixture(t)
+	dir := gf.SetupDocumentsFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "120_docs_pdf_extracted", args: []string{"-D", "sample.pdf"}},
 		{name: "121_docs_docx_extracted", args: []string{"-D", "sample.docx"}},
@@ -321,7 +322,7 @@ func TestGoldenDocuments(t *testing.T) {
 }
 
 func TestGoldenMedia(t *testing.T) {
-	dir := setupMediaFixture(t)
+	dir := gf.SetupMediaFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "140_media_mp4_video_and_audio", args: []string{"-M", "sample.mp4"}},
 		{name: "141_media_mp4_video_only", args: []string{"-M", "silent.mp4"}},
@@ -361,7 +362,7 @@ func TestGoldenMedia(t *testing.T) {
 // length (FileServer) or without one (chunked), and must describe itself the
 // same way a local file does.
 func TestGoldenMediaURL(t *testing.T) {
-	dir := setupMediaFixture(t)
+	dir := gf.SetupMediaFixture(t)
 	files := http.FileServer(http.Dir(dir))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if name, cut := strings.CutPrefix(r.URL.Path, "/cutoff"); cut {
@@ -430,7 +431,7 @@ func TestGoldenMediaURL(t *testing.T) {
 // Content decides over the name: text is never media, whatever it is called or
 // however it starts.
 func TestGoldenMediaLookalikes(t *testing.T) {
-	dir := setupMediaLookalikeFixture(t)
+	dir := gf.SetupMediaLookalikeFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "170b_media_weak_magic_text", args: []string{"-M", "bm25"}},
 		{name: "170c_media_lfs_pointer_png", args: []string{"-M", "x.png"}},
