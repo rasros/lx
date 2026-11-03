@@ -17,8 +17,7 @@ import (
 // the form they were written in.
 func runTestGoldenHost(t *testing.T, workDir, host string, env map[string]string, cases []goldenTestCase) {
 	t.Helper()
-	canonical, _ := filepath.EvalSymlinks(workDir)
-	runGoldenTests(t, cases, goldenRun{cwd: workDir, env: env, scrub: []string{workDir, canonical}, hosts: []string{host}})
+	runGoldenTests(t, cases, goldenRun{cwd: workDir, env: env, scrub: scrubDir(workDir), hosts: []string{host}})
 }
 
 // fileServer serves dir until the test and its parallel cases are done,
@@ -47,7 +46,7 @@ func TestGoldenArchiveOrigin(t *testing.T) {
 // skipped by size as any other file is. The size of a compressed file's
 // content is unknown until it is read, so reading stops past the limit.
 func TestGoldenArchiveMaxSize(t *testing.T) {
-	dir := setupArchiveFixture(t)
+	dir := gf.SetupArchiveFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "189d_max_size_archive_stats", args: []string{"--stats", "-Z", "-m", "16", "archive.zip", "archive.tar.gz"}},
 		{name: "189e_max_size_single_file_gz", args: []string{"--stats", "-Z", "-m", "10", "notes.txt.gz"}},
@@ -76,12 +75,11 @@ func TestGoldenArchiveEdges(t *testing.T) {
 // repoServer serves dir, with the repository URL host/owner/name fetched as
 // dir/name.zip. Each server registers its own host, removed on cleanup.
 func repoServer(t *testing.T, dir string) (url, host string) {
-	server := httptest.NewServer(http.FileServer(http.Dir(dir)))
-	t.Cleanup(server.Close)
-	t.Cleanup(sources.SetRepoHostForTest(strings.TrimPrefix(server.URL, "http://"), func(owner, repo, ref string) string {
-		return server.URL + "/" + repo + ".zip"
+	url, host = fileServer(t, dir)
+	t.Cleanup(sources.SetRepoHostForTest(host, func(owner, repo, ref string) string {
+		return url + "/" + repo + ".zip"
 	}))
-	return server.URL, strings.TrimPrefix(server.URL, "http://")
+	return url, host
 }
 
 // A repository URL is read as a checkout of the repository from its host's

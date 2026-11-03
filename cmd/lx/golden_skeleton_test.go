@@ -6,10 +6,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
 )
 
 func TestGoldenSkeleton(t *testing.T) {
-	dir := setupSkeletonFixture(t)
+	dir := gf.SetupSkeletonFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		// 300-309: Go
 		{name: "300_skeleton_go_functions", args: []string{"-u", "skeleton/main.go"}},
@@ -114,7 +116,7 @@ func TestGoldenSkeleton(t *testing.T) {
 // namespaces, traits, companion objects, nested types and privacy, with -u
 // (method signatures in their types), -Y (types and fields) and both.
 func TestGoldenSkeletonMembers(t *testing.T) {
-	dir := setupSkeletonFixture(t)
+	dir := gf.SetupSkeletonFixture(t)
 	runTestGolden(t, dir, skeletonModeCases(610, "members", []string{
 		"members.cpp", "members.cs", "Members.java", "members.kt", "members.swift",
 		"members.rs", "members.ts", "members.dart", "members.php", "members.ml", "members.m",
@@ -134,7 +136,7 @@ func TestGoldenSkeletonMembers(t *testing.T) {
 // enums and methods, as C when its C++ look is C (asm clobbers, attributes)
 // or when the C++ grammar fails on it.
 func TestGoldenSkeletonTopLevel(t *testing.T) {
-	dir := setupSkeletonFixture(t)
+	dir := gf.SetupSkeletonFixture(t)
 	// Error-recovery fixtures only pin behavior with -u, so their -Y case
 	// is left out.
 	functionsOnly := []string{"misparse.c", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp"}
@@ -176,7 +178,7 @@ func skeletonModeCases(start int, kind string, files []string) []goldenTestCase 
 }
 
 func TestGoldenSkeletonSlicing(t *testing.T) {
-	dir := setupSkeletonFixture(t)
+	dir := gf.SetupSkeletonFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		// 400-409: Go slicing
 		{name: "400_skeleton_lines_go_both", args: []string{"-u", "-Y", "--lines", "3", "skeleton/main.go"}},

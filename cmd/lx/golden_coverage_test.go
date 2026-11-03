@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
 )
 
 // --output redirects the bundle to a file, which moves stats to stdout and
@@ -27,7 +29,7 @@ func TestGoldenOutputFile(t *testing.T) {
 		{false, goldenTestCase{name: "172e_output_file_named_before_it_exists", args: []string{"--stats", "-o", "bundle.md", "bundle.md", "main.go"}}},
 	} {
 		t.Run(c.tc.name, func(t *testing.T) {
-			dir := setupWalkFixture(t)
+			dir := gf.SetupWalkFixture(t)
 			if c.earlier {
 				if err := os.WriteFile(filepath.Join(dir, "bundle.md"), []byte("an earlier bundle\n"), 0644); err != nil {
 					t.Fatal(err)
@@ -41,7 +43,7 @@ func TestGoldenOutputFile(t *testing.T) {
 // bare deliberately emits content only: trees, prompts, sections and error rows
 // all render empty.
 func TestGoldenBareSuppression(t *testing.T) {
-	dir := setupSectionsFixture(t)
+	dir := gf.SetupSectionsFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "173_bare_drops_tree", args: []string{"--bare", "-T", "doc"}},
 		{name: "174_bare_drops_prompt", args: []string{"--bare", "-p", "Explain this", "main.go"}},
@@ -54,7 +56,7 @@ func TestGoldenBareSuppression(t *testing.T) {
 // Format, verbosity and prompt extensions are all reachable from config rather
 // than flags; only the flag paths were covered.
 func TestGoldenConfigDrivenBehaviour(t *testing.T) {
-	dir := setupFormattingFixture(t)
+	dir := gf.SetupFormattingFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "178_config_sets_output_format", args: []string{"-y", "configs/xml_format.yaml", "main.go"}},
 		{name: "179_flag_overrides_config_format", args: []string{"-y", "configs/xml_format.yaml", "--md", "main.go"}},
@@ -63,7 +65,7 @@ func TestGoldenConfigDrivenBehaviour(t *testing.T) {
 }
 
 func TestGoldenPromptsDir(t *testing.T) {
-	dir := setupPromptLibFixture(t)
+	dir := gf.SetupPromptLibFixture(t)
 	runTestGoldenEnv(t, dir, map[string]string{"LX_PROMPTS_DIR": filepath.Join(dir, "prompts")}, []goldenTestCase{
 		{name: "181_list_prompts", args: []string{"--list-prompts"}},
 		{name: "182_prompts_dir_override", args: []string{
@@ -77,7 +79,7 @@ func TestGoldenPromptsDir(t *testing.T) {
 
 // Help is the flag table; it changes whenever a flag is added.
 func TestGoldenHelp(t *testing.T) {
-	dir := setupWalkFixture(t)
+	dir := gf.SetupWalkFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "184_help_short", args: []string{"-h"}},
 		{name: "185_help_long", args: []string{"--help"}},
@@ -86,7 +88,7 @@ func TestGoldenHelp(t *testing.T) {
 
 // A standalone .gz has no entry list; it is exposed as a single virtual entry.
 func TestGoldenSingleFileCompression(t *testing.T) {
-	dir := setupArchiveFixture(t)
+	dir := gf.SetupArchiveFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "186_expand_single_file_gz", args: []string{"-Z", "notes.txt.gz"}},
 		{name: "187_single_file_gz_without_flag", args: []string{"notes.txt.gz"}},

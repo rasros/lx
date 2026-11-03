@@ -3,12 +3,13 @@ package main
 import (
 	"path/filepath"
 	"testing"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
 )
 
 func TestGoldenRelativePaths(t *testing.T) {
-	workDir, srcDir := setupRelativePathsFixture(t)
+	workDir, srcDir := gf.SetupRelativePathsFixture(t)
 
-	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
 	perceivedRoot := filepath.Dir(srcDir)
 
 	cases := []goldenTestCase{
@@ -54,5 +55,5 @@ func TestGoldenRelativePaths(t *testing.T) {
 		{name: "262_symlink_follow_relative", args: []string{"--follow", "../links/loop"}},
 	}
 
-	runGoldenTests(t, cases, goldenRun{cwd: srcDir, scrub: []string{workDir, canonicalWorkDir, perceivedRoot}})
+	runGoldenTests(t, cases, goldenRun{cwd: srcDir, scrub: append(scrubDir(workDir), perceivedRoot)})
 }

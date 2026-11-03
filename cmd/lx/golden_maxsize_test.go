@@ -2,12 +2,14 @@ package main
 
 import (
 	"testing"
+
+	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
 )
 
 func TestGoldenMaxSize(t *testing.T) {
 	// The slicing fixture holds src/large.txt (~1.6 kB) alongside several
 	// files well under 100 bytes, so a limit between them is easy to express.
-	dir := setupSlicingFixture(t)
+	dir := gf.SetupSlicingFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "140_max_size_skips_large", args: []string{"-m", "1k", "."}},
 		{name: "141_max_size_bytes_no_suffix", args: []string{"-m", "20", "."}},
@@ -29,7 +31,7 @@ func TestGoldenMaxSize(t *testing.T) {
 
 func TestGoldenMaxSizeArchive(t *testing.T) {
 	// archive.zip holds hello.txt (20 bytes) and nested/world.go (15 bytes).
-	dir := setupArchiveFixture(t)
+	dir := gf.SetupArchiveFixture(t)
 	runTestGolden(t, dir, []goldenTestCase{
 		{name: "150_max_size_archive_entries", args: []string{"-Z", "-m", "16", "archive.zip"}},
 		{name: "151_max_size_archive_tree", args: []string{"-Z", "-m", "16", "-t", "archive.zip"}},

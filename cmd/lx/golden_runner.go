@@ -56,12 +56,14 @@ func runTestGolden(t *testing.T, workDir string, cases []goldenTestCase, extraSc
 // environment variables env set.
 func runTestGoldenEnv(t *testing.T, workDir string, env map[string]string, cases []goldenTestCase, extraScrub ...string) {
 	t.Helper()
-	canonicalWorkDir, _ := filepath.EvalSymlinks(workDir)
-	runGoldenTests(t, cases, goldenRun{
-		cwd:   workDir,
-		env:   env,
-		scrub: append([]string{workDir, canonicalWorkDir}, extraScrub...),
-	})
+	runGoldenTests(t, cases, goldenRun{cwd: workDir, env: env, scrub: append(scrubDir(workDir), extraScrub...)})
+}
+
+// scrubDir returns dir and its path with symlinks resolved, the names of dir
+// output shows as /ROOT.
+func scrubDir(dir string) []string {
+	canonical, _ := filepath.EvalSymlinks(dir)
+	return []string{dir, canonical}
 }
 
 // runGoldenTests runs every case in parallel, each with its own Env. The
