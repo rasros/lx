@@ -230,7 +230,7 @@ func (w *memberWalk) group(g *gotreesitter.Node, t string) {
 	first, last := startRow(g), endRow(g)
 	if slices.Contains(m.Frames, t) && (w.kept > keptBefore || first <= w.headerEnd) {
 		w.out = internal.KeepLine(w.out, c.Lines, first)
-		if n := g.ChildCount(); n > 0 && !g.Child(n-1).IsNamed() && !g.Child(n-1).IsMissing() && last > first {
+		if n := g.ChildCount(); n > 0 && !g.Child(n-1).IsNamed() && last > first {
 			w.out = internal.KeepLine(w.out, c.Lines, last)
 		}
 	}

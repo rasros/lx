@@ -52,7 +52,9 @@ func extract(langName string, src []byte, lines [][]byte, functions, structs boo
 		out = def.processNode(c, out, root.Child(i))
 	}
 	if def.conditionals {
-		out = langs.BalanceConditionals(lines, out, hiddenRows(c, root))
+		hidden := hiddenRows(c, root)
+		out = langs.DropStrayClosers(lines, out, hidden)
+		out = langs.BalanceConditionals(lines, out, hidden)
 	}
 	return out, true
 }
@@ -110,8 +112,13 @@ func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*got
 func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *gotreesitter.Node) []internal.LineRange {
 	nodeType := c.Type(node)
 
-	if def.recoverErrors && (node.IsError() || hidden(c.Lang, node)) {
-		return def.processError(c, out, node)
+	if def.recoverErrors {
+		switch {
+		case node.IsError() || hidden(c.Lang, node):
+			return def.processError(c, out, node)
+		case langs.Misrecovered(c, node):
+			return out
+		}
 	}
 
 	if slices.Contains(def.iterateChildren, nodeType) {
@@ -142,6 +149,15 @@ func (def *langDef) processNode(c *langs.Ctx, out []internal.LineRange, node *go
 		nodeType = c.Type(node)
 	}
 	sigStart := int(node.StartPoint().Row)
+
+	if def.recoverErrors && langs.Misparsed(c, node) {
+		if typ := langs.EmitMisparsed(c, nil, node); len(typ) > 0 {
+			out = c.EmitLeadingDoc(out, outerStart)
+			out = langs.EmitDecorators(out, c.Lines, outerStart, sigStart)
+			out = append(out, typ...)
+		}
+		return out
+	}
 
 	// A node of both funcTypes and structTypes (a C declaration) that is no
 	// function is a type.
@@ -200,12 +216,7 @@ func (def *langDef) processNamespace(c *langs.Ctx, out []internal.LineRange, n, 
 // place.
 func (def *langDef) processError(c *langs.Ctx, out []internal.LineRange, n *gotreesitter.Node) []internal.LineRange {
 	for i := 0; i < n.ChildCount(); i++ {
-		child := n.Child(i)
-		if hidden(c.Lang, child) {
-			out = def.processError(c, out, child)
-		} else {
-			out = def.processNode(c, out, child)
-		}
+		out = def.processNode(c, out, n.Child(i))
 	}
 	return out
 }
