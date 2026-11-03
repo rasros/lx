@@ -10,10 +10,9 @@ import (
 	"github.com/rasros/lx/pkg/lx"
 )
 
-// resolvePrompts finds every -P prompt, failing on the first it cannot find,
-// and reads those in regular files; it leaves stdin, devices and pipes to be
-// read in command-line order while rendering. It runs before any input is collected, so
-// a bad prompt fails before the walks and downloads of the run.
+// resolvePrompts finds every -P prompt and reads those in regular files,
+// before any input is collected, so a bad prompt fails early. Stdin, devices
+// and pipes are read while rendering.
 func resolvePrompts(sections []Section, r *promptResolver, env Env) error {
 	for _, s := range sections {
 		for _, it := range s.Items {
@@ -51,20 +50,9 @@ func (p *promptFileItem) readText(env Env) error {
 }
 
 // resolveSections collects every file item once, before rendering, so trees
-// and content share one view of what each path refers to. What an item fails
-// on is kept with it, for the render pass to add to the stream ahead of its
-// files: the stream reports and counts every failure of the run, in output
-// order.
-//
-// Stdin is not collected: it is a buffer, not a discoverable path, and it can
-// only be read once. The render pass reads it.
-//
-// A piped list names a set of paths, so an input it reaches twice, named and
-// through its directory, is collected once: a file once, a failure once, and
-// a file it already failed on, or that a failure names, not again. Inputs
-// and failures share one key, the absolute path, URL or archive entry path.
-//
-// It stops at the first target that finds ctx done and returns ctx's error.
+// and content agree. Failures stay with their item so the stream reports
+// them in output order. Stdin is left for the render pass. Inputs a piped
+// list reaches twice are collected once. The only error is ctx's.
 func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) error {
 	piped := map[string]bool{}
 	seen := func(key string) bool {

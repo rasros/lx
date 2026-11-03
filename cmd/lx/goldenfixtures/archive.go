@@ -167,13 +167,10 @@ func createTestGz(path, content string) {
 }
 
 // SetupRepoArchiveFixture writes repo.zip, laid out as a repository host
-// serves a repository: every file below one "repo-main/" directory, with
-// ignore files at the root and below it. Beside it are single compressed
-// files: notes.txt.gz, the hidden .bashrc.gz and plain.tar.gz, which holds
-// no tar archive. nowrap.zip has no one directory its files are all below,
-// and malformed.zip, wrapped in "repo-main/", has entries no checkout could
-// hold beside names a checkout keeps as they are. configs/ holds the
-// configs of SetupArchiveOriginFixture.
+// serves one below "repo-main/", with ignore files. Beside it are single
+// compressed files, nowrap.zip without a wrapping directory, malformed.zip
+// with entries no checkout could hold, and the configs of
+// SetupArchiveOriginFixture.
 func SetupRepoArchiveFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

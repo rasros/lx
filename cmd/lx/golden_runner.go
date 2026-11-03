@@ -37,10 +37,8 @@ type goldenTestCase struct {
 	outFile string
 }
 
-// goldenRun is what the cases of one batch share: the working directory they
-// run in, the environment variables set for them, the paths their output
-// names as /ROOT and the hosts, with their ports, it names as HOST, which
-// keeps the rest of a URL as written.
+// goldenRun is what the cases of one batch share: the working directory, the
+// environment, and the paths and hosts scrubbed to /ROOT and HOST.
 type goldenRun struct {
 	cwd   string
 	env   map[string]string
@@ -66,8 +64,7 @@ func runTestGoldenEnv(t *testing.T, workDir string, env map[string]string, cases
 	})
 }
 
-// runGoldenTests runs every case in parallel, each with an Env of its own, so
-// nothing a case sees of the process can leak between them. The test and its
+// runGoldenTests runs every case in parallel, each with its own Env. The
 // cases share their files, so a batch must not change them.
 func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 	t.Parallel()
@@ -284,9 +281,8 @@ func normalizeOutput(stdout, stderr string, roots ...string) string {
 		sb.WriteString("\n")
 	}
 
-	// Stderr is kept in the order it was written, which is part of the
-	// behavior: render workers log nothing but hand what went wrong back to
-	// the goroutine writing the output, so the order is deterministic.
+	// Stderr order is deterministic: workers hand problems back to the
+	// goroutine writing the output.
 	sb.WriteString("\n--- STDERR ---\n")
 	if s := strings.TrimSpace(clean(stderr)); s != "" {
 		sb.WriteString(s)

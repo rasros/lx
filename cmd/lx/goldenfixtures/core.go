@@ -86,9 +86,8 @@ func SetupSlicingFixture(t *testing.T) string {
 	return dir
 }
 
-// SetupLargeSlicingFixture holds a text file past the 32 KB that row counts
-// were once estimated from, with numbered lines so slices show where they come
-// from, and a file with CRLF line endings.
+// SetupLargeSlicingFixture holds a large text file with numbered lines, so
+// slices show where they come from, and a file with CRLF line endings.
 func SetupLargeSlicingFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

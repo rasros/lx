@@ -13,9 +13,8 @@ import (
 	"github.com/rasros/lx/internal/osenv"
 )
 
-// Env is everything a run sees of the process it runs in, so that runs can be
-// driven side by side, as the golden tests do. Run needs every field but
-// Clipboard, which may be nil: a run that copies its output then fails.
+// Env is everything a run sees of the process, so runs can be driven side by
+// side, as the golden tests do. Only Clipboard may be nil.
 type Env struct {
 	Stdin  io.Reader
 	Stdout io.Writer

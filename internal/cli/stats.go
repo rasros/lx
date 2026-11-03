@@ -36,9 +36,7 @@ const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
 	"\n" + `{{ end }}`
 
 // compileStats parses the stats template, or the default one when tmpl is
-// empty, failing on a field StatsContext lacks. It can call every function
-// the other templates can, with dataURI resolving against dir, and the
-// coloring helpers below.
+// empty, failing on a field StatsContext lacks.
 func compileStats(tmpl, dir string) (*template.Template, error) {
 	if tmpl == "" {
 		tmpl = defaultStatsTemplate

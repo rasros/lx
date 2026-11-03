@@ -14,8 +14,7 @@ type Section struct {
 	Discover lx.DiscoverOptions
 	Items    []item
 
-	// bareTrees names, a group per entry, the tree options that cover no
-	// files, for a warning once the inputs are collected.
+	// bareTrees names the tree options that cover no files, for a warning.
 	bareTrees []string
 }
 
@@ -56,8 +55,8 @@ type headingItem struct{ title string }
 type promptItem struct{ text string }
 
 // promptFileItem is a -P prompt, named by ref and found at path. A regular
-// file is read before inputs are collected, so it fails first; other files,
-// such as /dev/stdin, are read in turn while rendering.
+// file is read up front so it fails early; others, such as /dev/stdin, are
+// read while rendering.
 type promptFileItem struct {
 	ref, path, text string
 	read            bool
@@ -97,20 +96,15 @@ func newItem(op Op) item {
 }
 
 // compile splits ops into sections of items, each with its own interleaved
-// options. An interleaved option after files, or a -s after files, starts a
-// new section with the options reset. Options after files that no file
-// follows before the next -s or the end apply back to those files, with a
-// warning, whatever prompts or trees come between. Options with no file
-// before them in their section carry on into the section a -s starts, so
-// options before the first file belong to it however many prompts or -s
-// come first; options no file follows at all are reported.
+// options. An option or -s after files starts a new section. Trailing
+// options no file follows apply back to the files before them, with a
+// warning; options before any file carry on into the next section.
 func compile(log *slog.Logger, ops []Op, defaultRender lx.RenderOptions) []Section {
 	var sections []Section
 	current := Section{Render: defaultRender}
 	hasFiles := false
-	// pending are the interleaved options no file has followed yet, and
-	// afterFiles says they came right after files, which current was split
-	// from.
+	// pending are the interleaved options no file has followed yet;
+	// afterFiles says they came right after files.
 	var pending []Op
 	afterFiles := false
 
@@ -164,9 +158,8 @@ func compile(log *slog.Logger, ops []Op, defaultRender lx.RenderOptions) []Secti
 	return sections
 }
 
-// groupTrees gives each tree the file items it covers: those beside it up to
-// the next --tree-only or the end of s. A --tree-only also leaves the content
-// of the items it covers out; the items before it keep theirs.
+// groupTrees gives each tree the file items it covers, up to the next
+// --tree-only or the end of s. A --tree-only also drops its items' content.
 func (s *Section) groupTrees() {
 	var files []*fileItem
 	var stdins []*stdinItem
