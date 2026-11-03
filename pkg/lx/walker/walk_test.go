@@ -58,15 +58,14 @@ func TestWalker_StartOnFile(t *testing.T) {
 
 func TestWalker_StartOnFile_Ignored(t *testing.T) {
 	tmp := t.TempDir()
-	mustGitDir(t, tmp, ".git")
 	mustWriteFile(t, tmp, "ignore.me", "content")
 	mustWriteFile(t, tmp, ".gitignore", "*.me")
 
 	// The file is named, so it is included; a walk skips it.
-	if got := walkNamed(t, newWalker(nil, nil), tmp, "ignore.me"); !reflect.DeepEqual(got, []string{"ignore.me"}) {
+	if got := walkNamed(t, repoWalker(), tmp, "ignore.me"); !reflect.DeepEqual(got, []string{"ignore.me"}) {
 		t.Errorf("expected the named file to be included, got %v", got)
 	}
-	assertNotContains(t, collectPaths(t, newWalker(nil, nil), tmp), "ignore.me")
+	assertNotContains(t, collectPaths(t, repoWalker(), tmp), "ignore.me")
 }
 
 func TestWalker_SkipHidden(t *testing.T) {
@@ -160,7 +159,6 @@ func TestWalker_DirectoryTrailingSlash(t *testing.T) {
 
 func TestWalker_LoadLocalGitignore(t *testing.T) {
 	tmp := t.TempDir()
-	mustGitDir(t, tmp, ".git")
 	mustMkdir(t, tmp, "nested")
 
 	mustWriteFile(t, tmp, "root.txt", "root")
@@ -168,7 +166,7 @@ func TestWalker_LoadLocalGitignore(t *testing.T) {
 	mustWriteFile(t, tmp, "nested/should_keep.txt", "hi")
 	mustWriteFile(t, tmp, "nested/.gitignore", "should_ignore.txt")
 
-	w := newWalker(nil, nil)
+	w := repoWalker()
 	files := collectPaths(t, w, tmp)
 
 	assertContains(t, files, "root.txt")
@@ -178,7 +176,6 @@ func TestWalker_LoadLocalGitignore(t *testing.T) {
 
 func TestWalker_NestedGitignoreOverride(t *testing.T) {
 	tmp := t.TempDir()
-	mustGitDir(t, tmp, ".git")
 	mustMkdir(t, tmp, "deep")
 
 	mustWriteFile(t, tmp, ".gitignore", "*\n!deep/")
@@ -188,7 +185,7 @@ func TestWalker_NestedGitignoreOverride(t *testing.T) {
 	mustWriteFile(t, tmp, "deep/target.txt", "kept")
 	mustWriteFile(t, tmp, "deep/other.txt", "ignored")
 
-	w := newWalker(nil, nil)
+	w := repoWalker()
 	files := collectPaths(t, w, tmp)
 
 	assertNotContains(t, files, "root_file.txt")
@@ -372,4 +369,9 @@ func newWalker(base, override []string) *Walker {
 		overrides = append(overrides, ExcludeOverride(p))
 	}
 	return New(Options{Base: base, Overrides: overrides, IgnoreEnabled: true})
+}
+
+// repoWalker returns a walker whose walked fs.FS is a repository root.
+func repoWalker() *Walker {
+	return New(Options{IgnoreEnabled: true, RepoRoot: true})
 }

@@ -265,8 +265,8 @@ func TestWalkPath_RepoBoundaries(t *testing.T) {
 }
 
 // Overrides match a path as its root was named, as ripgrep's -g globs do:
-// a relative root as written, uncleaned, an absolute one with the working directory,
-// by either of its names, stripped from the front.
+// a relative root as written, uncleaned, an absolute one below the working
+// directory with it stripped from the front.
 func TestCache_Anchor(t *testing.T) {
 	top, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -284,12 +284,8 @@ func TestCache_Anchor(t *testing.T) {
 	slash := filepath.ToSlash
 	for _, tt := range []struct{ cwd, root, rel, want string }{
 		{link, link, ".", "."},
-		{link, real, "x", "x"},
-		{link, filepath.Join(real, "sub"), "x", "sub/x"},
 		{link, filepath.Join(link, "sub"), "x", "sub/x"},
 		{link, other, "x", slash(other) + "/x"},
-		{real, top, "real/e1/sub/x", "sub/x"},
-		{real, top, "real/e1", "."},
 		{real, top, "other/x", slash(top) + "/other/x"},
 		{real, "../x", "y", "../x/y"},
 		{real, "./sub/", "y", "sub/y"},

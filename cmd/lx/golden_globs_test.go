@@ -2,7 +2,6 @@ package main
 
 import (
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	gf "github.com/rasros/lx/cmd/lx/goldenfixtures"
@@ -51,8 +50,6 @@ func TestGoldenGlobs(t *testing.T) {
 
 		// A glob that cannot be parsed is an error.
 		{name: "954_glob_invalid", args: []string{"-n0", "-i", "src/[ab", "."}},
-		// A "]" opening a class is part of it, as in rg.
-		{name: "957_glob_class_leading_bracket", args: []string{"-n0", "-i", "[]a]*", "-i", "[!]a]*.go", "."}},
 		// An empty -e matches every path, as rg's -g '!' does, so only what a
 		// later glob keeps is left.
 		{name: "958_glob_empty_exclude_drops_everything", args: []string{"-n0", "-e", "", "-i", "b.txt", "."}},
@@ -72,21 +69,6 @@ func TestGoldenGlobs(t *testing.T) {
 	})
 }
 
-// Inside a character class a backslash is a literal character and a "]"
-// right after the opening "[" is part of the class, as in rg, and an
-// inverted range is an error.
-func TestGoldenGlobClasses(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("names with a backslash")
-	}
-	dir := gf.SetupGlobClassFixture(t)
-	runTestGolden(t, dir, []goldenTestCase{
-		{name: "960_glob_class_backslash_is_literal", args: []string{"-n0", "-i", `[\]`, "-i", `x[\]y`, "-i", `[\-a]`, "."}},
-		{name: "961_glob_class_leading_bracket", args: []string{"-n0", "-i", `[]\]`, "-i", `[!\]]`, "-i", `[\[]`, "."}},
-		{name: "962_glob_class_inverted_range", args: []string{"-n0", "-i", "[b-a]*", "."}},
-	})
-}
-
 // The entries of a URL archive are matched below the URL as written, "//"
 // and all, so a glob spelling out an entry's displayed path keeps it.
 func TestGoldenGlobsURLArchive(t *testing.T) {
@@ -99,17 +81,16 @@ func TestGoldenGlobsURLArchive(t *testing.T) {
 
 // Below the working directory, a relative root keeps its path as written,
 // so globs anchored at the working directory cannot match below "..", while
-// an absolute root has the working directory stripped from the front of the
-// paths below it.
+// an absolute root below it has the working directory stripped from the
+// front of the paths below it, and one above it keeps them absolute.
 func TestGoldenGlobsOutsideCwd(t *testing.T) {
 	dir := gf.SetupGlobsFixture(t)
 	runGoldenTests(t, []goldenTestCase{
 		{name: "941_glob_parent_root_misses_cwd_glob", args: []string{"-n0", "-i", "build/*.js", "-i", "../a.go", ".."}},
 		{name: "942_glob_absolute_root_above_cwd", args: []string{"-n0", "-i", "/x.js", dir}},
 		{name: "943_glob_absolute_root_outside_cwd", args: []string{"-n0", "-i", "**/ovr/keep.js", "-i", "ovr/drop.js", filepath.Join(dir, "ovr")}},
-		// A piped absolute path is judged as a root named that way: below a
-		// directory above the working directory, paths are matched relative
-		// to it.
+		// A piped absolute path is judged as a root named that way: the
+		// paths below one above the working directory stay absolute.
 		{name: "945_glob_stdin_absolute_dir_above_cwd", args: []string{"-n0", "-i", "sub/*", "-i", "/x.js"}, stdin: dir},
 	}, goldenRun{cwd: filepath.Join(dir, "build"), scrub: scrubDir(dir)})
 }

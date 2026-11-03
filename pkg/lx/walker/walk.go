@@ -123,7 +123,7 @@ func (w *Walker) judge(f *frame, name, childPath string, a Anchor, isDir bool) (
 			return true, "hidden path"
 		}
 	}
-	if isDir && w.overrides != nil && !w.overrides.reachBelow(ovPath) && !a.leadsToWD(ovPath) {
+	if isDir && w.overrides != nil && !w.overrides.reachBelow(ovPath) {
 		return true, "no include glob can match below it"
 	}
 	return false, ""

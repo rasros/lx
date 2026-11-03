@@ -1,6 +1,5 @@
 --- STDOUT ---
-[1/2] /ROOT/build/sub/y.js (1 rows)
-[2/2] /ROOT/build/x.js (1 rows)
+
 
 
 --- STDERR ---

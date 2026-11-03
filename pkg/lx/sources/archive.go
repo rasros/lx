@@ -58,9 +58,6 @@ type ArchiveOptions struct {
 	MaxSize int64
 	// Log is nil for slog.Default().
 	Log *slog.Logger
-	// Named marks an archive named rather than walked. A named compressed
-	// file's one entry is then never skipped as hidden.
-	Named bool
 }
 
 // ExpandArchive returns the files in the archive at absPath that opts.Walker
@@ -230,11 +227,9 @@ func (x *expansion) handle(ctx context.Context, info archives.FileInfo) error {
 // notes.txt.gz/notes.txt.
 func (x *expansion) decompress(d archives.Decompressor, file *os.File) error {
 	name := singleEntryName(x.opts.Origin)
-	keep := x.entries.Keep
-	if x.opts.Named {
-		keep = x.entries.KeepShown
-	}
-	if !keep(name, false) {
+	// The entry is the compressed file's own content, which was already
+	// judged hidden or not, so it is not skipped as hidden again.
+	if !x.opts.Walker.ShowHidden().Entries().Keep(name, false) {
 		return nil
 	}
 	rc, err := d.OpenReader(file)

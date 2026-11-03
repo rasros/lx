@@ -71,47 +71,6 @@ func SetupWorktreeExcludeFixture(t *testing.T) string {
 	return filepath.Join(dir, "wt")
 }
 
-// SetupStrayGitDirFixture builds a repository holding directories with a
-// .git that is not a git directory: an empty one, as a stray mkdir leaves,
-// and one with only an info/exclude. Neither is a repository root, so the
-// enclosing repository's rules keep applying below them and the stray
-// info/exclude is never read. It returns the repository root.
-func SetupStrayGitDirFixture(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-
-	makeGitDir(t, dir, ".git")
-	writeFile(t, dir, ".gitignore", "*.log\n", 0644)
-	if err := os.MkdirAll(filepath.Join(dir, "empty", ".git"), 0755); err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, dir, "empty/main.go", "package empty", 0644)
-	writeFile(t, dir, "empty/debug.log", "ignored by the repository .gitignore", 0644)
-	writeFile(t, dir, "bogus/.git/info/exclude", "*.go\n", 0644)
-	writeFile(t, dir, "bogus/util.go", "package bogus", 0644)
-	writeFile(t, dir, "bogus/trace.log", "ignored by the repository .gitignore", 0644)
-
-	return dir
-}
-
-// SetupStrayGitDirAboveFixture builds a project below a directory holding an
-// empty .git and a .gitignore. The empty .git does not make that directory a
-// repository, so outside one its .gitignore does not reach a walk started in
-// the project. It returns the project directory.
-func SetupStrayGitDirAboveFixture(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-
-	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, dir, ".gitignore", "*.log\n", 0644)
-	writeFile(t, dir, "proj/main.go", "package main", 0644)
-	writeFile(t, dir, "proj/run.log", "kept: no repository applies the parent .gitignore", 0644)
-
-	return filepath.Join(dir, "proj")
-}
-
 // SetupParentIgnoreFilesFixture builds a directory whose .gitignore ignores
 // *.tmp and bin/ and whose .ignore ignores *.ign, with a subdirectory src to
 // run lx from. With repo set the directory is a git repository root. As in
@@ -180,4 +139,22 @@ func SetupIgnoredDirNegationsFixture(t *testing.T) string {
 	}
 
 	return dir
+}
+
+// SetupStrayGitDirAboveFixture builds a project below a directory holding an
+// empty .git and a .gitignore. The empty .git does not make that directory a
+// repository, so outside one its .gitignore does not reach a walk started in
+// the project. It returns the project directory.
+func SetupStrayGitDirAboveFixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, ".gitignore", "*.log\n", 0644)
+	writeFile(t, dir, "proj/main.go", "package main", 0644)
+	writeFile(t, dir, "proj/run.log", "kept: no repository applies the parent .gitignore", 0644)
+
+	return filepath.Join(dir, "proj")
 }

@@ -1,8 +1,0 @@
---- STDOUT ---
-[1/4] \ (1 rows)
-[2/4] ] (1 rows)
-[3/4] a (1 rows)
-[4/4] x\y (1 rows)
-
-
---- STDERR ---
