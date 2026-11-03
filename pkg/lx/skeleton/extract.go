@@ -1,6 +1,7 @@
 package skeleton
 
 import (
+	"bytes"
 	"slices"
 	"sync"
 
@@ -76,27 +77,51 @@ func (p parsed) walk(src []byte, lines [][]byte, functions, structs bool) []inte
 		out = p.def.processNode(c, out, root.Child(i))
 	}
 	if p.def.conditionals {
-		out = langs.BalanceConditionals(lines, out, p.hiddenRows(lines))
+		hidden, trailing := p.comments(lines)
+		out = langs.BalanceConditionals(lines, out, hidden)
+		out = cutTrailingComments(internal.MergeRanges(out), trailing)
 	}
 	return out
 }
 
-// hiddenRows reports the rows inside comments and raw strings that span
+// cutTrailingComments cuts the last row of each range (merged) where a
+// comment that runs on to later rows starts after code (trailing, by row
+// and column), so a skeleton shows that row's code without an unclosed
+// comment.
+func cutTrailingComments(ranges []internal.LineRange, trailing map[int]int) []internal.LineRange {
+	for i, r := range ranges {
+		if col, ok := trailing[r.End-1]; ok && r.Cut == 0 {
+			ranges[i].Cut = col
+		}
+	}
+	return ranges
+}
+
+// comments reports the rows inside comments and raw strings that span
 // several rows (all but their first), where a line that reads like a
-// preprocessor directive is none. Ordinary string literals are left alone:
-// a directive between two of them (in inline asm) is a real one.
-func (p parsed) hiddenRows(lines [][]byte) []bool {
-	rows := make([]bool, len(lines))
+// preprocessor directive is none, and, by row, the column where a comment
+// that spans several rows starts after code on its first row (its code
+// trimmed of trailing space). Ordinary string literals are left alone: a
+// directive between two of them (in inline asm) is a real one.
+func (p parsed) comments(lines [][]byte) (hidden []bool, trailing map[int]int) {
+	hidden = make([]bool, len(lines))
+	trailing = make(map[int]int)
 	var walk func(n *gotreesitter.Node)
 	walk = func(n *gotreesitter.Node) {
 		first, last := int(n.StartPoint().Row), int(n.EndPoint().Row)
 		if first == last {
 			return
 		}
-		switch n.Type(p.lang) {
+		switch t := n.Type(p.lang); t {
 		case "comment", "raw_string_literal":
-			for row := first + 1; row <= last && row < len(rows); row++ {
-				rows[row] = true
+			for row := first + 1; row <= last && row < len(hidden); row++ {
+				hidden[row] = true
+			}
+			if t == "comment" && first < len(lines) {
+				col := int(n.StartPoint().Column)
+				if code := bytes.TrimRight(lines[first][:min(col, len(lines[first]))], " \t"); len(bytes.TrimSpace(code)) > 0 {
+					trailing[first] = len(code)
+				}
 			}
 			return
 		}
@@ -105,7 +130,7 @@ func (p parsed) hiddenRows(lines [][]byte) []bool {
 		}
 	}
 	walk(p.tree.RootNode())
-	return rows
+	return hidden, trailing
 }
 
 func parserPoolFor(langName string, newLang func() *gotreesitter.Language) (*gotreesitter.ParserPool, *gotreesitter.Language) {

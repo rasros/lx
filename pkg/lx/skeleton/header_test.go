@@ -1,6 +1,10 @@
 package skeleton
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/rasros/lx/pkg/lx/internal"
+)
 
 func TestCppEvidence(t *testing.T) {
 	tests := []struct {
@@ -48,5 +52,15 @@ func TestCppClean(t *testing.T) {
 			t.Errorf("%s: cppClean = %v, want %v", tt.name, got, tt.want)
 		}
 		p.tree.Release()
+	}
+}
+
+func TestTrailingComments(t *testing.T) {
+	src := []byte("struct s {\n  int a;  /* x,\n     y */\n  /* doc\n   */\n  int b; /* one row */\n};\n")
+	p, _ := parse("c", src)
+	defer p.tree.Release()
+	_, trailing := p.comments(internal.SplitLines(src))
+	if len(trailing) != 1 || trailing[1] != 8 {
+		t.Errorf("trailing = %v, want map[1:8]", trailing)
 	}
 }
