@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -47,22 +46,15 @@ func SetupArchiveEdgeFixture(t *testing.T) string {
 		{"../up.txt", "up\n"},
 		{"a/../../up2.txt", "up2\n"},
 		{"ok.txt", "ok\n"},
-	})
-	writeBytes(t, filepath.Join(dir, "lie.tar"), lyingTar(t, 1<<40))
-	writeBytes(t, filepath.Join(dir, "lie.zip"), lyingZip(t, 0xfffffff0))
-	writeBytes(t, filepath.Join(dir, "lie3.zip"), lyingZipOf(t, 1<<20, 3, "a.txt", "b.txt", "c.txt", "d.txt"))
+	}, nil)
+	writeFile(t, dir, "lie.tar", string(lyingTar(t, 1<<40)), 0644)
+	writeFile(t, dir, "lie.zip", string(lyingZip(t, 0xfffffff0)), 0644)
+	writeFile(t, dir, "lie3.zip", string(lyingZipOf(t, 1<<20, 3, "a.txt", "b.txt", "c.txt", "d.txt")), 0644)
 	createTestGz(filepath.Join(dir, "s100.txt.gz"), "one hundred\n")
 	createTestZip(filepath.Join(dir, "zip-inside.tar.gz"), [][2]string{{"z.txt", "a zip\n"}})
 	createTestZip(filepath.Join(dir, "zip-inside.gz"), [][2]string{{"z.txt", "a zip\n"}})
-	createTestTar(filepath.Join(dir, "plain-tar.tar.gz"), [][2]string{{"t.txt", "a tar\n"}})
+	createTestTar(filepath.Join(dir, "plain-tar.tar.gz"), [][2]string{{"t.txt", "a tar\n"}}, nil)
 	return dir
-}
-
-func writeBytes(t *testing.T, path string, data []byte) {
-	t.Helper()
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		t.Fatal(err)
-	}
 }
 
 // lyingTar returns a tar archive of big.txt, holding "hello\n", whose

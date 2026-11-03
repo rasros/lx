@@ -45,9 +45,7 @@ func repoTempDir(t *testing.T) string {
 }
 
 func makeSymlink(dir, target, name string) {
-	fp := filepath.Join(dir, name)
-	os.MkdirAll(filepath.Dir(fp), 0755)
-	_ = os.Symlink(filepath.Join(dir, target), fp)
+	makeSymlinkRaw(dir, filepath.Join(dir, target), name)
 }
 
 func makeSymlinkRaw(dir, target, name string) {
