@@ -59,7 +59,7 @@ func TestStream_ExtractDocuments_PropagatesFromRenderOptions(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("doc.docx", data), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	if _, err := stream.Execute(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -81,7 +81,7 @@ func TestStream_ExtractDocuments_EnabledViaRenderOptions(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("doc.docx", data), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	if _, err := stream.Execute(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,7 +103,7 @@ func TestStream_ConvertedFromNamesTheSourceFormat(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("doc.docx", makeTestDOCX(t, "Content")), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	if _, err := stream.Execute(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	if got := strings.TrimSpace(buf.String()); got != "[docx]" {
@@ -123,7 +123,7 @@ func TestStream_ConvertedFromEmptyWithoutAConverter(t *testing.T) {
 	stream.AddFile(sources.NewBufferInputFile("main.go", []byte("package main\n")), opts)
 
 	var buf strings.Builder
-	if err := stream.Execute(context.Background(), &buf); err != nil {
+	if _, err := stream.Execute(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	if got := strings.TrimSpace(buf.String()); got != "[]" {

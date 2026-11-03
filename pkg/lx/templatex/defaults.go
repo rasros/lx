@@ -10,7 +10,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/rasros/lx/internal/ansi"
 	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/internal"
 )
@@ -253,25 +252,6 @@ const defaultBarePrompt = ``
 const defaultBareTree = ``
 const defaultBareMeta = ``
 
-// 128k matches GPT-4o context, 200k matches Claude Opus.
-const (
-	tokenWarnThreshold   int64 = 128_000
-	tokenDangerThreshold int64 = 200_000
-)
-
-const defaultStatsTemplate = `{{ accent .ColorEnabled "▎" }} ` +
-	`{{ commafy .Global.TotalFiles }} {{ plural .Global.TotalFiles "file" "files" }} {{ dim .ColorEnabled "·" }} ` +
-	`{{ commafy .Global.TotalRows }} {{ plural .Global.TotalRows "row" "rows" }} {{ dim .ColorEnabled "·" }} ` +
-	`{{ commafy .Global.TotalSections }} {{ plural .Global.TotalSections "section" "sections" }}` +
-	`{{ if not .Global.SizeUnknown }} {{ dim .ColorEnabled "·" }} {{ humanize .Global.TotalSize }}{{ end }}` + "\n" +
-	`  {{ tokenLabel .Global.TokenEstimate .ColorEnabled }}` + "\n" +
-	`{{ if or .Global.SkippedBySize .Global.BinaryFiles .Global.FailedFiles }}  ` +
-	`{{ $sep := "" }}` +
-	`{{ if .Global.SkippedBySize }}{{ commafy .Global.SkippedBySize }} skipped (size){{ $sep = printf " %s " (dim .ColorEnabled "·") }}{{ end }}` +
-	`{{ if .Global.BinaryFiles }}{{ $sep }}{{ commafy .Global.BinaryFiles }} binary{{ $sep = printf " %s " (dim .ColorEnabled "·") }}{{ end }}` +
-	`{{ if .Global.FailedFiles }}{{ $sep }}{{ commafy .Global.FailedFiles }} failed{{ end }}` +
-	"\n" + `{{ end }}`
-
 // contentString renders template content as text. The processor hands
 // FileContext.Content over as a string, with any line numbers already in it,
 // but a fmt.Stringer such as LineNumberFormatter is rendered as text too rather
@@ -286,6 +266,13 @@ func contentString(v interface{}) string {
 		return s.String()
 	}
 	return fmt.Sprintf("%v", v)
+}
+
+// Funcs returns the functions every template can call, with dataURI
+// resolving relative paths against dir, or the process's working directory
+// when it is empty.
+func Funcs(dir string) template.FuncMap {
+	return templateFuncs(&core.TemplateEngine{Dir: dir})
 }
 
 // templateFuncs returns the functions templates of engine can call.
@@ -341,23 +328,6 @@ func templateFuncs(engine *core.TemplateEngine) template.FuncMap {
 				return singular
 			}
 			return plural
-		},
-		"accent": func(enabled bool, s string) string {
-			return ansi.New(enabled).Paint(s, ansi.Cyan)
-		},
-		"dim": func(enabled bool, s string) string {
-			return ansi.New(enabled).Paint(s, ansi.Dim)
-		},
-		"tokenLabel": func(n int64, enabled bool) string {
-			label := fmt.Sprintf("~%s tokens", commafy(n))
-			color := ansi.Green
-			switch {
-			case n >= tokenDangerThreshold:
-				color = ansi.Red
-			case n >= tokenWarnThreshold:
-				color = ansi.Yellow
-			}
-			return ansi.New(enabled).Paint(label, color, ansi.Bold)
 		},
 	}
 }

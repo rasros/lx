@@ -1,14 +1,12 @@
 package templatex
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/rasros/lx/internal/ansi"
 	"github.com/rasros/lx/pkg/lx/core"
 )
 
@@ -89,37 +87,6 @@ func TestTemplateFuncs_Commafy(t *testing.T) {
 	}
 }
 
-func TestTemplateFuncs_TokenLabel(t *testing.T) {
-	tokenLabel := templateFuncs(&core.TemplateEngine{})["tokenLabel"].(func(int64, bool) string)
-
-	if got := tokenLabel(15, false); got != "~15 tokens" {
-		t.Errorf("tokenLabel(15,false) = %q, want %q", got, "~15 tokens")
-	}
-	if got := tokenLabel(1234, false); got != "~1,234 tokens" {
-		t.Errorf("tokenLabel(1234,false) = %q", got)
-	}
-	if strings.ContainsAny(tokenLabel(15, false), "\x1b") {
-		t.Errorf("tokenLabel without color must not contain escapes")
-	}
-	cases := []struct {
-		n     int64
-		color string
-	}{
-		{90_000, string(ansi.Green)},
-		{150_000, string(ansi.Yellow)},
-		{300_000, string(ansi.Red)},
-	}
-	for _, c := range cases {
-		out := tokenLabel(c.n, true)
-		if !strings.HasPrefix(out, c.color+string(ansi.Bold)) {
-			t.Errorf("tokenLabel(%d,true) = %q, want prefix %q", c.n, out, c.color+string(ansi.Bold))
-		}
-		if !strings.HasSuffix(out, string(ansi.Reset)) {
-			t.Errorf("tokenLabel(%d,true) missing reset", c.n)
-		}
-	}
-}
-
 func TestTemplateFuncs_Plural(t *testing.T) {
 	plural := templateFuncs(&core.TemplateEngine{})["plural"].(func(interface{}, string, string) string)
 	if got := plural(1, "file", "files"); got != "file" {
@@ -153,92 +120,6 @@ func TestTemplateFuncs_Escape(t *testing.T) {
 			t.Errorf("escape(%v) = %q, want %q", tt.in, got, tt.want)
 		}
 	}
-}
-
-func TestDefaultStatsTemplate_Render(t *testing.T) {
-	cfg := core.NewConfig()
-	engine, err := Compile(cfg)
-	if err != nil {
-		t.Fatalf("Compile: %v", err)
-	}
-
-	render := func(ctx core.StatsContext) string {
-		var buf bytes.Buffer
-		if err := engine.Stats.Execute(&buf, ctx); err != nil {
-			t.Fatalf("Execute: %v", err)
-		}
-		return buf.String()
-	}
-
-	t.Run("two lines, no color, plural section", func(t *testing.T) {
-		out := render(core.StatsContext{
-			Global: core.GlobalContext{
-				TotalFiles:    12,
-				TotalRows:     1847,
-				TotalSections: 3,
-				TotalSize:     58400,
-				TokenEstimate: 14612,
-			},
-		})
-		if strings.ContainsAny(out, "\x1b") {
-			t.Errorf("uncolored render must not contain ANSI escapes: %q", out)
-		}
-		lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-		if len(lines) != 2 {
-			t.Fatalf("want 2 lines, got %d: %q", len(lines), out)
-		}
-		want1 := "▎ 12 files · 1,847 rows · 3 sections · 58.4 kB"
-		want2 := "  ~14,612 tokens"
-		if lines[0] != want1 {
-			t.Errorf("line 1 = %q, want %q", lines[0], want1)
-		}
-		if lines[1] != want2 {
-			t.Errorf("line 2 = %q, want %q", lines[1], want2)
-		}
-	})
-
-	t.Run("singular pluralization at 1", func(t *testing.T) {
-		out := render(core.StatsContext{
-			Global: core.GlobalContext{
-				TotalFiles: 1, TotalRows: 1, TotalSections: 1, TotalSize: 27, TokenEstimate: 15,
-			},
-		})
-		if !strings.Contains(out, "1 file ·") || !strings.Contains(out, "1 row ·") || !strings.Contains(out, "1 section ·") {
-			t.Errorf("singular forms missing: %q", out)
-		}
-	})
-
-	t.Run("size hidden when unavailable", func(t *testing.T) {
-		out := render(core.StatsContext{
-			Global: core.GlobalContext{
-				TotalFiles: 1, TotalRows: 50, TotalSections: 1, TotalSize: 0,
-				SizeUnknown: true, TokenEstimate: 10982,
-			},
-		})
-		lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-		want1 := "▎ 1 file · 50 rows · 1 section"
-		if lines[0] != want1 {
-			t.Errorf("line 1 = %q, want %q", lines[0], want1)
-		}
-		if strings.Contains(out, "-1") {
-			t.Errorf("rendered stats must never show a negative size: %q", out)
-		}
-	})
-
-	t.Run("color path bolds and colors token count", func(t *testing.T) {
-		out := render(core.StatsContext{
-			ColorEnabled: true,
-			Global: core.GlobalContext{
-				TotalFiles: 2, TotalRows: 4, TotalSections: 1, TotalSize: 100, TokenEstimate: 250_000,
-			},
-		})
-		if !strings.Contains(out, string(ansi.Red)+string(ansi.Bold)+"~250,000 tokens"+string(ansi.Reset)) {
-			t.Errorf("expected red+bold token label in colored render: %q", out)
-		}
-		if !strings.Contains(out, string(ansi.Cyan)+"▎"+string(ansi.Reset)) {
-			t.Errorf("expected accent on leader: %q", out)
-		}
-	})
 }
 
 // dataURI reads a relative path from the engine's Dir, not the process's

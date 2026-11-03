@@ -46,15 +46,17 @@
 //     Collect returned, to be reported and counted in output order.
 //   - Admit reports whether AddFile keeps a file under its RenderOptions.
 //   - AddTree enqueues a directory tree of the files Admit keeps.
-//   - Execute renders output to an io.Writer.
-//   - GetGlobalContext exposes aggregate statistics.
+//   - Plan reports what the stream would render, as its templates see it.
+//   - Execute renders output to an io.Writer once and returns a Report of
+//     what it rendered: rows, binary and failed files, bytes and tokens.
 //   - WithConcurrency / WithOnFailure / WithLogger customize processing.
 //     Skeleton rendering caps the workers at two.
 //
 // Every input that could not be read is a Failure, which reaches the caller
 // once: Collect returns the ones discovery meets, and a Stream hands its
 // handler, in output order, the ones added to it and the files it cannot
-// read, counting each in FailedFiles. A Stream with no handler logs them.
+// read, counting each in the Report's FailedFiles. A Stream with no
+// handler logs them.
 // The library logs to the *slog.Logger it is given: NewCollector,
 // UserIgnoreRules and Stream.WithLogger take one, and nil means
 // slog.Default().
@@ -91,7 +93,7 @@
 //		for _, f := range files {
 //			stream.AddFile(f, lx.RenderOptions{Head: -1})
 //		}
-//		if err := stream.Execute(ctx, os.Stdout); err != nil {
+//		if _, err := stream.Execute(ctx, os.Stdout); err != nil {
 //			panic(err)
 //		}
 //	}

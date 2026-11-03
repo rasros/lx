@@ -34,7 +34,7 @@ type PreparedItem struct {
 // Processor renders prepared items into an output writer.
 type Processor struct {
 	engine       *core.TemplateEngine
-	global       core.GlobalContext
+	global       core.Plan
 	tokenCounter core.TokenCounter
 }
 
@@ -75,7 +75,7 @@ type byteReaderProvider interface {
 
 // NewProcessor returns a Processor. It logs nothing: what goes wrong with a
 // file comes back in RenderStats.Issues.
-func NewProcessor(engine *core.TemplateEngine, global core.GlobalContext) *Processor {
+func NewProcessor(engine *core.TemplateEngine, global core.Plan) *Processor {
 	return &Processor{
 		engine:       engine,
 		global:       global,
