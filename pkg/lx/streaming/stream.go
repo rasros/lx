@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"runtime"
 
 	"github.com/rasros/lx/pkg/lx/core"
@@ -24,7 +25,6 @@ type Stream struct {
 	items       []interface{}
 	tokenizer   core.Tokenizer
 	engine      *core.TemplateEngine
-	workDir     string
 	executed    bool
 	sections    []*core.SectionContext
 	onFailure   FailureHandler
@@ -63,7 +63,6 @@ func NewStream(cfg *core.Config) (*Stream, error) {
 	return &Stream{
 		engine:      engine,
 		tokenizer:   core.DefaultTokenizer(),
-		workDir:     ".",
 		concurrency: runtime.NumCPU(),
 		log:         slog.Default(),
 	}, nil
@@ -183,8 +182,11 @@ func (s *Stream) AddMeta(body string, fields map[string]string) *Stream {
 // prepare plans the items queued so far, organizing them into sections.
 func (s *Stream) prepare() (core.Plan, []*core.SectionContext, []render.PreparedItem) {
 	global := core.Plan{
-		WorkDir:       s.workDir,
+		WorkDir:       s.engine.Dir,
 		SkippedBySize: s.skippedBySize,
+	}
+	if global.WorkDir == "" {
+		global.WorkDir, _ = os.Getwd()
 	}
 
 	sections := make([]*core.SectionContext, 0)
