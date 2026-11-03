@@ -42,8 +42,7 @@ type byteReaderReadCloser struct {
 	*bytes.Reader
 }
 
-func (r byteReaderReadCloser) Close() error              { return nil }
-func (r byteReaderReadCloser) ByteReader() *bytes.Reader { return r.Reader }
+func (r byteReaderReadCloser) Close() error { return nil }
 
 func newByteReaderReadCloser(data []byte) io.ReadCloser {
 	return byteReaderReadCloser{Reader: bytes.NewReader(data)}

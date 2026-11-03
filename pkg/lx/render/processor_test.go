@@ -113,48 +113,30 @@ func TestApplyConvertersLeavesContentWhenNoneApply(t *testing.T) {
 }
 
 func TestApplyConvertersRunsMatchingConverter(t *testing.T) {
-	converters = append(converters, converter{
-		name: "test",
-		applies: func(f sources.InputFile, _ core.RenderOptions, _ *internal.Format) bool {
-			return strings.HasSuffix(f.Path, ".zzz")
-		},
-		convert: func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error) {
-			return []byte("converted"), nil
-		},
-	})
-	t.Cleanup(func() { converters = converters[:len(converters)-1] })
+	src := []byte("<p>hi</p>")
+	file := sources.NewBufferInputFile("page.html", src)
+	opts := core.RenderOptions{ExtractDocuments: true}
+	reader, size, from, lang, ok, _ := applyConverters(file, opts, internal.Classify(file.Path, src), bytes.NewReader(src), int64(len(src)), false)
 
-	file := sources.NewBufferInputFile("doc.zzz", []byte("raw"))
-	reader, size, from, _, _, _ := applyConverters(file, core.RenderOptions{}, nil, bytes.NewReader([]byte("raw")), 3, false)
-
-	if from != "zzz" {
-		t.Errorf("convertedFrom = %q, want %q", from, "zzz")
+	if !ok || from != "html" || lang != "markdown" {
+		t.Errorf("got converted %v from %q to %q, want html converted to markdown", ok, from, lang)
 	}
 	got := make([]byte, size)
 	reader.ReadAt(got, 0)
-	if string(got) != "converted" {
-		t.Errorf("content = %q, want %q", got, "converted")
+	if strings.TrimSpace(string(got)) != "hi" {
+		t.Errorf("content = %q, want %q", got, "hi")
 	}
 }
 
 // A failing converter must not lose the original content.
 func TestApplyConvertersKeepsContentOnFailure(t *testing.T) {
-	converters = append(converters, converter{
-		name: "failing",
-		applies: func(f sources.InputFile, _ core.RenderOptions, _ *internal.Format) bool {
-			return strings.HasSuffix(f.Path, ".zzz")
-		},
-		convert: func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error) {
-			return nil, io.ErrUnexpectedEOF
-		},
-	})
-	t.Cleanup(func() { converters = converters[:len(converters)-1] })
-
 	src := []byte("raw content")
-	reader, size, from, _, _, failure := applyConverters(sources.NewBufferInputFile("doc.zzz", src), core.RenderOptions{}, nil, bytes.NewReader(src), int64(len(src)), false)
+	file := sources.NewBufferInputFile("song.mp3", src)
+	opts := core.RenderOptions{ExtractMedia: true}
+	reader, size, from, _, _, failure := applyConverters(file, opts, internal.FormatByExt(file.Path), bytes.NewReader(src), int64(len(src)), false)
 
-	if failure == nil || failure.Converter != "failing" || failure.Err != io.ErrUnexpectedEOF {
-		t.Errorf("failure = %v, want the failing converter's error", failure)
+	if failure == nil || failure.Converter != "media" || failure.Err == nil {
+		t.Errorf("failure = %v, want the media converter's error", failure)
 	}
 	if from != "" {
 		t.Errorf("convertedFrom = %q, want empty after a failure", from)

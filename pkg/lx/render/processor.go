@@ -69,10 +69,6 @@ type readerAtWithSize interface {
 	Size() int64
 }
 
-type byteReaderProvider interface {
-	ByteReader() *bytes.Reader
-}
-
 // NewProcessor returns a Processor. It logs nothing: what goes wrong with a
 // file comes back in RenderStats.Issues.
 func NewProcessor(engine *core.TemplateEngine, global core.Plan) *Processor {
@@ -185,9 +181,6 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64, error) {
 	switch v := rc.(type) {
 	case *os.File:
 		return v, sizeHint, nil
-	case byteReaderProvider:
-		br := v.ByteReader()
-		return br, br.Size(), nil
 	case readerAtWithSize:
 		return v, v.Size(), nil
 	case io.ReaderAt:
@@ -203,70 +196,37 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64, error) {
 	return lr, lr.Size(), nil
 }
 
-// converter replaces a file's bytes with a text rendering of them. Converters
-// run before binary and language detection, so detection describes what is
-// rendered. The first match wins.
-type converter struct {
-	name    string
-	applies func(f sources.InputFile, opts core.RenderOptions, format *internal.Format) bool
-	convert func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error)
-	// language of the produced content; empty means detect as usual.
-	language func(f sources.InputFile) string
-}
-
-var converters = []converter{
-	{
-		name: "document",
-		applies: func(f sources.InputFile, opts core.RenderOptions, _ *internal.Format) bool {
-			if !opts.ExtractDocuments {
-				return false
-			}
-			return sources.IsDocumentInput(f)
-		},
-		convert: sources.ConvertInput,
-		language: func(f sources.InputFile) string {
-			// The other formats yield plain text, which detection leaves unlabelled.
-			if sources.IsHTMLInput(f) {
-				return "markdown"
-			}
-			return ""
-		},
-	},
-	{
-		name: "media",
-		applies: func(_ sources.InputFile, opts core.RenderOptions, format *internal.Format) bool {
-			return opts.ExtractMedia && format.IsMedia()
-		},
-		convert: sources.ExtractMediaMetadata,
-	},
-}
-
 // applyConverters reports whether a converter replaced the content, and the
-// format it converted from. A failing converter leaves the content untouched
-// and is returned. An image about to be embedded is left alone.
+// format it converted from. Converters run before binary and language
+// detection, so detection describes what is rendered; the document converter
+// goes first. A failing converter leaves the content untouched and is
+// returned. An image about to be embedded is left alone.
 func applyConverters(file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool, *ConvertFailure) {
 	if embedImages && format.IsImage() {
 		return reader, size, "", "", false, nil
 	}
-	for _, c := range converters {
-		if !c.applies(file, opts, format) {
-			continue
+	name, lang := "", ""
+	var convert func(sources.InputFile, io.ReaderAt, int64) ([]byte, error)
+	if opts.ExtractDocuments && sources.IsDocumentInput(file) {
+		name, convert = "document", sources.ConvertInput
+		// The other formats yield plain text, which detection leaves unlabelled.
+		if sources.IsHTMLInput(file) {
+			lang = "markdown"
 		}
-		text, err := c.convert(file, reader, size)
-		if err != nil {
-			return reader, size, "", "", false, &ConvertFailure{Converter: c.name, Err: err}
-		}
-		lang := ""
-		if c.language != nil {
-			lang = c.language(file)
-		}
-		from := fileFormat(file.Path)
-		if from == "" && format != nil {
-			from = format.Name // an extensionless input, named by its content
-		}
-		return bytes.NewReader(text), int64(len(text)), from, lang, true, nil
+	} else if opts.ExtractMedia && format.IsMedia() {
+		name, convert = "media", sources.ExtractMediaMetadata
+	} else {
+		return reader, size, "", "", false, nil
 	}
-	return reader, size, "", "", false, nil
+	text, err := convert(file, reader, size)
+	if err != nil {
+		return reader, size, "", "", false, &ConvertFailure{Converter: name, Err: err}
+	}
+	from := fileFormat(file.Path)
+	if from == "" && format != nil {
+		from = format.Name // an extensionless input, named by its content
+	}
+	return bytes.NewReader(text), int64(len(text)), from, lang, true, nil
 }
 
 // classify decides the file's format from its content before any converter
