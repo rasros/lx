@@ -1,0 +1,16 @@
+--- STDOUT ---
+skeleton/cppempty.h (12 rows, function signatures)
+---
+```c
+int lsame(const char* ca, const char* cb
+#ifndef NO_LENGTHS
+          , int lca, int lcb
+#endif
+);
+...
+/* Returns the norm of x. */
+double nrm2(int n, const double* x);
+```
+
+
+--- STDERR ---

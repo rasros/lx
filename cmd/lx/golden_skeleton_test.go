@@ -33,6 +33,7 @@ func TestGoldenSkeleton(t *testing.T) {
 		{name: "322_skeleton_c_both", args: []string{"-u", "-Y", "skeleton/main.c"}},
 		{name: "323_skeleton_cpp_both", args: []string{"-u", "-Y", "skeleton/main.cpp"}},
 		{name: "324_skeleton_c_block_doc", args: []string{"-u", "-Y", "skeleton/blockdoc.c"}},
+		{name: "327_skeleton_h_unhinted_cpp", args: []string{"-u", "skeleton/nohint.h"}},
 
 		// 330-339: Java
 		{name: "330_skeleton_java_structs", args: []string{"-Y", "skeleton/Main.java"}},
@@ -128,14 +129,18 @@ func TestGoldenSkeletonMembers(t *testing.T) {
 // default arguments and pure virtuals in a .h file read as C, directives
 // inside raw strings and between strings, and error recovery: a misparsed
 // declaration that holds functions kept whole, nodes the grammar hides,
-// statements recovered as declarations, and a conditional left open.
+// statements recovered as declarations, and a conditional left open. The
+// last fixtures pin how a .h file is read: as C++ when it holds only C++
+// enums and methods, as C when its C++ look is C (asm clobbers, attributes)
+// or when the C++ grammar fails on it.
 func TestGoldenSkeletonTopLevel(t *testing.T) {
 	dir := setupSkeletonFixture(t)
 	// Error-recovery fixtures only pin behavior with -u, so their -Y case
 	// is left out.
-	functionsOnly := []string{"misparse.h", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp"}
+	functionsOnly := []string{"misparse.c", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp"}
 	var cases []goldenTestCase
-	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "defaults.h", "idiom.h", "rawstring.cpp", "asm.c", "misparse.h", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp"} {
+	for i, file := range []string{"toplevel.h", "toplevel.cpp", "guard.h", "api.hpp", "defaults.h", "idiom.h", "rawstring.cpp", "asm.c", "misparse.c", "hidden.cpp", "openif.c", "stmt.c", "stmt.cpp",
+		"enumclass.h", "kernel.h", "cppempty.h"} {
 		stem := strings.TrimSuffix(file, filepath.Ext(file))
 		for _, tc := range skeletonModeCases(650+3*i, stem, []string{file}) {
 			if slices.Contains(functionsOnly, file) && strings.HasSuffix(tc.name, "_types") {

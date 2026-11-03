@@ -315,8 +315,8 @@ type skeletonView struct {
 
 // applySkeleton reduces source to signatures and definitions, or returns nil
 // when the file is not reduced. Unlike a converter it runs after detection,
-// because it needs the detected language.
-func applySkeleton(cfg core.RenderOptions, lang string, reader io.ReaderAt, size int64, isBinary, isImage bool) *skeletonView {
+// because it needs the detected language. A header (.h) may be C or C++.
+func applySkeleton(cfg core.RenderOptions, lang string, header bool, reader io.ReaderAt, size int64, isBinary, isImage bool) *skeletonView {
 	if isBinary || isImage || (!cfg.SkeletonFunctions && !cfg.SkeletonTypes) || !skeleton.Supported(lang) {
 		return nil
 	}
@@ -327,7 +327,7 @@ func applySkeleton(cfg core.RenderOptions, lang string, reader io.ReaderAt, size
 	}
 
 	return &skeletonView{
-		lines: skeleton.Keep(lang, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes),
+		lines: skeleton.Keep(lang, header, allData, cfg.SkeletonFunctions, cfg.SkeletonTypes),
 		rows:  internal.CountLines(allData),
 		mode:  skeletonModeLabel(cfg.SkeletonFunctions, cfg.SkeletonTypes),
 	}
@@ -440,7 +440,7 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 	if ctx.Err() != nil {
 		return core.FileContext{}, issues
 	}
-	skel := applySkeleton(cfg, lang, reader, size, isBinary, isImage)
+	skel := applySkeleton(cfg, lang, strings.EqualFold(filepath.Ext(file.Path), ".h"), reader, size, isBinary, isImage)
 	var skeletonMode string
 	if skel != nil {
 		skeletonMode = skel.mode

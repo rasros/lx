@@ -20,7 +20,7 @@ func NewPoint(x, y float64) Point {
 	return Point{x, y}
 }
 `)
-	out := string(Extract("go", src, true, true))
+	out := string(Extract("go", false, src, true, true))
 	for _, want := range []string{
 		"// Point is a 2D point.",
 		"\t// X is the horizontal coordinate.",
@@ -48,7 +48,7 @@ def create(name):
     """Create something."""
     return name
 `)
-	out := string(Extract("python", src, true, true))
+	out := string(Extract("python", false, src, true, true))
 	for _, want := range []string{
 		"# leading comment for animal",
 		`    """Base class for all animals."""`,
@@ -72,7 +72,7 @@ pub struct User {
 /// Create a user.
 pub fn make(name: String) -> User { User { name } }
 `)
-	out := string(Extract("rust", src, true, true))
+	out := string(Extract("rust", false, src, true, true))
 	for _, want := range []string{
 		"/// User type.",
 		"    /// Public name.",
@@ -98,7 +98,7 @@ public class Calculator {
     public int add(int x) { return value + x; }
 }
 `)
-	out := string(Extract("java", src, true, true))
+	out := string(Extract("java", false, src, true, true))
 	for _, want := range []string{
 		"/**",
 		" * The Calculator.",
@@ -124,7 +124,7 @@ export class Point {
 /** Top-level fn. */
 export function topLevel(x: number): number { return x; }
 `)
-	out := string(Extract("typescript", src, true, true))
+	out := string(Extract("typescript", false, src, true, true))
 	for _, want := range []string{
 		"/** A point. */",
 		"    /** Horizontal axis. */",
@@ -142,7 +142,7 @@ func TestC_MultiLineBlockComment(t *testing.T) {
    across two lines. */
 int subtract(int a, int b);
 `)
-	out := string(Extract("c", src, true, false))
+	out := string(Extract("c", false, src, true, false))
 	for _, want := range []string{
 		"/* Subtract b from a",
 		"   across two lines. */",
@@ -163,7 +163,7 @@ typedef struct P {
     int y;
 } P;
 `)
-	out := string(Extract("c", src, false, true))
+	out := string(Extract("c", false, src, false, true))
 	if strings.Count(out, "/* leading */") != 1 {
 		t.Errorf("leading comment duplicated:\n%s", out)
 	}
@@ -182,7 +182,7 @@ func TestHaskell_BlockComment(t *testing.T) {
    With a continuation. -}
 newtype Name = Name String
 `)
-	out := string(Extract("haskell", src, false, true))
+	out := string(Extract("haskell", false, src, false, true))
 	for _, want := range []string{
 		"{- A newtype wrapper.",
 		"   With a continuation. -}",
@@ -206,7 +206,7 @@ module M = struct
     pi *. r *. r
 end
 `)
-	out := string(Extract("ocaml", src, true, true))
+	out := string(Extract("ocaml", false, src, true, true))
 	for _, want := range []string{
 		"(* Outer doc. *)",
 		"  (* Inner doc. *)",
@@ -228,7 +228,7 @@ def combine(x, y)
   x + y
 end
 `)
-	out := string(Extract("ruby", src, true, false))
+	out := string(Extract("ruby", false, src, true, false))
 	for _, want := range []string{
 		"=begin",
 		"Doc for combine.",
@@ -252,7 +252,7 @@ func Helper() {}
 // Real doc for Real.
 func Real() {}
 `)
-	out := string(Extract("go", src, true, false))
+	out := string(Extract("go", false, src, true, false))
 	if strings.Contains(out, "Top-of-file comment") {
 		t.Errorf("orphan comment should not attach to Helper:\n%s", out)
 	}
