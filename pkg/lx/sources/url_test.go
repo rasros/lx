@@ -172,7 +172,7 @@ func TestDownloadURLToTempFile(t *testing.T) {
 	}))
 	defer server.Close()
 
-	path, cleanup, err := DownloadURLToTempFile(context.Background(), server.URL+"/main.zip")
+	path, cleanup, err := DownloadURLToTempFile(context.Background(), server.URL+"/main.zip", t.TempDir())
 	if err != nil {
 		t.Fatalf("DownloadURLToTempFile error: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestDownloadURLToTempFile_StatusError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, _, err := DownloadURLToTempFile(context.Background(), server.URL+"/main.zip")
+	_, _, err := DownloadURLToTempFile(context.Background(), server.URL+"/main.zip", t.TempDir())
 	if err == nil {
 		t.Fatalf("expected status error")
 	}
@@ -210,7 +210,7 @@ func TestDownloadURLToTempFile_DownloadedArchiveDetectable(t *testing.T) {
 	}))
 	defer server.Close()
 
-	path, cleanup, err := DownloadURLToTempFile(context.Background(), server.URL+"/main.zip")
+	path, cleanup, err := DownloadURLToTempFile(context.Background(), server.URL+"/main.zip", t.TempDir())
 	if err != nil {
 		t.Fatalf("DownloadURLToTempFile error: %v", err)
 	}

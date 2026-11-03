@@ -1,6 +1,7 @@
 package templatex
 
 import (
+	"errors"
 	"fmt"
 	"html"
 	"math"
@@ -333,16 +334,22 @@ func templateFuncs(engine *core.TemplateEngine) template.FuncMap {
 			}
 			return str
 		},
-		"dataURI": func(path string) string {
+		// dataURI reads a file on disk. An archive entry has none, so its
+		// empty AbsPath fails the template instead of rendering nothing;
+		// its .DataURI holds an image's content.
+		"dataURI": func(path string) (string, error) {
+			if path == "" {
+				return "", errors.New("dataURI: no file on disk to read; an archive entry has no AbsPath, and .DataURI holds an image's content")
+			}
 			abs := path
 			if !filepath.IsAbs(abs) && engine.Dir != "" {
 				abs = filepath.Join(engine.Dir, abs)
 			}
 			data, err := os.ReadFile(abs)
 			if err != nil {
-				return ""
+				return "", nil
 			}
-			return internal.DataURI(path, data)
+			return internal.DataURI(path, data), nil
 		},
 		"escape": func(s interface{}) string {
 			return html.EscapeString(contentString(s))

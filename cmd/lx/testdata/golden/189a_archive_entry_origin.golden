@@ -1,0 +1,12 @@
+--- STDOUT ---
+archive.zip/hello.txt abs=[] archive=[/ROOT/archive.zip] entry=[hello.txt]
+
+
+archive.zip/nested/world.go abs=[] archive=[/ROOT/archive.zip] entry=[nested/world.go]
+
+
+notes.txt.gz/notes.txt.gz abs=[] archive=[/ROOT/notes.txt.gz] entry=[notes.txt.gz]
+
+
+
+--- STDERR ---

@@ -124,8 +124,13 @@ type Config struct {
 
 // FileContext represents the data provided to file-level templates.
 type FileContext struct {
-	Path             string
-	AbsPath          string
+	Path    string
+	AbsPath string
+	// Archive and Entry name an archive entry, which has no AbsPath: the
+	// archive's absolute path, or its URL when it was downloaded, and the
+	// entry's path inside it.
+	Archive          string
+	Entry            string
 	Size             int64
 	OriginalSize     int64
 	ModTime          time.Time

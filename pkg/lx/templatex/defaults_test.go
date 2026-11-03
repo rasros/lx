@@ -129,11 +129,11 @@ func TestDataURIResolvesAgainstDir(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "logo.svg"), []byte("<svg/>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	dataURI := templateFuncs(&core.TemplateEngine{Dir: dir})["dataURI"].(func(string) string)
-	if got := dataURI("logo.svg"); !strings.HasPrefix(got, "data:") {
+	dataURI := templateFuncs(&core.TemplateEngine{Dir: dir})["dataURI"].(func(string) (string, error))
+	if got, _ := dataURI("logo.svg"); !strings.HasPrefix(got, "data:") {
 		t.Errorf("dataURI(logo.svg) = %q, want a data URI of the file in Dir", got)
 	}
-	if got := dataURI("missing.svg"); got != "" {
+	if got, _ := dataURI("missing.svg"); got != "" {
 		t.Errorf("dataURI(missing.svg) = %q, want empty", got)
 	}
 }

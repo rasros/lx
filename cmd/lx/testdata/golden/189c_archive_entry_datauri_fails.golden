@@ -1,0 +1,5 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: template: file_content:1:15: executing "file_content" at <dataURI .AbsPath>: error calling dataURI: dataURI: no file on disk to read; an archive entry has no AbsPath, and .DataURI holds an image's content

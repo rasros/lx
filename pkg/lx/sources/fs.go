@@ -13,8 +13,15 @@ import (
 )
 
 type InputFile struct {
-	Path    string
+	Path string
+	// AbsPath is the absolute path of the file on disk, or the URL of one
+	// fetched from a URL. It is empty for an archive entry, which is no file
+	// on disk.
 	AbsPath string
+	// Archive and Entry name an archive entry: the archive's absolute path,
+	// or its URL when it was downloaded, and the entry's path inside it.
+	Archive string
+	Entry   string
 	Size    int64
 	ModTime time.Time
 
@@ -28,6 +35,16 @@ type InputFile struct {
 	// such as an HTTP response's Content-Type. It is shared by pointer so the
 	// value copies the pipeline makes all observe what Open recorded.
 	mediaType *string
+}
+
+// Key names the input uniquely among those of one run, as core.Failure.Path
+// names one that could not be read: its AbsPath, or its archive's and the
+// entry's path in it.
+func (f InputFile) Key() string {
+	if f.Archive != "" {
+		return f.Archive + "/" + f.Entry
+	}
+	return f.AbsPath
 }
 
 type byteReaderReadCloser struct {

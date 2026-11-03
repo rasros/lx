@@ -37,12 +37,14 @@ type goldenTestCase struct {
 }
 
 // goldenRun is what the cases of one batch share: the working directory they
-// run in, the environment variables set for them and the paths their output
-// names as /ROOT.
+// run in, the environment variables set for them, the paths their output
+// names as /ROOT and the hosts, with their ports, it names as HOST, which
+// keeps the rest of a URL as written.
 type goldenRun struct {
 	cwd   string
 	env   map[string]string
 	scrub []string
+	hosts []string
 }
 
 // runTestGolden runs cases in workDir, naming it /ROOT.
@@ -110,7 +112,11 @@ func runGoldenTests(t *testing.T, cases []goldenTestCase, run goldenRun) {
 				stderrBuf.WriteString("\nCLI Error: " + err.Error() + "\n")
 			}
 
-			fullOutput := normalizeOutput(stdoutBuf.String(), stderrBuf.String(), run.scrub...)
+			stdout, stderr := stdoutBuf.String(), stderrBuf.String()
+			for _, h := range run.hosts {
+				stdout, stderr = strings.ReplaceAll(stdout, h, "HOST"), strings.ReplaceAll(stderr, h, "HOST")
+			}
+			fullOutput := normalizeOutput(stdout, stderr, run.scrub...)
 			if tc.outFile != "" {
 				content := "(missing)\n"
 				if data, err := os.ReadFile(filepath.Join(run.cwd, tc.outFile)); err == nil {
