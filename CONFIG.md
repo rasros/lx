@@ -47,7 +47,7 @@ All keys are optional. Templates not listed here aren't recognized.
 
 | Key                       | Type     | Default        | Notes                                                                                             |
 |---------------------------|----------|----------------|---------------------------------------------------------------------------------------------------|
-| `output_format`           | enum     | `markdown`     | `markdown` \| `xml` \| `html` \| `bare`. Overridden by `--md`/`--xml`/`--html`/`--bare`.          |
+| `output_format`           | enum     | `markdown`     | `markdown` \| `xml` \| `html` \| `bare`; any other value is an error. Overridden by `--md`/`--xml`/`--html`/`--bare`. |
 | `output_mode`             | enum     | `stdout`       | `stdout` \| `copy`. Overridden by `-c`/`-C`/`-o`.                                                 |
 | `show_stats`              | enum     | `auto`         | `auto` \| `always` \| `never`. Overridden by `--stats`/`--no-stats`/`-q`.                         |
 | `verbosity`               | enum     | `warn`         | `debug` \| `info` \| `warn` \| `error` \| `silent` (or numeric `0`/`1`/`2+`). Overridden by `-v`. |
@@ -57,7 +57,7 @@ All keys are optional. Templates not listed here aren't recognized.
 | `file_error_template`     | template | format default | Renders when a file can't be read.                                                                |
 | `file_binary_template`    | template | format default | Renders when a file is detected as binary.                                                        |
 | `file_compact_template`   | template | format default | Renders in compact mode (`-n 0`).                                                                 |
-| `file_header_template`    | template | format default | Shared partial usable from the four `file_*_templates` as `{{ template "file_header" . }}`.       |
+| `file_header_template`    | template | format default | Shared partial usable from the five other `file_*_templates` as `{{ template "file_header" . }}`.       |
 | `file_image_template`     | template | format default | Renders an image file. Can call `file_content` and `file_binary` as well as `file_header`.        |
 | `section_template`        | template | format default | Renders a logical section break (from `-s`).                                                      |
 | `prompt_template`         | template | format default | Renders text injected via `-p` or `-P`.                                                           |
@@ -88,12 +88,12 @@ The README's [Prompts and sections](README.md#prompts-and-sections) section cove
 set overrides that one property and leaves the rest of the profile in place, so `--html` with `separators: true` is
 still HTML. The shipped YAML profiles spell out the Markdown and XML ones in full.
 
-| Profile    | `separators` | `embed_images` | `file_image_template` renders an image as |
-|------------|--------------|----------------|-------------------------------------------|
-| `markdown` | `true`       | `false`        | `file_binary`                             |
-| `xml`      | `true`       | `false`        | `file_binary`                             |
-| `html`     | `false`      | `true`         | `file_content`, which shows `.DataURI`    |
-| `bare`     | `false`      | `false`        | `file_binary`                             |
+| Profile    | `separators` | `embed_images` | `file_image_template` renders an image as      |
+|------------|--------------|----------------|------------------------------------------------|
+| `markdown` | `true`       | `false`        | `file_binary`                                  |
+| `xml`      | `true`       | `false`        | `file_binary`                                  |
+| `html`     | `false`      | `true`         | an `<img>` of `.DataURI`, apart from content   |
+| `bare`     | `false`      | `false`        | `file_binary`                                  |
 
 With `separators`, lx writes a blank line between items (files, prompts, trees and section titles), a single newline
 between two compact files, and a blank line before each section after the first. Without them items run together, so
@@ -217,7 +217,7 @@ Every `file_*_template` is parsed together with `file_header_template`, so any o
 ```
 
 to render the shared header. `file_image_template` can also call `file_content` and `file_binary`, which is how the
-built-in profiles render images. The Markdown profile uses this; the XML profile intentionally doesn't define
+built-in profiles other than HTML render images. The Markdown profile uses this; the XML profile intentionally doesn't define
 `file_header_template` (see the comment at the top of `xml_config.yaml`).
 
 ## Override recipes

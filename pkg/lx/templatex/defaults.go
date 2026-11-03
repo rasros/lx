@@ -40,11 +40,9 @@ type profile struct {
 	EmbedImages bool
 }
 
-// Image templates that render an image as one of the other file templates.
-const (
-	imageAsContent = `{{ template "file_content" . }}`
-	imageAsBinary  = `{{ template "file_binary" . }}`
-)
+// imageAsBinary renders an image as the binary file template does, for the
+// formats that do not embed images.
+const imageAsBinary = `{{ template "file_binary" . }}`
 
 // profiles are the built-in output formats by name.
 var profiles = map[string]profile{
@@ -82,7 +80,7 @@ var profiles = map[string]profile{
 		FileError:     defaultHTMLError,
 		FileBinary:    defaultHTMLBinary,
 		FileCompact:   defaultHTMLCompact,
-		FileImage:     imageAsContent,
+		FileImage:     defaultHTMLImage,
 		Section:       defaultHTMLSection,
 		SectionHeader: defaultHTMLSectionHeader,
 		SectionFooter: defaultHTMLSectionFooter,
@@ -222,7 +220,7 @@ const defaultHTMLOutputFooter = `</main>
 const defaultHTMLContent = `<article id="file-{{ .FileIndex }}">
 <header>
  <a href="#file-{{ .FileIndex }}" aria-label="Link to this file"><strong>{{ .Path }}</strong></a>
-{{- if and (gt .Size 0) (not .IsImage) (not .IsError) }}
+{{- if and (gt .Size 0) (not .IsError) }}
  <small>
 {{- if .IsCompactView -}}
    ({{ if .IsEstimate }}~{{ end }}{{ .TotalRows }} rows - compact)
@@ -232,12 +230,16 @@ const defaultHTMLContent = `<article id="file-{{ .FileIndex }}">
  </small>
 {{- end }}
 </header>
-{{- if .IsImage }}
-<img src="{{ .DataURI }}" alt="{{ .Path }}" />
-{{- else }}
 <pre><code{{ if .Language }} class="language-{{ .Language }}"{{ end }}>
 {{ .Content | escape | endNewline }}</code></pre>
-{{- end }}
+</article>
+`
+
+const defaultHTMLImage = `<article id="file-{{ .FileIndex }}">
+<header>
+ <a href="#file-{{ .FileIndex }}" aria-label="Link to this file"><strong>{{ .Path }}</strong></a>
+</header>
+<img src="{{ .DataURI }}" alt="{{ .Path }}" />
 </article>
 `
 
