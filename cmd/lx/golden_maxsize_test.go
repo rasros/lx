@@ -17,7 +17,6 @@ func TestGoldenMaxSize(t *testing.T) {
 		{name: "143_max_size_tree_matches_content", args: []string{"-m", "1k", "-T", "."}},
 		{name: "144_max_size_tree_only", args: []string{"-m", "1k", "-t", "."}},
 		{name: "145_max_size_named_file", args: []string{"-m", "1k", "src/large.txt"}},
-		{name: "146_max_size_applies_to_named_file", args: []string{"-m", "1k", "src/large.txt"}},
 		{name: "147_max_size_per_section_override", args: []string{"-m", "20", ".", "-m", "2k", "src/large.txt"}},
 		{name: "148_max_size_invalid_value", args: []string{"-m", "notasize", "."}},
 		{name: "149_max_size_attached_short_form", args: []string{"-m1k", "."}},

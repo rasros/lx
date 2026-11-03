@@ -46,13 +46,12 @@ func loadFrom(t *testing.T, yaml string) (*lx.Config, *CliConfig) {
 	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	env, _, _ := testEnv(t)
-	env.LookupEnv = func(k string) (string, bool) {
+	env := Env{Cwd: t.TempDir(), LookupEnv: func(k string) (string, bool) {
 		if k == "XDG_CONFIG_HOME" {
 			return dir, true
 		}
 		return "", false
-	}
+	}}
 
 	lxCfg, cliCfg, err := LoadConfigChain(env, slog.Default(), path)
 	if err != nil {

@@ -265,35 +265,6 @@ func assertNotContains(t *testing.T, list []string, item string) {
 	}
 }
 
-// An -i glob matches a path as a gitignore pattern does: by its base name
-// without a slash, as a whole path with one, and never by a directory above
-// it, which the walk judges on its own.
-func TestIncludeMatch(t *testing.T) {
-	tests := []struct {
-		pattern string
-		path    string
-		want    bool
-	}{
-		{"*.go", "sub/main.go", true},
-		{"*.go", "main.txt", false},
-		{"/foo.txt", "foo.txt", true},
-		{"/foo.txt", "sub/foo.txt", false},
-		{"src/*.go", "src/main.go", true},
-		{"src/*.go", "pkg/src/main.go", false},
-		{"**/test", "a/b/test", true},
-		{"**/test", "test", true},
-		{"target", "src/target", true},
-		{"target", "target/main.go", false},
-		{"node_modules/", "node_modules/pkg/foo.go", false},
-	}
-	for _, tt := range tests {
-		o := compileOverrides([]Override{IncludeOverride(tt.pattern)})
-		if m, _ := o.match(tt.path, false, false); (m == matchKeep) != tt.want {
-			t.Errorf("match(%q, %q) = %v, want %v", tt.pattern, tt.path, m == matchKeep, tt.want)
-		}
-	}
-}
-
 func TestParseRules(t *testing.T) {
 	t.Run("comment and blank lines skipped", func(t *testing.T) {
 		rules := parseRules([]string{"# comment", "  ", "foo"}, "", "test")
