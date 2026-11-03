@@ -41,7 +41,22 @@ const (
 type Collector = discover.Collector
 type URLError = discover.URLError
 
-type FileErrorHandler = streamingpkg.FileErrorHandler
+// Failure is an input that could not be read, so it is missing from the
+// output, of a FailureKind. Collector.Collect returns them; added to a Stream
+// with AddFailure they are reported and counted with the files the Stream
+// cannot read.
+type Failure = core.Failure
+type FailureKind = core.FailureKind
+
+const (
+	FailedStat    = core.FailedStat
+	FailedURL     = core.FailedURL
+	FailedWalk    = core.FailedWalk
+	FailedArchive = core.FailedArchive
+	FailedRead    = core.FailedRead
+)
+
+type FailureHandler = streamingpkg.FailureHandler
 
 func NewConfig() *Config { return core.NewConfig() }
 
@@ -49,8 +64,8 @@ func Merge(dst *Config, src *Config) { core.Merge(dst, src) }
 
 // NewCollector returns a Collector, which finds the inputs of the targets of
 // one run as lx does. Relative targets resolve against cwd, or the process's
-// working directory when it is empty, and problems are logged to log, or
-// slog.Default() when it is nil.
+// working directory when it is empty. Collect returns the inputs it fails
+// on; the rest is logged to log, or slog.Default() when it is nil.
 func NewCollector(cwd string, log *slog.Logger) *Collector { return discover.NewCollector(cwd, log) }
 
 // IncludeGlob returns lx's -i pattern p, ripgrep's -g p: a GlobInclude, or a
@@ -97,10 +112,20 @@ func (s *Stream) WithConcurrency(n int) *Stream {
 	return s
 }
 
-// WithOnFileError sets h to be told about each file that cannot be opened,
-// in output order, from the goroutine running Execute.
-func (s *Stream) WithOnFileError(h FileErrorHandler) *Stream {
-	s.inner.WithOnFileError(h)
+// WithOnFailure sets h to be told about every failure, in output order,
+// from the goroutine running Execute: the ones added with AddFailure and the
+// files that cannot be read as they render, each counted once in FailedFiles.
+// Without one, the stream logs them.
+func (s *Stream) WithOnFailure(h FailureHandler) *Stream {
+	s.inner.WithOnFailure(h)
+	return s
+}
+
+// AddFailure adds an input that could not be read, such as one Collect
+// returned. It renders nothing, but is reported where it stands in the output
+// and counted in FailedFiles.
+func (s *Stream) AddFailure(f Failure) *Stream {
+	s.inner.AddFailure(f)
 	return s
 }
 

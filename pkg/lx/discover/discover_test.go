@@ -3,15 +3,18 @@ package discover
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/sources"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
@@ -88,9 +91,9 @@ func TestCollect_IgnoreFileReads(t *testing.T) {
 		c := newCollector(host, dir, slog.Default())
 		included := 0
 		for _, target := range targets {
-			files, err := c.Collect(context.Background(), target, Options{})
-			if err != nil {
-				t.Fatal(err)
+			files, failures, err := c.Collect(context.Background(), target, Options{})
+			if err != nil || len(failures) > 0 {
+				t.Fatal(err, failures)
 			}
 			included += len(files)
 		}
@@ -129,21 +132,64 @@ func paths(files []sources.InputFile) []string {
 	return out
 }
 
-// A target that does not exist is an error, which names the path stat'ed.
+// A target that does not exist is a failure, of the path stat'ed.
 func TestCollect_MissingTarget(t *testing.T) {
-	files, err := NewCollector(t.TempDir(), nil).Collect(context.Background(), "nope.go", Options{})
+	dir := t.TempDir()
+	files, failures, err := NewCollector(dir, nil).Collect(context.Background(), "nope.go", Options{})
 	var pe *fs.PathError
-	if !errors.As(err, &pe) || pe.Op != "stat" || len(files) != 0 {
-		t.Fatalf("got %v, %v; want a stat error and no inputs", paths(files), err)
+	if err != nil || len(files) != 0 || len(failures) != 1 {
+		t.Fatalf("got %v, %v, %v; want one failure and no inputs", paths(files), failures, err)
+	}
+	f := failures[0]
+	if f.Kind != core.FailedStat || f.Path != filepath.Join(dir, "nope.go") || !errors.As(f.Err, &pe) || pe.Op != "stat" {
+		t.Errorf("got %+v, want a stat failure of the path", f)
+	}
+}
+
+// An archive that cannot be expanded is a failure, as is a directory below a
+// target that cannot be read; the rest of the walk goes on.
+func TestCollect_FailuresBelowTarget(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Getuid() == 0 {
+		t.Skip("needs an unreadable directory")
+	}
+	dir := t.TempDir()
+	for name, data := range map[string]string{"a.go": "package a", "bad.zip": "not a zip", "locked/b.go": "package b"} {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(filepath.Join(dir, "locked"), 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "locked"), 0o755) })
+
+	files, failures, err := NewCollector(dir, nil).Collect(context.Background(), ".", Options{ExpandArchives: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := paths(files); !slices.Equal(got, []string{"a.go"}) {
+		t.Errorf("got %v, want [a.go]", got)
+	}
+	var got []string
+	for _, f := range failures {
+		got = append(got, fmt.Sprintf("%d:%s", f.Kind, f.Path))
+	}
+	want := []string{fmt.Sprintf("%d:bad.zip", core.FailedArchive), fmt.Sprintf("%d:locked", core.FailedWalk)}
+	if !slices.Equal(got, want) {
+		t.Errorf("failures %v, want %v", got, want)
 	}
 }
 
 // A URL is one input, fetched only when rendered.
 func TestCollect_URL(t *testing.T) {
 	url := "https://example.com/repo.zip"
-	files, err := NewCollector("", nil).Collect(context.Background(), url, Options{})
-	if err != nil {
-		t.Fatal(err)
+	files, failures, err := NewCollector("", nil).Collect(context.Background(), url, Options{})
+	if err != nil || len(failures) > 0 {
+		t.Fatal(err, failures)
 	}
 	if got := paths(files); !slices.Equal(got, []string{url}) {
 		t.Fatalf("got %v, want [%s]", got, url)
@@ -158,7 +204,7 @@ func TestCollect_CancelledWalk(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	files, err := NewCollector("", nil).Collect(ctx, dir, Options{})
+	files, _, err := NewCollector("", nil).Collect(ctx, dir, Options{})
 	if !errors.Is(err, context.Canceled) || len(files) != 0 {
 		t.Fatalf("got %v, %v; want context.Canceled and no inputs", paths(files), err)
 	}

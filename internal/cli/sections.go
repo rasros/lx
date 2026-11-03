@@ -16,6 +16,7 @@ type Section struct {
 	treeFiles   map[int][]lx.InputFile
 	skipFileOps map[int]bool
 	resolved    map[int][]lx.InputFile
+	failures    map[int][]lx.Failure
 }
 
 // parseSections splits ops into sections, each with its own interleaved

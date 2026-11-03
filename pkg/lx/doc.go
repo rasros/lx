@@ -42,13 +42,19 @@
 // Stream methods:
 //
 //   - AddFile, AddSection, AddPrompt, AddMeta enqueue content.
+//   - AddFailure enqueues an input that could not be read, such as one
+//     Collect returned, to be reported and counted in output order.
 //   - Admit reports whether AddFile keeps a file under its RenderOptions.
 //   - AddTree enqueues a directory tree of the files Admit keeps.
 //   - Execute renders output to an io.Writer.
 //   - GetGlobalContext exposes aggregate statistics.
-//   - WithConcurrency / WithOnFileError / WithLogger customize processing.
+//   - WithConcurrency / WithOnFailure / WithLogger customize processing.
 //     Skeleton rendering caps the workers at two.
 //
+// Every input that could not be read is a Failure, which reaches the caller
+// once: Collect returns the ones discovery meets, and a Stream hands its
+// handler, in output order, the ones added to it and the files it cannot
+// read, counting each in FailedFiles. A Stream with no handler logs them.
 // The library logs to the *slog.Logger it is given: NewCollector,
 // UserIgnoreRules and Stream.WithLogger take one, and nil means
 // slog.Default().
@@ -70,7 +76,7 @@
 //
 //		var opts lx.DiscoverOptions
 //		opts.IgnoreRules, opts.GitExcludes = lx.UserIgnoreRules(os.LookupEnv, nil)
-//		files, err := lx.NewCollector("", nil).Collect(ctx, ".", opts)
+//		files, failures, err := lx.NewCollector("", nil).Collect(ctx, ".", opts)
 //		if err != nil {
 //			panic(err)
 //		}
@@ -78,6 +84,9 @@
 //		stream, err := lx.NewStream(lx.NewConfig())
 //		if err != nil {
 //			panic(err)
+//		}
+//		for _, f := range failures {
+//			stream.AddFailure(f)
 //		}
 //		for _, f := range files {
 //			stream.AddFile(f, lx.RenderOptions{Head: -1})

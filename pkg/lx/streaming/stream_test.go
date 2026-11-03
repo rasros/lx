@@ -3,6 +3,7 @@ package streaming
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -424,9 +425,10 @@ func TestStream_TreeListsOnlyAdmittedFiles(t *testing.T) {
 	}
 }
 
-// Files that cannot be opened are reported in output order, whichever worker
-// rendered them first.
-func TestStream_FileErrorsInOutputOrder(t *testing.T) {
+// Files that cannot be opened and failures added to the stream are reported
+// in output order, whichever worker rendered them first, and each is counted
+// once.
+func TestStream_FailuresInOutputOrder(t *testing.T) {
 	stream, err := NewStream(core.NewConfig())
 	if err != nil {
 		t.Fatal(err)
@@ -435,12 +437,16 @@ func TestStream_FileErrorsInOutputOrder(t *testing.T) {
 	for i := range 64 {
 		path := "missing-" + strconv.Itoa(i)
 		want = append(want, path)
+		if i%3 == 0 {
+			stream.AddFailure(core.Failure{Kind: core.FailedStat, Path: path, Err: errors.New("gone")})
+			continue
+		}
 		stream.AddFile(sources.InputFile{Path: path, Open: func() (io.ReadCloser, error) {
 			return nil, fmt.Errorf("open %s: gone", path)
 		}}, core.RenderOptions{Head: -1})
 	}
 	var got []string
-	stream.WithConcurrency(8).WithOnFileError(func(f sources.InputFile, err error) {
+	stream.WithConcurrency(8).WithOnFailure(func(f core.Failure) {
 		got = append(got, f.Path)
 	})
 	if err := stream.Execute(context.Background(), io.Discard); err != nil {
@@ -448,6 +454,9 @@ func TestStream_FileErrorsInOutputOrder(t *testing.T) {
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("reported %v, want %v", got, want)
+	}
+	if n := stream.GetGlobalContext().FailedFiles; n != len(want) {
+		t.Errorf("FailedFiles = %d, want %d", n, len(want))
 	}
 }
 

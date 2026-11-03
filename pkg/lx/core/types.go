@@ -193,3 +193,32 @@ type TokenCounter func(size int64, content interface{}) int64
 type Tokenizer interface {
 	Estimate(size int64, content interface{}) int64
 }
+
+// Failure is an input that could not be read, so it is missing from the
+// output. Discovery returns the failures it meets and a Stream reports the
+// ones added to it, or met rendering, in output order, so each failure is
+// counted once, in the Stream's FailedFiles.
+type Failure struct {
+	Kind FailureKind
+	// Path is the path or URL of the input.
+	Path string
+	Err  error
+}
+
+// FailureKind is the step an input failed at.
+type FailureKind int
+
+const (
+	// FailedStat is a named path that could not be stat'd.
+	FailedStat FailureKind = iota
+	// FailedURL is a URL that could not be parsed or downloaded.
+	FailedURL
+	// FailedWalk is a directory or file below a named one that could not be
+	// read or stat'd.
+	FailedWalk
+	// FailedArchive is an archive, or an entry in one, that could not be
+	// read.
+	FailedArchive
+	// FailedRead is a file that could not be opened or read, as it rendered.
+	FailedRead
+)

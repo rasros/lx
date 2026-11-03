@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -30,7 +31,10 @@ func overrideIfSet[T comparable](dst *T, src T) {
 }
 
 // LoadConfigChain merges the user's config file, the one $LX_CONFIG names and
-// the one cliPath names, each over the ones before it.
+// the one cliPath names, each over the ones before it. A missing user or
+// $LX_CONFIG file is skipped and one that fails is logged and skipped; a
+// cliPath file that fails is the error, which is left to the caller to
+// report.
 func LoadConfigChain(env Env, log *slog.Logger, cliPath string) (*lx.Config, *CliConfig, error) {
 	lxCfg := lx.NewConfig()
 
@@ -46,8 +50,7 @@ func LoadConfigChain(env Env, log *slog.Logger, cliPath string) (*lx.Config, *Cl
 			if os.IsNotExist(err) && !strict {
 				return nil
 			}
-			log.Error("Failed to open config file", "path", path, "error", err)
-			return err
+			return fmt.Errorf("config file: %w", err)
 		}
 		defer f.Close()
 
@@ -55,8 +58,7 @@ func LoadConfigChain(env Env, log *slog.Logger, cliPath string) (*lx.Config, *Cl
 
 		var loaded CliConfig
 		if err := yaml.NewDecoder(f).Decode(&loaded); err != nil {
-			log.Error("Failed to parse config file", "path", path, "error", err)
-			return err
+			return fmt.Errorf("parse config file %s: %w", path, err)
 		}
 
 		lx.Merge(lxCfg, &loaded.Config)
@@ -73,12 +75,15 @@ func LoadConfigChain(env Env, log *slog.Logger, cliPath string) (*lx.Config, *Cl
 	}
 
 	if configDir, err := env.configDir(); err == nil {
-		path := filepath.Join(configDir, "lx", "config.yaml")
-		_ = apply(path, false)
+		if err := apply(filepath.Join(configDir, "lx", "config.yaml"), false); err != nil {
+			log.Error("Skipping config file", "error", err)
+		}
 	}
 
 	if envPath := env.getenv("LX_CONFIG"); envPath != "" {
-		_ = apply(envPath, false)
+		if err := apply(envPath, false); err != nil {
+			log.Error("Skipping config file", "error", err)
+		}
 	}
 
 	if cliPath != "" {

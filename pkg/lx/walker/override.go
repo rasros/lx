@@ -116,7 +116,7 @@ func (o Override) rule() (Rule, bool) {
 		p = strings.ReplaceAll(p, `\`, "/")
 	}
 	p, valid := translateClasses(p)
-	r := newRule(p, o.Kind != Exclude, "", "-i/-e globs")
+	r := newRule(p, o.Kind != Exclude, "", "globs")
 	r.invalid = !valid
 	return r, true
 }
@@ -208,7 +208,7 @@ func (o *overrides) match(p string, isDir, wantReason bool) (match, string) {
 		return m, reason
 	}
 	if o.whitelist && !isDir {
-		return matchIgnore, "matched by no -i glob"
+		return matchIgnore, "matched by no include glob"
 	}
 	return matchNone, ""
 }

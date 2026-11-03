@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"log/slog"
 	"slices"
 
@@ -12,7 +11,9 @@ import (
 
 // resolveSections collects every file op once, before rendering, so the tree
 // builder and the content pass share one view of what each path refers to.
-// It returns how many paths could not be resolved.
+// What an op fails on is kept with it, for the content pass to add to the
+// stream ahead of the op's files: the stream reports and counts every failure
+// of the run, in output order.
 //
 // Stdin ("-") resolves to nothing: it is a buffer, not a discoverable path, and
 // it can only be read once. The content pass handles it directly.
@@ -21,8 +22,7 @@ import (
 // through its directory, is collected once.
 //
 // It stops at the first target that finds ctx done and returns ctx's error.
-func resolveSections(ctx context.Context, log *slog.Logger, sections []Section, c *lx.Collector) (int, error) {
-	unresolved := 0
+func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) error {
 	piped := map[string]bool{}
 	for si := range sections {
 		s := &sections[si]
@@ -32,14 +32,15 @@ func resolveSections(ctx context.Context, log *slog.Logger, sections []Section, 
 			}
 			opts := s.Discover
 			opts.Piped = op.Piped
-			files, err := c.Collect(ctx, op.Value, opts)
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return unresolved, ctxErr
-			}
+			files, failures, err := c.Collect(ctx, op.Value, opts)
 			if err != nil {
-				logUnresolved(log, op.Value, err)
-				unresolved++
-				continue
+				return err
+			}
+			if len(failures) > 0 {
+				if s.failures == nil {
+					s.failures = make(map[int][]lx.Failure)
+				}
+				s.failures[oi] = failures
 			}
 			if op.Piped {
 				files = slices.DeleteFunc(files, func(f lx.InputFile) bool {
@@ -57,20 +58,30 @@ func resolveSections(ctx context.Context, log *slog.Logger, sections []Section, 
 			s.resolved[oi] = files
 		}
 	}
-	return unresolved, nil
+	return nil
 }
 
-func logUnresolved(log *slog.Logger, target string, err error) {
-	var pe *fs.PathError
-	var ue *lx.URLError
-	switch {
-	case errors.As(err, &pe) && pe.Op == "stat":
-		log.Error("Failed to stat path", "path", pe.Path, "error", err)
-	case errors.As(err, &ue) && ue.Download:
-		log.Error("Failed to download URL archive", "url", ue.URL, "error", ue.Err)
-	case errors.As(err, &ue):
-		log.Error("Failed to create URL input", "url", ue.URL, "error", ue.Err)
+// logFailure logs an input the run could not read, naming the step it
+// failed at.
+func logFailure(log *slog.Logger, f lx.Failure) {
+	switch f.Kind {
+	case lx.FailedStat:
+		log.Error("Failed to stat path", "path", f.Path, "error", f.Err)
+	case lx.FailedURL:
+		var ue *lx.URLError
+		switch {
+		case errors.As(f.Err, &ue) && ue.Download:
+			log.Error("Failed to download URL archive", "url", ue.URL, "error", ue.Err)
+		case errors.As(f.Err, &ue):
+			log.Error("Failed to create URL input", "url", ue.URL, "error", ue.Err)
+		default:
+			log.Error("Failed to read URL", "url", f.Path, "error", f.Err)
+		}
+	case lx.FailedWalk:
+		log.Error("Failed to access path during walk", "path", f.Path, "error", f.Err)
+	case lx.FailedArchive:
+		log.Error("Failed to expand archive", "path", f.Path, "error", f.Err)
 	default:
-		log.Error("Failed to resolve path", "path", target, "error", err)
+		log.Error("Failed to read file", "path", f.Path, "error", f.Err)
 	}
 }

@@ -155,8 +155,8 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 		return err
 	}
 
-	stream.WithLogger(log).WithDir(env.Cwd).WithOnFileError(func(f lx.InputFile, err error) {
-		log.Error("Failed to read file", "path", f.Path, "error", err)
+	stream.WithLogger(log).WithDir(env.Cwd).WithOnFailure(func(f lx.Failure) {
+		logFailure(log, f)
 	})
 	log.Debug("Processing operations", "total_ops", len(parsed.Ops))
 
@@ -168,8 +168,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 		d.IgnoreRules, d.GitExcludes, d.OutPath = ignoreRules, gitExcludes, out.path
 	}
 
-	unresolved, err := resolveSections(ctx, log, sections, lx.NewCollector(env.Cwd, log))
-	if err != nil {
+	if err := resolveSections(ctx, sections, lx.NewCollector(env.Cwd, log)); err != nil {
 		return err
 	}
 	assignTrees(log, sections)
@@ -190,6 +189,9 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 
 			switch op.Action {
 			case "FILE":
+				for _, f := range section.failures[oi] {
+					stream.AddFailure(f)
+				}
 				if section.skipFileOps[oi] {
 					log.Debug("Skipping file content (tree-only mode)", "path", op.Value)
 					continue
@@ -199,7 +201,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 					log.Info("Reading content from stdin")
 					data, err := io.ReadAll(env.Stdin)
 					if err != nil {
-						log.Error("Failed to read from stdin", "error", err)
+						stream.AddFailure(lx.Failure{Kind: lx.FailedRead, Path: "stdin", Err: err})
 						continue
 					}
 					stream.AddFile(lx.NewBufferInputFile("stdin", data), section.Render)
@@ -247,7 +249,6 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
-		log.Error("Pipeline execution failed", "error", err)
 		return err
 	}
 	if sink != nil {
@@ -273,7 +274,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 			"skipped", global.SkippedBySize)
 	}
 
-	handleStatsDisplay(log, env, parsed, cliOpts, stream, out.debug, unresolved)
+	handleStatsDisplay(log, env, parsed, cliOpts, stream, out.debug)
 	return nil
 }
 
@@ -285,7 +286,7 @@ func newLogger(env Env, level slog.Level) *slog.Logger {
 	return slog.New(slog.NewTextHandler(env.Stderr, &slog.HandlerOptions{Level: level}))
 }
 
-func handleStatsDisplay(log *slog.Logger, env Env, parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer, unresolved int) {
+func handleStatsDisplay(log *slog.Logger, env Env, parsed *ParsedArgs, cliOpts *CliConfig, stream *lx.Stream, debugOut io.Writer) {
 	showStatsFlag := cliOpts.ShowStats
 	if _, ok := parsed.Globals["stats"]; ok {
 		showStatsFlag = "always"
@@ -309,11 +310,7 @@ func handleStatsDisplay(log *slog.Logger, env Env, parsed *ParsedArgs, cliOpts *
 	}
 
 	if show {
-		// Paths that never resolved fail before reaching the stream, so the
-		// stream cannot count them itself.
 		global := stream.GetGlobalContext()
-		global.FailedFiles += unresolved
-
 		err := stream.GetEngine().Stats.Execute(debugOut, lx.StatsContext{
 			Global:       global,
 			ColorEnabled: ansi.Enabled(debugOut, env.LookupEnv),

@@ -23,6 +23,11 @@ type Result struct {
 	SectionIndex int
 	Issues       FileIssues // of File, a file item
 	File         sources.InputFile
+	// Failure is the input the item failed on, if any.
+	Failure *core.Failure
+	// Omit marks an item that writes nothing, as a failure added to the
+	// stream.
+	Omit bool
 }
 
 // LayoutWriter acts as a middleman between the pipeline assembler and the output writer.

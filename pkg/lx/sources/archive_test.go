@@ -104,7 +104,7 @@ func TestExpandArchive_BasicEntries(t *testing.T) {
 
 	w := walker.New(walker.Options{})
 
-	files, err := ExpandArchive(context.Background(), path, "archive.zip", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "archive.zip", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestExpandArchive_DisplayPathPrefix(t *testing.T) {
 
 	w := walker.New(walker.Options{})
 
-	files, err := ExpandArchive(context.Background(), path, "path/to/archive.zip", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "path/to/archive.zip", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestExpandArchive_ContentReadable(t *testing.T) {
 
 	w := walker.New(walker.Options{})
 
-	files, err := ExpandArchive(context.Background(), path, "archive.zip", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "archive.zip", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestExpandArchive_OpenIsIndependent(t *testing.T) {
 
 	w := walker.New(walker.Options{})
 
-	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "arc", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestExpandArchive_HiddenFiltered(t *testing.T) {
 
 	w := walker.New(walker.Options{Overrides: []walker.Override{walker.ExcludeOverride(".*")}})
 
-	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "arc", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestExpandArchive_HiddenIncluded(t *testing.T) {
 
 	w := walker.New(walker.Options{})
 
-	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "arc", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestExpandArchive_IncludeFilter(t *testing.T) {
 
 	w := walker.New(walker.Options{Overrides: []walker.Override{walker.IncludeOverride("*.go")}})
 
-	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "arc", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestExpandArchive_ExcludeViaWalkerRule(t *testing.T) {
 
 	w := walker.New(walker.Options{Overrides: []walker.Override{walker.ExcludeOverride("secret.txt")}})
 
-	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "arc", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestExpandArchive_EmptyZip(t *testing.T) {
 
 	w := walker.New(walker.Options{})
 
-	files, err := ExpandArchive(context.Background(), path, "arc", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "arc", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestExpandArchive_EmptyZip(t *testing.T) {
 func TestExpandArchive_UnknownExtension(t *testing.T) {
 	w := walker.New(walker.Options{IgnoreEnabled: true})
 
-	files, err := ExpandArchive(context.Background(), "/any/path/file.go", "file.go", w, nil)
+	files, _, err := ExpandArchive(context.Background(), "/any/path/file.go", "file.go", w, nil)
 	if err != nil {
 		t.Fatalf("expected nil for non-archive path, got: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestExpandArchive_UnknownExtension(t *testing.T) {
 func TestExpandArchive_BadZipPath(t *testing.T) {
 	w := walker.New(walker.Options{IgnoreEnabled: true})
 
-	_, err := ExpandArchive(context.Background(), "/nonexistent/path/archive.zip", "arc", w, nil)
+	_, _, err := ExpandArchive(context.Background(), "/nonexistent/path/archive.zip", "arc", w, nil)
 	if err == nil {
 		t.Fatal("expected error for nonexistent archive, got nil")
 	}
@@ -293,7 +293,7 @@ func TestExpandArchive_TarGz_BasicEntries(t *testing.T) {
 
 	w := walker.New(walker.Options{})
 
-	files, err := ExpandArchive(context.Background(), path, "archive.tar.gz", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "archive.tar.gz", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -310,7 +310,7 @@ func TestExpandArchive_TarGz_ContentReadable(t *testing.T) {
 
 	w := walker.New(walker.Options{})
 
-	files, err := ExpandArchive(context.Background(), path, "arc.tar.gz", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "arc.tar.gz", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -357,7 +357,7 @@ func TestExpandArchive_Gz_SingleEntry(t *testing.T) {
 
 	w := walker.New(walker.Options{})
 
-	files, err := ExpandArchive(context.Background(), path, "data.txt.gz", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "data.txt.gz", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}
@@ -383,7 +383,7 @@ func TestExpandArchive_TarGz_IncludeFilter(t *testing.T) {
 
 	w := walker.New(walker.Options{Overrides: []walker.Override{walker.IncludeOverride("*.go")}})
 
-	files, err := ExpandArchive(context.Background(), path, "arc.tar.gz", w, nil)
+	files, _, err := ExpandArchive(context.Background(), path, "arc.tar.gz", w, nil)
 	if err != nil {
 		t.Fatalf("ExpandArchive error: %v", err)
 	}

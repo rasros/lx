@@ -35,13 +35,16 @@ func TestLibraryMatchesCLI(t *testing.T) {
 
 	var opts lx.DiscoverOptions
 	opts.IgnoreRules, opts.GitExcludes = lx.UserIgnoreRules(lookupEnv, nil)
-	files, err := lx.NewCollector(cwd, nil).Collect(ctx, ".", opts)
-	if err != nil {
-		t.Fatal(err)
+	files, failures, err := lx.NewCollector(cwd, nil).Collect(ctx, ".", opts)
+	if err != nil || len(failures) > 0 {
+		t.Fatal(err, failures)
 	}
 	stream, err := lx.NewStream(lx.NewConfig())
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, f := range failures {
+		stream.AddFailure(f)
 	}
 	for _, f := range files {
 		stream.AddFile(f, lx.RenderOptions{Head: -1})

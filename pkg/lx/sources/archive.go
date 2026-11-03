@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mholt/archives"
+	"github.com/rasros/lx/pkg/lx/core"
 	"github.com/rasros/lx/pkg/lx/walker"
 )
 
@@ -49,19 +50,19 @@ type archiveCandidate struct {
 }
 
 // ExpandArchive returns the files in the archive at absPath, displayed below
-// displayPath, that w walks to.
+// displayPath, that w walks to, and the entries that could not be read.
 // Entries are read into memory, so the archive is not needed once it returns.
-// Problems with single entries are logged to log, or slog.Default() when nil.
-func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, log *slog.Logger) ([]InputFile, error) {
+// It logs to log, or slog.Default() when nil.
+func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, log *slog.Logger) ([]InputFile, []core.Failure, error) {
 	if log == nil {
 		log = slog.Default()
 	}
 	if !IsArchivePath(absPath) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	fsys, err := archives.FileSystem(ctx, absPath, nil)
 	if err != nil {
-		return nil, fmt.Errorf("open archive %q: %w", absPath, err)
+		return nil, nil, fmt.Errorf("open archive %q: %w", absPath, err)
 	}
 	defer closeFS(fsys)
 
@@ -71,11 +72,19 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 	}
 
 	var candidates []archiveCandidate
+	var failures []core.Failure
+	fail := func(entryPath string, err error) {
+		p := archiveBase
+		if entryPath != "." {
+			p += "/" + entryPath
+		}
+		failures = append(failures, core.Failure{Kind: core.FailedArchive, Path: p, Err: err})
+	}
 	candidateByKey := make(map[string]int)
 
 	err = w.Walk(fsys, ".", func(entryPath string, d fs.DirEntry, err error) error {
 		if err != nil {
-			log.Warn("Error accessing archive entry", "archive", displayPath, "path", entryPath, "error", err)
+			fail(entryPath, err)
 			return nil
 		}
 		if d.IsDir() {
@@ -98,7 +107,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 
 		info, err := d.Info()
 		if err != nil {
-			log.Error("Failed to stat archive entry", "path", entryPath, "error", err)
+			fail(entryPath, err)
 			return nil
 		}
 
@@ -118,17 +127,17 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(candidates) == 0 {
 		log.Debug("Archive expansion finished", "archive", displayPath, "files_found", 0)
-		return nil, nil
+		return nil, failures, nil
 	}
 
 	usedExtractor, err := materializeWithExtractor(ctx, absPath, candidates, candidateByKey, log)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for i := range candidates {
@@ -137,7 +146,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 		}
 		data, err := snapshotArchiveEntry(fsys, candidates[i].entryPath, candidates[i].size)
 		if err != nil {
-			log.Warn("Failed to read archive entry", "archive", displayPath, "path", candidates[i].entryPath, "error", err)
+			fail(candidates[i].entryPath, err)
 			continue
 		}
 		candidates[i].data = data
@@ -164,7 +173,7 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 	}
 
 	log.Debug("Archive expansion finished", "archive", displayPath, "files_found", len(files), "used_extractor", usedExtractor)
-	return files, nil
+	return files, failures, nil
 }
 
 func closeFS(fsys fs.FS) {
