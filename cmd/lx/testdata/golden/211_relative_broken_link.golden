@@ -3,4 +3,4 @@
 
 
 --- STDERR ---
-Error: Failed to stat path: stat /ROOT/links/broken_link: FILE_NOT_FOUND (path=/ROOT/links/broken_link)
+Error: Failed to stat path: stat /ROOT/links/broken_link: FILE_NOT_FOUND (path=../links/broken_link)

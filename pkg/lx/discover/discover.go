@@ -136,7 +136,7 @@ func (c *Collector) Collect(ctx context.Context, target string, opts Options) ([
 		if c.isOutput(target, opts.OutPath) {
 			return nil, nil, nil
 		}
-		return nil, []core.Failure{{Kind: core.FailedStat, Path: absPath, Err: err}}, nil
+		return nil, []core.Failure{{Kind: core.FailedStat, Path: absPath, Display: target, Err: err}}, nil
 	}
 	return c.walk(ctx, w, newRoot(c.cwd, target, absPath, stat.IsDir()), opts)
 }
@@ -207,7 +207,7 @@ func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options,
 }
 
 func urlFailure(err *URLError) []core.Failure {
-	return []core.Failure{{Kind: core.FailedURL, Path: err.URL, Err: err}}
+	return []core.Failure{{Kind: core.FailedURL, Path: err.URL, Display: err.URL, Err: err}}
 }
 
 // root is a local target: the filesystem its files are opened in and how
@@ -298,7 +298,7 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 	var files []sources.InputFile
 	var failures []core.Failure
 	fail := func(path string, err error) {
-		failures = append(failures, core.Failure{Kind: core.FailedWalk, Path: r.display(path), Err: err})
+		failures = append(failures, core.Failure{Kind: core.FailedWalk, Path: r.abs(path), Display: r.display(path), Err: err})
 	}
 	err := w.WalkPath(r.rawPath, func(path string, d fs.DirEntry, err error) error {
 		if !r.isDir {
@@ -360,7 +360,7 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 		return nil, nil, ctxErr
 	}
 	if err != nil {
-		failures = append(failures, core.Failure{Kind: core.FailedWalk, Path: r.rawPath, Err: err})
+		failures = append(failures, core.Failure{Kind: core.FailedWalk, Path: r.absPath, Display: r.rawPath, Err: err})
 	}
 	c.log.Debug("Walker finished", "root", r.walkRoot, "files_matched", len(files))
 	return files, failures, nil
@@ -387,7 +387,11 @@ func (c *Collector) expandArchive(ctx context.Context, absPath, displayPath stri
 		return nil, nil, ctxErr
 	}
 	if err != nil {
-		failures = append(failures, core.Failure{Kind: core.FailedArchive, Path: displayPath, Err: err})
+		key := absPath
+		if sources.IsHTTPURL(displayPath) {
+			key = displayPath
+		}
+		failures = append(failures, core.Failure{Kind: core.FailedArchive, Path: key, Display: displayPath, Err: err})
 	}
 	return files, failures, nil
 }

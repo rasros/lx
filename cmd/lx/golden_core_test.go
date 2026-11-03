@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -124,6 +125,7 @@ func TestGoldenErrors(t *testing.T) {
 		{name: "061b_stats_counts_unreadable_entries", args: []string{"--stats", "secret"}},
 		{name: "061c_stats_counts_broken_archive", args: []string{"--stats", "-Z", "broken"}},
 		{name: "061d_stats_counts_missing_and_unreadable", args: []string{"--stats", "nope.go", "secret/locked.txt"}},
+		{name: "061e_stats_piped_list_counts_each_failure_once", args: []string{"--stats", "-Z"}, stdin: "secret\nsecret/locked_dir\nsecret/locked.txt\nbroken\nbroken/bad.zip\nnope.go\nnope.go\n"},
 		{name: "062_missing_file", args: []string{"nonexistent.go"}},
 		{name: "063_spaces_in_filename", args: []string{"spaces/file with spaces.txt"}},
 		{name: "064_spaces_in_dirname", args: []string{"spaces"}},
@@ -309,6 +311,18 @@ func TestGoldenMediaURL(t *testing.T) {
 	dir := setupMediaFixture(t)
 	files := http.FileServer(http.Dir(dir))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if name, cut := strings.CutPrefix(r.URL.Path, "/cutoff"); cut {
+			// A body shorter than the length it declares.
+			data, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Length", strconv.Itoa(len(data)+100))
+			w.WriteHeader(http.StatusOK)
+			w.Write(data)
+			return
+		}
 		name, chunked := strings.CutPrefix(r.URL.Path, "/chunked")
 		if !chunked {
 			files.ServeHTTP(w, r)
@@ -338,6 +352,7 @@ func TestGoldenMediaURL(t *testing.T) {
 		{name: "170q_media_url_truncated_suffixless", args: []string{"-M", u + "/truncated.mp4", u + "/suffixless", u + "/mislabelled.jpg"}},
 		{name: "170r_media_url_html_embeds", args: []string{"--html", "-M", u + "/sample.png"}},
 		{name: "170s_url_compact", args: []string{"-n0", u + "/notes.txt", u + "/chunked/notes.txt", u + "/sample.mp4"}},
+		{name: "170t_url_cut_off_body_fails", args: []string{"--stats", u + "/cutoff/notes.txt", u + "/notes.txt"}},
 	}, u)
 }
 

@@ -141,7 +141,7 @@ func TestCollect_MissingTarget(t *testing.T) {
 		t.Fatalf("got %v, %v, %v; want one failure and no inputs", paths(files), failures, err)
 	}
 	f := failures[0]
-	if f.Kind != core.FailedStat || f.Path != filepath.Join(dir, "nope.go") || !errors.As(f.Err, &pe) || pe.Op != "stat" {
+	if f.Kind != core.FailedStat || f.Path != filepath.Join(dir, "nope.go") || f.Display != "nope.go" || !errors.As(f.Err, &pe) || pe.Op != "stat" {
 		t.Errorf("got %+v, want a stat failure of the path", f)
 	}
 }
@@ -176,9 +176,9 @@ func TestCollect_FailuresBelowTarget(t *testing.T) {
 	}
 	var got []string
 	for _, f := range failures {
-		got = append(got, fmt.Sprintf("%d:%s", f.Kind, f.Path))
+		got = append(got, fmt.Sprintf("%s:%s:%s", f.Kind, f.Display, strings.TrimPrefix(f.Path, dir)))
 	}
-	want := []string{fmt.Sprintf("%d:bad.zip", core.FailedArchive), fmt.Sprintf("%d:locked", core.FailedWalk)}
+	want := []string{"archive:bad.zip:/bad.zip", "walk:locked:/locked"}
 	if !slices.Equal(got, want) {
 		t.Errorf("failures %v, want %v", got, want)
 	}

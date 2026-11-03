@@ -3,4 +3,4 @@
 
 
 --- STDERR ---
-Error: Failed to stat path: stat /ROOT/nonexistent.go: FILE_NOT_FOUND (path=/ROOT/nonexistent.go)
+Error: Failed to stat path: stat /ROOT/nonexistent.go: FILE_NOT_FOUND (path=nonexistent.go)

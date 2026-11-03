@@ -73,12 +73,19 @@ func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.W
 
 	var candidates []archiveCandidate
 	var failures []core.Failure
+	// A failure is named below the archive's absolute path, or its URL.
+	key := absPath
+	if IsHTTPURL(displayPath) {
+		key = archiveBase
+	}
 	fail := func(entryPath string, err error) {
-		p := archiveBase
+		f := core.Failure{Kind: core.FailedArchive, Path: key, Display: archiveBase, Err: err}
 		if entryPath != "." {
-			p += "/" + entryPath
+			f.Kind = core.FailedArchiveEntry
+			f.Path += "/" + entryPath
+			f.Display += "/" + entryPath
 		}
-		failures = append(failures, core.Failure{Kind: core.FailedArchive, Path: p, Err: err})
+		failures = append(failures, f)
 	}
 	candidateByKey := make(map[string]int)
 
@@ -189,13 +196,19 @@ func readAllWithSizeHint(r io.Reader, sizeHint int64) ([]byte, error) {
 		return io.ReadAll(r)
 	}
 
+	// A short entry is one that ends cleanly; io.ErrUnexpectedEOF from the
+	// reader is a corrupt one, as a cut-off compressed stream is.
 	buf := make([]byte, int(sizeHint))
-	n, err := io.ReadFull(r, buf)
-	if err != nil {
-		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+	n := 0
+	for n < len(buf) {
+		m, err := r.Read(buf[n:])
+		n += m
+		if errors.Is(err, io.EOF) {
 			return buf[:n], nil
 		}
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Size hints can be inaccurate for some formats. Keep reading if there is tail data.
@@ -273,17 +286,18 @@ func materializeWithExtractor(ctx context.Context, absPath string, candidates []
 
 		rc, err := info.Open()
 		if err != nil {
-			log.Warn("Failed to open extractor entry", "archive", absPath, "path", key, "error", err)
+			// The entry is read again below; a failure there is reported.
+			log.Debug("Failed to open extractor entry", "archive", absPath, "path", key, "error", err)
 			return nil
 		}
 		data, readErr := readAllWithSizeHint(rc, info.Size())
 		closeErr := rc.Close()
 		if readErr != nil {
-			log.Warn("Failed to read extractor entry", "archive", absPath, "path", key, "error", readErr)
+			log.Debug("Failed to read extractor entry", "archive", absPath, "path", key, "error", readErr)
 			return nil
 		}
 		if closeErr != nil {
-			log.Warn("Failed to close extractor entry", "archive", absPath, "path", key, "error", closeErr)
+			log.Debug("Failed to close extractor entry", "archive", absPath, "path", key, "error", closeErr)
 			return nil
 		}
 

@@ -1,0 +1,15 @@
+--- STDOUT ---
+[1/2] /ROOT/cutoff/notes.txt - error: truncated after 17 bytes: unexpected EOF
+
+[2/2] /ROOT/notes.txt (1 rows)
+---
+```text
+beside the media
+```
+
+
+--- STDERR ---
+Error: Failed to read file: truncated after 17 bytes: unexpected EOF (path=/ROOT/cutoff/notes.txt)
+▎ 2 files · 1 row · 1 section
+  ~67 tokens
+  1 failed
