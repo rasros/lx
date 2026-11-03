@@ -1,0 +1,34 @@
+--- STDOUT ---
+skeleton/blockdoc.c (30 rows, definitions)
+---
+```c
+int helper(void) {
+...
+/**
+   A block doc whose lines do not start with an asterisk: kept whole above
+   the function it documents.
+*/
+int documented(void);
+...
+/*
+   Unstarred lines that read like code stay in the doc:
+   Example: x = 1;
+   #define-like text
+*/
+int example(void);
+...
+// A line comment ending in a block closer, globs like **/
+int globbed(void);
+...
+/* The tails of trailing field comments document nothing below them. */
+struct irq {
+    int vcpu;       /* The VCPU it is queued on,
+...
+    int target;     /* The VCPU it should go to,
+...
+    int pending;
+};
+```
+
+
+--- STDERR ---

@@ -16,6 +16,8 @@ type CommentSyntax struct {
 	// Blocks are multi-line comments: a line that ends one is followed up
 	// to the line that opens it.
 	Blocks []BlockComment
+	// Line are the line comment markers among Prefixes.
+	Line []string
 }
 
 // BlockComment is a multi-line comment's delimiters.
@@ -33,12 +35,14 @@ var (
 	CComments = CommentSyntax{
 		Prefixes: []string{"//", "/*", "*"},
 		Blocks:   []BlockComment{{Open: "/*", Close: "*/"}},
+		Line:     []string{"//"},
 	}
 	// RustComments is CComments plus "#" attribute lines such as
 	// #[derive(Debug)], which are sibling nodes of the item they annotate.
 	RustComments = CommentSyntax{
 		Prefixes: []string{"//", "/*", "*", "#"},
 		Blocks:   CComments.Blocks,
+		Line:     CComments.Line,
 	}
 	// PHPComments is CComments plus # comments and #[Attribute] lines.
 	PHPComments = RustComments
@@ -49,12 +53,14 @@ var (
 	// RubyComments is # and =begin/=end.
 	RubyComments = CommentSyntax{
 		Prefixes: []string{"#", "=begin"},
+		Line:     []string{"#"},
 		Blocks:   []BlockComment{{Open: "=begin", Close: "=end", WholeLine: true}},
 	}
 	// HaskellComments is -- and {- -}.
 	HaskellComments = CommentSyntax{
 		Prefixes: []string{"--", "{-", "-}"},
 		Blocks:   []BlockComment{{Open: "{-", Close: "-}"}},
+		Line:     []string{"--"},
 	}
 	// OCamlComments is (* *) with "*" continuation lines.
 	OCamlComments = CommentSyntax{
@@ -73,26 +79,23 @@ func (cs *CommentSyntax) LeadingDocStart(lines [][]byte, row int) int {
 		if isBlankLine(line) {
 			break
 		}
-		if cs.isDocLine(line) {
-			r--
-			continue
-		}
-		block, ok := cs.closedBlock(line)
-		if !ok {
-			break
-		}
-		found := false
-		for r >= 0 {
-			if block.opens(lines[r]) {
-				r--
-				found = true
+		// A block comment's closing line may look like a continuation
+		// line (`*/`), but the lines above it up to its opener belong to
+		// the block whatever they hold. A comment whose opener follows
+		// code trails that code and documents nothing below it, and a
+		// closer with no opener is no doc.
+		if block, ok := cs.closedBlock(line); ok && !cs.lineComment(line) {
+			open := cs.openerAbove(block, lines, r-1)
+			if open < 0 {
 				break
 			}
-			r--
+			r = open - 1
+			continue
 		}
-		if !found {
+		if !cs.isDocLine(line) {
 			break
 		}
+		r--
 	}
 	if r+1 < row {
 		return r + 1
@@ -187,6 +190,39 @@ func (cs *CommentSyntax) closedBlock(line []byte) (BlockComment, bool) {
 		return b, true
 	}
 	return BlockComment{}, false
+}
+
+// openerAbove returns the row at or above row (the one above a closing
+// line) of the nearest line that starts with b's opener, or -1 when the
+// nearest opener follows code on its line (a trailing comment), or a line
+// closes another comment first, or there is none. Lines that read as doc
+// lines (`* see /* here */`) are comment text whatever they hold.
+func (cs *CommentSyntax) openerAbove(b BlockComment, lines [][]byte, row int) int {
+	for ; row >= 0; row-- {
+		line := lines[row]
+		switch {
+		case b.opens(line) && (b.WholeLine || !bytesContains(trimLeadingSpace(line)[len(b.Open):], b.Close)):
+			return row
+		case b.opens(line):
+			return -1 // a comment of its own line
+		case b.WholeLine, cs.isDocLine(line):
+		case bytesContains(line, b.Open), bytesContains(line, b.Close):
+			return -1
+		}
+	}
+	return -1
+}
+
+// lineComment reports a line that starts with a line comment, which a
+// block closer at its end does not close.
+func (cs *CommentSyntax) lineComment(line []byte) bool {
+	s := trimLeadingSpace(line)
+	for _, p := range cs.Line {
+		if hasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func (b BlockComment) opens(line []byte) bool {

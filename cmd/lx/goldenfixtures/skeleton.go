@@ -18,6 +18,7 @@ func SetupSkeletonFixture(t *testing.T) string {
 		"commentbody.hs",
 		"main.c",
 		"main.cpp",
+		"blockdoc.c",
 		"Main.java",
 		"main.rs",
 		"main.ts",

@@ -2,6 +2,9 @@
 skeleton/misparse.h (8 rows, definitions)
 ---
 ```c
+/**
+   C++ read as C: the struct misparses into a declaration that holds
+   functions, kept whole.
 */
 struct expr_pair {
     unsigned hash() const { return mix(m_node->hash(), m_delta); }
