@@ -1,0 +1,5 @@
+--- STDOUT ---
+
+
+--- STDERR ---
+CLI Error: unknown output format "htm": want markdown, xml, html or bare

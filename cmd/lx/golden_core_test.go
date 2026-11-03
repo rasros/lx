@@ -187,6 +187,7 @@ func TestGoldenProfileOverrides(t *testing.T) {
 			"file_image_template: \"{{ template \\\"file_header\\\" . }}\\n![{{ .Path }}]({{ .DataURI }})\"\n",
 		"image_as_binary.yaml":     "embed_images: false\nfile_image_template: \"{{ template \\\"file_binary\\\" . }}\"\n",
 		"image_unknown_field.yaml": "file_image_template: \"{{ .Width }}\"\n",
+		"unknown_format.yaml":      "output_format: htm\n",
 	}
 	for name, data := range cfgs {
 		if err := os.WriteFile(filepath.Join(cfgDir, name), []byte(data), 0644); err != nil {
@@ -200,6 +201,7 @@ func TestGoldenProfileOverrides(t *testing.T) {
 		{name: "089e_profile_md_embed_images", args: []string{"-y", cfg("embed_images.yaml"), "langs/main.rs", "assets/logo.png"}},
 		{name: "089f_profile_html_image_as_binary", args: []string{"--html", "-y", cfg("image_as_binary.yaml"), "assets/logo.png"}},
 		{name: "089g_profile_image_template_unknown_field_fails_up_front", args: []string{"-y", cfg("image_unknown_field.yaml"), "langs/main.rs"}},
+		{name: "089h_profile_unknown_format_fails", args: []string{"-y", cfg("unknown_format.yaml"), "langs/main.rs"}},
 	})
 }
 
