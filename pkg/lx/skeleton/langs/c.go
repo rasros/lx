@@ -8,12 +8,29 @@ import (
 // CFuncVisible reports a C or C++ function definition, or a declaration
 // with a declarator that declares a function. A pointer to a function
 // (`int (*handler)(int);`) is a variable, not a function.
+//
+// A declaration that failed to parse but holds a function declarator
+// somewhere (C++ read as C: a class taken for a declaration) is reported
+// too, and kept whole: its declarators say nothing reliable, and the
+// functions in it would otherwise be lost.
 func CFuncVisible(c *Ctx, n *gotreesitter.Node) bool {
 	if c.Type(n) != "declaration" {
 		return true
 	}
 	for i := 0; i < n.ChildCount(); i++ {
 		if n.FieldNameForChild(i, c.Lang) == "declarator" && declaresFunction(c, n.Child(i)) {
+			return true
+		}
+	}
+	return n.HasError() && hasDescendantOfType(c, n, "function_declarator")
+}
+
+func hasDescendantOfType(c *Ctx, n *gotreesitter.Node, typ string) bool {
+	if c.Type(n) == typ {
+		return true
+	}
+	for i := 0; i < n.ChildCount(); i++ {
+		if hasDescendantOfType(c, n.Child(i), typ) {
 			return true
 		}
 	}
