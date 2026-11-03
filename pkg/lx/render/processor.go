@@ -91,8 +91,8 @@ func (p *Processor) SetTokenCounter(tc core.TokenCounter) {
 }
 
 // RenderPrepared processes one item containing pre-calculated section and
-// indices. Once ctx is done it stops reading and converting the file, writes
-// nothing and returns ctx's error.
+// indices. A file whose read fails once ctx is done writes nothing, and
+// RenderPrepared returns ctx's error.
 func (p *Processor) RenderPrepared(ctx context.Context, w io.Writer, item PreparedItem, scratchBuf []byte) (RenderStats, error) {
 	var stats RenderStats
 	var data interface{}
@@ -210,7 +210,7 @@ func readerFor(rc io.ReadCloser, sizeHint int64) (io.ReaderAt, int64) {
 type converter struct {
 	name    string
 	applies func(f sources.InputFile, opts core.RenderOptions, format *internal.Format) bool
-	convert func(ctx context.Context, f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error)
+	convert func(f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error)
 	// language of the produced content; empty means detect as usual.
 	language func(f sources.InputFile) string
 }
@@ -238,18 +238,14 @@ var converters = []converter{
 		applies: func(_ sources.InputFile, opts core.RenderOptions, format *internal.Format) bool {
 			return opts.ExtractMedia && format.IsMedia()
 		},
-		// Media is described from its headers; a blocking source stops its
-		// reads once ctx is done.
-		convert: func(_ context.Context, f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error) {
-			return sources.ExtractMediaMetadata(f, r, size)
-		},
+		convert: sources.ExtractMediaMetadata,
 	},
 }
 
 // applyConverters reports whether a converter replaced the content, and the
 // format it converted from. A failing converter leaves the content untouched
 // and is returned. An image about to be embedded is left alone.
-func applyConverters(ctx context.Context, file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool, *ConvertFailure) {
+func applyConverters(file sources.InputFile, opts core.RenderOptions, format *internal.Format, reader io.ReaderAt, size int64, embedImages bool) (io.ReaderAt, int64, string, string, bool, *ConvertFailure) {
 	if embedImages && format.IsImage() {
 		return reader, size, "", "", false, nil
 	}
@@ -257,7 +253,7 @@ func applyConverters(ctx context.Context, file sources.InputFile, opts core.Rend
 		if !c.applies(file, opts, format) {
 			continue
 		}
-		text, err := c.convert(ctx, file, reader, size)
+		text, err := c.convert(file, reader, size)
 		if err != nil {
 			return reader, size, "", "", false, &ConvertFailure{Converter: c.name, Err: err}
 		}
@@ -386,18 +382,19 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 		}
 	}
 
-	// A stream may never end, so it reads only up to the size limit.
-	stream, isStream := rc.(*sources.Stream)
-	if isStream && cfg.MaxSize > 0 {
-		stream.SetLimit(cfg.MaxSize)
-	}
-
-	// A stream is read to its end here, for its size.
-	reader, size := readerFor(rc, file.Size)
-
-	if isStream && stream.Err() != nil {
-		issues.ReadErr = stream.Err()
-		return p.errorContext(file, index, stream.Err().Error()), issues
+	// A stream that may never end reads up to the size limit, which for
+	// files that state their size is applied before they are opened.
+	var reader io.ReaderAt
+	var size int64
+	if stream, ok := rc.(*sources.Stream); ok {
+		data, err := sources.ReadStream(stream, cfg.MaxSize)
+		if err != nil {
+			issues.ReadErr = err
+			return p.errorContext(file, index, err.Error()), issues
+		}
+		reader, size = bytes.NewReader(data), int64(len(data))
+	} else {
+		reader, size = readerFor(rc, file.Size)
 	}
 
 	if scratch == nil {
@@ -406,7 +403,7 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 
 	format, verified := classify(file.Path, reader, scratch)
 	reader, size, convertedFrom, convertedLang, converted, convertFailure := applyConverters(
-		ctx, file, cfg, format, reader, size, p.engine.EmbedImages && verified)
+		file, cfg, format, reader, size, p.engine.EmbedImages && verified)
 	issues.Convert = convertFailure
 
 	isBinary, lang := detectContent(file.Path, reader, scratch)
@@ -416,10 +413,6 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 	// A converted image renders as text.
 	isImage := format.IsImage() && verified && !converted
 
-	// Skeleton parsing cannot be interrupted, so check ctx before it.
-	if ctx.Err() != nil {
-		return core.FileContext{}, issues
-	}
 	skel := applySkeleton(cfg, lang, strings.EqualFold(filepath.Ext(file.Path), ".h"), reader, size, isBinary, isImage)
 	var skeletonMode string
 	if skel != nil {

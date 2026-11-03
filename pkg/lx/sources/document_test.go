@@ -2,8 +2,6 @@ package sources
 
 import (
 	"bytes"
-	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -131,7 +129,7 @@ func TestConvertInput_PDFMediaTypeWithoutExtension(t *testing.T) {
 	data := makeTestPDF(t, "URLPdfContent")
 	mediaType := "application/pdf; charset=binary"
 	f := InputFile{Path: "https://arxiv.org/pdf/2608.26263", mediaType: &mediaType}
-	text, err := ConvertInput(context.Background(), f, bytes.NewReader(data), int64(len(data)))
+	text, err := ConvertInput(f, bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -142,7 +140,7 @@ func TestConvertInput_PDFMediaTypeWithoutExtension(t *testing.T) {
 
 func TestDocxXMLToText_ParagraphEndsWithNewline(t *testing.T) {
 	xml := `<w:body><w:p><w:r><w:t>Line 1</w:t></w:r></w:p><w:p><w:r><w:t>Line 2</w:t></w:r></w:p></w:body>`
-	got := xmlToText(context.Background(), strings.NewReader(xml))
+	got := xmlToText(strings.NewReader(xml))
 	if !strings.Contains(got, "\n") {
 		t.Errorf("expected newline between paragraphs, got %q", got)
 	}
@@ -156,14 +154,14 @@ func TestDocxXMLToText_ParagraphEndsWithNewline(t *testing.T) {
 
 func TestDocxXMLToText_MultipleRuns(t *testing.T) {
 	xml := `<w:p><w:r><w:t>Hello </w:t></w:r><w:r><w:t>World</w:t></w:r></w:p>`
-	got := xmlToText(context.Background(), strings.NewReader(xml))
+	got := xmlToText(strings.NewReader(xml))
 	if !strings.Contains(got, "Hello") || !strings.Contains(got, "World") {
 		t.Errorf("expected both run texts, got %q", got)
 	}
 }
 
 func TestDocxXMLToText_Empty(t *testing.T) {
-	got := xmlToText(context.Background(), strings.NewReader(""))
+	got := xmlToText(strings.NewReader(""))
 	if got != "" {
 		t.Errorf("expected empty string for empty input, got %q", got)
 	}
@@ -172,7 +170,7 @@ func TestDocxXMLToText_Empty(t *testing.T) {
 func TestExtractDOCXText_MultipleParagraphs(t *testing.T) {
 	data := testzip.DOCX(t, "First paragraph", "Second paragraph", "Third paragraph")
 	r := bytes.NewReader(data)
-	text, err := extractDOCXText(context.Background(), r, int64(len(data)))
+	text, err := extractDOCXText(r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -187,7 +185,7 @@ func TestExtractDOCXText_MultipleParagraphs(t *testing.T) {
 func TestExtractDOCXText_Corrupted(t *testing.T) {
 	data := []byte("this is not a zip or docx file")
 	r := bytes.NewReader(data)
-	_, err := extractDOCXText(context.Background(), r, int64(len(data)))
+	_, err := extractDOCXText(r, int64(len(data)))
 	if err == nil {
 		t.Error("expected error for corrupted DOCX, got nil")
 	}
@@ -196,7 +194,7 @@ func TestExtractDOCXText_Corrupted(t *testing.T) {
 func TestExtractXLSXText_Corrupted(t *testing.T) {
 	data := []byte("not a xlsx file at all")
 	r := bytes.NewReader(data)
-	_, err := extractXLSXText(context.Background(), r, int64(len(data)))
+	_, err := extractXLSXText(r, int64(len(data)))
 	if err == nil {
 		t.Error("expected error for corrupted XLSX, got nil")
 	}
@@ -214,7 +212,7 @@ func TestExtractPDFText_Corrupted(t *testing.T) {
 func TestExtractDocumentText_UnsupportedExtension(t *testing.T) {
 	data := []byte("some data")
 	r := bytes.NewReader(data)
-	_, err := ExtractDocumentText(context.Background(), "file.odt", r, int64(len(data)))
+	_, err := ExtractDocumentText("file.odt", r, int64(len(data)))
 	if err == nil {
 		t.Error("expected error for unsupported extension, got nil")
 	}
@@ -226,7 +224,7 @@ func TestExtractDocumentText_UnsupportedExtension(t *testing.T) {
 func TestExtractPPTXText_MultipleSlides(t *testing.T) {
 	data := makeTestPPTX(t, "Slide one content", "Slide two content", "Slide three content")
 	r := bytes.NewReader(data)
-	text, err := extractPPTXText(context.Background(), r, int64(len(data)))
+	text, err := extractPPTXText(r, int64(len(data)))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -241,7 +239,7 @@ func TestExtractPPTXText_MultipleSlides(t *testing.T) {
 func TestExtractPPTXText_Corrupted(t *testing.T) {
 	data := []byte("not a pptx file")
 	r := bytes.NewReader(data)
-	_, err := extractPPTXText(context.Background(), r, int64(len(data)))
+	_, err := extractPPTXText(r, int64(len(data)))
 	if err == nil {
 		t.Error("expected error for corrupted PPTX, got nil")
 	}
@@ -257,84 +255,5 @@ func TestIsHTMLPath(t *testing.T) {
 		if isHTMLPath(p) {
 			t.Errorf("isHTMLPath(%q) = true, want false", p)
 		}
-	}
-}
-
-// cancellingReader cancels the run on its first read, as a signal arriving
-// mid-conversion would.
-type cancellingReader struct {
-	r      *bytes.Reader
-	cancel context.CancelFunc
-}
-
-func (c cancellingReader) ReadAt(p []byte, off int64) (int, error) {
-	c.cancel()
-	return c.r.ReadAt(p, off)
-}
-
-// A conversion cancelled midway returns ctx's error, never what the parse
-// made of its cut-short input.
-func TestExtractDocumentTextStopsWhenCancelled(t *testing.T) {
-	docs := map[string][]byte{
-		"a.pdf":  makeTestPDF(t, "pdf text"),
-		"a.docx": testzip.DOCX(t, "docx text"),
-		"a.xlsx": makeTestXLSX(t, "Sheet1", map[string]interface{}{"A1": "xlsx text"}),
-		"a.pptx": makeTestPPTX(t, "pptx text"),
-		"a.html": []byte("<p>html text</p>"),
-	}
-	for name, data := range docs {
-		ctx, cancel := context.WithCancel(context.Background())
-		r := cancellingReader{r: bytes.NewReader(data), cancel: cancel}
-		text, err := ExtractDocumentText(ctx, name, r, int64(len(data)))
-		if !errors.Is(err, context.Canceled) || text != nil {
-			t.Errorf("%s: got %q, %v; want context.Canceled", name, text, err)
-		}
-	}
-}
-
-// Streaming a sheet's rows renders them as GetRows returns them: empty rows
-// between rows with cells kept, empty rows at the end dropped.
-func TestXLSXSheetTextMatchesGetRows(t *testing.T) {
-	data := makeTestXLSX(t, "Sheet1", map[string]interface{}{
-		"B2": "b2", "A5": "a5", "C5": 3, "A7": "",
-	})
-	f, err := excelize.OpenReader(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	rows, err := f.GetRows("Sheet1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var want strings.Builder
-	for _, row := range rows {
-		want.WriteString(strings.Join(row, "\t") + "\n")
-	}
-	got, err := xlsxSheetText(context.Background(), f, "Sheet1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != want.String() {
-		t.Errorf("xlsxSheetText = %q, want %q", got, want.String())
-	}
-}
-
-// A sheet stops between rows once ctx is done, not only between sheets.
-func TestXLSXSheetTextStopsWithinSheet(t *testing.T) {
-	cells := map[string]interface{}{}
-	for i := 1; i <= 3*ctxCheckEvery; i++ {
-		cells[fmt.Sprintf("A%d", i)] = i
-	}
-	f, err := excelize.OpenReader(bytes.NewReader(makeTestXLSX(t, "Sheet1", cells)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	got, _ := xlsxSheetText(ctx, f, "Sheet1")
-	if n := strings.Count(got, "\n"); n >= ctxCheckEvery {
-		t.Errorf("read %d rows of a cancelled sheet, want fewer than %d", n, ctxCheckEvery)
 	}
 }

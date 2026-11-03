@@ -1,6 +1,6 @@
 --- STDOUT ---
-/dev/zero - error: stopped reading after 64 MB, the default limit for a stream (-m sets another)
+/dev/zero - error: stopped reading after 64000000 bytes (-m sets the limit)
 
 
 --- STDERR ---
-Error: Failed to read file: stopped reading after 64 MB, the default limit for a stream (-m sets another) (path=/dev/zero)
+Error: Failed to read file: stopped reading after 64000000 bytes (-m sets the limit) (path=/dev/zero)

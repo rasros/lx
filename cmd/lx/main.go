@@ -2,87 +2,41 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/rasros/lx/internal/ansi"
 	"github.com/rasros/lx/internal/cli"
-	"github.com/rasros/lx/pkg/lx"
 )
 
-// cleanupGrace is how long a run cancelled by a signal may take to clean up,
-// such as dropping its -o buffer and stopping profiling, before the process
-// dies of the signal anyway: a run stuck in work that does not check for
-// cancellation must not outlive the signal.
-const cleanupGrace = 500 * time.Millisecond
+// A run cancelled by a signal that has not ended within this grace period,
+// such as one blocked reading a FIFO, is ended by force.
+const cancelGrace = 500 * time.Millisecond
+
+// cancelledStatus is the status a shell reports for an interrupted command.
+const cancelledStatus = 130
 
 func main() {
-	os.Exit(run())
-}
-
-// run runs lx in the process and returns its exit status. A terminating
-// signal cancels the run and, once it has cleaned up, kills the process as
-// the signal would have, so a shell sees the usual status.
-func run() int {
 	env, err := cli.OSEnv()
-	if err != nil {
-		return report(err)
-	}
-
-	sigs := make(chan os.Signal, 1)
-	var caught []os.Signal
-	for _, sig := range terminating {
-		// A signal the process was started ignoring, as a background job
-		// or under nohup is, stays ignored.
-		if !signal.Ignored(sig) {
-			caught = append(caught, sig)
-		}
-	}
-	if len(caught) > 0 {
-		signal.Notify(sigs, caught...)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	done := make(chan error, 1)
-	go func() { done <- cli.Run(ctx, os.Args[1:], env) }()
-
-	select {
-	case err := <-done:
-		signal.Stop(sigs)
-		return status(err)
-	case sig := <-sigs:
-		// A second signal kills at once.
-		signal.Reset(caught...)
-		cancel()
-		deadline := time.Now().Add(cleanupGrace)
-		select {
-		case <-done:
-		case <-time.After(cleanupGrace):
-		}
-		// Work Run abandoned may still be removing its temporary files.
-		lx.WaitCleanups(time.Until(deadline))
-		return dieOf(sig)
-	}
-}
-
-// status maps the error Run returned to the exit status, reporting it.
-func status(err error) int {
 	if err == nil {
-		return 0
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-ctx.Done()
+			stop() // a second signal kills at once
+			time.Sleep(cancelGrace)
+			os.Exit(cancelledStatus)
+		}()
+		err = cli.Run(ctx, os.Args[1:], env)
+		if ctx.Err() != nil {
+			os.Exit(cancelledStatus)
+		}
 	}
-	var exit cli.ExitError
-	if errors.As(err, &exit) {
-		return exit.Code
+	if err != nil {
+		label := ansi.For(os.Stderr, os.LookupEnv).Paint("Error:", ansi.Bold, ansi.Red)
+		fmt.Fprintf(os.Stderr, "%s %v\n", label, err)
+		os.Exit(1)
 	}
-	return report(err)
-}
-
-func report(err error) int {
-	label := ansi.For(os.Stderr, os.LookupEnv).Paint("Error:", ansi.Bold, ansi.Red)
-	fmt.Fprintf(os.Stderr, "%s %v\n", label, err)
-	return 1
 }
