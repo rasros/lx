@@ -135,6 +135,11 @@ func (s *Stream) executePipeline(ctx context.Context, dest *byteCounter, global 
 				out <- render.Result{Index: item.StreamIndex, Failure: &f}
 				continue
 			}
+			if _, ok := item.Raw.(core.SectionContext); ok {
+				// The layout renders a section's title as it opens it.
+				out <- render.Result{Index: item.StreamIndex, Section: true, SectionIndex: item.Section.Index}
+				continue
+			}
 			select {
 			case jobsCh <- seqJob{seqID: item.StreamIndex, item: item, out: out}:
 			case <-ctx.Done():
@@ -166,14 +171,16 @@ Loop:
 		if res.Failure != nil {
 			totals.failed++
 		}
-		if res.Buffer == nil {
+		if res.Buffer == nil && !res.Section {
 			written++
 			continue
 		}
 		if err := layout.WriteItem(res); err != nil {
 			return totals, err
 		}
-		bufferPool.Put(res.Buffer)
+		if res.Buffer != nil {
+			bufferPool.Put(res.Buffer)
+		}
 		written++
 	}
 
