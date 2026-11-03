@@ -10,8 +10,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
-	"time"
 
 	"github.com/mholt/archives"
 	"github.com/rasros/lx/pkg/lx/core"
@@ -39,283 +39,296 @@ func IsArchivePath(path string) bool {
 	return false
 }
 
-type archiveCandidate struct {
-	key           string
-	entryPath     string
-	effectivePath string
-	size          int64
-	modTime       time.Time
-	data          []byte
-	materialized  bool
+// ArchiveOptions say how ExpandArchive names and picks the entries of an
+// archive.
+type ArchiveOptions struct {
+	// Display is the path the entries are displayed below.
+	Display string
+	// Origin names the archive in each entry's InputFile.Archive: its
+	// absolute path, or its URL when it was downloaded.
+	Origin string
+	// Walker picks the entries, as its Walk would pick them in an fs.FS of
+	// the archive; nil keeps them all.
+	Walker *walker.Walker
+	// MaxSize, when positive, is the size over which an entry is not read.
+	// Such an entry is returned with its size alone, for the stream to drop
+	// as it drops any file over its RenderOptions.MaxSize, which MaxSize
+	// should be.
+	MaxSize int64
+	// Log is told about entries that cannot be read, and skipped ones;
+	// nil logs to slog.Default().
+	Log *slog.Logger
 }
 
-// ExpandArchive returns the files in the archive at absPath, displayed below
-// displayPath, that w walks to, and the entries that could not be read.
-// Entries are read into memory, so the archive is not needed once it returns.
-// It logs to log, or slog.Default() when nil.
-func ExpandArchive(ctx context.Context, absPath, displayPath string, w *walker.Walker, log *slog.Logger) ([]InputFile, []core.Failure, error) {
-	if log == nil {
-		log = slog.Default()
-	}
+// ExpandArchive returns the files in the archive at absPath that opts.Walker
+// keeps, in the order a walk would find them. The archive is read once, from
+// start to end, and only the entries kept and no larger than opts.MaxSize
+// are read, into memory, so the archive is not needed once it returns. An
+// entry whose path leaves the archive, through "..", is skipped. An archive
+// that cannot be read to its end fails with the entries read before it
+// failed. The entries that cannot be read, or end before the size the
+// archive claims for them, are returned as failures. An archive holding a file and a directory of the same name, as
+// no filesystem can, has both returned, but a tree of them shows only the
+// directory.
+func ExpandArchive(ctx context.Context, absPath string, opts ArchiveOptions) ([]InputFile, []core.Failure, error) {
 	if !IsArchivePath(absPath) {
 		return nil, nil, nil
 	}
-	fsys, err := archives.FileSystem(ctx, absPath, nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("open archive %q: %w", absPath, err)
+	if opts.Walker == nil {
+		opts.Walker = walker.New(walker.Options{})
 	}
-	defer closeFS(fsys)
-
-	archiveBase := filepath.ToSlash(filepath.Clean(displayPath))
-	if IsHTTPURL(displayPath) {
-		archiveBase = strings.TrimSuffix(displayPath, "/")
-	}
-
-	var candidates []archiveCandidate
-	var failures []core.Failure
-	// A failure is named below the archive's absolute path, or its URL.
-	key := absPath
-	if IsHTTPURL(displayPath) {
-		key = archiveBase
-	}
-	fail := func(entryPath string, err error) {
-		f := core.Failure{Kind: core.FailedArchive, Path: key, Display: archiveBase, Err: err}
-		if entryPath != "." {
-			f.Kind = core.FailedArchiveEntry
-			f.Path += "/" + entryPath
-			f.Display += "/" + entryPath
-		}
-		failures = append(failures, f)
-	}
-	candidateByKey := make(map[string]int)
-
-	err = w.Walk(fsys, ".", func(entryPath string, d fs.DirEntry, err error) error {
-		if err != nil {
-			fail(entryPath, err)
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		candidatePath := entryPath
-		if candidatePath == "." {
-			candidatePath = d.Name()
-		}
-
-		key := normalizeArchiveEntryPath(candidatePath)
-		if key == "" {
-			return nil
-		}
-		effectivePath := archiveBase + "/" + key
-
-		info, err := d.Info()
-		if err != nil {
-			fail(entryPath, err)
-			return nil
-		}
-
-		if _, exists := candidateByKey[key]; exists {
-			log.Warn("Skipping duplicate archive entry path", "archive", displayPath, "path", key)
-			return nil
-		}
-
-		candidateByKey[key] = len(candidates)
-		candidates = append(candidates, archiveCandidate{
-			key:           key,
-			entryPath:     candidatePath,
-			effectivePath: effectivePath,
-			size:          info.Size(),
-			modTime:       info.ModTime(),
-		})
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(candidates) == 0 {
-		log.Debug("Archive expansion finished", "archive", displayPath, "files_found", 0)
-		return nil, failures, nil
-	}
-
-	usedExtractor, err := materializeWithExtractor(ctx, absPath, candidates, candidateByKey, log)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	for i := range candidates {
-		if candidates[i].materialized {
-			continue
-		}
-		data, err := snapshotArchiveEntry(fsys, candidates[i].entryPath, candidates[i].size)
-		if err != nil {
-			fail(candidates[i].entryPath, err)
-			continue
-		}
-		candidates[i].data = data
-		candidates[i].materialized = true
-	}
-
-	var files []InputFile
-	for i := range candidates {
-		if !candidates[i].materialized {
-			continue
-		}
-		cached := candidates[i].data
-		f := InputFile{
-			Path:    candidates[i].effectivePath,
-			AbsPath: absPath + "/" + candidates[i].entryPath,
-			Size:    int64(len(cached)),
-			ModTime: candidates[i].modTime,
-			Open: func(context.Context) (io.ReadCloser, error) {
-				return newByteReaderReadCloser(cached), nil
-			},
-		}
-		log.Debug("File accepted from archive", "path", f.Path, "size", f.Size)
-		files = append(files, f)
-	}
-
-	log.Debug("Archive expansion finished", "archive", displayPath, "files_found", len(files), "used_extractor", usedExtractor)
-	return files, failures, nil
-}
-
-func closeFS(fsys fs.FS) {
-	if c, ok := fsys.(io.Closer); ok {
-		_ = c.Close()
-	}
-}
-
-const maxInt = int64(^uint(0) >> 1)
-
-func readAllWithSizeHint(r io.Reader, sizeHint int64) ([]byte, error) {
-	if sizeHint <= 0 || sizeHint > maxInt {
-		return io.ReadAll(r)
-	}
-
-	// A short entry is one that ends cleanly; io.ErrUnexpectedEOF from the
-	// reader is a corrupt one, as a cut-off compressed stream is.
-	buf := make([]byte, int(sizeHint))
-	n := 0
-	for n < len(buf) {
-		m, err := r.Read(buf[n:])
-		n += m
-		if errors.Is(err, io.EOF) {
-			return buf[:n], nil
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Size hints can be inaccurate for some formats. Keep reading if there is tail data.
-	var probe [1]byte
-	m, readErr := r.Read(probe[:])
-	if errors.Is(readErr, io.EOF) {
-		return buf, nil
-	}
-	if readErr != nil {
-		return nil, readErr
-	}
-
-	tail, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	out := make([]byte, 0, n+m+len(tail))
-	out = append(out, buf...)
-	out = append(out, probe[:m]...)
-	out = append(out, tail...)
-	return out, nil
-}
-
-func snapshotArchiveEntry(fsys fs.FS, path string, sizeHint int64) ([]byte, error) {
-	f, err := fsys.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	if sizeHint <= 0 {
-		if info, statErr := f.Stat(); statErr == nil {
-			sizeHint = info.Size()
-		}
-	}
-	return readAllWithSizeHint(f, sizeHint)
-}
-
-func materializeWithExtractor(ctx context.Context, absPath string, candidates []archiveCandidate, candidateByKey map[string]int, log *slog.Logger) (bool, error) {
 	file, err := os.Open(absPath)
 	if err != nil {
-		return false, err
+		return nil, nil, err
 	}
 	defer file.Close()
 
-	format, _, err := archives.Identify(ctx, filepath.Base(absPath), file)
+	format, err := identifyArchive(ctx, file, filepath.Base(absPath))
 	if err != nil {
-		if errors.Is(err, archives.NoMatch) {
-			return false, nil
-		}
-		return false, fmt.Errorf("identify archive %q: %w", absPath, err)
+		return nil, nil, err
 	}
 
-	extractor, ok := format.(archives.Extractor)
-	if !ok {
-		return false, nil
+	x := expansion{opts: opts, log: opts.Log, base: archiveBase(opts.Display), seen: map[string]bool{}}
+	if x.log == nil {
+		x.log = slog.Default()
 	}
+	switch f := format.(type) {
+	case archives.Extractor:
+		x.entries = opts.Walker.Entries()
+		err = f.Extract(ctx, file, x.handle)
+	case archives.Decompressor:
+		err = x.decompress(f, file)
+	default:
+		return nil, nil, errors.New("no format lx can read")
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, nil, ctxErr
+	}
+	if n := len(x.failures); err != nil && n > 0 && errors.Is(err, x.failures[n-1].Err) {
+		// The entry that failed ended the archive, as a tar entry cut short
+		// does: one failure, counted once.
+		err = nil
+	}
+	if err != nil {
+		err = fmt.Errorf("extract: %w", err)
+	}
+
+	x.sort()
+	files := make([]InputFile, len(x.files))
+	for i, e := range x.files {
+		files[i] = e.file
+	}
+	x.log.Debug("Archive expansion finished", "archive", opts.Display, "files_found", len(files), "failures", len(x.failures))
+	return files, x.failures, err
+}
+
+// identifyArchive identifies the format of the archive file, named name,
+// by its content, as a .zip named .tar.gz is a zip archive, or by its name
+// when the content does not say, as for a brotli stream, which has no
+// header. It leaves file at its start. Its error is the same for every
+// file no format fits.
+func identifyArchive(ctx context.Context, file *os.File, name string) (archives.Format, error) {
+	format, _, err := archives.Identify(ctx, "", file)
+	if errors.Is(err, archives.NoMatch) {
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+		format, _, err = archives.Identify(ctx, name, file)
+	}
+	if err != nil {
+		// Identify tries the formats in no fixed order and names the one
+		// it failed on, so the error says no more than that none fit.
+		return nil, errors.New("no format lx can read")
+	}
+	// Identify reads the head of a seekable stream and rewinds it, but the
+	// extractors read from where the file is.
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return true, fmt.Errorf("rewind archive %q: %w", absPath, err)
+		return nil, err
 	}
+	return format, nil
+}
 
-	err = extractor.Extract(ctx, file, func(ctx context.Context, info archives.FileInfo) error {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		key := normalizeArchiveEntryPath(info.NameInArchive)
-		idx, ok := candidateByKey[key]
-		if !ok || candidates[idx].materialized {
-			return nil
-		}
+// archiveBase is the path the entries of an archive displayed as display
+// are below.
+func archiveBase(display string) string {
+	if IsHTTPURL(display) {
+		return strings.TrimSuffix(display, "/")
+	}
+	return filepath.ToSlash(filepath.Clean(display))
+}
 
-		rc, err := info.Open()
-		if err != nil {
-			// The entry is read again below; a failure there is reported.
-			log.Debug("Failed to open extractor entry", "archive", absPath, "path", key, "error", err)
-			return nil
-		}
-		data, readErr := readAllWithSizeHint(rc, info.Size())
-		closeErr := rc.Close()
-		if readErr != nil {
-			log.Debug("Failed to read extractor entry", "archive", absPath, "path", key, "error", readErr)
-			return nil
-		}
-		if closeErr != nil {
-			log.Debug("Failed to close extractor entry", "archive", absPath, "path", key, "error", closeErr)
-			return nil
-		}
+// expansion collects the entries of one archive as it is read.
+type expansion struct {
+	opts    ArchiveOptions
+	log     *slog.Logger
+	base    string
+	entries *walker.Entries
+	seen    map[string]bool
+	files   []entryFile
+	// failures are the entries that could not be read.
+	failures []core.Failure
+}
 
-		candidates[idx].data = data
-		candidates[idx].materialized = true
-		if candidates[idx].modTime.IsZero() {
-			candidates[idx].modTime = info.ModTime()
-		}
-		if candidates[idx].size <= 0 {
-			candidates[idx].size = int64(len(data))
+// fail records that the entry at key, which is entry in the archive, could
+// not be read. It is named below the archive's origin, as the inputs it
+// would have been are keyed.
+func (x *expansion) fail(key, entry string, err error) {
+	x.failures = append(x.failures, core.Failure{
+		Kind:    core.FailedArchiveEntry,
+		Path:    x.opts.Origin + "/" + entry,
+		Display: x.base + "/" + key,
+		Err:     err,
+	})
+}
+
+type entryFile struct {
+	key  string
+	file InputFile
+}
+
+// handle decides on one entry of an archive being extracted: a directory
+// the walker skips is skipped whole, and a file is read only when it is
+// kept and no larger than MaxSize.
+func (x *expansion) handle(ctx context.Context, info archives.FileInfo) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	key := normalizeArchiveEntryPath(info.NameInArchive)
+	if key == "" {
+		return nil
+	}
+	if key == ".." || strings.HasPrefix(key, "../") {
+		x.log.Debug("Skipping archive entry outside the archive", "archive", x.opts.Display, "path", info.NameInArchive)
+		return nil
+	}
+	if info.IsDir() {
+		if !x.entries.Keep(key, true) {
+			return fs.SkipDir
 		}
 		return nil
-	})
-	if err != nil {
-		return true, fmt.Errorf("extract archive %q: %w", absPath, err)
 	}
+	if !info.Mode().IsRegular() {
+		x.log.Debug("Skipping archive entry that is not a regular file", "archive", x.opts.Display, "path", key, "mode", info.Mode().String())
+		return nil
+	}
+	if !x.entries.Keep(key, false) {
+		return nil
+	}
+	if x.seen[key] {
+		x.log.Warn("Skipping duplicate archive entry path", "archive", x.opts.Display, "path", key)
+		return nil
+	}
+	x.seen[key] = true
 
-	return true, nil
+	if x.over(info.Size()) {
+		x.add(key, info.Size(), info, nil)
+		return nil
+	}
+	rc, err := info.Open()
+	if err != nil {
+		x.fail(key, key, err)
+		return nil
+	}
+	data, n, err := readEntry(rc, info.Size(), x.opts.MaxSize)
+	_ = rc.Close()
+	if err != nil {
+		x.fail(key, key, err)
+		return nil
+	}
+	x.add(key, n, info, data)
+	return nil
+}
+
+// decompress reads the one entry of a compressed file, which is named after
+// it and kept whatever the walker says, as the root of a walk is.
+func (x *expansion) decompress(d archives.Decompressor, file *os.File) error {
+	rc, err := d.OpenReader(file)
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+	// The size of the decompressed content is known only once it is read.
+	// Unlike a Stream it is not capped at DefaultStreamLimit without -m: it
+	// ends, as the entries of any archive do, which are not capped either.
+	data, n, err := readEntry(rc, -1, x.opts.MaxSize)
+	if err != nil {
+		name := singleEntryName(x.opts.Origin)
+		x.fail(name, name, err)
+		return nil
+	}
+	var info fs.FileInfo
+	if st, err := file.Stat(); err == nil {
+		info = st
+	}
+	x.add(singleEntryName(x.opts.Origin), n, info, data)
+	return nil
+}
+
+// singleEntryName names the content of the compressed file at origin, a
+// path or URL, after it: the name of the file or of the URL's path, never
+// that of the file a URL was downloaded to.
+func singleEntryName(origin string) string {
+	if u, err := parseHTTPURL(origin); err == nil {
+		return path.Base(u.Path)
+	}
+	return filepath.Base(origin)
+}
+
+// over reports whether an entry of size bytes is too large to read.
+func (x *expansion) over(size int64) bool {
+	return x.opts.MaxSize > 0 && size > x.opts.MaxSize
+}
+
+// add adds the entry at key, of size bytes. Its content is data, or, when
+// it is over MaxSize, unread.
+func (x *expansion) add(key string, size int64, info fs.FileInfo, data *content) {
+	f := InputFile{
+		Path:    x.base + "/" + key,
+		Archive: x.opts.Origin,
+		Entry:   key,
+		Size:    size,
+	}
+	if info != nil {
+		f.ModTime = info.ModTime()
+	}
+	if x.over(size) {
+		x.log.Debug("Archive entry over the size limit left unread", "archive", x.opts.Display, "path", key, "size", size)
+		f.Open = func(context.Context) (io.ReadCloser, error) {
+			return nil, fmt.Errorf("%s is over the size limit and was not read", f.Path)
+		}
+	} else {
+		f.Open = func(context.Context) (io.ReadCloser, error) { return data.open(), nil }
+	}
+	x.files = append(x.files, entryFile{key: key, file: f})
+}
+
+// sort puts the entries in the order a walk finds them: depth first, each
+// directory's entries by name.
+func (x *expansion) sort() {
+	slices.SortStableFunc(x.files, func(a, b entryFile) int {
+		return compareWalkOrder(a.key, b.key)
+	})
+}
+
+// compareWalkOrder orders slash-separated paths as a walk visits them,
+// comparing name by name, so "a/x" comes before "a.txt".
+func compareWalkOrder(a, b string) int {
+	for {
+		an, arest, amore := strings.Cut(a, "/")
+		bn, brest, bmore := strings.Cut(b, "/")
+		if c := strings.Compare(an, bn); c != 0 {
+			return c
+		}
+		switch {
+		case !amore && !bmore:
+			return 0
+		case !amore:
+			return -1
+		case !bmore:
+			return 1
+		}
+		a, b = arest, brest
+	}
 }
 
 func normalizeArchiveEntryPath(p string) string {

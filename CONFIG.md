@@ -126,7 +126,9 @@ FileContext is bound to the six file templates (`file_content_template`, `file_e
 | Field              | Type           | Notes                                              |
 |--------------------|----------------|----------------------------------------------------|
 | `Path`             | string         | Display path (relative when possible).             |
-| `AbsPath`          | string         | Absolute path on disk.                             |
+| `AbsPath`          | string         | Absolute path on disk, the URL fetched, or `stdin`. Empty for an archive entry. |
+| `Archive`          | string         | For an archive entry, the archive's absolute path, or its URL when downloaded. |
+| `Entry`            | string         | For an archive entry, its path inside the archive. |
 | `Size`             | int64          | Bytes as rendered. Pair with `humanize`.           |
 | `OriginalSize`     | int64          | Bytes on disk, before any conversion.              |
 | `ModTime`          | time.Time      | Pair with `date "2006-01-02"`.                     |
@@ -136,6 +138,7 @@ FileContext is bound to the six file templates (`file_content_template`, `file_e
 | `Content`          | interface{}    | Pair with `endNewline`.                            |
 | `IsBinary`         | bool           |                                                    |
 | `IsImage`          | bool           |                                                    |
+| `DataURI`          | string         | An image's content as a `data:` URI, in the HTML format. |
 | `IsCompactView`    | bool           |                                                    |
 | `IsError`          | bool           |                                                    |
 | `ReadError`        | string         | Set when `IsError`.                                |
@@ -203,7 +206,7 @@ Provided by `pkg/lx/templatex/defaults.go`:
 | `humanize`   | `int64 → string`                | `1024` → `"1.0 kB"`, etc.                                     |
 | `endNewline` | `interface{} → string`          | Stringify and ensure exactly one trailing `\n`.               |
 | `date`       | `layout, time.Time → string`    | Wrapper around `time.Format`.                                 |
-| `dataURI`    | `path → string`                 | Reads a file and emits a `data:<mime>;base64,…` URI.          |
+| `dataURI`    | `path → string`                 | Reads a file on disk and emits a `data:<mime>;base64,…` URI. An empty path, the `AbsPath` of an archive entry, fails the template; use `.DataURI`. |
 | `escape`     | `interface{} → string`          | HTML-escape (used by the HTML format's defaults).             |
 | `commafy`    | `int → string`                  | `1234567` → `"1,234,567"`.                                    |
 | `plural`     | `n, singular, plural → string`  | `singular` when n is 1, else `plural`.                        |

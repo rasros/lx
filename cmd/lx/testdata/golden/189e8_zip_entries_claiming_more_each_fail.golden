@@ -1,0 +1,11 @@
+--- STDOUT ---
+lie3.zip/d.txt (1 rows)
+
+
+--- STDERR ---
+Error: Failed to read archive entry: unexpected EOF (path=lie3.zip/a.txt)
+Error: Failed to read archive entry: unexpected EOF (path=lie3.zip/b.txt)
+Error: Failed to read archive entry: unexpected EOF (path=lie3.zip/c.txt)
+▎ 1 file · 1 row · 1 section · 6 B
+  ~11 tokens
+  3 failed

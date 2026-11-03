@@ -80,13 +80,14 @@ func resolveSections(ctx context.Context, sections []Section, c *lx.Collector) e
 			}
 			opts := s.Discover
 			opts.Piped = f.piped
+			opts.MaxSize = s.Render.MaxSize
 			files, failures, err := c.Collect(ctx, f.arg, opts)
 			if err != nil {
 				return err
 			}
 			if f.piped {
 				failures = slices.DeleteFunc(failures, func(f lx.Failure) bool { return seen(f.Path) })
-				files = slices.DeleteFunc(files, func(f lx.InputFile) bool { return seen(f.AbsPath) })
+				files = slices.DeleteFunc(files, func(f lx.InputFile) bool { return seen(f.Key()) })
 			}
 			f.files, f.failures = files, failures
 		}

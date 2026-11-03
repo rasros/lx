@@ -43,6 +43,14 @@ type Options struct {
 	// ExpandArchives collects the files inside archives instead of the
 	// archives themselves.
 	ExpandArchives bool
+	// MaxSize, when positive, is the size over which the entries of an
+	// expanded archive are not read: they are collected with their size
+	// alone, for the stream to drop as it drops any file over its
+	// RenderOptions.MaxSize, which MaxSize should be.
+	MaxSize int64
+	// TempDir is where URL archives are downloaded to be expanded, or the
+	// default directory for temporary files when empty.
+	TempDir string
 
 	// OutPath is an absolute path never collected, such as the file output
 	// is written to.
@@ -186,7 +194,7 @@ func readIgnorePatterns(log *slog.Logger, p string) []string {
 // itself; an archive's entries are.
 func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options, forceExpand bool) ([]sources.InputFile, []core.Failure, error) {
 	if (opts.ExpandArchives || forceExpand) && sources.IsHTTPArchiveURL(rawURL) {
-		tempPath, cleanup, err := sources.DownloadURLToTempFile(ctx, rawURL)
+		tempPath, cleanup, err := sources.DownloadURLToTempFile(ctx, rawURL, opts.TempDir)
 		if err != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return nil, nil, ctxErr
@@ -195,7 +203,7 @@ func (c *Collector) collectURL(ctx context.Context, rawURL string, opts Options,
 		}
 		// Expansion reads the entries into memory.
 		defer cleanup()
-		return c.expandArchive(ctx, tempPath, rawURL, opts, strings.TrimSuffix(rawURL, "/")+"/", "Ignored in URL archive")
+		return c.expandArchive(ctx, tempPath, rawURL, rawURL, opts, strings.TrimSuffix(rawURL, "/")+"/", "Ignored in URL archive")
 	}
 
 	urlFile, err := sources.NewURLInputFile(rawURL)
@@ -325,7 +333,7 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 			if r.isDir {
 				rel = path
 			}
-			entries, entryFailures, err := c.expandArchive(ctx, r.abs(path), display, opts, anchor.Path(rel)+"/", "Ignored in archive")
+			entries, entryFailures, err := c.expandArchive(ctx, r.abs(path), r.abs(path), display, opts, anchor.Path(rel)+"/", "Ignored in archive")
 			files = append(files, entries...)
 			failures = append(failures, entryFailures...)
 			return err
@@ -373,11 +381,11 @@ func (c *Collector) walk(ctx context.Context, w *walker.Walker, r root, opts Opt
 	return files, failures, nil
 }
 
-// expandArchive returns the entries of the archive at absPath, displayed
-// below displayPath, that opts keep, and the failures of the archive or its
-// entries. The globs match ovPrefix before each entry's path in the archive.
-// Its only error is ctx's.
-func (c *Collector) expandArchive(ctx context.Context, absPath, displayPath string, opts Options, ovPrefix, ignoreMsg string) ([]sources.InputFile, []core.Failure, error) {
+// expandArchive returns the entries of the archive at absPath, named origin
+// and displayed below displayPath, that opts keep, and the failures of the
+// archive or its entries. The globs match ovPrefix before each entry's path
+// in the archive. Its only error is ctx's.
+func (c *Collector) expandArchive(ctx context.Context, absPath, origin, displayPath string, opts Options, ovPrefix, ignoreMsg string) ([]sources.InputFile, []core.Failure, error) {
 	wopts := walker.Options{
 		Overrides:      opts.Globs,
 		OverridePrefix: ovPrefix,
@@ -389,16 +397,18 @@ func (c *Collector) expandArchive(ctx context.Context, absPath, displayPath stri
 			c.log.Debug(ignoreMsg, "path", displayPath+"/"+p, "reason", reason)
 		}
 	}
-	files, failures, err := sources.ExpandArchive(ctx, absPath, displayPath, walker.New(wopts), c.log)
+	files, failures, err := sources.ExpandArchive(ctx, absPath, sources.ArchiveOptions{
+		Display: displayPath,
+		Origin:  origin,
+		Walker:  walker.New(wopts),
+		MaxSize: opts.MaxSize,
+		Log:     c.log,
+	})
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return nil, nil, ctxErr
 	}
 	if err != nil {
-		key := absPath
-		if sources.IsHTTPURL(displayPath) {
-			key = displayPath
-		}
-		failures = append(failures, core.Failure{Kind: core.FailedArchive, Path: key, Display: displayPath, Err: err})
+		failures = append(failures, core.Failure{Kind: core.FailedArchive, Path: origin, Display: displayPath, Err: err})
 	}
 	return files, failures, nil
 }

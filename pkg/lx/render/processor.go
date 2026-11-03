@@ -164,6 +164,8 @@ func (p *Processor) errorContext(file sources.InputFile, index int, msg string) 
 	return core.FileContext{
 		Path:         file.Path,
 		AbsPath:      file.AbsPath,
+		Archive:      file.Archive,
+		Entry:        file.Entry,
 		Size:         file.Size,
 		OriginalSize: file.Size,
 		ModTime:      file.ModTime,
@@ -487,6 +489,8 @@ func (p *Processor) prepareFileContext(ctx context.Context, file sources.InputFi
 	fCtx := core.FileContext{
 		Path:          file.Path,
 		AbsPath:       file.AbsPath,
+		Archive:       file.Archive,
+		Entry:         file.Entry,
 		Size:          size,
 		OriginalSize:  file.Size,
 		TotalRows:     totalRows,

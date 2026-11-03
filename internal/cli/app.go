@@ -172,7 +172,7 @@ func processStream(ctx context.Context, parsed *ParsedArgs, rawArgs []string, en
 	sections := compile(log, parsed.Ops, lx.RenderOptions{Head: -1})
 	for i := range sections {
 		d := &sections[i].Discover
-		d.IgnoreRules, d.GitExcludes, d.OutPath = ignoreRules, gitExcludes, out.path
+		d.IgnoreRules, d.GitExcludes, d.OutPath, d.TempDir = ignoreRules, gitExcludes, out.path, env.TempDir
 	}
 
 	promptResolver := newPromptResolver(env, resolvePromptsDir(parsed, cliOpts, env), cliOpts.PromptExtensions)

@@ -1,0 +1,9 @@
+--- STDOUT ---
+http://HOST/archive.tar.gz/hello.txt abs=[] archive=[http://HOST/archive.tar.gz] entry=[hello.txt]
+
+
+http://HOST/archive.tar.gz/nested/world.go abs=[] archive=[http://HOST/archive.tar.gz] entry=[nested/world.go]
+
+
+
+--- STDERR ---

@@ -73,9 +73,10 @@ type urlBody struct {
 
 func (b urlBody) ContentLength() int64 { return b.length }
 
-// DownloadURLToTempFile downloads a URL with HTTP GET to a temporary file.
+// DownloadURLToTempFile downloads a URL with HTTP GET to a temporary file in
+// dir, or the default directory for temporary files when dir is empty.
 // Caller must invoke cleanup after processing completes.
-func DownloadURLToTempFile(ctx context.Context, raw string) (path string, cleanup func(), err error) {
+func DownloadURLToTempFile(ctx context.Context, raw, dir string) (path string, cleanup func(), err error) {
 	u, err := parseHTTPURL(raw)
 	if err != nil {
 		return "", nil, err
@@ -97,7 +98,7 @@ func DownloadURLToTempFile(ctx context.Context, raw string) (path string, cleanu
 	}
 
 	ext := filepath.Ext(u.Path)
-	tmp, err := os.CreateTemp("", "lx-url-*"+ext)
+	tmp, err := os.CreateTemp(dir, "lx-url-*"+ext)
 	if err != nil {
 		return "", nil, err
 	}

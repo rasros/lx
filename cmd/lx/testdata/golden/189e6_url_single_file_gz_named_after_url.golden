@@ -1,0 +1,6 @@
+--- STDOUT ---
+http://HOST/s100.txt.gz/s100.txt.gz abs=[] archive=[http://HOST/s100.txt.gz] entry=[s100.txt.gz]
+
+
+
+--- STDERR ---

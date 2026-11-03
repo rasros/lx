@@ -1,0 +1,6 @@
+--- STDOUT ---
+lie.zip/b.txt (1 rows)
+
+
+--- STDERR ---
+Error: Failed to read archive entry: unexpected EOF (path=lie.zip/a.txt)
