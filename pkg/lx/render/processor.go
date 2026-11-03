@@ -243,7 +243,9 @@ var converters = []converter{
 			return opts.ExtractMedia && format.IsMedia()
 		},
 		// Media is described from its headers, read through the opened
-		// source, whose reads already stop with ctx.
+		// source: one that can block stops its reads once ctx is done, and
+		// any other is read from memory or disk, which a cancel need not
+		// wait out.
 		convert: func(_ context.Context, f sources.InputFile, r io.ReaderAt, size int64) ([]byte, error) {
 			return sources.ExtractMediaMetadata(f, r, size)
 		},
